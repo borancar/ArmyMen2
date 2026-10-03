@@ -82,7 +82,7 @@ int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
 {
     /* The index and the name are re-read at each use, as the image does. */
 #define INDEX (*(const int32_t *)((const uint8_t *)rec + SCRIPT_REF_OFF_NAME_INDEX))
-#define NAME  ((*(const AM2_ScriptName *const *)(uintptr_t)ADDR_SCRIPT_NAMES)[INDEX].name)
+#define NAME  ((*(const AM2_ScriptName *const *)&g_scriptNames)[INDEX].name)
     uint32_t n;
 
     if (INDEX < 0) {

@@ -37,23 +37,23 @@ extern "C" {
  * word means. See the comment there. */
 #define kKindName(k)     ((const char *)((void *)(uintptr_t)( \
                              ((const uint32_t *)((void *)(uintptr_t)( \
-                                 ADDR_SCRIPT_KIND_NAMES)))[k])))
+                                 ((uintptr_t)g_scriptKindNames))))[k])))
 #define kUnknownWord     ((const char *)((void *)(uintptr_t)( \
                              *(const uint32_t *)((void *)(uintptr_t)( \
-                                 ADDR_SCRIPT_UNKNOWN_STR)))))
-#define kPadBit(n)       (((const int32_t *)((void *)(uintptr_t)(ADDR_PAD_BIT_TABLE)))[n])
+                                 ((uintptr_t)g_scriptUnknownStr))))))
+#define kPadBit(n)       ((g_padBitTable)[n])
 #define kImageStr(a)     ((const char *)((void *)(uintptr_t)( \
                              *(const uint32_t *)((void *)(uintptr_t)(a)))))
-#define kCommObject      (*(uint8_t *const *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
+#define kCommObject      (g_commObject)
 
 /* Image data the reconstruction WRITES. */
-#define kScriptWord      ((char *)((void *)(uintptr_t)(ADDR_SCRIPT_WORD_BUF)))
-#define kScriptNames     (*(AM2_ScriptName **)((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))
-#define kScriptNameCount (*(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT)))
-#define kScriptNameCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_CAP)))
-#define kObjScripts      (*(AM2_ObjScript **)((void *)(uintptr_t)(ADDR_OBJ_SCRIPTS)))
-#define kObjScriptCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT)))
-#define kObjScriptCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP)))
+#define kScriptWord      (g_scriptWordBuf)
+#define kScriptNames     (*(AM2_ScriptName * *)&g_scriptNames)
+#define kScriptNameCount (g_scriptNameCount)
+#define kScriptNameCap   (g_scriptNameCap)
+#define kObjScripts      (g_objScripts)
+#define kObjScriptCount  (g_currentObjScript)
+#define kObjScriptCap    (g_objScriptCap)
 
 /* Advance one token and check its kind, with the two messages the original
  * writes out at every argument; *at moves either way. Not a function in the

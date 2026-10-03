@@ -48,16 +48,15 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * am2_weapon_pose_frames[53]/[56] (0x004750B4/C0), handled in standalone.h. */
 #endif
 
-#define kRegionOfCell (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_OF_CELL)))
-#define kRegionCost   (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_COST)))
-#define kRegionNext   (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_NEXT)))
+#define kRegionOfCell (g_regionOfCell)
+#define kRegionCost   (g_regionCost)
+#define kRegionNext   (g_regionNext)
 /* Spelled as army.cpp spells it, so checkglobals sees one name per
  * address rather than two. */
-#define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 /* 0x00514EF0 holds a POINTER to the array, not the array. Same shape as the
  * cell map above; getting this wrong took the game down on the first run. */
-#define kRegions      (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGIONS)))
-#define kTracePF      (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_TRACE_PF)))
+#define kRegions      (*(uint8_t * *)&g_regions)
+#define kTracePF      (g_optTracePf)
 
 #define kNLinks(r)  (*(uint8_t *)(kRegions + (r) * AM2_REGION_SIZE \
                                  + REGION_OFF_NLINKS))
@@ -159,19 +158,19 @@ void __cdecl BuildRegionGraph(void)
     int32_t x, y;
     int32_t tile;
 
-#define weights (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+#define weights (g_cellWeights)
 
     if (!kRegionOfCell || !weights)
         return;
 
-    tile = *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)) * AM2_REGION_MARGIN
+    tile = g_mapTilesW * AM2_REGION_MARGIN
            + AM2_REGION_MARGIN;
 
     for (y = AM2_REGION_MARGIN;
-         y < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_H)) - AM2_REGION_MARGIN;
+         y < g_mapTilesH - AM2_REGION_MARGIN;
          tile += AM2_REGION_MARGIN * 2, y++) {
         for (x = AM2_REGION_MARGIN;
-             x < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W))
+             x < g_mapTilesW
                  - AM2_REGION_MARGIN;
              tile++, x++) {
             uint16_t at = (uint16_t)tile;
@@ -190,14 +189,14 @@ void __cdecl BuildRegionGraph(void)
             if (!region)
                 continue;
 
-            if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE))) {
-#define old ((int32_t)*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+            if (region >= g_regionStride) {
+#define old ((int32_t)g_regionStride)
                 kRegions = (uint8_t *)am2_realloc(kRegions,
                     (size_t)(region + 1) * AM2_REGION_SIZE);
                 memset(kRegions + (uint32_t)old * AM2_REGION_SIZE, 0,
                        (size_t)(region - old + 1) * AM2_REGION_SIZE);
 #undef old
-                *(int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)) =
+                g_regionStride =
                     (int16_t)(region + 1);
             }
 
@@ -216,7 +215,7 @@ void __cdecl BuildRegionGraph(void)
             /* Up, left, right, down -- four inlined tests in the original
              * and four here, in its order. Each is linked when its region
              * differs and its weight is under AM2_BLOCK_FULL. */
-#define w ((uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)))
+#define w ((uint32_t)g_mapTilesW)
 
             if ((int32_t)kRegionOfCell[at - w] != region
                 && weights[at - w] < AM2_BLOCK_FULL)
@@ -238,7 +237,7 @@ void __cdecl BuildRegionGraph(void)
     }
 
     {
-#define stride ((int32_t)*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+#define stride ((int32_t)g_regionStride)
 #define bytes  ((size_t)(stride * stride))
 
         kRegionNext = (uint8_t *)am2_malloc(bytes);
@@ -247,7 +246,7 @@ void __cdecl BuildRegionGraph(void)
         kRegionCost = (uint8_t *)am2_malloc(bytes);
         memset(kRegionCost, 0, bytes);
 
-        *(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)) = 1;
+        g_regionStamp = 1;
 #undef bytes
 #undef stride
     }
@@ -289,11 +288,11 @@ void __cdecl BuildRegionGraph(void)
  * trig tables and the roach footprints. */
 void __cdecl BuildTileDeltas(void)
 {
-    const int32_t  w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t *const decal = (int32_t *)(uintptr_t)ADDR_TILE_STEP8;
-    int32_t *const ring8 = (int32_t *)(uintptr_t)ADDR_TILE_RING8;
-    int32_t *const nb    = (int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
-    int32_t *const ring4 = (int32_t *)(uintptr_t)ADDR_TILE_RING4;
+    const int32_t  w     = g_mapTilesW;
+    int32_t *const decal = g_tileStep8;
+    int32_t *const ring8 = g_tileRing8;
+    int32_t *const nb    = g_tileNeighbours;
+    int32_t *const ring4 = g_tileRing4;
 
     decal[0] = -1 - w;                      /* raster order */
     decal[1] = -w;
@@ -376,16 +375,16 @@ int32_t __cdecl PointRuleVehicle(int32_t tile)
     const uint16_t t    = (uint16_t)tile;
     int32_t        army;
 
-    if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[t]
+    if ((g_cellWeights)[t]
         >= (int8_t)AM2_BLOCK_FULL)
         return 1;
 
-    if ((*(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER)[t] > 0)
+    if ((*(const int8_t *const *)&g_tileCover)[t] > 0)
         return 1;
 
-    army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+    army = g_pointRuleArmy;
     if (army < AM2_COMM_SLOTS
-        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
+        && ((const int8_t *const *)g_tileRevealGrids)[army][t]
                > 0)
         return 1;
 
@@ -398,17 +397,17 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
     const uint16_t t    = (uint16_t)tile;
     int32_t        army;
 
-    if (!((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[t]
+    if (!((g_tileFlags)[t]
           & AM2_TILE_OPEN))
         return 1;
 
-    if ((*(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER)[t]
+    if ((*(const int8_t *const *)&g_tileCover)[t]
         < (int8_t)AM2_BOAT_COVER_MIN)
         return 1;
 
-    army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+    army = g_pointRuleArmy;
     if (army < AM2_COMM_SLOTS
-        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
+        && ((const int8_t *const *)g_tileRevealGrids)[army][t]
                > 0)
         return 1;
 
@@ -418,15 +417,15 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
 /* 0x00437DB0 -- everything else, and a null object. */
 int32_t __cdecl PointRuleDefault(int32_t tile)
 {
-#define ARMY (*(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY)
+#define ARMY (g_pointRuleArmy)
     if (ARMY < AM2_COMM_SLOTS
-        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[ARMY]
+        && ((const int8_t *const *)g_tileRevealGrids)[ARMY]
                [(uint16_t)tile] > 0)
         return 1;
 #undef ARMY
 
     /* `setge` on the byte, not a branch -- the original's own tail. */
-    return (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint16_t)tile]
+    return (g_cellWeights)[(uint16_t)tile]
            >= (int8_t)AM2_BLOCK_FULL;
 }
 
@@ -460,11 +459,11 @@ void __cdecl SetPointRule(void *obj)
     const uint8_t *o = (const uint8_t *)obj;
 
     if (o) {
-        *(int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY =
+        g_pointRuleArmy =
             *(const int8_t *)(o + OBJ_OFF_ARMY);
 
         if (ObjIsType3((const AM2_Object *)o)) {
-            *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+            g_pointRule =
                 *(const int32_t *)(o + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
                     ? (uint32_t)(uintptr_t)PointRuleBoat
                     : (uint32_t)(uintptr_t)PointRuleVehicle;
@@ -476,14 +475,14 @@ void __cdecl SetPointRule(void *obj)
              * order; the other way round scheduled the store first. */
             int32_t roach = ObjIsType8((const AM2_Object *)o);
 
-            *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+            g_pointRule =
                 (uint32_t)(uintptr_t)PointRuleVehicle;
             if (roach)
                 return;
         }
     }
 
-    *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+    g_pointRule =
         (uint32_t)(uintptr_t)PointRuleDefault;
 }
 
@@ -571,7 +570,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
     if (from == to)
         return 0;
 
-    stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
+    stride = g_regionStride;
 
     /* CORRECTED. This compared `!=` and called that "already solved", which is
        the original's test inverted: 0x00406492 is `cmp cl, al; je` PAST the
@@ -580,19 +579,19 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
        write the stamp byte into the cost entry as the last thing they do. The
        inverted version re-solved every solved pair and skipped every unsolved
        one; see ActivateRegion for why nothing here caught it. */
-    if ((*(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_COST)))
+    if ((g_regionCost)
             [stride * from + to]
-        == *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP))) {
+        == g_regionStamp) {
         /* already solved */
     } else if (!solve) {
         return -1;
     } else {
         RegionSolvePair(from, to);
-        stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
+        stride = g_regionStride;
     }
 
     at   = from;
-    next = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_NEXT));
+    next = g_regionNext;
     hops = 0;
 
     while (1) {
@@ -619,7 +618,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
 int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
 {
     /* The region map is re-read after each call, as the image does. */
-#define CELLS (*(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_OF_CELL)))
+#define CELLS (g_regionOfCell)
     int32_t rb, ra, hops;
 
     rb = CELLS[(uint32_t)TileOfPoint(
@@ -682,34 +681,34 @@ void __cdecl ActivateRegion(int32_t region)
 {
     uint8_t *rec;
 
-    if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+    if (region >= g_regionStride)
         return;
 
-    rec = *(uint8_t *const *)((void *)(uintptr_t)(ADDR_REGIONS))
+    rec = *(uint8_t *const *)&g_regions
           + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
 
     if (*(const int32_t *)rec != 0)
         return;
 
     *(int32_t *)rec = 1;
-    (*(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))++;
+    (g_regionStamp)++;
 }
 
 void __cdecl InactivateRegion(int32_t region)
 {
     uint8_t *rec;
 
-    if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+    if (region >= g_regionStride)
         return;
 
-    rec = *(uint8_t *const *)((void *)(uintptr_t)(ADDR_REGIONS))
+    rec = *(uint8_t *const *)&g_regions
           + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
 
     if (*(const int32_t *)rec == 0)
         return;
 
     *(int32_t *)rec = 0;
-    (*(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))++;
+    (g_regionStamp)++;
 }
 
 typedef int32_t (__cdecl *AM2_PointRuleFn)(uint16_t tile);
@@ -755,11 +754,11 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
 
     /* As NearestAllowedTile: the rule, the map's size, its row shift and the
      * cell table are read from their globals at every use. */
-#define CELLS (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
-#define RULE  (*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)
-#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
-#define SHIFT (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+#define CELLS (g_regionOfCell)
+#define RULE  (*(AM2_PointRuleFn *)&g_pointRule)
+#define MAP_W (g_mapTilesW)
+#define MAP_H (g_mapTilesH)
+#define SHIFT (*(const int32_t *)&g_mapRowShift)
     cell   = tile & 0xFFFF;
     region = CELLS[tile & 0xFFFF];
 
@@ -770,15 +769,15 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
         int32_t x, y, dir, step, leg, tried;
 
         x     = cell & (MAP_W - 1);
-        y     = (int32_t)(cell >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+        y     = (int32_t)(cell >> g_mapRowShift);
         dir   = 0;
         step  = 0;
         leg   = 1;
         tried = 0;
 
         for (;;) {
-            x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
-            y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
+            x += (g_spiralDx)[dir];
+            y += (g_spiralDy)[dir];
 
             if (x > 0 && x < MAP_W && y > 0 && y < MAP_H) {
                 int32_t cand = (y << SHIFT) + x;
@@ -874,16 +873,16 @@ uint16_t __cdecl NearestAllowedTile(void *obj, uint32_t tile, uint32_t *pt)
 
     SetPointRule(obj);
 
-#define CELLS (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
+#define CELLS (g_regionOfCell)
     cell   = tile & 0xFFFF;
     region = CELLS[tile & 0xFFFF];
 
     /* The rule, the map's size and its row shift are read from their globals
      * at every use. */
-#define RULE  (*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)
-#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
-#define SHIFT (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+#define RULE  (*(AM2_PointRuleFn *)&g_pointRule)
+#define MAP_W (g_mapTilesW)
+#define MAP_H (g_mapTilesH)
+#define SHIFT (*(const int32_t *)&g_mapRowShift)
     if (!RULE(tile)) {
         if (*(const uint16_t *)pt == 0)
             *pt = PointOfTile(tile);
@@ -897,15 +896,15 @@ uint16_t __cdecl NearestAllowedTile(void *obj, uint32_t tile, uint32_t *pt)
 
         x     = cell & (MAP_W - 1);
         /* The shift count is read as a byte, `mov cl, [shift]`. */
-        y     = (int32_t)(cell >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+        y     = (int32_t)(cell >> g_mapRowShift);
         dir   = 0;
         step  = 0;
         leg   = 1;
         tried = 0;
 
         for (;;) {
-            x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
-            y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
+            x += (g_spiralDx)[dir];
+            y += (g_spiralDy)[dir];
 
             if (x > 0 && x < MAP_W && y > 0 && y < MAP_H) {
                 int32_t cand = (y << SHIFT) + x;
@@ -1001,7 +1000,7 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
 
     (void)unused;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+    if (!g_frameDeltaMs)
         return 0;
 
     rows = (uint8_t *)0;
@@ -1025,7 +1024,7 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
     *(uint32_t *)out = *(const uint32_t *)(o + OBJ_OFF_POS);
     if (speed) {
         /* The float step is compared against DOUBLE constants. */
-        step = (float)speed * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+        step = (float)speed * g_frameDeltaSec;
         if (step >= 0.0 && step < (double)AM2_MOVE_MIN_STEP)
             step = AM2_MOVE_MIN_STEP;
         else if (step < 0.0 && step > -(double)AM2_MOVE_MIN_STEP)
@@ -1083,7 +1082,7 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     uint8_t   *o    = (uint8_t *)obj;
     AM2_Point *out  = (AM2_Point *)outPt;
     int32_t    animId =
-        ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
+        (g_weaponPoseFrames)[pose];
     uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
     const AM2_AnimTable *table;
     int32_t              i;
@@ -1115,17 +1114,17 @@ found:
 
     if (fast) {
         speed = (int32_t)(AM2_ANIM_FAST_STEP
-                          / *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+                          / g_frameDeltaSec);
     } else {
         speed = table->entries[i].anim->field4;
     }
 
     if (*(const uint32_t *)(rows + ROW_OFF_FIELD_2C)
-        == (uint32_t)ADDR_ROW_LUT_DOUBLES)
+        == (uint32_t)((uintptr_t)g_rowLutDoubles))
         speed += speed;
 
     /* The bias is a byte local, pushed as the byte argument it is. */
-    bias = ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId];
+    bias = (g_frameHeadingBias)[animId];
     return MoveStepPoint(obj, heading, bias, speed, 0, 0, out);
 }
 
@@ -1136,17 +1135,13 @@ found:
 static inline int32_t PathDistXY(uint32_t fromTile, uint32_t toTile)
 {
     return ApproxDistXY((int32_t)((toTile
-                                   & (*(const uint32_t *)(uintptr_t)
-                                          ADDR_MAP_TILES_W - 1))
+                                   & (*(const uint32_t *)&g_mapTilesW - 1))
                                   - (fromTile
-                                     & (*(const uint32_t *)(uintptr_t)
-                                            ADDR_MAP_TILES_W - 1))),
+                                     & (*(const uint32_t *)&g_mapTilesW - 1))),
                         (int32_t)((toTile
-                                   >> (*(const uint32_t *)(uintptr_t)
-                                           ADDR_MAP_ROW_SHIFT & 0xFFFF))
+                                   >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))
                                   - (fromTile
-                                     >> (*(const uint32_t *)(uintptr_t)
-                                             ADDR_MAP_ROW_SHIFT & 0xFFFF))));
+                                     >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))));
 }
 
 /* The heuristic both A* layers use: that distance scaled by 1.5 through the
@@ -1174,19 +1169,18 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
     uint32_t elapsed = Ticks() - startTicks;
     int32_t  budget;
 
-    *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS += (int32_t)elapsed;
+    g_pathFrameMs += (int32_t)elapsed;
     if (elapsed <= AM2_PATH_MIN_ELAPSED)
         return;
 
-    budget  = (int32_t)((uint32_t)(*(const int32_t *)(uintptr_t)
-                                       ADDR_PATH_MAX_SEARCHES * considered)
+    budget  = (int32_t)((uint32_t)(g_pathMaxSearches * considered)
                         / elapsed);
-    budget += *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES / 2;
+    budget += g_pathMaxNodes / 2;
     budget  = (int32_t)((uint32_t)budget >> 1) * 2;
     /* Stored, then overridden: the floor is an unsigned compare. */
-    *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = budget;
+    g_pathMaxNodes = budget;
     if ((uint32_t)budget <= AM2_PATH_MIN_NODES)
-        *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = AM2_PATH_MIN_NODES;
+        g_pathMaxNodes = AM2_PATH_MIN_NODES;
 }
 
 /* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by
@@ -1256,8 +1250,8 @@ static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused)
 {
-#define region (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
-#define step ((const int32_t *)(uintptr_t)ADDR_TILE_STEP8)
+#define region (g_regionOfCell)
+#define step (g_tileStep8)
     uint32_t startTicks;
     int32_t  considered = 0;
     int32_t  fromTile, toTile, goal, goalTile;
@@ -1270,14 +1264,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
     /* One time budget per frame, reset when the clock moves. `ja` is unsigned,
      * so a frame that has already spent its allowance refuses outright. */
-    if (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-        != *(const int32_t *)(uintptr_t)ADDR_PATH_FRAME_STAMP) {
-        *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_STAMP =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-        *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS = 0;
-    } else if ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS
-               > (uint32_t)*(const int32_t *)(uintptr_t)
-                     ADDR_PATH_MAX_SEARCHES) {
+    if (*(const int32_t *)&g_gameClockMs
+        != g_pathFrameStamp) {
+        g_pathFrameStamp =
+            *(const int32_t *)&g_gameClockMs;
+        g_pathFrameMs = 0;
+    } else if ((uint32_t)g_pathFrameMs
+               > (uint32_t)g_pathMaxSearches) {
         return 0;
     }
 
@@ -1299,18 +1292,18 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     startRegion = region[fromTile];
     startTicks  = Ticks();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_PATH_RESUME == -1) {
+    if (g_pathResume == -1) {
         /* Bumped BEFORE it is stamped, so the start node carries the new
          * generation and every other node's stamp is stale by construction --
          * which is what makes a 1 MB array usable without clearing it. It is a
          * uint16 and nothing resets it, so it wraps; the original's. */
-        ++*(uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+        ++g_pathGeneration;
 
         g_pathNodes[fromTile].g      = 0;
         g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(fromTile, toTile);
         g_pathNodes[fromTile].depth  = 0;
         g_pathNodes[fromTile].stamp  =
-            *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+            g_pathGeneration;
         g_pathNodes[fromTile].state  = 1;
         g_pathNodes[fromTile].prev   = 0;
         g_pathNodes[fromTile].next   = 0;
@@ -1320,9 +1313,9 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     } else {
         /* Dead: see the header. Nothing writes either global, and the gate
          * above cannot be anything but -1. */
-        goal = *(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_GOAL;
-        from = (uint16_t)*(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_HEAD;
-        *(int32_t *)(uintptr_t)ADDR_PATH_RESUME = -1;
+        goal = g_pathResumeGoal;
+        from = (uint16_t)g_pathResumeHead;
+        g_pathResume = -1;
     }
 
     goalTile   = goal & 0xFFFF;
@@ -1338,7 +1331,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             g_pathNodes[from & 0xFFFF].prev = 0;
         g_pathNodes[curTile].state = 2;
 
-        if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES)
+        if (considered > g_pathMaxNodes)
             goto budget;
 
         /* The goal, or the region shortcut, which needs BOTH guards: a goal
@@ -1358,7 +1351,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
                 continue;
-            if ((*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)(nb))
+            if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
             nbRegion = region[nb];
             if (nbRegion != 0 && nbRegion != startRegion
@@ -1373,8 +1366,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
                           | (uint16_t)((uint32_t)g + g_pathNodes[curTile].g));
             {
-                uint8_t f = (*(const uint8_t *const *)(uintptr_t)
-                                 ADDR_TILE_FLAGS)[nb];
+                uint8_t f = (g_tileFlags)[nb];
                 if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
                     g += 3;
                 if (!(f & AM2_TILE_LITTLE_COVER_NEAR))
@@ -1383,10 +1375,10 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             h = PathHeuristic(nb, goalTile);
 
 #define b g_pathNodes[nb]
-            if (b.stamp != *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION) {
+            if (b.stamp != g_pathGeneration) {
                 /* Never seen this search: claim it and fall through to the
                  * insert with the current head. */
-                b.stamp  = *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+                b.stamp  = g_pathGeneration;
                 b.g      = (uint16_t)g;
                 b.h      = (uint16_t)h;
                 b.parent = (uint16_t)cur;
@@ -1528,7 +1520,7 @@ ok:
 int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
 {
     uint8_t  *o = (uint8_t *)obj;
-    uint16_t *route = (uint16_t *)((void *)(uintptr_t)(ADDR_TILE_LINE_BUF));
+    uint16_t *route = g_tileLineBuf;
     int32_t   n;       /* FindPath fills it; only read on success */
     int32_t   i;
     int32_t   x, y;
@@ -1543,8 +1535,8 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
     if (!FindPath(*(const uint16_t *)(o + OBJ_OFF_TILE),
                         TileOfPoint(*at), route, &n, arg)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-            + *(const int32_t *)((void *)(uintptr_t)(ADDR_PATH_RETRY_MS));
+            *(const int32_t *)&g_gameClockMs
+            + g_pathRetryMs;
         return 0;
     }
 
@@ -1564,7 +1556,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
     *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = (uint16_t)n;
 
     *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_MOVE_VALID_MS;
+        *(const int32_t *)&g_gameClockMs + AM2_MOVE_VALID_MS;
     return 1;
 }
 
@@ -1623,11 +1615,11 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
     NearestAllowedTile(obj, TileOfPoint(*to), to);
 
     TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS), *to,
-                  (uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF, &count);
+                  g_tileLineBuf, &count);
 
     for (i = 0; i < count; i++) {
-        if ((*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)(
-                ((const uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF)[i]))
+        if ((*(AM2_PointRuleFn *)&g_pointRule)(
+                (g_tileLineBuf)[i]))
             return 0;                   /* the rule refused this tile */
     }
 
@@ -1667,13 +1659,13 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
  */
 static inline int32_t TileCoverInBounds(uint16_t tile)
 {
-    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t w = g_mapTilesW;
     int32_t x = (int32_t)tile & (w - 1);
     int32_t y = (int32_t)tile
-                >> *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+                >> *(const int32_t *)&g_mapRowShift;
 
     return x >= 2 && x < w - 2
-        && y >= 2 && y < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 2;
+        && y >= 2 && y < g_mapTilesH - 2;
 }
 
 /* TileCoverAdd -- original 0x004384A0, three callers.
@@ -1697,12 +1689,12 @@ void __cdecl TileCoverAdd(uint16_t tile)
         return;
 
     /* The grid pointer is re-read for every tile it touches. */
-#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+#define COVER (g_tileCover)
     COVER[tile]++;
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
         COVER[(int32_t)tile
-              + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]++;
+              + (g_tileNeighbours)[i]]++;
 #undef COVER
 }
 
@@ -1727,12 +1719,12 @@ void __cdecl TileCoverSub(uint16_t tile)
         return;
 
     /* The grid pointer is re-read for every tile it touches. */
-#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+#define COVER (g_tileCover)
     COVER[tile]--;
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
         COVER[(int32_t)tile
-              + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]--;
+              + (g_tileNeighbours)[i]]--;
 #undef COVER
 }
 
@@ -1767,17 +1759,17 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     int32_t       covered;
     int32_t       i;
 
-    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    weights = g_cellWeights;
     if (weights[tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
         return 0;
 
-    cover = *(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER;
+    cover = *(const int8_t *const *)&g_tileCover;
     covered  = 0;
     weighted = 0;
 
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
         /* The neighbour is recomputed at each use, offset first. */
-#define AT (((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i] + tile)
+#define AT ((g_tileNeighbours)[i] + tile)
 
         if (weights[AT] >= (int8_t)AM2_CELL_WEIGHT_STEP)
             weighted++;
@@ -1788,10 +1780,10 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     }
 
     if (weighted < 1)
-        (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile]
+        (g_tileFlags)[tile]
             |= AM2_TILE_NO_WEIGHT_NEAR;
     if (covered < 2)
-        (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile]
+        (g_tileFlags)[tile]
             |= AM2_TILE_LITTLE_COVER_NEAR;
 
     return 0;
@@ -1851,16 +1843,16 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
 
     /* In the original's order: the two x edges, then the two y edges. */
     c.left = Clamp(area.left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+              g_mapTilesW
                   - AM2_TILEMASK_MARGIN);
     c.right = Clamp(area.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+              g_mapTilesW
                   - AM2_TILEMASK_MARGIN);
     c.top = Clamp(area.top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+              g_mapTilesH
                   - AM2_TILEMASK_MARGIN);
     c.bottom = Clamp(area.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+              g_mapTilesH
                   - AM2_TILEMASK_MARGIN);
 
     box[3] = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then left, then right */
@@ -2075,9 +2067,9 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
     uint8_t        *cells;
-    int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
+    int32_t        *ring  = g_tilemaskNeighbours;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
+                                (g_bitFromN);
     const AM2_Rect *hit;
     const uint8_t  *m;
     const uint8_t  *bits;
@@ -2105,32 +2097,32 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 
     /* The world clamp, x pair then y pair, with a margin of one tile. */
     lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left, 1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+               g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
     rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left - 1,
                1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+               g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
     tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top, 1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+               g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
     bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top - 1,
                1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+               g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
     /* and the tile clamp over the same four, into the grid. */
     box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                   g_mapTilesH
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
     box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                   g_mapTilesW
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
     box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                   g_mapTilesH
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
     box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                   g_mapTilesW
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
     w = box[2] - box[0] + 1;
@@ -2234,24 +2226,24 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
  * is stored beside the width. */
 static inline void ShiftTileCover(uint16_t cell, int32_t centre, int32_t delta)
 {
-    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t  w = g_mapTilesW;
     int32_t  tx = (int32_t)((uint32_t)cell & (uint32_t)(w - 1));
     int32_t  ty = (int32_t)((uint32_t)cell
-                            >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+                            >> g_mapRowShift);
     const int32_t *n;
     int32_t  i;
 
     if (tx < AM2_TILEMASK_MARGIN || tx >= w - AM2_TILEMASK_MARGIN)
         return;
     if (ty < AM2_TILEMASK_MARGIN
-        || ty >= *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+        || ty >= g_mapTilesH
                  - AM2_TILEMASK_MARGIN)
         return;
 
-#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+#define COVER (g_tileCover)
     COVER[cell] = (uint8_t)(COVER[cell] + centre);
 
-    n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
+    n = g_tileNeighbours;
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
         COVER[n[i] + cell] += (uint8_t)delta;
 #undef COVER
@@ -2261,24 +2253,24 @@ static inline void ShiftTileCover(uint16_t cell, int32_t centre, int32_t delta)
  * fixed at one, which VC6 schedules differently from the general form. */
 static inline void ShiftTileCoverUp(uint16_t cell)
 {
-    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t  w = g_mapTilesW;
     int32_t  tx = (int32_t)((uint32_t)cell & (uint32_t)(w - 1));
     int32_t  ty = (int32_t)((uint32_t)cell
-                            >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+                            >> g_mapRowShift);
     const int32_t *n;
     int32_t  i;
 
     if (tx < AM2_TILEMASK_MARGIN || tx >= w - AM2_TILEMASK_MARGIN)
         return;
     if (ty < AM2_TILEMASK_MARGIN
-        || ty >= *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+        || ty >= g_mapTilesH
                  - AM2_TILEMASK_MARGIN)
         return;
 
-#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+#define COVER (g_tileCover)
     COVER[cell] = (uint8_t)(COVER[cell] + 1);
 
-    n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
+    n = g_tileNeighbours;
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
         COVER[cell + n[i]]++;
 #undef COVER
@@ -2391,7 +2383,7 @@ void __cdecl ItemTeardown(void *obj)
      * subtraction. */
     height = *(const int8_t *)(o + OBJ_OFF_RANK);
     if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-        > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+        > (int8_t)(g_tileAttrs)
               [*(const uint16_t *)(o + OBJ_OFF_TILE)])
         return;
     if (!height)
@@ -2405,11 +2397,11 @@ void __cdecl ItemTeardown(void *obj)
     idx = 0;            /* the zero slot, not the top -- see above */
 
     for (row = rect[1]; row <= rect[3]; row++) {
-        int32_t cell = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * row
+        int32_t cell = g_mapTilesW * row
                        + rect[0];
 
         for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
-#define weights (*(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+#define weights (*(uint8_t *const *)&g_cellWeights)
             uint16_t tile;
             int8_t   h;
             int8_t   nh;
@@ -2525,7 +2517,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
                       + AAIREC_OFF_CRUSH_DAMAGE);
 
     if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-        > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+        > (int8_t)(g_tileAttrs)
               [*(const uint16_t *)(o + OBJ_OFF_TILE)])
         return;
     if (!height)
@@ -2544,11 +2536,11 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
          * agree only for a power-of-two width, which ShiftTileCover's own
          * comment already records as the reason that shift is stored beside
          * the width. Each is written as its own function has it. */
-        int32_t cell = (row << *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+        int32_t cell = (row << g_mapRowShift)
                        + rect[0];
 
         for (x = rect[0]; x <= rect[2]; cell++, idx++, x++) {
-#define weights (*(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+#define weights (*(uint8_t *const *)&g_cellWeights)
             uint16_t tile;
             int8_t   h;
             int8_t   nh;
@@ -2578,7 +2570,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
                 ((int16_t *)&at)[1] = (int16_t)oy;
 
                 for (hit = (uint8_t *)ObjectsAtPoint(&at,
-                         (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                         g_objMapDesc);
                      hit;
                      hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
                     if (hit == o)
@@ -2698,9 +2690,9 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
     uint8_t        *cells;
-    int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
+    int32_t        *ring  = g_tilemaskNeighbours;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
+                                (g_bitFromN);
     const uint8_t  *m;
     const uint8_t  *bits;
     const uint8_t  *spr;
@@ -2737,31 +2729,31 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
 
 
     lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox, 1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+               g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
     rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox - 1,
                1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+               g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
     tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy, 1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+               g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
     bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy - 1,
                1 << AM2_TILE_SHIFT,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+               g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
     box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                   g_mapTilesH
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
     box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                   g_mapTilesW
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
     box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                   g_mapTilesH
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
     box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                   g_mapTilesW
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
     w = box[2] - box[0] + 1;
@@ -2928,10 +2920,10 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
     if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_TIMED) {
         *(int32_t *)(c + SIGHTC_OFF_READY) =
             ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
-             < *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+             < g_gameClockMs
                - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
     } else {
-        const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+        const uint8_t *rank = g_rankRecords
             + (uint32_t)*(const int32_t *)(u + OBJ_OFF_RANK) * RANK_REC_BYTES;
         /* The cooldown widened to 64 bits (`fild qword`) and scaled by the
          * rank's float directly (`fmul dword`). */
@@ -2940,7 +2932,7 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
              * *(const float *)(rank + RANK_REC_OFF_FIRE_SCALE));
 
         *(int32_t *)(c + SIGHTC_OFF_READY) =
-            (wait < *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            (wait < g_gameClockMs
                     - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
     }
 #undef RANGE
@@ -2988,12 +2980,12 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
     void          *hdr;
     int32_t        x, y, n;
 
-    if (slot >= *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+    if (slot >= g_keyTableN)
         return 1;
 
     rec = ((const uint8_t *const *)
-              *(void *const *)(uintptr_t)ADDR_AAI_RECORDS)[slot];
-    hdr = ((void *const *)*(void *const *)(uintptr_t)ADDR_RECORD_LISTS)
+              *(void *const *)&g_aaiRecords)[slot];
+    hdr = ((void *const *)*(void *const *)&g_recordLists)
               [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)];
 
     if (*(const void *const *)((const uint8_t *)hdr + LISTHDR_OFF_MASK
@@ -3004,7 +2996,7 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
 
     n = 0;
     for (y = mask.r.top; y <= mask.r.bottom; y++) {
-        int32_t tile = (y << *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+        int32_t tile = (y << *(const int32_t *)&g_mapRowShift)
                        + mask.r.left;
 
         for (x = mask.r.left; x <= mask.r.right; n++, tile++, x++) {
@@ -3014,17 +3006,17 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
                 continue;
 
             /* SIGNED: `cmp byte, 0xf; jge`. */
-            if (((const int8_t *)*(void *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+            if (((const int8_t *)*(void *const *)&g_cellWeights)
                     [(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
                 return 0;
 
-            if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+            if (((const uint8_t *)*(void *const *)&g_tileKind)
                     [(uint16_t)tile] != (uint32_t)kind)
                 return 0;
 
             pt = PointOfTile(tile);
             if (ObjectsHitByPoint(&pt,
-                    (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC))
+                    g_objMapDesc))
                 return 0;
         }
     }
@@ -3060,12 +3052,12 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
 void __cdecl RebuildTileCover(void)
 {
     /* The map size and the weight table are read afresh at every use. */
-#define W       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define H       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
-#define WEIGHTS (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+#define W       (g_mapTilesW)
+#define H       (g_mapTilesH)
+#define WEIGHTS (g_cellWeights)
     int32_t y;
 
-    memset(*(void **)(uintptr_t)ADDR_TILE_COVER, 0, (size_t)(W * H));
+    memset(*(void * *)&g_tileCover, 0, (size_t)(W * H));
 
     for (y = 1; y < H - 1; y++) {
         int32_t tile = W * y + 1;
@@ -3120,7 +3112,7 @@ typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
  */
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 {
-#define REGIONS (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)
+#define REGIONS (g_regionOfCell)
     const int8_t  *weights;
     const int32_t *ring;
     int32_t        first;
@@ -3130,8 +3122,8 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         return REGIONS[tile];
 
     /* Both tables are read after the rand call, weights first. */
-    ring    = (const int32_t *)(uintptr_t)ADDR_TILE_RING8 + (orig_region_rand() & 6);
-    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    ring    = g_tileRing8 + (orig_region_rand() & 6);
+    weights = g_cellWeights;
 
     delta   = ring[0];
     first   = delta;
@@ -3140,8 +3132,8 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         int32_t at = delta + (int32_t)tile;
 
         if (at > 0
-            && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
-                    * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+            && at < g_mapTilesW
+                    * g_mapTilesH
             && REGIONS[at] > 0
             && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
             REGIONS[tile] = REGIONS[at];
@@ -3255,13 +3247,13 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
 
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
-#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+#define stride (g_regionStride)
         int16_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
-            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
+            != g_regionStamp)
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
@@ -3340,7 +3332,7 @@ heading:
     if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                    (const AM2_Point *)dest) < AM2_AI_ARRIVED_DIST) {
         *(int32_t *)(w + 8) = 1;
-        *(uint32_t *)dest = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(uint32_t *)dest = g_zeroPoint;
         return;
     }
 
@@ -3422,7 +3414,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
     }
 
     if (!*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)
-        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && g_gameClockMs
                > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
         *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
 
@@ -3432,13 +3424,13 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
      * keep the route and go straight to walking it. */
     if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                     *(const uint32_t *)&pt)
-        && (uint32_t)*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && (uint32_t)*(const int32_t *)&g_gameClockMs
                < (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
         goto walk;
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         *(uint32_t *)&pt                      = *(const uint32_t *)dest;
         *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
@@ -3488,11 +3480,11 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         goto after_region;
 
     {
-#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+#define stride (g_regionStride)
         int16_t link;
 
         if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
-            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
+            != g_regionStamp)
             RegionSolvePair(fromRegion, toRegion);
 
         {
@@ -3521,14 +3513,14 @@ after_region:
             && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
                    < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT))
             goto walk;
-        if ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        if ((uint32_t)*(const int32_t *)&g_gameClockMs
             > (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
             goto walk;
     }
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         /* The goal it was ASKED for, not the point it is walking to. */
         *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
@@ -3588,7 +3580,7 @@ walk:
                     break;
                 *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 0;
                 *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) =
-                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                    g_zeroPoint;
                 break;
             }
             at++;
@@ -3606,8 +3598,8 @@ walk:
      * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
     *(int32_t *)(w + 8) =
         *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
-            ? ((const int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE_ALT)[*(const int32_t *)ctx]
-            : ((const int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE)[*(const int32_t *)ctx];
+            ? (g_aiMoveStateAlt)[*(const int32_t *)ctx]
+            : (g_aiMoveState)[*(const int32_t *)ctx];
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
         *(int32_t *)(w + 8) = 3;
 
@@ -3674,13 +3666,13 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
 
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
-#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+#define stride (g_regionStride)
         int16_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
-            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
+            != g_regionStamp)
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
@@ -3772,7 +3764,7 @@ heading:
     if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                    (const AM2_Point *)dest) < AM2_ROACH_ARRIVED_DIST) {
         *(int32_t *)(w + 0x14) = 1;
-        *(uint32_t *)dest = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(uint32_t *)dest = g_zeroPoint;
         return;
     }
 
@@ -3832,7 +3824,7 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
     }
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
 
     if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR) > 0) {   /* unsigned; `> 0` is the
                                        * original's `test; jbe`-skip spelling */
@@ -3842,7 +3834,7 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
     }
 
     if (*(const int32_t *)(c + SIGHT_OFF_FOUND)
-        && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && (uint32_t)(g_gameClockMs
                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
            >= AM2_AI_TURN_DELAY_MS)
         w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
@@ -3913,7 +3905,7 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
         if (hit > 0) {
             if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
@@ -3924,7 +3916,7 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
         AiPromoteFound(o, c);
 
         if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
                >= AM2_AI_TURN_DELAY_MS)
             w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
@@ -3976,7 +3968,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
         if (hit > 0) {
             if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
@@ -3990,7 +3982,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     AiPromoteFound(o, c);
 
     if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-        && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && (uint32_t)(g_gameClockMs
                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
            >= AM2_AI_TURN_DELAY_MS)
         w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
@@ -4029,11 +4021,11 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * single 28: the same source around different surroundings -- in AiAttackBody
  * the bearing lands in ebx and the rank in ebp, the other way round from the
  * rest. All four match byte for byte on it. */
-#define AI_RANKF(off) (*(const int32_t *)((uintptr_t)ADDR_RANK_RECORDS         \
+#define AI_RANKF(off) (*(const int32_t *)(((uintptr_t)g_rankRecords)         \
         + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES + (off)))
-#define AI_DIRF(T, off) (*(T *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR             \
+#define AI_DIRF(T, off) (*(T *)(((uintptr_t)g_sightBlockByDir)             \
         + dir * AM2_SIGHT_DIR_STRIDE + (off)))
-#define AI_SIGHT_GEN (*(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION)
+#define AI_SIGHT_GEN (g_sightGeneration)
 /* The original hands AngleOfDelta the distance as a third argument it does
  * not read; the push is in the image, so it is reproduced. The cast goes
  * through void (*)(void) because that is GCC's sanctioned escape. */
@@ -4076,7 +4068,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
                                                                               \
         for (i = 0; i < n; i++) {                                             \
             int32_t a = (int8_t)(*(const uint8_t *const *)                    \
-                                 (uintptr_t)ADDR_TILE_ATTRS)[buf[i]];         \
+                                 ((uintptr_t)&g_tileAttrs))[buf[i]];         \
                                                                               \
             if (a > viewerAttr)                                               \
                 highest = a;                                                  \
@@ -4169,7 +4161,7 @@ void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
             AiPromoteFound(o, c);
     } else {
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
     }
 
     seen = LEAD;
@@ -4230,7 +4222,7 @@ engage:
             *(o + OBJ_OFF_HIT_DIR) = 0;
         }
         if (LEAD
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
                >= AM2_AI_TURN_DELAY_MS)
             w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
@@ -4268,7 +4260,7 @@ out_of_sight:
         w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
     }
     if (*(void *const *)(c + SIGHT_OFF_OBSERVER)) {
-        if ((uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        if ((uint32_t)(g_gameClockMs
                        - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
             >= AM2_AI_TURN_DELAY_MS)
             w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
@@ -4317,14 +4309,14 @@ typedef struct {
     int32_t stamp;          /* SIGHTDIR_OFF_STAMP */
     int32_t trace_stamp;    /* SIGHTDIR_OFF_TRACE_STAMP */
 } AM2_SightDirRec;
-#define RANKREC(r)  (((const AM2_RankRec *)(uintptr_t)ADDR_RANK_RECORDS)[r])
-#define SIGHTDIR(d) (((AM2_SightDirRec *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR)[d])
+#define RANKREC(r)  (((const AM2_RankRec *)g_rankRecords)[r])
+#define SIGHTDIR(d) (((AM2_SightDirRec *)g_sightBlockByDir)[d])
 
 static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t dir,
                                 int32_t viewerAttr, int32_t gen)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
-    const uint8_t *attrs = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS;
+    const uint8_t *attrs = g_tileAttrs;
     int32_t        highest = AM2_AI_SIGHT_FLOOR;
     int32_t        n = 0, i = 0, reach;
 
@@ -4466,7 +4458,7 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
 
     if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_ENGAGE_DEST) {
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
         AiTrooperStep(obj, out, ctx);
@@ -4477,9 +4469,9 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
 
     /* Arrived: forget both remembered points and look for something to do. */
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
 
     if (LEAD) {
         /* Out of the band the current weapon wants: pick another and rebuild
@@ -4585,7 +4577,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
     else
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) <= 0
         && !*(const int32_t *)(o + OBJ_OFF_TARGET_UID)) {
@@ -4603,7 +4595,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
                 goto tail;
             }
             *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                g_zeroPoint;
             goto react;
         }
 
@@ -4616,7 +4608,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
 
         if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
             *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                g_zeroPoint;
             *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
             AiTrooperStep(obj, out, ctx);
             goto tail;
@@ -4625,7 +4617,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
         /* Arrived at the state point: clear the detour and reload the state
          * point from the copy the head made. */
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
         goto react;
@@ -4635,7 +4627,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)
         && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
         if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST)
@@ -4658,7 +4650,7 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
             goto tail;
         }
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         goto react;
     }
 
@@ -4691,7 +4683,7 @@ seen_it:
     }
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
     *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
         *(const uint32_t *)(LEAD + OBJ_OFF_UID);
     *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
@@ -4728,11 +4720,11 @@ tail:
      * a fresh detour point 360 units toward it. */
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
         if (IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND))
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
                > AM2_AI_KEEP_RANGE_MS) {
             *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                g_gameClockMs;
             /* (unused, the object to head toward, distance, out) -- the
              * first argument really is discarded, per air.h, and the original
              * passes the stepping object into it. */
@@ -4798,7 +4790,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
     else
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) <= 0) {
         *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
@@ -4808,7 +4800,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
             /* Off the leash: drop the detour, restore the post and go back to it,
              * forgetting whatever was being chased. */
             *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                g_zeroPoint;
             if (!state)
                 *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
                     *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
@@ -4829,7 +4821,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
                 goto tail;
             }
             *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                g_zeroPoint;
             goto react;
         }
 
@@ -4846,7 +4838,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)
         && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
         if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
@@ -4879,7 +4871,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
             goto tail;
         }
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         goto react;
     }
 
@@ -4913,7 +4905,7 @@ seen_it:
             goto react;
         }
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
             *(const uint32_t *)(LEAD + OBJ_OFF_UID);
         *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
@@ -4935,11 +4927,11 @@ react:
     AiHitReact(obj, out, ctx);
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
         if (IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND))
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
                > AM2_AI_KEEP_RANGE_MS) {
             *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                g_gameClockMs;
             RandomPointAhead(obj, *(void *const *)(c + SIGHTC_OFF_FOUND),
                              AM2_AI_PATROL_DETOUR,
                              (AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT));
@@ -5061,7 +5053,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     int32_t  reach;
     AM2_Rect box;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_A
+    if (g_perframeCountA
         > AM2_SIGHT_SCANS_PER_FRAME)
         return (void *)0;
 
@@ -5106,9 +5098,9 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
 
     *(int32_t *)(o + OBJ_OFF_FIELD_F4) = 0;
     *(uint32_t *)(o + OBJ_OFF_FIELD_FC) =
-        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        g_gameClockMs
         + AM2_AI_TROOPER_RETRY_MS;
-    ++*(int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+    ++g_sightGeneration;
     orig_log_one(o);
 
     reach = RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK)).sight_range;
@@ -5118,10 +5110,10 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     box.bottom = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) + reach;
 
     if (flags)
-        it = (uint8_t *)ObjectsInRect(&box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+        it = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsHittable);
     else
-        it = (uint8_t *)ObjectsInRect(&box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+        it = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsLiveTarget);
     if (!it)
         goto finish;
@@ -5151,7 +5143,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)it)) {
             RevealObj(it);
             *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
-                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
         }
         it = next;
@@ -5251,7 +5243,7 @@ in_sight:
         cand = it;
         if ((*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3
              || *(const int32_t *)(o + OBJ_OFF_AI_MODE) == 2)
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_HIT_TIME))
                    > AM2_SIGHT_KIND7_RANGE
             && ObjsAreAllied(it, o, 0))
@@ -5260,7 +5252,7 @@ in_sight:
         if (ObjIsOurs(o, 0)) {
             RevealObj(it);
             *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
-                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
         }
 
@@ -5380,7 +5372,7 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     uint8_t *c = (uint8_t *)ctx;
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
 
     /* Two tests, each ending in the same route call -- one block in the
      * image, which both reach. */
@@ -5410,7 +5402,7 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
         AiPromoteFound(o, c);
 
         if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
                >= AM2_AI_TURN_DELAY_MS)
             w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
@@ -5491,7 +5483,7 @@ void __cdecl AiStep(void *obj, void *out)
     }
 
     *(uint16_t *)(o + OBJ_OFF_REGION) =
-        (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
+        (g_regionOfCell)
             [*(const uint16_t *)(o + OBJ_OFF_TILE)];
 }
 
@@ -5586,7 +5578,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
     int32_t  d;
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
 
     if (!LEAD)
         goto hitreact;
@@ -5750,7 +5742,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
     } else if (kind != 8
                && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3) {
         int32_t limit = *(const int32_t *)
-            ((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+            (g_rankRecords
              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                * RANK_REC_BYTES
              + RANK_REC_OFF_THRESHOLD);
@@ -5760,7 +5752,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
                            + (V >= 0x80 ? 1 : 0);
 
             *(int32_t *)(w + 8) =
-                ((const int32_t *)((void *)(uintptr_t)(ADDR_HIT_POSE_BY_CLASS)))[slot];
+                (g_hitPoseByClass)[slot];
         } else if ((int32_t)V < limit) {
             *(int32_t *)(w + 8) = AM2_POSE_HIT_HEAVY;
         }
@@ -5816,7 +5808,7 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
     const uint8_t *c   = (const uint8_t *)ctx;
 
     /* The clock is re-read at every use, as the image does. */
-#define now (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+#define now (g_gameClockMs)
 
     if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) > now) {
         if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
@@ -5903,12 +5895,12 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
     }
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
 
     AiHitReact(obj, out, ctx);
 
     if (*(const int32_t *)(c + SIGHTC_OFF_FOUND)
-        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && g_gameClockMs
            - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
            >= AM2_AI_TURN_DELAY_MS)
         w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
@@ -6002,7 +5994,7 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
 
     RevealObj(s);
     *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_REVEAL_MS;
+        *(const int32_t *)&g_gameClockMs + AM2_REVEAL_MS;
 #undef observer
 }
 
@@ -6068,7 +6060,7 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
                     if (ObjIsOurs((void *)observer, 1)) {
                         RevealObj(s);
                         *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-                            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            *(const int32_t *)&g_gameClockMs
                             + AM2_REVEAL_MS;
                     }
                 }
@@ -6152,7 +6144,7 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
                         && maxRange != AM2_SIGHT_OMNI_RANGE) {
                         RevealObj(s);
                         *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-                            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            *(const int32_t *)&g_gameClockMs
                             + AM2_REVEAL_MS;
                     }
                 }
@@ -6212,10 +6204,10 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
 void __cdecl SealMapEdges(void)
 {
     /* The map size and both tables are read afresh at every use. */
-#define W       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define H       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
-#define WEIGHTS (*(int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)
-#define FLAGS   (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)
+#define W       (g_mapTilesW)
+#define H       (g_mapTilesH)
+#define WEIGHTS (g_cellWeights)
+#define FLAGS   (g_tileFlags)
     int32_t x, y, i;
 
     for (x = 0; x < W; x++) {
@@ -6286,8 +6278,8 @@ void __cdecl SealMapEdges(void)
 void __cdecl UnrevealArea(int32_t army, uint32_t at)
 {
     /* The map's size is read from its globals at every use. */
-#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+#define MAP_W (g_mapTilesW)
+#define MAP_H (g_mapTilesH)
     uint16_t tile;
     int32_t  x, y, x0, x1, y0, y1;
 
@@ -6296,7 +6288,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
 
     tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
     x    = (int32_t)(tile & (uint32_t)(MAP_W - 1));
-    y    = (int32_t)(tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+    y    = (int32_t)(tile >> g_mapRowShift);
 
     x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, MAP_W - 1);
     x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, MAP_W - 1);
@@ -6326,7 +6318,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
                     int32_t cols = x1 - x0 + 1;
 
                     do {
-                        ((uint8_t **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[slot]
+                        ((uint8_t * *)g_tileRevealGrids)[slot]
                             [(uint32_t)at_i & 0xFFFFu]--;
                         at_i++;
                     } while (--cols);
@@ -6349,9 +6341,9 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
 static inline int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
 {
 #define TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
-#define SHIFT   ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT    \
+#define SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift    \
                  & 0xFFFFu)
-#define WMASK   ((uint32_t)(*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1))
+#define WMASK   ((uint32_t)(g_mapTilesW - 1))
     return ApproxDistXY((int32_t)((TILE(b) & WMASK) - (TILE(a) & WMASK)),
                         (int32_t)((TILE(b) >> SHIFT) - (TILE(a) >> SHIFT)));
 #undef TILE
@@ -6361,7 +6353,7 @@ static inline int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
 
 static inline uint8_t *RegionAt(int32_t id)
 {
-    return (uint8_t *)*(void *const *)(uintptr_t)ADDR_REGIONS
+    return (uint8_t *)g_regions
            + (uint32_t)id * AM2_REGION_SIZE;
 }
 
@@ -6454,13 +6446,13 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 /* The search's working pointers are GLOBALS and the original goes through
  * them at every use -- every field store below is a reload of the global
  * in the image. */
-#define GOAL  (*(uint8_t **)(uintptr_t)ADDR_REGION_GOAL)
-#define HEAD  (*(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD)
-#define CUR   (*(uint8_t **)(uintptr_t)ADDR_REGION_CURRENT)
-#define NB    (*(uint8_t **)(uintptr_t)ADDR_REGION_NEIGHBOUR)
-#define WALK  (*(uint8_t **)(uintptr_t)ADDR_REGION_WALK)
-#define PREV  (*(uint8_t **)(uintptr_t)ADDR_REGION_INSERT_PREV)
-#define GEN   (*(int32_t *)(uintptr_t)ADDR_REGION_GENERATION)
+#define GOAL  (g_regionGoal)
+#define HEAD  (g_regionOpenHead)
+#define CUR   (g_regionCurrent)
+#define NB    (g_regionNeighbour)
+#define WALK  (g_regionWalk)
+#define PREV  (g_regionInsertPrev)
+#define GEN   (g_regionGeneration)
 #define I32(r, off) (*(int32_t *)((r) + (off)))
 #define PTR(r, off) (*(uint8_t **)((r) + (off)))
     int32_t  edges = 0;
@@ -6474,7 +6466,7 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
     if (!I32(RegionAt(from), REGION_OFF_ACTIVE))
         return 0;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE == -1) {
+    if (g_regionSearchState == -1) {
         GOAL = RegionAt(to);
         HEAD = RegionAt(from);
         GEN += 1;
@@ -6493,9 +6485,9 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
         PTR(HEAD, REGION_OFF_PARENT) = (uint8_t *)0;
     } else {
         /* Dead -- see above. Written out because the original has it. */
-        HEAD = *(uint8_t *const *)(uintptr_t)ADDR_REGION_RESUME_NODE;
-        to   = *(const int32_t *)(uintptr_t)ADDR_REGION_RESUME_GOALID;
-        *(int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE = -1;
+        HEAD = g_regionResumeNode;
+        to   = g_regionResumeGoalid;
+        g_regionSearchState = -1;
     }
 
     while (1) {
@@ -6664,12 +6656,12 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
 
     /* Every table and the stride are read from their globals at each
      * store. */
-#define NEXT   (*(uint8_t *const *)(uintptr_t)ADDR_REGION_NEXT)
-#define COST   (*(uint8_t *const *)(uintptr_t)ADDR_REGION_COST)
-#define STRIDE (*(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE)
-#define STAMP  (*(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP)
+#define NEXT   (g_regionNext)
+#define COST   (g_regionCost)
+#define STRIDE (g_regionStride)
+#define STAMP  (g_regionStamp)
     if (!*(const int32_t *)((const uint8_t *)
-              *(void *const *)(uintptr_t)ADDR_REGIONS
+              g_regions
               + (uint32_t)to * AM2_REGION_SIZE + REGION_OFF_ACTIVE))
         return;
 
@@ -6973,8 +6965,8 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
 typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
                                        void *a, void *b, int32_t z);
-#define kRangeWant (*(const double *)((void *)(uintptr_t)(ADDR_SIGHT_RANGE_WANT)))
-#define kRangeHi   (*(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)))
+#define kRangeWant (g_sightRangeWant)
+#define kRangeHi   (g_weaponRangeHi)
 
 /* One of the two reference blocks both builders share: resolve a uid to an
  * object and drop it if it has gone, been destroyed, been concealed, or is at
@@ -7099,7 +7091,7 @@ void __cdecl AiBuildContext(void *obj, void *out)
                      (int32_t *)(s + SIGHT_OFF_RANGE),
                      s + SIGHT_OFF_BEARING);
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if (g_gameClockMs
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         *(int32_t *)(s + SIGHT_OFF_FOUND) =
             (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
@@ -7129,7 +7121,7 @@ void __cdecl AiBuildContext(void *obj, void *out)
         *(int32_t *)(s + SIGHT_OFF_MAX_RANGE) =
             (int32_t)((double)*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE) * kRangeHi);
         *(int32_t *)(s + SIGHT_OFF_READY) =
-            (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            (g_gameClockMs
              - *(const uint32_t *)(w + ITEM_OFF_LAST_USE))
             > *(const uint32_t *)(REC + ITEMTYPE_OFF_COOLDOWN);
 #undef REC
@@ -7227,7 +7219,7 @@ void __cdecl RoachBuildContext(void *obj, void *out)
             orig_log("Bad!\n");
     }
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if (g_gameClockMs
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         *(int32_t *)(s + SIGHT_OFF_FOUND) =
             (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
@@ -7244,7 +7236,7 @@ void __cdecl RoachBuildContext(void *obj, void *out)
     *(int32_t *)(s + ROACHCTX_OFF_WANT_RANGE) = AM2_ROACH_WANT_RANGE;
     *(int32_t *)(s + ROACHCTX_OFF_MAX_RANGE)  = AM2_ROACH_MAX_RANGE;
     *(int32_t *)(s + ROACHCTX_OFF_READY) =
-        (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        (g_gameClockMs
          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_ROACH_READY_MS;
 
     *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
@@ -7329,7 +7321,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         int32_t r;
 
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
+            *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
 
         r = orig_region_rand();
 
@@ -7360,7 +7352,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         }
     }
 
-    if ((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if ((g_gameClockMs
          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_AI_IDLE_TIMEOUT_MS
         && *(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) < AM2_AI_REACHED_DIST) {
         int32_t   army = *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1;
@@ -7370,7 +7362,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         if (rec)
             from = *(const uint32_t *)(rec + 4);
 
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && !AM2_THE_COMM->CommMustBroadcast(
                                   (int16_t)army)) {
             DamageBroadcast(obj, from, AM2_AI_TIMEOUT_DAMAGE, 3,
@@ -7384,7 +7376,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
             *(const uint32_t *)(ctx + SIGHTC_OFF_DEST);
         AiTrooperStep(obj, out, ctx);
 
-        if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        if (g_gameClockMs
                 - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
             > AM2_AI_STATE_MS)
             *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = AM2_AI_STATE_STALE;
@@ -7543,7 +7535,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
                          (int32_t *)(c + SIGHTC_OFF_RANGE),
                          c + SIGHTC_OFF_BEARING);
 
-            rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+            rank = g_rankRecords
                    + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                      * RANK_REC_BYTES;
 
@@ -7566,7 +7558,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
                            (const AM2_Point *)(V + OBJ_OFF_POS));
     }
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if (g_gameClockMs
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         /* SightScan's sixth argument is the SARGE flag, ARG3 of this function
          * (espmap: `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the anchor
@@ -7663,7 +7655,7 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
  * this file is flat. */
 typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
 #define orig_get_tick_count \
-    (*(AM2_RegionTickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
+    (*(AM2_RegionTickFn *)g_iatGetTickCount)
 
 /* Type2PlayerStep -- original 0x0044AD40, one caller: StepType2's player arm,
  * which runs when the object is Sarge AND belongs to the default owner. So
@@ -7782,7 +7774,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
         } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                               (const AM2_Point *)dest)
                    > AM2_WALK_START_DIST) {
-            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            if (g_gameClockMs
                     - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
                 > AM2_WALK_TURN_MS) {
                 uint8_t a = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
@@ -7796,7 +7788,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
 
         if (!*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
             *(uint32_t *)dest =
-                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                g_zeroPoint;
     }
 
     if (*(const int32_t *)(w + 8) == 2)
@@ -7805,26 +7797,26 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
                 ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
 
     if (RowAnimField4(*(const void *const *)(o + OBJ_OFF_ROWS),
-                      (uint16_t)*(const int16_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
+                      (uint16_t)*(const int16_t *)((const uint8_t *)g_weaponPoseFrames
                                + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0)
         return;
 
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
      * spells the same two fields as AM2_MousePress, privately. */
     if (orig_get_tick_count()
-            - ((const uint32_t *)((void *)(uintptr_t)(ADDR_MOUSE_PRESS)))[1]
+            - (g_mousePress)[1]
         > AM2_VIEW_SNAP_MS
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
-        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP  = 1;
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+        g_viewSnap  = 1;
+        g_objCtxSet = 1;
     }
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
         return;
 
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
+    for (i = 0; i < g_selectedCount; i++) {
         uint8_t *other = (uint8_t *)LookupByUID(
-            (*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
 
         if (!other || other == o)
             continue;
@@ -8032,7 +8024,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
      * arrive over the wire rather than being decided here. Computed before
      * anything is fired and read again at the very bottom. */
     remote = 0;
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         remote = 1;
@@ -8040,7 +8032,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
     /* Unsigned, as the original's `cmp`/`sbb`/`neg` is. */
     def   = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
     ready = (*(const uint32_t *)(def + ITEMTYPE_OFF_COOLDOWN)
-             < (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+             < (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)))
             ? 1 : 0;
 
@@ -8057,7 +8049,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
 
     *(int32_t *)(out + SIGHTCOUT_OFF_SEEN) = 0;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
         *(int32_t *)out = 0;
@@ -8066,7 +8058,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
 
     *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 0;
     *(uint32_t *)(w + ITEM_OFF_LAST_USE) =
-        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        g_gameClockMs;
 
     target = (uint8_t *)LookupByUID(*(const uint32_t *)(out + SIGHTCOUT_OFF_UID));
 
@@ -8139,7 +8131,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
              *(const int32_t *)(w + OBJ_OFF_UID),
              *(const int32_t *)(w + ITEM_OFF_AMMO));
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+    if (g_mpSession) {
         if (!remote)
             TrooperFireSend(o, w);
         else
@@ -8210,12 +8202,12 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     /* Outside a session, or for an army the comm object does not own, ask how
      * long the facing has been stable; a trooper that has just turned keeps
      * the facing it turned to. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                            (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
         found = 1;
     } else {
-        found = (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        found = (uint32_t)(g_gameClockMs
                              - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
                   > AM2_TROOPER_SETTLE_MS;
         if (!found)
@@ -8227,12 +8219,12 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     if (*(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) + 0x3C) <= 0
         && RowAnimField4(*(uint8_t *const *)(o + OBJ_OFF_ROWS),
                          (uint16_t)*(const int16_t *)(
-                             (const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
+                             (const uint8_t *)g_weaponPoseFrames
                              + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0) {
         *(int16_t *)(o + OBJ_OFF_FIELD_D6) = 0;
         *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = 0;
         at = (uint8_t *)ObjectsAtPoint((const uint32_t *)(o + OBJ_OFF_POS),
-                                       (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                                       g_objMapDesc);
         goto settle_facing;
     }
 
@@ -8256,7 +8248,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
      * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
     d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
     if ((uint32_t)*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT)
-        > (uint32_t)*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS) {
+        > (uint32_t)g_gameClockMs) {
         if (d > AM2_TROOPER_TURN_ARC) {
             facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
                                + AM2_TROOPER_TURN_STEP);
@@ -8274,7 +8266,7 @@ have_facing:
     pose = ObjNextKind538(o, *(const int32_t *)(w + 8));
     AnimStepPoint(o, facing, pose, &stepPoint, 0);
     at = (uint8_t *)ObjectsAtPoint(&stepPoint,
-                                   (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                                   g_objMapDesc);
     if (BlockWeightRoute(o, stepPoint, at, &inside) < AM2_STEP_ROUTE_OK) {
         /* Walkable: take this heading and step, with no sweep at all.
          * 0x0044B14B jumps straight to the tail that writes the facing
@@ -8318,12 +8310,11 @@ sweep:
     tries = AM2_STEP_SWEEP_OTHER;
     if (ObjType2Field548((const AM2_Object *)o)
         && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-               == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+               == (int32_t)g_defaultOwner
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
         tries = AM2_STEP_SWEEP_PLAYER;
     {
-        const int32_t *step = (const int32_t *)((void *)(uintptr_t)(
-                                  ADDR_STEP_FACING_SWEEP));
+        const int32_t *step = g_stepFacingSweep;
         /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
          * 0x0044B174 -- and stops when the count reaches the limit, so the
          * limit is one more than the headings tried: three for the player's
@@ -8335,7 +8326,7 @@ sweep:
             facing = (uint8_t)(facing + (uint8_t)step[i - 1]);
             AnimStepPoint(o, facing, pose, &stepPoint, 0);
             at = (uint8_t *)ObjectsAtPoint(&stepPoint,
-                                           (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                                           g_objMapDesc);
             if (BlockWeightRoute(o, stepPoint, at, &inside)
                 < AM2_STEP_ROUTE_OK)
                 break;
@@ -8363,7 +8354,7 @@ sweep:
             speed  = 0;
             *(w + 4) = facing;
             *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) =
-                (int32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                (int32_t)(g_gameClockMs
                           + AM2_TROOPER_TURN_MS);
             *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
                 (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
@@ -8402,7 +8393,7 @@ no_route:
         *(w + 4) = facing;
     } else if (*(const int32_t *)(w + 0x0C)
                || !found
-               || (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+               || (g_mpSession
                    && !AM2_THE_COMM->CommMustBroadcast(
                           (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
                    && ObjType2Field548((const AM2_Object *)o))) {
@@ -8419,7 +8410,7 @@ settle_facing:
     /* A facing that actually changed stamps the settle clock. */
     if (*(const uint8_t *)(o + OBJ_OFF_FACING) != *(const uint8_t *)(w + 4)) {
         *(uint32_t *)(o + OBJ_OFF_DEADLINE_D0) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
         *(o + OBJ_OFF_FACING) = *(const uint8_t *)(w + 4);
     }
     TrooperFire(o, weapon, out);
@@ -8456,8 +8447,8 @@ settle_facing:
              * anyone the comm object does not answer for. */
             int32_t local = 1;
 
-            if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-                void *comm = *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+            if (g_mpSession) {
+                void *comm = *(void *const *)&g_commObject;
 
                 local = 0;
                 if (*(const int32_t *)((const uint8_t *)comm + 0x3D8)
@@ -8467,8 +8458,7 @@ settle_facing:
                 else if (!AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
                          || *(const int32_t *)(
-                                (const uint8_t *)*(void *const *)(uintptr_t)
-                                    ADDR_COMM_OBJECT + 0x3D8))
+                                (const uint8_t *)*(void *const *)&g_commObject + 0x3D8))
                     goto watched;
             }
             if (!local) {
@@ -8498,8 +8488,7 @@ settle_facing:
                 /* Gated on a comm-object flag, and reached through the folded
                  * `ret` at ADDR_LOG -- which is what NAMES this function. */
                 if (*(const int32_t *)(
-                        (const uint8_t *)*(void *const *)(uintptr_t)
-                            ADDR_COMM_OBJECT + 0x418))
+                        (const uint8_t *)*(void *const *)&g_commObject + 0x418))
                     orig_log_six(
                         (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                         (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
@@ -8509,10 +8498,10 @@ settle_facing:
                             *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
                             + ITEMTYPE_OFF_CAPACITY),
                         had, qty,
-                        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT);
+                        *(void *const *)&g_commObject);
 
                 *(uint32_t *)(at + OBJ_OFF_PICKUP_AFTER) =
-                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    g_gameClockMs
                     + AM2_SIGHT_REVEAL_MS;
                 TrooperWantItemSend(o, at, 0, slot, qty);
             } else {
@@ -8528,14 +8517,13 @@ watched:
                     RevealObj(at);
                     PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
                 }
-            } else if ((!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            } else if ((!g_mpSession
                         || AM2_THE_COMM->CommMustBroadcast(
                                (int16_t)*(const int8_t *)(at + OBJ_OFF_ARMY)))
 
                        && (*(const uint8_t *)(o + OBJ_OFF_ARMY)
                                != *(const uint8_t *)(at + OBJ_OFF_ARMY)
-                           || (uint32_t)(*(const uint32_t *)(uintptr_t)
-                                             ADDR_GAME_CLOCK_MS
+                           || (uint32_t)(g_gameClockMs
                                          - *(const uint32_t *)(
                                                at + OBJ_OFF_DEADLINE_58))
                                   > AM2_AI_KEEP_RANGE_MS)) {
@@ -8550,12 +8538,12 @@ watched:
         if (*(const int32_t *)at == 1
             && *(const int32_t *)(*(uint8_t *const *)(at + OBJ_OFF_FIELD_94))
                    == 0x20
-            && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            && g_gameClockMs
                    > *(const uint32_t *)(o + OBJ_OFF_FIELD_5B0)
                      + AM2_TROOPER_HEAL_MS) {
             HealObject(o, AM2_TROOPER_HEAL, at);
             *(uint32_t *)(o + OBJ_OFF_FIELD_5B0) =
-                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                g_gameClockMs;
         }
     }
 
@@ -8602,8 +8590,7 @@ pose:
         } else {
             int8_t h = (int8_t)*(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET);
 
-            if ((uint8_t)h != (*(const uint8_t *const *)(uintptr_t)
-                                   ADDR_TILE_ATTRS)[
+            if ((uint8_t)h != (g_tileAttrs)[
                                   *(const uint16_t *)(o + OBJ_OFF_TILE)])
                 v = h;
             else
@@ -8612,8 +8599,7 @@ pose:
         ObjMoveAlongFacing(o, v, 0, 0);
     }
 
-    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)((const int32_t *)((void *)(uintptr_t)(
-        ADDR_TROOPER_CLASS_VALUE)))[klass];
+    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)(g_trooperClassValue)[klass];
 
     /* DRAG THE HELD WEAPONS ALONG. This is the loop whose absence bootcamp's
      * object dump caught: a dropped weapon left at 0,0 instead of at the
@@ -8635,8 +8621,7 @@ pose:
      * current one, and only when the two differ and it does not already hold
      * the new one. */
     {
-        const uint8_t *reg = *(const uint8_t *const *)(uintptr_t)
-                                 ADDR_REGION_OF_CELL;
+        const uint8_t *reg = g_regionOfCell;
         uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
         uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
 
@@ -8731,7 +8716,7 @@ void __cdecl StepType2(void *obj)
     }
 
     if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
-        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && g_gameClockMs
            > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
         if (!ObjIsFriendly(obj))
             ObjConceal(obj, 0);
@@ -8785,7 +8770,7 @@ void __cdecl StepType2(void *obj)
 
     if (*(const int32_t *)(o + OBJ_OFF_SARGE)
         && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-           == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+           == (int32_t)g_defaultOwner) {
         /* `cmp [0x5122c8], esi; jne` at 0x0044B9B0 -- the test is whether
          * the FOLLOWED OBJECT IS THIS ONE, not whether anything is followed.
          * Written as a test for null, it inverted the gate in practice: the
@@ -8794,7 +8779,7 @@ void __cdecl StepType2(void *obj)
          * a keypress or a click, in either build, while the original walked
          * -- and every A/B was silent, because both sides are driven with
          * the same input and agreed about ignoring it. */
-        if (*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A == obj
+        if (g_objCtxObjA == obj
             && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
             Type2PlayerInput(obj, w, out);
         Type2PlayerStep(obj, out);
@@ -8803,7 +8788,7 @@ void __cdecl StepType2(void *obj)
                                         * Sarge takes exactly this path */
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto tail;
@@ -8874,7 +8859,7 @@ void __cdecl StepType3(void *obj)
         ObjClearFootprint(obj);
 
     if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
-        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        && g_gameClockMs
            > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
         if (!ObjIsFriendly(obj))
             ObjConceal(obj, 0);
@@ -8896,7 +8881,7 @@ void __cdecl StepType3(void *obj)
     if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) == 0) {
         /* One six-byte x/y/z assignment, as the image copies it. */
         typedef struct { int16_t x, y, z; } Xyz;
-        *(Xyz *)(o + TROOPER_OFF_POS_X) = *(const Xyz *)(uintptr_t)ADDR_AIM_X;
+        *(Xyz *)(o + TROOPER_OFF_POS_X) = *(const Xyz *)&g_aimX;
         *(int32_t *)(o + TROOPER_OFF_LOCAL_TARGET) = 0;
     }
 
@@ -8975,7 +8960,7 @@ void __cdecl StepType3(void *obj)
      * player's keys did nothing once Sarge had boarded. Found by loading one
      * save in the native build and in the original and holding D. */
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) == 0
-        && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && (!g_mpSession
             || AM2_THE_COMM->CommMustBroadcast(
                    (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))) {
         /* No occupant: the attach arm (0x0045D894), laid out after this one. */
@@ -9016,7 +9001,7 @@ void __cdecl StepType3(void *obj)
 
 post:
     /* The second tail. Everything above reaches it. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto emit;
@@ -9162,7 +9147,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
 
     /* Arrived. */
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
+        *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
 
 #define LEADER (*(uint8_t *const *)(c + SIGHT_OFF_LEADER))
     /* The leader triple into the observer slot, re-reading the leader. */
@@ -9439,33 +9424,17 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
  * a `grep -E 'error'` had been discarding all session. */
 #define AM2_CHEAT_ABS(v)  abs(v)
 
-#define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
-#define g_inputSuppress (*(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
-#define g_mouseGrab    (*(intptr_t *)(uintptr_t)ADDR_MOUSE_GRAB)
-#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-#define g_mouseDZ      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DZ)
-#define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
-#define g_cursorPoint  (*(int32_t *)(uintptr_t)ADDR_CURSOR_POINT)
-#define g_cursorX      (*(int32_t *)(uintptr_t)ADDR_CURSOR_X)
-#define g_cursorY      (*(int32_t *)(uintptr_t)ADDR_CURSOR_Y)
-#define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
-#define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
-#define g_gameClockMs   (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
-#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
-#define g_turnRepeatMs (*(int32_t *)(uintptr_t)ADDR_TURN_REPEAT_MS)
-#define g_throttleDeadline (*(uint32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE)
-#define g_mousePressMs (*(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS)
-#define g_pointerHoverUid (*(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID)
+#define g_viewRect   ((AM2_Rect *)&g_viewX)
+#define g_defaultPos    (*(const AM2_Point *)&g_zeroPoint)
 
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
  * is why no single base is introduced over the run. */
-#define kActionCrouch ((const int32_t *)(uintptr_t)ADDR_ACTION_CROUCH)
-#define kActionProne  ((const int32_t *)(uintptr_t)ADDR_ACTION_PRONE)
-#define kActionKey1   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY1)
-#define kActionKey4   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY4)
-#define kActionKey5   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY5)
+#define kActionCrouch (g_actionCrouch)
+#define kActionProne  (g_actionProne)
+#define kActionKey1   (g_actionKey1)
+#define kActionKey4   (g_actionKey4)
+#define kActionKey5   (g_actionKey5)
 /* The weapon-code filter for the aim-cursor write in Type2PlayerInput, from
  * the byte table the original's jump table indexes at 0x0044AD24. It is the
  * dispatch selector for `jmp [ecx*4 + 0x0044AD1C]`: 0 selects the cursor-write
@@ -9529,7 +9498,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     void      *hit;
     int32_t    moved = 0;
 
-    if (g_charHandler != 0)
+    if ((*(am2_char_fn *)&g_charHandler) != 0)
         return;
     if (g_inputSuppress != 0)
         return;
@@ -9537,9 +9506,9 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     NextInventorySlot(o);
 
     /* Take the pointer for ourselves the moment it moves over the map. */
-    if (PointInRect(g_blitRect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)
-        && g_mouseGrab == 0 && g_mouseChanged[0] != 0)
-        g_mouseGrab = -1;
+    if (PointInRect(g_blitRect, (const AM2_Point *)&g_cursorPoint)
+        && (*(intptr_t *)&g_mouseGrab) == 0 && (&g_mouseChanged)[0] != 0)
+        (*(intptr_t *)&g_mouseGrab) = -1;
 
     cls = ClassifyByCode74(o);
 
@@ -9554,7 +9523,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
      * two high words for y -- the same idiom the cheat console's jumpjets arm
      * uses, and written as halves here for the same reason. */
     at.x  = (int16_t)(g_viewRect->left + g_cursorPoint);
-    at.y  = (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+    at.y  = (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                       + *(const int16_t *)&g_viewRect->top);
     dist  = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
     /* THE WHOLE POINT IS COPIED AND ONLY ITS Y IS THEN REPLACED. 0x0044A4F2
@@ -9707,18 +9676,18 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
 
     /* From here the pointer drives. Anything that took the map's pointer for
      * another purpose, or a pointer outside the map, skips to the tail. */
-    if (g_mouseGrab != -1) {
+    if ((*(intptr_t *)&g_mouseGrab) != -1) {
         if (!PointInRect(g_blitRect,
-                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                         (const AM2_Point *)&g_cursorPoint))
             goto tail;
-        if (g_mouseGrab != 0)
+        if ((*(intptr_t *)&g_mouseGrab) != 0)
             goto tail;
     }
 
-    if (g_mouseButton[0] != 0) {
+    if ((&g_mouseButton)[0] != 0) {
         int32_t bearing;
 
-        g_mouseGrab = -1;
+        (*(intptr_t *)&g_mouseGrab) = -1;
         /* THE DISTANCE IS TO `at` AND THE BEARING IS TO `aim`, and they are
          * one slot apart: `lea eax,[esp+0x14]` at 0x0044A8C0 is +0x10 with
          * one push outstanding, `lea ecx,[esp+0x18]` at 0x0044A8DA is +0x0C
@@ -9742,8 +9711,8 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     }
 
     if (GetMenuRow() == 1) {
-        if (g_mouseButton[0] != 0) {
-            g_throttleDeadline = g_gameClockMs + AM2_CLICK_THROTTLE_MS;
+        if ((&g_mouseButton)[0] != 0) {
+            (*(uint32_t *)&g_throttleDeadline) = g_gameClockMs + AM2_CLICK_THROTTLE_MS;
             *(int32_t *)(w + 0xC) = 1;
             if (*(const int32_t *)(*(uint8_t **)((uint8_t *)weapon
                                                  + OBJ_OFF_FIELD_C0) + 0x24) != 0)
@@ -9780,7 +9749,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
                 }
             }
 
-            if (g_mouseChanged[0] != 0)
+            if ((&g_mouseChanged)[0] != 0)
                 *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
             *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
 
@@ -9820,7 +9789,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
         }
 
         /* Button up: only a pointer that actually moved does anything. */
-        if (g_mouseChanged[0] == 0)
+        if ((&g_mouseChanged)[0] == 0)
             goto tail;
 
         *(uint16_t *)(w + 0x14) = (uint16_t)aim.x;
@@ -9847,18 +9816,18 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
      * is throttled so that holding the button does not re-order every frame. */
     if (moved != 0)
         goto tail;
-    if (g_gameClockMs <= g_throttleDeadline)
+    if (g_gameClockMs <= (*(uint32_t *)&g_throttleDeadline))
         goto tail;
 
-    if (g_mouseButton[0] == 0) {
-        if (g_mouseChanged[0] == 0)
+    if ((&g_mouseButton)[0] == 0) {
+        if ((&g_mouseChanged)[0] == 0)
             goto tail;
 
         /* A TAP: released soon after it was pressed and barely moved since.
          * Both bounds are the press record's, not this frame's. */
         if (orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS
-            && ApproxDist((const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT,
-                          (const AM2_Point *)(uintptr_t)ADDR_MOUSE_PRESS) < 4) {
+            && ApproxDist((const AM2_Point *)&g_cursorPoint,
+                          (const AM2_Point *)g_mousePress) < 4) {
             w[4] = (uint8_t)AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
                                          &at);
             *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
@@ -9881,7 +9850,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
             else
                 *(int32_t *)(o + OBJ_OFF_UID_56C) = 0;
         }
-        if (g_mouseButton[0] == 0)
+        if ((&g_mouseButton)[0] == 0)
             goto tail;
     }
 
@@ -9976,11 +9945,11 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
         if (*(const int32_t *)(p + 0x0Cu) != 0) {
             limit = (int32_t)((double)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
                               - *(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE)
-                                * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+                                * g_frameDeltaSec);
             speed = (want_speed > limit) ? want_speed : limit;
         } else {
             limit = (int32_t)(*(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE)
-                                * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                * g_frameDeltaSec
                               + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
             speed = (want_speed < limit) ? want_speed : limit;
         }
@@ -10008,7 +9977,7 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
     if (nowFacing != thenFacing) {
         commit = (*(const int32_t *)(o + OBJ_OFF_FIELD_5A8) != 0
                   || thenFacing != *(const uint8_t *)(o + OBJ_OFF_FIELD_5A4));
-        elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        elapsed = g_gameClockMs
                   - *(const uint32_t *)(row + ROW_OFF_TURN_STAMP);
 
         if ((elapsed > *(const uint32_t *)(o + VEHICLE_OFF_TURN_INTERVAL)
@@ -10080,7 +10049,7 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
      * arm's own clear exit, return without the reset. (vehmove2-6591.txt.) */
 
     /* A networked client only steers a vehicle it owns. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto stop;
@@ -10097,13 +10066,13 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
         && *(const int32_t *)((const uint8_t *)out + 0x08u) == 1)
         goto stop;
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if (g_gameClockMs
         - *(const uint32_t *)(o + 0x56Cu) < 0x4B0u) {
         SetFacing08(Step3NextCandidate(o), o, out);
         if (!Step3TurnBlocked(o, out, &local))
             return;
         *(uint32_t *)(o + 0x56Cu) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
 
         /* The search. Seven attempts, fanning out alternately either side of
          * the base heading; the counter is PERSISTENT in the object, so a
@@ -10124,7 +10093,7 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
      * resets the search state (0x0045CA05 -> 0x0045CA85). */
     if (Step3TurnBlocked(o, out, &local)) {
         *(uint32_t *)(o + 0x56Cu) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
         if (*(const int32_t *)(o + 0x570u) == 0)
             *(int32_t *)(o + 0x570u) = FacingFromDelta08(out, local);
         for (;;) {
@@ -10257,16 +10226,16 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
     }
 
     if (*(const int32_t *)(o + 0x10Cu) == 0)
-        *(uint32_t *)(o + 0xC0u) = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(uint32_t *)(o + 0xC0u) = g_zeroPoint;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
         return;
 
-    if (orig_get_tick_count() - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+    if (orig_get_tick_count() - g_mousePressMs
             > 0x1F4u
         && *(const int32_t *)(o + 0x10Cu) == 0) {
-        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+        g_viewSnap = 1;
+        g_objCtxSet = 1;
     }
 
     if ((*(const uint32_t *)(o + 8) & 0x400u) == 0)
@@ -10275,9 +10244,9 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
     /* Five separate guards in the original, each its own branch to the loop
      * tail. Kept separate rather than ANDed: equivalent today, and the order
      * is what the image states. */
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
+    for (i = 0; i < g_selectedCount; i++) {
         uint8_t *other = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
 
         if (other == 0)
             continue;
@@ -10400,14 +10369,14 @@ void __cdecl Step3Drive(void *obj, void *rec)
         if (first != second) {
             int32_t changed = (*(const int32_t *)(o + 0x5A8u) != 0
                                || second != *(const uint8_t *)(o + 0x5A4u));
-            uint32_t age = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            uint32_t age = g_gameClockMs
                            - *(const uint32_t *)(gun + 0x58u);
 
             if ((age > *(const uint32_t *)(o + 0x564u) && changed)
                 || age > 0x320u) {
                 *(uint8_t *)(o + 0x5A4u) = first;
                 *(uint32_t *)(gun + 0x58u) =
-                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                    g_gameClockMs;
             } else {
                 turn = 0;
             }
@@ -10481,12 +10450,12 @@ void __cdecl Step3Drive(void *obj, void *rec)
             if (*(const int32_t *)(r + 0x0Cu) != 0) {
                 int32_t v = (int32_t)((float)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
                                       - (float)*(const int32_t *)(o + 0x560u)
-                                        * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+                                        * g_frameDeltaSec);
                 if (speed <= v)
                     speed = v;
             } else {
                 int32_t v = (int32_t)((float)*(const int32_t *)(o + 0x560u)
-                                        * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                        * g_frameDeltaSec
                                       + (float)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
                 if (speed >= v)
                     speed = v;
@@ -10542,16 +10511,16 @@ void __cdecl Step3Drive(void *obj, void *rec)
             if (first != second) {
                 uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
 
-                if (*(const uint32_t *)(g + 0x58u) == *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS) {
-                    *(uint32_t *)(turret + 0x58u) = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                if (*(const uint32_t *)(g + 0x58u) == g_gameClockMs) {
+                    *(uint32_t *)(turret + 0x58u) = g_gameClockMs;
                 } else {
-                    uint32_t age = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS - *(const uint32_t *)(turret + 0x58u);
+                    uint32_t age = g_gameClockMs - *(const uint32_t *)(turret + 0x58u);
 
                     if ((age <= 0x3Cu || *(const int32_t *)(o + 0x52Cu) == 1)
                         && age <= 0x96u)
                         swing = 0;
                     else
-                        *(uint32_t *)(turret + 0x58u) = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                        *(uint32_t *)(turret + 0x58u) = g_gameClockMs;
                 }
             }
 
@@ -10574,10 +10543,10 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 int32_t      height;
 
                 *(uint32_t *)(weapon + 0xC4u) =
-                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                    g_gameClockMs;
                 height = ObjHeight(o);
 
-                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
+                if (g_mpSession == 0
                     || AM2_THE_COMM->CommMustBroadcast(
                            (int16_t)*(const int8_t *)(o + 0x10u))) {
                     *(int32_t *)(r + 0x24u) = 0;
@@ -10627,9 +10596,9 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
                 *(int32_t *)(r + 4) = 0;
                 *(uint32_t *)(r + 0x18u) =
-                    *(const uint32_t *)(uintptr_t)ADDR_AIM_X;
+                    g_aimX;
                 *(uint16_t *)(r + 0x1Cu) =
-                    *(const uint16_t *)(uintptr_t)ADDR_AIM_Z;
+                    g_aimZ;
                 *(int32_t *)(r + 0x20u) = 0;
             }
         }
@@ -10711,16 +10680,16 @@ void __cdecl Step3Drive(void *obj, void *rec)
         uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
 
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
-            *(void **)(g + 0x30u) = *(void **)(uintptr_t)ADDR_REMAP_IDENTITY;
+            *(void **)(g + 0x30u) = *(void * *)&g_remapIdent;
         else
-            *(void **)(g + 0x30u) = *(void **)(uintptr_t)ADDR_REMAP_BRIGHT;
+            *(void **)(g + 0x30u) = g_remapBright;
     }
 
     /* Everything under the point the vehicle is MOVING TO, not where it is:
      * ObjectsAtPoint is handed the step point MoveStepPoint just wrote. */
     {
         uint8_t *p = (uint8_t *)ObjectsAtPoint(&step,
-                         (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                         g_objMapDesc);
 
         while (p != 0) {
             if (ObjIsItem((const AM2_Object *)p)
@@ -10734,16 +10703,16 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
             if (CanPickUp(p) && ListFirstField548(o)) {
                 *(uint32_t *)(p + 0xC8u) =
-                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + 0x7D0u;
+                    g_gameClockMs + 0x7D0u;
 
                 /* The comm object is read afresh at each use. */
-#define comm (*(void **)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (*(void * *)&g_commObject)
 
                 /* Two broadcast questions, not one: the first refuses
                  * outright when the host flag at +0x3D8 is set AND we would
                  * broadcast, and only the second decides whether a WANT is
                  * actually sent. */
-                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+                if (g_mpSession != 0
                     && !(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
                          && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u)))) {
                     if (((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u))
@@ -10764,11 +10733,11 @@ void __cdecl Step3Drive(void *obj, void *rec)
             if (*(const int32_t *)p == 1
                 && **(const int32_t *const *)(p + 0x94u) == 0x21
                 && *(const int16_t *)(p + 0x62u) > 0
-                && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                && g_gameClockMs
                        > *(const uint32_t *)(o + 0x5A0u) + 0x1F4u) {
                 HealObject(o, 0x19, p);
                 *(uint32_t *)(o + 0x5A0u) =
-                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                    g_gameClockMs;
             }
 
             p = (uint8_t *)*(void *const *)(p + 0x68u);
@@ -10778,7 +10747,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
     /* A stopped vehicle keeps its own tile height; a moving one takes the
      * height of the tile it is standing on when that differs. */
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0) {
-        const uint8_t *attrs = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS;
+        const uint8_t *attrs = g_tileAttrs;
 
         if (*(const uint8_t *)(o + 0x65u) != attrs[*(const uint16_t *)(o + 0x1Au)])
             tileArg = *(const int8_t *)(o + 0x65u);
@@ -10838,19 +10807,19 @@ void __cdecl Step3Input(void *obj, void *rec)
     int32_t   steered = 0;
     int32_t   range, allied, other;   /* SightScan's discarded outs */
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER != 0)
+    if (g_charHandler != 0)
         return;
-    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS != 0)
+    if (g_inputSuppress != 0)
         return;
 
     /* Weapon cycling, and the mouse half is the MIDDLE button RELEASED --
      * state up with the edge set. Reached as element 2 of the two button
      * arrays, which is how NextInventorySlot already spells the same pair. */
     if (ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)
-        || (((const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)[AM2_MOUSE_MIDDLE] == 0
-            && ((const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)[AM2_MOUSE_MIDDLE] != 0)) {
+        || ((&g_mouseButton)[AM2_MOUSE_MIDDLE] == 0
+            && (&g_mouseChanged)[AM2_MOUSE_MIDDLE] != 0)) {
         uint8_t *unit = (uint8_t *)LookupOwnerObj(
-            *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+            *(const int32_t *)&g_defaultOwner);
 
         if (unit != 0) {
 #define sel (*(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL))
@@ -10887,14 +10856,14 @@ void __cdecl Step3Input(void *obj, void *rec)
      * displacement, and this block keeps such offsets unnamed. */
     *(int32_t *)(o + 0x5A8u) = 0;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A
+    if (g_objCtxValA
         != *(const int32_t *)(o + OBJ_OFF_UID))
         return;
 
     /* Throttled by the object's own deadline, and all five out-params are
      * discarded -- what is wanted is the scan's side effects, the same
      * reading NextInventorySlot's header records for its call. */
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    if (g_gameClockMs
             > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
         SightScan(o, &range, &bearing, &allied, &other, 0);
     }
@@ -10915,7 +10884,7 @@ void __cdecl Step3Input(void *obj, void *rec)
             *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) - 8);
         steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
     }
 
@@ -10930,7 +10899,7 @@ void __cdecl Step3Input(void *obj, void *rec)
             *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) + 8);
         steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
     }
 
@@ -10942,7 +10911,7 @@ void __cdecl Step3Input(void *obj, void *rec)
         *(int32_t *)(r + 0x10u) = 0;
         steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
     }
 
@@ -10952,7 +10921,7 @@ void __cdecl Step3Input(void *obj, void *rec)
         *(int32_t *)(r + 0x0Cu) = 1;
         steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
     }
 
@@ -10980,27 +10949,27 @@ void __cdecl Step3Input(void *obj, void *rec)
     if (GetMenuRow() == 3 || GetMenuRow() == 1) {
         int32_t inMap = 1;
 
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_GRAB != -1) {
-            if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
-                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+        if (g_mouseGrab != -1) {
+            if (!PointInRect(g_blitRect,
+                             (const AM2_Point *)&g_cursorPoint))
                 inMap = 0;
-            else if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_GRAB != 0)
+            else if (g_mouseGrab != 0)
                 inMap = 0;
         }
 
         if (inMap) {
             const int32_t *button =
-                (const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON;
+                &g_mouseButton;
             const int32_t *changed =
-                (const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+                &g_mouseChanged;
             uint8_t aim;
 
             ((int16_t *)&cursorWorld)[0] = (int16_t)(
-                *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
-                + *(const int32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+                g_viewX
+                + g_cursorPoint);
             ((int16_t *)&cursorWorld)[1] = (int16_t)(
-                *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
-                + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+                *(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
+                + *(const int16_t *)&g_viewY);
 
             dist = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                               (const AM2_Point *)&cursorWorld);
@@ -11008,7 +10977,7 @@ void __cdecl Step3Input(void *obj, void *rec)
                                (const AM2_Point *)&cursorWorld);
             aimDelta = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), aim);
 
-            *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = -1;
+            g_mouseGrab = -1;
             if (steered == 1)
                 OverlayPrepare(1, 1);
 
@@ -11021,11 +10990,11 @@ void __cdecl Step3Input(void *obj, void *rec)
             } else if (!button[AM2_MOUSE_LEFT] && changed[AM2_MOUSE_LEFT]
                        && GetMenuRow() != 1
                        && orig_get_tick_count()
-                              - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                              - g_mousePressMs
                           < AM2_CLICK_TAP_MS
                        && ApproxDist(
-                              (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT,
-                              (const AM2_Point *)(uintptr_t)ADDR_MOUSE_PRESS) < 4) {
+                              (const AM2_Point *)&g_cursorPoint,
+                              (const AM2_Point *)g_mousePress) < 4) {
                 /* A TAP, not a drag: released within 500 ms and within four
                  * pixels of where it went down. That orders a move. */
                 if (dist > 0x30) {
@@ -11044,7 +11013,7 @@ void __cdecl Step3Input(void *obj, void *rec)
                                   (const AM2_Point *)&cursorWorld);
                 *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
                 *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                    g_zeroPoint;
                 *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
                 *(int32_t *)(o + 0x5A8u) = 1;
 
@@ -11076,7 +11045,7 @@ void __cdecl Step3Input(void *obj, void *rec)
     {
 #define def (*(const uint8_t *const *)(weapon + 0xC0u))
         /* The time since the last shot is worked out at each test. */
-#define since (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS \
+#define since (g_gameClockMs \
                - *(const uint32_t *)(weapon + 0xC4u))
 
         if (ActionKeyDown(AM2_ACTION_09)) {
@@ -11093,14 +11062,14 @@ void __cdecl Step3Input(void *obj, void *rec)
 
         if (GetMenuRow() != 1 && steered != 1)
             return;
-        if (*(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3 != 0)
+        if (g_weaponFnSlot3 != 0)
             return;
 
         {
             const int32_t *button =
-                (const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON;
+                &g_mouseButton;
             const int32_t *changed =
-                (const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+                &g_mouseChanged;
 
             if (button[AM2_MOUSE_LEFT]) {
                 if (*(const int32_t *)(def + 0x24u) == 0)

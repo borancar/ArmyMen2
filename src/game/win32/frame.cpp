@@ -70,11 +70,6 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 
 #define call0(a)  (((am2_void_fn)(uintptr_t)(a))())
 
-#define g_comm         (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_statePending (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)
-#define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
-#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
-#define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 
 typedef void    (__cdecl *AM2_NoArgFn)(void);
 /* The image's logger reached with NOTHING pushed. Declared up here because
@@ -85,13 +80,9 @@ typedef void    (__cdecl *AM2_VoidFn0b)(void);
 typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 /* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
-#define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
-#define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 /* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
-#define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
-#define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+#define VIEW_TARGET ((AM2_Point *)&g_viewTarget)
+#define VIEW_EYE2   ((const AM2_Point *)&g_listenerPos)
 
 
 /* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
@@ -127,28 +118,28 @@ void __cdecl MissionInput(void)
     int32_t step;
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
-        *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_STATE_ESCAPE_MENU;
+        g_overlayDirty = 1;
+        g_subState = AM2_STATE_ESCAPE_MENU;
         return;
     }
 
     if (!g_mpSession) {
         if (ActionKeyReleased(AM2_ACTION_SHOW_INFO)) {
-            if (*(const char *)(uintptr_t)ADDR_LEVEL_STR_C) {
+            if (g_levelStrC) {
                 SetGameDir("bitmaps");
                 FreeBitmap(&g_currentBitmap);
                 g_currentBitmap = LoadBitmap(
-                    (const char *)(uintptr_t)ADDR_LEVEL_STR_C, 0);
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
+                    &g_levelStrC, 0);
+                g_subState =
                     AM2_SUBSTATE_INFO_BITMAP;
-                *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+                g_overlayDirty = 1;
                 SendGamePause(1, 8);
             }
-            if (*(const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME)
+            if (g_levelSoundName)
                 /* Slot 0 at priority 1 -- the original's order; this once
                  * had the two swapped. */
                 PlayDynamicSound(
-                    (const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME,
+                    &g_levelSoundName,
                     0, 0, 0, 0, 0, 1, 0);
             LatchKeyState();
         }
@@ -156,9 +147,9 @@ void __cdecl MissionInput(void)
         ShowInfoMp();
     }
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
+    if (g_charHandler)
         return;
-    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_inputSuppress)
         return;
 
     /* flag8 OR (button AND changed) -- the mouse pair is an AND, which is what
@@ -166,44 +157,44 @@ void __cdecl MissionInput(void)
      * Getting it wrong dismisses the sign on the first mouse MOVE. */
     if (g_currentBitmap
         && (DismissKeyReleased()
-            || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED))) {
-        *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
+            || (g_mouseButton
+                && g_mouseChanged))) {
+        g_mouseClaimed = 1;
         FreeBitmap(&g_currentBitmap);
-        if (*(const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME)
-            StopNamedSound((const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, 0);
+        if (g_levelSoundName)
+            StopNamedSound(&g_levelSoundName, 0);
     }
 
     /* Both set means give up: something is being followed AND the button is
      * held, so a drag must not fight the follow. Not `!button` -- that
      * inversion scrolls exactly when it should not, and is what the frame
      * counts caught. */
-    if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+    if (g_objCtxValA
+        && g_mouseButton)
         return;
 
-    step = (int32_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
-                     * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+    step = (int32_t)(g_viewSpeed
+                     * g_frameDeltaSec);
 
-#define cx (*(const int16_t *)(uintptr_t)ADDR_CURSOR_POINT)
-#define cy (*(const int16_t *)((uintptr_t)ADDR_CURSOR_POINT + 2))
+#define cx (*(const int16_t *)&g_cursorPoint)
+#define cy (*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2))
 
-    if (cx > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+    if (cx > g_bitmapAreaW
               - AM2_SCROLL_MARGIN) {
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        g_objCtxSet = 0;
         VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x + step);
     }
     if (cx < AM2_SCROLL_MARGIN) {
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        g_objCtxSet = 0;
         VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x - step);
     }
-    if (cy > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+    if (cy > g_bitmapAreaH
               - AM2_SCROLL_MARGIN) {
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        g_objCtxSet = 0;
         VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y + step);
     }
     if (cy < AM2_SCROLL_MARGIN) {
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        g_objCtxSet = 0;
         VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y - step);
     }
 #undef cx
@@ -249,13 +240,13 @@ void __cdecl MissionInput(void)
  * once, and the mission plays normally. */
 void __cdecl FrameClockStep(void)
 {
-#define CLOCK    (*(uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
-#define LAST     (*(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS)
-#define DELTA_MS (*(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+#define CLOCK    (g_gameClockMs)
+#define LAST     (g_lastTickMs)
+#define DELTA_MS (g_frameDeltaMs)
     uint32_t  delta;
     uint32_t  now;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_FIXED_STEP) {
+    if (g_fixedStep) {
         LAST  = CLOCK;
         delta = AM2_FIXED_STEP_MS;
         goto store;         /* one store, shared with the clamp's */
@@ -277,7 +268,7 @@ store:
     /* The original converts the delta to a 64-bit integer (it is unsigned),
      * multiplies by a float constant on the x87 stack and stores a float --
      * `fmul dword ptr [0.001f]`, which a float literal gives. */
-    *(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC = delta * 0.001f;
+    g_frameDeltaSec = delta * 0.001f;
 #undef CLOCK
 #undef LAST
 #undef DELTA_MS
@@ -287,10 +278,7 @@ typedef void  (__cdecl *AM2_VoidFn0)(void);
 /* PausedFrameStep is reconstructed below; frame.h declares it. */
 void __cdecl PausedFrameStep(void);
 
-#define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 /* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 /* 0x00425CD0. Sub-state 33's PAUSED arm -- what an in-mission frame does while
  * something has the game stopped, where TakeMenuRequest runs when nothing has.
@@ -327,14 +315,14 @@ void __cdecl MissionPausedFrame(void)
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
         RequestState(1);
-        UnPauseGame(*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS);
+        UnPauseGame(g_eventFlags);
         return;
     }
 
-    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
     PausedFrameStep();
 
-    if (!(*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS & AM2_PAUSE_MAP_WAIT))
+    if (!(g_eventFlags & AM2_PAUSE_MAP_WAIT))
         return;
     if (g_currentBitmap)
         return;
@@ -344,13 +332,13 @@ void __cdecl MissionPausedFrame(void)
     g_currentBitmap = LoadBitmap(
         "mapwait.bmp", 0);
 
-    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
 
     bmp = g_currentBitmap;
     DrawSprite((AM2_Sprite *)bmp,
-               (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+               (g_bitmapAreaW
                 - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_W)) >> 1,
-               (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+               (g_bitmapAreaH
                 - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_H)) >> 1,
                0);
 
@@ -370,15 +358,15 @@ void __cdecl MissionPausedFrame(void)
  * computed -- the same thing here, but it is what the original does. */
 uint32_t __cdecl GetPauseFlags(void)
 {
-    return *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
+    return g_eventFlags;
 }
 
 /* Returns the new mask -- eax holds it on both paths, reloaded after the log. */
 uint32_t __cdecl PauseGame(uint32_t bits)
 {
-#define FLAGS (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
+#define FLAGS (g_eventFlags)
     FLAGS |= bits;
-    if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
+    if (*(const int32_t *)(g_commObject + COMM_OFF_VERBOSE))
         orig_log("PauseGame: %x (set: %x)\n", FLAGS, bits);
     return FLAGS;
 }
@@ -386,7 +374,7 @@ uint32_t __cdecl PauseGame(uint32_t bits)
 uint32_t __cdecl UnPauseGame(uint32_t bits)
 {
     FLAGS &= ~bits;
-    if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
+    if (*(const int32_t *)(g_commObject + COMM_OFF_VERBOSE))
         orig_log("UnPauseGame: %x (reset: %x)\n", FLAGS, bits);
     return FLAGS;
 #undef FLAGS
@@ -398,7 +386,7 @@ uint32_t __cdecl UnPauseGame(uint32_t bits)
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline int32_t CommActive(void)
 {
-    return *(const int32_t *)(g_comm + AM2_COMM_OFF_ACTIVE) != 0;
+    return *(const int32_t *)(g_commObject + AM2_COMM_OFF_ACTIVE) != 0;
 }
 
 /* 0x00427420. Mouse then keyboard, and both are ours -- the original is a call
@@ -438,7 +426,7 @@ void __cdecl FramePost(void)
     ProcessResendQueue();
 
     /* Signed, as the original's `jge`. */
-    if ((int32_t)MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
+    if ((int32_t)MsgField12(g_msgListPool)
         < (int32_t)AM2_COMM_MIN_BUFFERS)
         CommNoBuffers();
 }
@@ -462,7 +450,7 @@ void __cdecl State0Frame(void)
 
     if (g_stateEntered) {
         StateEnter0();
-        *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK = GetTickCount();
+        g_state0Tick = GetTickCount();
     }
 
     MovieStepCurrent();
@@ -515,48 +503,48 @@ typedef void (__cdecl *AM2_VoidFn0)(void);
 void __cdecl State1Enter(void)
 {
     ClearBothSurfaces();
-    SetGameDir(*(const char *const *)(uintptr_t)ADDR_DIR_TITLE_PTR);
+    SetGameDir(g_dirTitlePtr);
     LoadPaletteFile("01_000_00_screen.bmp",
-                    *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
-    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+                    *(void * *)&g_activePalette);
+    SetGamePalette(*(uint8_t * *)&g_activePalette);
 
     BuildFontAlias(1);
     BuildFontAlias(2);
     InitMenuScreen();
 
-    *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
-    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED   = 0;
+    g_presentEnabled = 1;
+    g_stateEntered   = 0;
     RefreshGate(1);
 
     {
-        const uint8_t *comm = g_comm;   /* the POINTER, dereferenced */
+        const uint8_t *comm = g_commObject;   /* the POINTER, dereferenced */
 
         if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
             if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_LOBBY_HOST;
-                *(int32_t *)(uintptr_t)ADDR_MP_SESSION = 1;
+                g_subState = AM2_MENU_MODE_LOBBY_HOST;
+                g_mpSession = 1;
             } else {
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_LOBBY_JOIN;
-                *(int32_t *)(uintptr_t)ADDR_MP_SESSION = 2;
+                g_subState = AM2_MENU_MODE_LOBBY_JOIN;
+                g_mpSession = 2;
             }
         } else {
-            switch (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST) {
+            switch (g_menuRequest) {
             case 7:
             case 9:
             case 13:
             case 18:
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE    =
-                    *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
-                *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = 1;
+                g_subState    =
+                    g_menuRequest;
+                g_menuRequest = 1;
                 break;
             default:
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_TITLE;
+                g_subState = AM2_MENU_MODE_TITLE;
                 break;
             }
         }
     }
 
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_overlayDirty = 1;
     StartAudioStream((void *)"title.wav", 0);
 }
 
@@ -596,16 +584,16 @@ void __cdecl State1Enter(void)
  */
 void __cdecl State1Menu(void)
 {
-    void   *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    void   *dlg = g_paintObject;
 
     if (dlg) {
         ObjVDelete(dlg, 1);
-        *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+        g_paintObject = (void *)0;
     }
 
     /* One arm per screen, in the image's layout order; the case values are
      * the menu modes. */
-    switch (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE) {
+    switch (g_subState) {
     case  1: OpenTitleScreen(); break;
     case  2: OpenSelectMap(); break;
     case  3: OpenSelectPlayer(); break;
@@ -629,14 +617,14 @@ void __cdecl State1Menu(void)
     case 14: OpenOptionsMenu(); break;
     }
 
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     if (dlg) {
-        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
-        dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
+        dlg = g_paintObject;
         ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
 
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+    g_overlayDirty = 0;
 }
 
 /* 0x00426570. State 1 -- the menus.
@@ -659,22 +647,22 @@ void __cdecl State1Frame(void)
     if (g_stateEntered)
         State1Enter();
 
-    int32_t *requestSet = (int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET;
+    int32_t *requestSet = &g_menuRequestSet;
 
     if (*requestSet) {
-        *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
-            *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
+        g_subState =
+            g_menuRequest;
         *requestSet = 0;
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+        g_overlayDirty = 1;
         State1Menu();
     } else if (g_overlayDirty) {
         State1Menu();
     }
 
     if (!GetPauseFlags()) {
-        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
 
-        void *obj = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        void *obj = g_paintObject;
 
         /* its update virtual, as the thiscall the original makes */
         if (obj)
@@ -742,17 +730,17 @@ void __cdecl State1Frame(void)
  * "my change broke it" from "nothing has ever tested this path". */
 void __cdecl LevelTeardown(void)
 {
-    AM2_Widget *dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+    AM2_Widget *dlg = *(AM2_Widget * *)&g_paintObject;
 
     if (dlg) {
         WidgetVDelete(dlg, 1);
-        *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT = (AM2_Widget *)0;
+        *(AM2_Widget * *)&g_paintObject = (AM2_Widget *)0;
     }
 
     StopAllSounds();
     FreeObjScripts();
     ResetScriptState();
-    ScriptResetTokens((AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
+    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
     ResetPads();
     call0(ADDR_FREE_ARMY_LISTS_ALIAS);
     FreeSeqContexts();
@@ -819,81 +807,81 @@ typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t);
  * freed. The progress bar is stepped at ten fixed points from 10 to 100. */
 void __cdecl State2Enter(void)
 {
-    AM2_Widget *screen = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+    AM2_Widget *screen = *(AM2_Widget * *)&g_paintObject;
     am2_FILE   *save   = (am2_FILE *)0;
     AM2_Sprite *splash;
     void       *leader;
 
     if (screen) {
         WidgetVDelete(screen, 1);
-        *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+        g_paintObject = (void *)0;
     }
-    if (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
-        FreeBitmap((void **)(uintptr_t)ADDR_CURRENT_BITMAP);
+    if (g_currentBitmap)
+        FreeBitmap(&g_currentBitmap);
 
     ClearBothSurfaces();
-    *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
+    g_presentEnabled = 1;
 
-    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK == 0)
+    if (*(const uint8_t *)&g_gameprocBlock == 0)
         goto no_load;
-    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_STR_B == 0) {
+    if (*(const uint8_t *)&g_gameprocStrB == 0) {
     no_load:
-        *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
-    } else if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING != 0) {
+        g_loadPending = 0;
+    } else if (g_loadPending != 0) {
         save = OpenSaveForLoad();
         if (!save) {
-            *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     = 1;
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX  = 1;
+            g_loadPending = 0;
+            g_levelId     = 1;
+            g_levelIndex  = 1;
         }
     }
 
-    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    SetGameDir(g_tilesetPath);
     LoadPaletteFile("palette.bmp",
-                    *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
-    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+                    *(void * *)&g_activePalette);
+    SetGamePalette(*(uint8_t * *)&g_activePalette);
 
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_DF)))
-        SpriteSetLoad((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    if (g_optDf)
+        SpriteSetLoad(g_tilesetPath);
 
     ZeroUnread50C34C();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0
-        && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
-        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
+    if (g_optDbg != 0
+        && g_mpSession == 0)
+        g_scriptReloading = 1;
+    if (g_mpSession != 0)
+        g_fogOfWar = 0;
     else
-        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 1;
+        g_fogOfWar = 1;
 
     ResetItemsAndUids();
-    *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 0;
+    g_haveDefaultCof = 0;
 
     /* A default .cof only matters for a fresh campaign level past the first. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
-        && *(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0
-        && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 1) {
+    if (g_mpSession == 0
+        && g_loadPending == 0
+        && g_levelId > 1) {
         uint8_t find[AM2_FINDDATA_BYTES];
 
         SetGameDir("save");
         int32_t h = orig_findfirst(
             "default.cof", find);
         if (h != -1) {
-            *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 1;
+            g_haveDefaultCof = 1;
             orig_findclose(h);
         }
     }
 
     SetGameDir("bitmaps");
-    splash = LoadBitmap((const char *)(uintptr_t)ADDR_LEVEL_STR_B, 1);
+    splash = LoadBitmap(g_levelStrB, 1);
     if (!splash)
         splash = LoadBitmap("load_default.bmp", 1);
     if (splash) {
-        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
         DrawSprite(splash,
-                   (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+                   (g_screenW
                     - splash->bounds.right) / 2,
-                   (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H
+                   (g_screenH
                     - splash->bounds.bottom) / 2,
                    0);
     }
@@ -903,16 +891,16 @@ void __cdecl State2Enter(void)
     BuildFontAlias(0);
     BuildFontAlias(1);
 
-    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    SetGameDir(g_tilesetPath);
     LoadDefTables();
-    Teardown445F40((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    Teardown445F40(g_dirScratch);
     DeclareBuiltinNames();
     ResetPadsAlias();
     FreeObjScripts();
 
-    StartAudioStream((char *)(uintptr_t)ADDR_LEVEL_STR_A, 1);
-    LoadMap((const char *)(uintptr_t)ADDR_MAP_NAME,
-            (const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    StartAudioStream(g_levelStrA, 1);
+    LoadMap(&g_mapName_,
+            g_tilesetPath);
 
     ProgressBar(0x0A);
     LoadTilesetPalettes();
@@ -933,34 +921,34 @@ void __cdecl State2Enter(void)
     SeqSubsystemInit();
     InitRemapsAndLists();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF != 0)
+    if (g_haveDefaultCof != 0)
         LoadDefaultCof();
-    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+    if (g_loadPending == 0)
         PlaceScenario();
 
     ProgressBar(0x50);
-    *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
-    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP      = 1;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET    = 1;
+    g_levelFlagE30 = 1;
+    g_viewSnap      = 1;
+    g_objCtxSet    = 1;
 
     BuildHudWidgets();
     InitMenuScreen();
     RefreshGate(1);
-    *(int32_t *)(uintptr_t)ADDR_FULL_REDRAW = 1;
+    g_fullRedraw = 1;
     ProgressBar(0x5A);
     ResetTimers();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+    if (g_loadPending == 0)
         LoadLevelScript();
     else
         LoadGame(save);
 
     ProgressBar(0x64);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MISSION_RETRY != 0) {
-        int32_t n = *(const int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT + 1;
-        *(int32_t *)(uintptr_t)ADDR_MISSION_RETRY = 0;
-        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = n;
+    if (g_missionRetry != 0) {
+        int32_t n = g_attemptCount + 1;
+        g_missionRetry = 0;
+        g_attemptCount = n;
         orig_log("Attempt# %d\n", n);
     }
     orig_log("calculating region data...\n");
@@ -969,7 +957,7 @@ void __cdecl State2Enter(void)
 
     /* Select whatever the local player leads -- its vehicle if it is in one. */
     leader = LookupOwnerObj(
-                 (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+                 (int32_t)g_defaultOwner);
     if (leader) {
         SelectInventorySlot(leader,
             *(const int32_t *)((const uint8_t *)leader + UNIT_OFF_INVENTORY_SEL));
@@ -979,7 +967,7 @@ void __cdecl State2Enter(void)
                 *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING)));
         else
             SelectUnit(leader);
-        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+        g_viewSnap = 1;
     }
 
     /* `call 0x45CAA0` at 0x0042568A with NOTHING pushed -- the same
@@ -998,16 +986,16 @@ void __cdecl State2Enter(void)
      * our side ran straight past MESSAGE FROM HQ while the original sat on
      * it. 189,990 pixels, twice, and identical logs and object state either
      * way: the mission had loaded correctly and only the pause was missing. */
-    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0
-        && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
-        && *(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0)
+    if (g_loadPending == 0
+        && g_mpSession == 0
+        && g_optDbg != 0)
         PauseGame(8);
 
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE        = AM2_MENU_MODE_PLAY;
-    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
-    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED    = 0;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY    = 1;
-    *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
+    g_subState        = AM2_MENU_MODE_PLAY;
+    g_menuRequest     = 0;
+    g_stateEntered    = 0;
+    g_overlayDirty    = 1;
+    g_scriptReloading = 0;
     SendGamePause(0, 0x10000);
 }
 
@@ -1020,9 +1008,9 @@ void __cdecl State2Frame(void)
 
     if (g_stateEntered) {
         State2Enter();
-        if (*(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE) {
+        if (g_stateEnterOnce) {
             TakeMenuRequest();
-            *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 0;
+            g_stateEnterOnce = 0;
             return;
         }
         if (GetPauseFlags())
@@ -1122,74 +1110,74 @@ void __cdecl State3Frame(void)
  * RefreshDraw when ADDR_STATE_ENTER_ONCE is clear. */
 void __cdecl TakeMenuRequest(void)
 {
-    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
-        *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
-            *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
-        *(int32_t *)(uintptr_t)ADDR_STATE_PENDING    = 1;
+    if (g_menuRequestSet) {
+        g_subState =
+            g_menuRequest;
+        g_menuRequest     = 0;
+        g_menuRequestSet = 0;
+        g_statePending    = 1;
         return;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
-        if (!*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING) {
-            *(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS = 0;
-            *(uint32_t *)(uintptr_t)ADDR_CLOCK_BASE_MS =
-                *(const int32_t *)(uintptr_t)ADDR_FIXED_STEP ? 0u : Ticks();
-            *(uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS = 0;
+    if (g_overlayDirty) {
+        if (!g_loadPending) {
+            g_frameDeltaMs = 0;
+            *(uint32_t *)&g_clockBaseMs =
+                g_fixedStep ? 0u : Ticks();
+            g_gameClockMs = 0;
             MissionStartup();
         }
 
         if (g_mpSession)
-            *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = 1;
+            g_netSettleCount = 1;
 
-        *(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS =
-            *(const int32_t *)(uintptr_t)ADDR_FIXED_STEP ? 0u : Ticks();
+        g_lastTickMs =
+            g_fixedStep ? 0u : Ticks();
 
         orig_log_noargs();      /* no arguments -- the original's, see above */
 
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
-        *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING  = 0;
-    } else if (*(const int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD) {
+        g_scriptReload = 0;
+        g_overlayDirty = 0;
+        g_loadPending  = 0;
+    } else if (g_scriptReload) {
         /* The option is read afresh after the reload, not held. */
-        if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG)
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+        if (g_optDbg)
+            g_scriptReloading = 1;
 
-        ReadScript((const char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH,
-                   (AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
+        ReadScript(g_scriptReloadPath,
+                   (AM2_ScriptCtx *)g_scriptContext);
         DeclareRuleVars();
         MissionStartup();
 
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
-        if (!*(const int32_t *)(uintptr_t)ADDR_OPT_DBG)
+        g_scriptReload = 0;
+        if (!g_optDbg)
             return;
 
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
-        *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_SUBSTATE_INFO_BITMAP;
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+        g_scriptReloading = 0;
+        g_subState = AM2_SUBSTATE_INFO_BITMAP;
+        g_overlayDirty = 1;
         return;
     }
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (!g_netGame) {
         FrameClockStep();
         TimerTick();
     }
 
     MissionInput();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
-        *(uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_SEC = AM2_NET_FRAME_DELTA_SEC;
+    if (g_netGame) {
+        *(uint32_t *)&g_frameDeltaSec = AM2_NET_FRAME_DELTA_SEC;
 
         if (g_mpSession) {
-            int32_t n = *(const int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT;
+            int32_t n = g_netSettleCount;
 
             if (n > 0) {
                 n++;
-                *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = n;
+                g_netSettleCount = n;
                 if (n == AM2_NET_SETTLE_FRAMES) {
-                    *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = 0;
-                    if (*(const int32_t *)(g_comm + COMM_OFF_IS_HOST))
+                    g_netSettleCount = 0;
+                    if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
                         AiTakeAbandoned();
                 }
             }
@@ -1200,10 +1188,10 @@ void __cdecl TakeMenuRequest(void)
     HudUpdate();
     ClearFrameCounts();
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (!g_netGame) {
         ObjFrameSweep();
     } else {
-        void *paint = *(void *const *)(uintptr_t)ADDR_PAINT_OBJECT;
+        void *paint = g_paintObject;
 
         if (paint)
             ObjVUpdate(paint);
@@ -1217,7 +1205,7 @@ void __cdecl TakeMenuRequest(void)
     FlameTick();
     AdvanceSecondDeadline();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE) {
+    if (g_stateEnterOnce) {
         HudPaint();
         PresentFrame();
         return;
@@ -1227,7 +1215,6 @@ void __cdecl TakeMenuRequest(void)
 
 /* Spelled exactly as surface.cpp, mapdraw.cpp and palette.cpp spell it, so the
  * four stay one definition; checkglobals enforces that. */
-#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
 
 /* 0x004266F0, one caller -- RunFrame, on entering state 3. State 3 is the
@@ -1261,7 +1248,7 @@ void __cdecl StateEnter3(void)
     ClearBothSurfaces();
     RefreshGate(0);
 
-    MovieBuildName(name, (const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY);
+    MovieBuildName(name, &g_movieToPlay);
     PlayMovie(name, 0);
 
     LatchKeyState();
@@ -1269,8 +1256,8 @@ void __cdecl StateEnter3(void)
     /* GetTickCount itself, not Ticks: the original calls the import here,
      * so this stamp is milliseconds since boot even where Ticks would use the
      * performance counter. */
-    *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK   = GetTickCount();
-    *(int32_t  *)(uintptr_t)ADDR_STATE_ENTERED = 0;
+    g_state0Tick   = GetTickCount();
+    g_stateEntered = 0;
 }
 
 
@@ -1322,9 +1309,9 @@ void __cdecl StateEnter0(void)
     RefreshGate(0);
 
     over = GameOverState();
-    ((const AM2_StateAction *)(uintptr_t)ADDR_STATE_ACTIONS)[over].onEnter();
+    (g_stateActions)[over].onEnter();
 
-    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED = 0;
+    g_stateEntered = 0;
 }
 
 
@@ -1372,24 +1359,24 @@ void __cdecl StateEnter0(void)
  * found it. */
 void __cdecl Substate22(void)
 {
-    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
+    if (g_menuRequestSet) {
         FreeBitmap(&g_currentBitmap);
-        *(int32_t *)(uintptr_t)ADDR_MENU_MODE        = AM2_SUBSTATE_PLAY;
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY    = 0;
+        g_subState        = AM2_SUBSTATE_PLAY;
+        g_menuRequestSet = 0;
+        g_overlayDirty    = 0;
         return;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+    if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
 #define BMP ((uint8_t *)g_currentBitmap)
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+        g_overlayDirty = 0;
         if (BMP) {
-            SetDrawTarget(g_primarySurface);
+            SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
             DrawSprite((AM2_Sprite *)BMP,
-                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+                       (g_screenW
                         - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
-                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H
+                       (g_screenH
                         - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
                        0);
         }
@@ -1397,10 +1384,10 @@ void __cdecl Substate22(void)
     }
 
     if (DismissKeyReleased()
-        || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)) {
+        || (g_mouseButton
+            && g_mouseChanged)) {
         SendGamePause(0, AM2_EVENT_FLAG_8);
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+        g_menuRequestSet = 1;
     }
 }
 
@@ -1435,11 +1422,11 @@ void __cdecl ShowMpResult(int32_t result)
 {
     UnPauseGame(AM2_MP_RESULT_UNPAUSE);
     SetGameDir("bitmaps");
-    SetDrawTarget(g_primarySurface);
+    SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
 
     PausedFrameStep();
-    CommReportStats(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
-    CommPublishResult(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
+    CommReportStats(*(void * *)&g_commObject);
+    CommPublishResult(*(void * *)&g_commObject);
 
     if (result == AM2_MP_RESULT_WON) {
         FreeBitmap(&g_currentBitmap);
@@ -1455,11 +1442,11 @@ void __cdecl ShowMpResult(int32_t result)
             LoadBitmap("mphostleft.bmp", 0);
     }
 
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_SUBSTATE_ESCAPE;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_subState     = AM2_SUBSTATE_ESCAPE;
+    g_overlayDirty = 1;
 
     orig_log_noargs();
-    CommReopenSession(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
+    CommReopenSession(*(void * *)&g_commObject);
 }
 
 
@@ -1525,15 +1512,15 @@ void __cdecl RefreshDraw(void)
 
     bmp = g_currentBitmap;
     if (bmp
-        && *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST != AM2_SUBSTATE_BITMAP
-        && *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST != AM2_SUBSTATE_ESCAPE
-        && !*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+        && g_menuRequest != AM2_SUBSTATE_BITMAP
+        && g_menuRequest != AM2_SUBSTATE_ESCAPE
+        && !g_overlayDirty) {
         int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
         int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
 
         DrawSprite((AM2_Sprite *)bmp,
-                   (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1,
-                   (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1,
+                   (g_bitmapAreaW - w) >> 1,
+                   (g_bitmapAreaH - h) >> 1,
                    0);
     }
 
@@ -1588,28 +1575,28 @@ void __cdecl RefreshDraw(void)
  * request. It does. */
 void __cdecl Substate34Escape(void)
 {
-    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
+    if (g_menuRequestSet) {
         FreeBitmap(&g_currentBitmap);
         RequestState(1);
         /* The comm object is read after the calls. */
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST =
-            *(const int32_t *)(*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+        g_menuRequest =
+            *(const int32_t *)(g_commObject
                                + COMM_OFF_IS_HOST)
                 ? AM2_MENU_REQ_MP_HOST : AM2_MENU_REQ_MP_JOIN;
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
+        g_menuRequestSet = 0;
         return;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+    if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
 #define BMP ((uint8_t *)g_currentBitmap)
-        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+        g_overlayDirty = 0;
         if (BMP) {
-            SetDrawTarget(g_primarySurface);
+            SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
             DrawSprite((AM2_Sprite *)BMP,
-                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+                       (g_bitmapAreaW
                         - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
-                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+                       (g_bitmapAreaH
                         - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
                        0);
         }
@@ -1617,8 +1604,8 @@ void __cdecl Substate34Escape(void)
     }
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+        g_menuRequest     = 0;
+        g_menuRequestSet = 1;
     }
 }
 
@@ -1631,7 +1618,7 @@ void __cdecl State4Frame(void)
     if (!g_stateEntered)
         return;
 
-    PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, WM_CLOSE, 0, 0);
+    PostMessageA(*(HWND *)&g_enumContext, WM_CLOSE, 0, 0);
     g_stateEntered = 0;
 }
 
@@ -1685,7 +1672,7 @@ void __cdecl PollMovieSkipKey(void)
         /* abs() of the COMPARISON, not of the difference: the parenthesis
          * is misplaced in the original, which compiles the unsigned test and
          * then takes abs of its 0 or 1. The same answer either way. */
-        if (abs(GetTickCount() - *(const uint32_t *)(uintptr_t)ADDR_STATE0_TICK
+        if (abs(GetTickCount() - g_state0Tick
                 > AM2_MOVIE_SKIP_HOLDOFF_MS)) {
             MovieEndCurrent();
             LatchKeyState();
@@ -1719,9 +1706,9 @@ void __cdecl State1Common(void)
         }
     }
 
-    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
+    SetDrawTarget(g_backBuffer);
 
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 
     DrawMenuCursor();
@@ -1845,13 +1832,13 @@ void __cdecl PausedFrameStep(void)
         { 0x20000u, 0x40000u, 0x80000u, 0x100000u };
 
     /* The comm object is read at every use. */
-#define comm (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (g_commObject)
     const int16_t *xy;
     int32_t        active = 0;
     int32_t        slot;
     int32_t        n;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+    if (g_mpSession == 0)
         return;
 
 
@@ -1862,7 +1849,7 @@ void __cdecl PausedFrameStep(void)
     }
 
     active--;
-    xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
+    xy = (const int16_t *)(g_mpRowCoords
                            + (uint32_t)active * 16u);
 
     for (slot = 0; slot < 4; xy += 2, slot++) {
@@ -1897,14 +1884,14 @@ void __cdecl PausedFrameStep(void)
             variant = 3;
 
         /* The pause flags are read afresh at each test. */
-#define pause (*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
-        if (slot == *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT) {
+#define pause (g_eventFlags)
+        if (slot == g_ourSlot) {
             if (pause & 8u)
                 badge = 1;
             else if (pause & 0x10000u)
                 variant = 0;
             else if (*(const int32_t *)(rec + 0x274u) == 0
-                     && *(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0)
+                     && g_netGame != 0)
                 variant = 1;
         } else if (pause & kPauseBitsB[slot]) {
             badge = 1;
@@ -1913,12 +1900,12 @@ void __cdecl PausedFrameStep(void)
         } else if (pause & kPauseBitsC[slot]) {
             variant = 0;
         } else if (*(const int32_t *)(rec + 0x274u) == 0
-                   && *(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0) {
+                   && g_netGame != 0) {
             variant = 1;
         }
 
         army = ((AM2_Comm *)comm)->CommArmyOfSlot(slot);
-        DrawSprite((*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MP_MARK_GRID)
+        DrawSprite((g_mpMarkGrid)
                        [army * 5 + variant],
                    xy[0], xy[1], 0);
 
@@ -1929,15 +1916,15 @@ void __cdecl PausedFrameStep(void)
             int32_t tx = ((variant - 3) != 0 ? -1 : 0) & ~0x1F;
 
             tx += 0x5E + xy[0];
-            DrawSprite((*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MP_TEAM_SPRITES)
+            DrawSprite((g_mpTeamSprites)
                            [*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258)],
                        tx, xy[1] + 3, 0);
         }
 
         if (badge) {
             AM2_Sprite *spr = (variant == 3)
-                ? *(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_A
-                : *(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_B;
+                ? g_mpMarkA
+                : g_mpMarkB;
 
             DrawSprite(spr, xy[0], xy[1], 0);
         }
@@ -1945,7 +1932,7 @@ void __cdecl PausedFrameStep(void)
         if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
             DrawLatencyBar(active, slot);
         else
-            DrawSprite(*(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_C,
+            DrawSprite(g_mpMarkC,
                        xy[0] + 0x37, xy[1] + 3, 0);
 
         if (variant <= 2)
@@ -1954,10 +1941,10 @@ void __cdecl PausedFrameStep(void)
         am2_sprintf(scoreText, "%d",
                     GetArmyScore(comm, slot));
         width = TextExtent(scoreText, 1, NULL);
-        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;
         DrawText(xy[0] - width + 0x32, xy[1] + 4, scoreText, 1, 0,
-                 *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+                 g_hiliteColour);
         UnlockSurface();
 
         if (mates > 1) {
@@ -1965,14 +1952,14 @@ void __cdecl PausedFrameStep(void)
                         ((AM2_Comm *)comm)->CommTeamScore(slot));
             width = TextExtent(teamText, 1, NULL);
             if (!LockSurface(
-                    *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+                    *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
             DrawText(xy[0] - width + 0x58, xy[1] + 4, teamText, 1, 0,
-                     *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+                     g_hiliteColour);
             UnlockSurface();
         }
 
-        if (*(const int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON) {
+        if (g_infoOverlayOn) {
             RECT clip;
 
             clip.left   = xy[0];
@@ -1980,32 +1967,32 @@ void __cdecl PausedFrameStep(void)
             clip.bottom = xy[1] + 0x14 + 0x14;
             clip.right  = xy[0] + 0x6E;
             if (!LockSurface(
-                    *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+                    *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
             DrawTextClipped(xy[0] + 2, xy[1] + 0x14 + 2,
                             (const char *)(rec + 0x218u), 1, clip,
-                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+                            g_whiteInk);
             UnlockSurface();
         }
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON) {
+    if (g_infoOverlayOn) {
         char buf[284];
         RECT clip;
 
         am2_sprintf(buf, "Game type: %s, Goal: %d",
                     (const char *)ScriptListFind(
-                        (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME) + 0x80,
-                    *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+                        &g_mpScriptName) + 0x80,
+                    g_scoreLimit);
 
         clip.left   = xy[0];
         clip.bottom = xy[1] + 0x24 + 0x14;
         clip.top    = xy[1] + 0x24;
         clip.right  = xy[0] + 0x190;
-        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;
         DrawTextClipped(xy[0] + 2, xy[1] + 0x24 + 2, buf, 1, clip,
-                        *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+                        g_whiteInk);
         UnlockSurface();
     }
 #undef comm

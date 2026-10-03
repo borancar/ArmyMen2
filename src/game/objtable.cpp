@@ -301,7 +301,7 @@ void __cdecl SelectUnit(void *obj)
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
-#define REC ((int32_t *)(uintptr_t)ADDR_SELECTED_UIDS)
+#define REC ((int32_t *)g_selectedUids)
     if (!o)
         return;
     if (REC[1] > AM2_MAX_SELECTED)
@@ -313,8 +313,7 @@ void __cdecl SelectUnit(void *obj)
 
     ((AM2_Rec *)REC)->PtrListPush((void *)(uintptr_t)*(const uint32_t *)(o + 4));
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
-    OnSelectionChanged(*(const uint32_t *)(uintptr_t)
-                              ADDR_ZERO_POINT);
+    OnSelectionChanged(g_zeroPoint);
 #undef REC
 }
 
@@ -337,7 +336,7 @@ void __cdecl DeselectUnit(void *obj)
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
-#define REC ((int32_t *)(uintptr_t)ADDR_SELECTED_UIDS)
+#define REC ((int32_t *)g_selectedUids)
     if (!o)
         return;
 
@@ -352,8 +351,7 @@ void __cdecl DeselectUnit(void *obj)
     }
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
-    OnSelectionChanged(*(const uint32_t *)(uintptr_t)
-                              ADDR_ZERO_POINT);
+    OnSelectionChanged(g_zeroPoint);
 #undef REC
 }
 

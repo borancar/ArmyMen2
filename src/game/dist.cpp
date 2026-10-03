@@ -138,8 +138,6 @@ uint8_t __cdecl Log2Mask(int32_t value)
     }
 }
 
-#define g_atanSin ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_SIN)
-#define g_atanCos ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_COS)
 
 /* The bodies the original writes out at each use: abs() -- VC6's cdq/xor/sub
  * intrinsic -- and the steeper axis tested first. */

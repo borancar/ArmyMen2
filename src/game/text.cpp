@@ -49,18 +49,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#define g_surfaceLocked   (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_glyphOffset ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
-#define g_fontBase    ((uint8_t *const *)(uintptr_t)ADDR_FONT_BASES)
-#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 /* Compared for identity only, never dereferenced, so a flat module can
  * hold it without naming a COM type. It was int32_t here, which is the
  * width hazard this project has fixed-width types to avoid: on the
  * native build a pointer is not 32 bits and the compare would truncate. */
-#define g_drawTarget     (*(void *const *)(uintptr_t)ADDR_DRAW_TARGET)
-#define g_primarySurface (*(void *const *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_originDX    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
-#define g_originDY    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
 
 void __cdecl DrawText(int32_t x, int32_t y, const char *str,
                       int32_t font, int32_t arg4, int32_t colour)
@@ -109,7 +101,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         dstX = penX;
         dstY = y;
 
-        if (!ClipRect(&src, &g_screenClip, &dstX, &dstY, &out))
+        if (!ClipRect(&src, &(*(const AM2_Rect *)g_screenClip), &dstX, &dstY, &out))
             return;                 /* not `continue` -- see the header note */
 
         if (g_drawTarget == g_primarySurface) {

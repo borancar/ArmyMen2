@@ -109,27 +109,12 @@ static_assert(sizeof(DDSURFACEDESC) == 0x6C, "the 0x6c bytes it reserves");
 static_assert((DISCL_EXCLUSIVE | DISCL_FOREGROUND) == 5, "mouse cooperation");
 static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperation");
 
-#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_ddraw2      (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
-#define g_primarySurface     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_backBuffer  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
-#define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
-#define g_drawTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
-#define g_surfaceLocked (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_backgroundColour (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
-#define g_dinput      (*(LPDIRECTINPUTA *)(uintptr_t)ADDR_DINPUT)
-#define g_diMouse     (*(LPDIRECTINPUTDEVICEA *)(uintptr_t)ADDR_DI_MOUSE)
-#define g_diKeyboard  (*(LPDIRECTINPUTDEVICEA *)(uintptr_t)ADDR_DI_KEYBOARD)
 
-#define g_hInstance   (*(HINSTANCE *)(uintptr_t)ADDR_HINSTANCE)
-#define g_screenW     (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W)
-#define g_screenH     (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H)
-#define g_windowed    (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
 
-#define kIID_IDirectDraw2 (*(const GUID *)(uintptr_t)ADDR_IID_DIRECTDRAW2)
-#define kGuidSysMouse     (*(const GUID *)(uintptr_t)ADDR_GUID_SYS_MOUSE)
-#define kGuidSysKeyboard  (*(const GUID *)(uintptr_t)ADDR_GUID_SYS_KEYBOARD)
+#define kIID_IDirectDraw2 (g_iidDirectdraw2)
+#define kGuidSysMouse     (g_guidSysMouse)
+#define kGuidSysKeyboard  (g_guidSysKeyboard)
 /* THE DATA FORMATS ARE THE API'S, NOT THE IMAGE'S, in the standalone build.
  * The original's c_dfDIMouse is intact at ADDR_DF_MOUSE, but its `rgodf`
  * points at 0x004643A0 -- a const array MSVC placed BELOW .rdata, inside the
@@ -146,10 +131,10 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 #define kFormatMouse      (&c_dfDIMouse)
 #define kFormatKeyboard   (&c_dfDIKeyboard)
 #else
-#define kFormatMouse      ((LPCDIDATAFORMAT)(uintptr_t)ADDR_DF_MOUSE)
-#define kFormatKeyboard   ((LPCDIDATAFORMAT)(uintptr_t)ADDR_DF_KEYBOARD)
+#define kFormatMouse      ((LPCDIDATAFORMAT)((uintptr_t)g_dfMouse))
+#define kFormatKeyboard   ((LPCDIDATAFORMAT)((uintptr_t)g_dfKeyboard))
 #endif
-#define kBufferSizeProp   ((LPCDIPROPHEADER)(uintptr_t)ADDR_DIPROP_BUFFER_SIZE)
+#define kBufferSizeProp   ((LPCDIPROPHEADER)((uintptr_t)g_dipropBufferSize))
 
 /* The game's import thunks, not ours -- see the note at the top. */
 typedef HRESULT (WINAPI *am2_ddraw_create_fn)(GUID *, LPDIRECTDRAW *, IUnknown *);
@@ -252,7 +237,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
             DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;
         ddsd.dwBackBufferCount = 1;
     }
-    hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &g_primarySurface, NULL);
+    hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &(*(LPDIRECTDRAWSURFACE *)&g_primarySurface), NULL);
     if (hr)
         return hr;
 
@@ -261,7 +246,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
                                              DDSCAPS_OFFSCREENPLAIN, -1);
     } else {
         caps.dwCaps = DDSCAPS_BACKBUFFER;
-        hr = IDirectDrawSurface_GetAttachedSurface(g_primarySurface, &caps,
+        hr = IDirectDrawSurface_GetAttachedSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), &caps,
                                                    &g_backBuffer);
         if (hr)
             return hr;
@@ -269,11 +254,11 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
 
     g_offscreen  = CreateOffscreenSurface(g_screenW, g_screenH,
                                          DDSCAPS_OFFSCREENPLAIN, -1);
-    ClearSurface(g_primarySurface, g_backgroundColour);
+    ClearSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), g_backgroundColour);
     ClearSurface(g_backBuffer, g_backgroundColour);
 
     /* Drawing starts aimed at the back buffer, with no lock held. */
-    g_drawTarget    = g_backBuffer;
+    (*(LPDIRECTDRAWSURFACE *)&g_drawTarget)    = g_backBuffer;
     g_surfaceLocked = 0;
     return 0;
 }
@@ -333,19 +318,17 @@ int32_t __cdecl InitInput(HWND hWnd)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmemset-transposed-args"
 #endif
-    memset((void *)(uintptr_t)ADDR_KEYS_BUFFER_A, 0x100, 0);
-    memset((void *)(uintptr_t)ADDR_KEYS_BUFFER_B, 0x100, 0);
-    *(uint32_t *)(uintptr_t)ADDR_KEYS_PREV_PTR = ADDR_KEYS_BUFFER_B;
-    memset((void *)(uintptr_t)ADDR_KEY_PRESSED, 0x400, 0);
+    memset(g_keysBufferA, 0x100, 0);
+    memset(g_keysBufferB, 0x100, 0);
+    *(uint32_t *)&g_prevKeys = ((uintptr_t)g_keysBufferB);
+    memset((void *)g_keyPressed, 0x400, 0);
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
-    *(uint32_t *)(uintptr_t)ADDR_KEYS_NOW_PTR = ADDR_KEYS_BUFFER_A;
+    *(uint32_t *)&g_curKeys = ((uintptr_t)g_keysBufferA);
     return 1;
 }
 
-#define g_diDevice3      (*(LPDIRECTINPUTDEVICEA *)(uintptr_t)ADDR_DI_DEVICE_3)
-#define g_mouseAcquired  (*(int32_t *)(uintptr_t)ADDR_DI_MOUSE_ACQUIRED)
 
 /* Unacquire, then Release, then forget. */
 /* Written out in place for each device, as the original has it: the global
@@ -412,18 +395,7 @@ static_assert((uint32_t)DIERR_INPUTLOST == 0x8007001Eu, "DIERR_INPUTLOST");
 #define BUTTON_DOWN 0x80u
 static_assert(sizeof(DIDEVICEOBJECTDATA) == 16, "DIDEVICEOBJECTDATA");
 
-#define g_mouseDX      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DX)
-#define g_mouseDY      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DY)
-#define g_mouseDZ      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DZ)
-#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-#define g_mouseClaimed ((int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED)
-#define g_mouseMoved   (*(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
 
-#define g_cursorX      (*(int32_t *)(uintptr_t)ADDR_CURSOR_X)
-#define g_cursorY      (*(int32_t *)(uintptr_t)ADDR_CURSOR_Y)
-#define g_cursorPoint  (*(int32_t *)(uintptr_t)ADDR_CURSOR_POINT)
-#define g_screenClip   (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 
 /* One per button, in the order the button arrays use. */
 typedef struct {
@@ -431,7 +403,6 @@ typedef struct {
     uint32_t tick;      /* GetTickCount then */
 } AM2_MousePress;
 
-#define g_mousePress   ((AM2_MousePress *)(uintptr_t)ADDR_MOUSE_PRESS)
 
 typedef int32_t (__cdecl *am2_clamp_fn)(int32_t v, int32_t lo, int32_t hi);
 
@@ -461,8 +432,8 @@ void __cdecl UpdateMouseState(void)
 
     g_cursorX += g_mouseDX;
     g_cursorY += g_mouseDY;
-    g_cursorX = Clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
-    g_cursorY = Clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
+    g_cursorX = Clamp(g_cursorX, (*(const AM2_Rect *)g_screenClip).left, (*(const AM2_Rect *)g_screenClip).right - 1);
+    g_cursorY = Clamp(g_cursorY, (*(const AM2_Rect *)g_screenClip).top, (*(const AM2_Rect *)g_screenClip).bottom - 1);
 
     /* x first here schedules y's store first, as the image has it. */
     ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;
@@ -471,27 +442,27 @@ void __cdecl UpdateMouseState(void)
     /* The three buttons are written out, not looped -- VC6 does not unroll
      * -- and the left one's whole condition is asked a second time for the
      * grab clear: the image branches on the change flag again there. */
-    if (g_mouseButton[0] && g_mouseChanged[0]) {
-        g_mousePress[0].point = g_cursorPoint;
-        g_mousePress[0].tick  = tick;
+    if ((&g_mouseButton)[0] && (&g_mouseChanged)[0]) {
+        ((AM2_MousePress *)g_mousePress)[0].point = g_cursorPoint;
+        ((AM2_MousePress *)g_mousePress)[0].tick  = tick;
     }
-    if (g_mouseButton[0] && g_mouseChanged[0])
-        *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = 0;
-    if (g_mouseButton[1] && g_mouseChanged[1]) {
-        g_mousePress[1].point = g_cursorPoint;
-        g_mousePress[1].tick  = tick;
+    if ((&g_mouseButton)[0] && (&g_mouseChanged)[0])
+        g_mouseGrab = 0;
+    if ((&g_mouseButton)[1] && (&g_mouseChanged)[1]) {
+        ((AM2_MousePress *)g_mousePress)[1].point = g_cursorPoint;
+        ((AM2_MousePress *)g_mousePress)[1].tick  = tick;
     }
-    if (g_mouseButton[2] && g_mouseChanged[2]) {
-        g_mousePress[2].point = g_cursorPoint;
-        g_mousePress[2].tick  = tick;
+    if ((&g_mouseButton)[2] && (&g_mouseChanged)[2]) {
+        ((AM2_MousePress *)g_mousePress)[2].point = g_cursorPoint;
+        ((AM2_MousePress *)g_mousePress)[2].tick  = tick;
     }
 
-    if (g_mouseChanged[0] || g_mouseChanged[1])
+    if ((&g_mouseChanged)[0] || (&g_mouseChanged)[1])
         g_mouseMoved = 1;
 
     if (g_mouseDX || g_mouseDY || g_mouseMoved)
-        *(int32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(int32_t *)&g_mouseActivity =
+            *(const int32_t *)&g_gameClockMs;
 }
 
 /* One button event. `changed` is against the previous state rather than a
@@ -501,18 +472,18 @@ void __cdecl UpdateMouseState(void)
  * image has it (an inline function or a join-side store keeps one join). */
 #define MouseButton(n, data)                                                  \
     do {                                                                      \
-        int32_t was_ = g_mouseButton[n];                                      \
+        int32_t was_ = (&g_mouseButton)[n];                                      \
         int32_t now_;                                                         \
                                                                               \
         if ((data) & BUTTON_DOWN) {                                           \
             now_ = 1;                                                         \
-            g_mouseButton[n] = now_;                                          \
+            (&g_mouseButton)[n] = now_;                                          \
         } else {                                                              \
             now_ = 0;                                                         \
-            g_mouseClaimed[n] = 0;                                            \
-            g_mouseButton[n] = now_;                                          \
+            (&g_mouseClaimed)[n] = 0;                                            \
+            (&g_mouseButton)[n] = now_;                                          \
         }                                                                     \
-        g_mouseChanged[n] = (now_ != was_);                                   \
+        (&g_mouseChanged)[n] = (now_ != was_);                                   \
     } while (0)
 
 void __cdecl PollMouse(void)
@@ -535,9 +506,9 @@ void __cdecl PollMouse(void)
     g_mouseDX = 0;
     g_mouseDY = 0;
     g_mouseDZ = 0;
-    g_mouseChanged[0] = 0;
-    g_mouseChanged[1] = 0;
-    g_mouseChanged[2] = 0;
+    (&g_mouseChanged)[0] = 0;
+    (&g_mouseChanged)[1] = 0;
+    (&g_mouseChanged)[2] = 0;
     g_mouseMoved = 0;
 
     for (;;) {
@@ -639,10 +610,6 @@ static_assert(DIK_LMENU == 0x38 && DIK_RMENU == 0xB8, "alt scancodes");
 #define REPEAT_FIRST_MS   250u
 #define REPEAT_NEXT_MS    150u
 
-#define g_curKeys    (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
-#define g_prevKeys   (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
-#define g_keyRepeat  ((uint32_t *)(uintptr_t)ADDR_KEY_REPEAT_AT)
-#define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
 
 /* If `a` is down, make `b` match it; otherwise if `b` is down, make `a` match.
  * The original writes this out three times. */

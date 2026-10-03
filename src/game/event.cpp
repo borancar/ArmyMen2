@@ -37,7 +37,7 @@ typedef void    (__cdecl *am2_event_notify_fn)(int32_t, int32_t, int32_t,
                                                int32_t);
 
 
-#define kScriptConditions (*(AM2_ScriptCond **)((void *)(uintptr_t)(ADDR_SCRIPT_CONDITIONS)))
+#define kScriptConditions (g_scriptConditions)
 
 /* ---- the registration table -------------------------------------------
  *
@@ -62,7 +62,7 @@ typedef struct AM2_EventEntry {
     struct AM2_EventEntry   *next;
 } AM2_EventEntry;
 
-#define kEventTable ((AM2_EventEntry **)((void *)(uintptr_t)(ADDR_EVENT_TABLE)))
+#define kEventTable (g_eventTable)
 #define kImageFn(a)       ((const void *)((void *)(uintptr_t)(a)))
 
 
@@ -156,14 +156,14 @@ void __cdecl DeclareRuleVars(void)
 #define WIN(name, handler, army)                                            \
     EventRegister(0, ScriptNameUid((const char *)(uintptr_t)(name)), 0,     \
                   (const void *)(handler), (void *)(uintptr_t)(army), 0);
-    WIN(ADDR_NAME_GREENWINS,     EvtArmyWins, 0)
-    WIN(ADDR_NAME_TANWINS,       EvtArmyWins, 1)
-    WIN(ADDR_NAME_BLUEWINS,      EvtArmyWins, 2)
-    WIN(ADDR_NAME_GREYWINS,      EvtArmyWins, 3)
-    WIN(ADDR_NAME_GREENTEAMWINS, EvtTeamWins, 0)
-    WIN(ADDR_NAME_TANTEAMWINS,   EvtTeamWins, 1)
-    WIN(ADDR_NAME_BLUETEAMWINS,  EvtTeamWins, 2)
-    WIN(ADDR_NAME_GREYTEAMWINS,  EvtTeamWins, 3)
+    WIN(((uintptr_t)g_nameGreenwins),     EvtArmyWins, 0)
+    WIN(((uintptr_t)g_nameTanwins),       EvtArmyWins, 1)
+    WIN(((uintptr_t)g_nameBluewins),      EvtArmyWins, 2)
+    WIN(((uintptr_t)g_nameGreywins),      EvtArmyWins, 3)
+    WIN(((uintptr_t)g_nameGreenteamwins), EvtTeamWins, 0)
+    WIN(((uintptr_t)g_nameTanteamwins),   EvtTeamWins, 1)
+    WIN(((uintptr_t)g_nameBlueteamwins),  EvtTeamWins, 2)
+    WIN(((uintptr_t)g_nameGreyteamwins),  EvtTeamWins, 3)
 #undef WIN
 
 #define RULE(handler, slot) {                                               \
@@ -171,9 +171,9 @@ void __cdecl DeclareRuleVars(void)
         *(int32_t *)(uintptr_t)(slot) = uid;                                \
         EventRegister(0, uid, 0, (const void *)(handler), 0, 0);            \
     }
-    RULE(EvtRuleA, ADDR_RULE_UID_A)
-    RULE(EvtRuleB, ADDR_RULE_UID_B)
-    RULE(EvtRuleC, ADDR_RULE_UID_C)
+    RULE(EvtRuleA, ((uintptr_t)&g_ruleUidA))
+    RULE(EvtRuleB, ((uintptr_t)&g_ruleUidB))
+    RULE(EvtRuleC, ((uintptr_t)&g_ruleUidC))
 #undef RULE
 
     /* One registration per event term of every `if`, with the condition itself
@@ -208,7 +208,6 @@ void __cdecl DeclareRuleVars(void)
 /* LookupByUID and ObjIsTypeIn238 are both reconstructed, so these call them
  * directly rather than through the image. Reaching for an orig_ macro here was
  * caught by tools/checkseams.py, which exists for exactly that. */
-#define g_allyMatrix ((int32_t *)(uintptr_t)ADDR_ALLY_MATRIX)
 
 void __cdecl EvtSetField540(uint32_t uid, int32_t value)
 {
@@ -468,7 +467,7 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
 #define orig_fread  (*(am2_fread_fn)ADDR_FREAD)
 #define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
 
-#define kScriptContext (*(AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)))
+#define kScriptContext (*(AM2_ScriptCtx *)g_scriptContext)
 
 int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
 {
@@ -513,7 +512,7 @@ int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
     return 1;
 }
 
-#define kPads ((AM2_Pad *)((void *)(uintptr_t)(ADDR_PADS)))
+#define kPads ((AM2_Pad *)g_pads)
 
 int32_t __cdecl LoadEventSection(am2_FILE *fp)
 {
@@ -657,7 +656,7 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
     return 1;
 }
 
-#define kEventBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_EVENT_BLOCK)))
+#define kEventBlock ((void *)(uintptr_t)((void *)&g_eventBlock))
 
 int32_t __cdecl SaveEventBlock(am2_FILE *fp)
 {
@@ -739,7 +738,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
  * because the call sites are what carry the format strings that named these
  * functions in the first place. */
 #define kEventDebug \
-    (*(const int32_t *)((const uint8_t *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)) \
+    (*(const int32_t *)((const uint8_t *)*(void * *)&g_commObject \
                         + COMM_OFF_VERBOSE))
 
 
@@ -850,7 +849,7 @@ void __cdecl MissionStartup(void)
 {
     char    name[0x10];     /* "startup%d" */
     char    save[0x40];     /* "map%d_mission%d.sav" -- a buffer of its own */
-    int32_t level = *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX;
+    int32_t level = g_levelIndex;
     int32_t id;
 
     if (level <= 0)
@@ -861,27 +860,26 @@ void __cdecl MissionStartup(void)
     if (id > 0)
         EventNotify(0, id, 0, 0, 0, 0, 0, 0, 1, 0);
 
-    *(int32_t *)(uintptr_t)ADDR_SCRIPT_STATE_FLAG = 1;
+    g_scriptStateFlag = 1;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_LEVEL_ID <= 0)
+    if (g_levelId <= 0)
         return;
-    if (!*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+    if (!*(const uint8_t *)&g_gameprocBlock)
         return;
-    if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
+    if (g_winEnabled)
         return;
 
     sprintf(save, "map%d_mission%d.sav",
-            *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID,
-            *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX);
+            g_levelId,
+            g_levelIndex);
     SaveGame(save);
-    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, save);
+    strcpy(&g_gameprocStrB, save);
 }
 
 /* The count and the table are ONE object in the image: a store into a timer
  * is a store the compiler has to assume reaches the count, which is why the
  * image reads the count again after filling a slot. Viewed from the count. */
 typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBlock;
-#define g_timerBlock   (*(AM2_TimerBlock *)((void *)(uintptr_t)(ADDR_TIMER_COUNT)))
 #define g_timerCount   (g_timerBlock.count)
 #define g_timers       (g_timerBlock.timers)
 
@@ -916,8 +914,8 @@ typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBloc
  * recomputes `start` from now is reached by nothing. */
 void __cdecl TimerTick(void)
 {
-#define NOW  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
-#define LAST (*(uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK)
+#define NOW  (g_gameClockMs)
+#define LAST (g_eventBlock)
     AM2_Timer *timers = g_timers;
     int32_t    i;
 
@@ -1121,11 +1119,11 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
     int32_t  i;
 
     /* The slot goes back into `army`. */
-    army = ((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))->CommSlotForArmy(army);
+    army = ((AM2_Comm *)*(void * *)&g_commObject)->CommSlotForArmy(army);
     i = 0;
 
     /* The slot's list is re-indexed at every use. */
-#define list (((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[army])
+#define list (((uint8_t * *)g_armyObjLists)[army])
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
         uint8_t *obj = (uint8_t *)LookupByUID(
@@ -1361,7 +1359,7 @@ void __cdecl ResetScriptState(void)
     FreeScriptConditions();
     EventClearAll();
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_STATE_FLAG)) = 0;
+    g_scriptStateFlag = 0;
 }
 
 /* 0x0041FEA0. Resolve a uid and act on the object, if there is one.
@@ -1408,7 +1406,7 @@ uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
     if (name < 0 || name >= kScriptNameCount)
         return 0;
 
-    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ME))) {
+    if (name == g_svarMe) {
         if (me != 0)
             return me;
 
@@ -1832,7 +1830,7 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     DeployItem(obj, *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
 
     if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
-        == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        == *(const int32_t *)&g_defaultOwner)
         PlayDynamicSound("mp_pop.wav",
                          0, 0, 0, 0, 3, 2, 0);
 }
@@ -1870,7 +1868,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     army = *(const int8_t *)(obj + OBJ_OFF_ARMY);
 
     unit = (uint8_t *)CreateTrooper(
-               (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+               g_dirScratch,
                *(const int16_t *)(obj + OBJ_OFF_POS),
                *(const int16_t *)(obj + OBJ_OFF_POS + 2),
                ((AM2_Comm *)kCommObject)->CommArmyOfSlot(army),
@@ -2020,15 +2018,15 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
     if (obj == (uint8_t *)0)
         return;
 
-    *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ_PREV)) =
-        *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ));
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL_PREV)) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL));
-    *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ))  = obj;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL)) = *(const int32_t *)(obj + 4);
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET_PREV)) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET));
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET)) = 1;
+    g_objCtxObjPrev =
+        g_objCtxObj;
+    g_objCtxValPrev =
+        g_objCtxVal;
+    g_objCtxObj  = obj;
+    g_objCtxVal = *(const int32_t *)(obj + 4);
+    g_objCtxSetPrev =
+        g_objCtxSet;
+    g_objCtxSet = 1;
 }
 
 /* 0x0041F570 and 0x0041F5C0. A pair over one object flag bit and one global,
@@ -2051,11 +2049,11 @@ void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
 {
     uint8_t *obj;
 
-    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15))) {
-        *(int32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_FLAG)) = 1;
+    if (name == g_svarId15) {
+        g_evtId15Flag = 1;
 
         obj = (uint8_t *)LookupByUID(
-                  *(const uint32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_UID)));
+                  *(const uint32_t *)&g_evtId15Uid);
 
         if (obj != (uint8_t *)0)
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
@@ -2073,8 +2071,8 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
 {
     uint8_t *obj;
 
-    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15))) {
-        *(int32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_FLAG)) = 0;
+    if (name == g_svarId15) {
+        g_evtId15Flag = 0;
         return;
     }
 
@@ -2100,7 +2098,7 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
  * defect recorded there does not apply. */
 void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 {
-    uint8_t **lists = (uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS));
+    uint8_t **lists = (uint8_t * *)g_armyObjLists;
     int32_t   slot  = AM2_THE_COMM->CommSlotForArmy(
                                       army);
     int32_t   i     = 0;
@@ -2205,21 +2203,21 @@ void __cdecl EvtShowBitmap(const char *name)
 {
     SetGameDir("bitmaps");
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_MENU_MODE)) = AM2_SUBSTATE_BITMAP;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OVERLAY_DIRTY))      = 1;
+    g_subState = AM2_SUBSTATE_BITMAP;
+    g_overlayDirty      = 1;
 
     SendGamePause(1, AM2_EVENT_FLAG_8);
 
-    FreeBitmap((void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)));
-    *(void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)) = LoadBitmap(name, 0);
+    FreeBitmap(&g_currentBitmap);
+    g_currentBitmap = LoadBitmap(name, 0);
 }
 
 void __cdecl EvtShowBitmapNoPause(const char *name)
 {
     SetGameDir("bitmaps");
 
-    FreeBitmap((void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)));
-    *(void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)) = LoadBitmap(name, 0);
+    FreeBitmap(&g_currentBitmap);
+    g_currentBitmap = LoadBitmap(name, 0);
 }
 
 /* ------------------------------------------- object table record ---- */
@@ -2248,7 +2246,7 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
     if (obj == (uint8_t *)0)
         return;
 
-#define REC ((uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS)) \
+#define REC (g_objTableRecords \
              + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE)
 #define SUB (obj + OBJ_OFF_SUBRECORD)
     switch (*(const int32_t *)obj) {
@@ -2331,31 +2329,31 @@ void __cdecl MissionEnded(int32_t lost)
     uint8_t *next;
     int32_t  movie;
 
-    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS = 0;
+    g_inputSuppress = 0;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
-        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    if (g_winEnabled) {
+        SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s%d.txt",
-                    (const char *)(uintptr_t)ADDR_MAP_NAME,
-                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
+                    &g_mapName_,
+                    g_levelIndex + 1);
 
         h = orig_findfirst(path, found);
         if (h == -1) {
             movie = 0;
 
             rec = (uint8_t *)FindLevelRecord(
-                      *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+                      g_levelId);
             if (!rec)
                 goto no_next;
 
             if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
-                strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                strcpy(&g_movieToPlay,
                        (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
                 movie = 1;
             }
             if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
-                > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
-                *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
+                > g_movieCount) {
+                g_movieCount =
                     *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
                 SaveOptions();
             }
@@ -2363,56 +2361,56 @@ void __cdecl MissionEnded(int32_t lost)
                 goto no_next;
 
             RequestState(3);
-            *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
+            g_stateArg = 1;
             return;
         }
 
         orig_findclose(h);
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
-        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
-        strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
-        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
+        g_scriptReload = 1;
+        g_attemptCount = 0;
+        strcpy(g_scriptReloadPath, path);
+        g_levelIndex += 1;
         return;
     }
 
-    if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
-        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    if (!lost && g_levelId > 0) {
+        SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s%d.txt",
-                    (const char *)(uintptr_t)ADDR_MAP_NAME,
-                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
+                    &g_mapName_,
+                    g_levelIndex + 1);
 
         h = orig_findfirst(path, found);
         if (h == -1) {
             movie = 0;
 
             rec = (uint8_t *)FindLevelRecord(
-                      *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+                      g_levelId);
             if (rec) {
                 if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
-                    strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                    strcpy(&g_movieToPlay,
                            (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
                     movie = 1;
                 }
                 if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
-                    > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
-                    *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
+                    > g_movieCount) {
+                    g_movieCount =
                         *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
                     SaveOptions();
                 }
             }
 
             next = (uint8_t *)FindLevelRecord(
-                       *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID + 1);
+                       g_levelId + 1);
             SaveDefaultCof();
 
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX   = 1;
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     += 1;
-            *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
+            g_levelIndex   = 1;
+            g_levelId     += 1;
+            g_attemptCount = 0;
             SelectLevel(next);
 
             if (movie) {
                 RequestState(3);
-                *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = (next != 0) + 1;
+                g_stateArg = (next != 0) + 1;
                 return;
             }
             if (next) {
@@ -2425,38 +2423,38 @@ no_next:
         }
 
         orig_findclose(h);
-        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
-        strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
-        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
+        g_scriptReload = 1;
+        strcpy(g_scriptReloadPath, path);
+        g_levelIndex += 1;
         return;
     }
 
     /* ---- lost, or no level in hand ---- */
     rec = (uint8_t *)FindLevelRecord(
-              *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
-    *(char *)(uintptr_t)ADDR_MOVIE_TO_PLAY = '\0';
+              g_levelId);
+    g_movieToPlay = '\0';
 
     if (rec && strlen((const char *)(rec + LEVEL_OFF_LOSE_MOVIES))) {
         do {
             /* The clock is read again on every pass -- the image does not
              * hoist it, so an empty pick waits for the clock to move on. */
             uint32_t pick =
-                *(volatile const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                *(volatile const uint32_t *)((uintptr_t)&g_gameClockMs)
                 % AM2_LOSE_MOVIE_COUNT;
 
-            strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+            strcpy(&g_movieToPlay,
                    (const char *)(rec + LEVEL_OFF_LOSE_MOVIES
                                   + pick * AM2_LEVEL_STR_BYTES));
-        } while (*(const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY == '\0');
+        } while (g_movieToPlay == '\0');
     }
 
-    if (!strlen((const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY))
-        strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+    if (!strlen(&g_movieToPlay))
+        strcpy(&g_movieToPlay,
                "grave");
 
     RequestState(3);
-    *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
-    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = AM2_MENU_REQUEST_LOST;
+    g_stateArg = 1;
+    g_menuRequest = AM2_MENU_REQUEST_LOST;
 }
 
 /* 0x00421750. Evaluate an `if`'s testvar comparisons. All must pass; a
@@ -2511,7 +2509,7 @@ int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c, void *unused)
  * the body at the OTHER end of the call as well as this one. */
 void __cdecl AdvanceMission(int32_t a, int32_t b)
 {
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) == 0) {
+    if (g_mpSession == 0) {
         orig_mission_local(a);
         return;
     }
@@ -2770,13 +2768,13 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
                         int32_t maskB, int32_t delay, int32_t removeevent,
                         int32_t arg)
 {
-    const uint8_t *comm = *(const uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
+    const uint8_t *comm = g_commObject;
 
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) != 0
+    if (g_mpSession != 0
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)
         return;
 
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MENU_MODE))
+    if (g_subState
         == AM2_SUBSTATE_ESCAPE)
         return;
 
@@ -2866,7 +2864,6 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
 }
 
 /* The mission clock and the timer table, all in the image. */
-#define g_gameClockMs  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 
 int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
                             int32_t count, int32_t id, int32_t lowPriority)
@@ -2932,15 +2929,15 @@ void __cdecl ResetTimers(void)
 {
     uint32_t *id;
 
-    *(int32_t *)(uintptr_t)ADDR_EVENT_BLOCK = 0;
-    *(int32_t *)(uintptr_t)ADDR_TIMER_COUNT = 0;
+    *(int32_t *)&g_eventBlock = 0;
+    *(int32_t *)&g_timerBlock = 0;
     /* From the first record's id field to one past the last, sixteen bytes at
      * a time -- the records themselves are left alone. */
     /* Signed address compare -- the original walks the table with a signed
      * int32 cursor (`jl`, not `jb`); both ends are below 0x80000000 so the
      * result is identical, but the signedness is what MSVC 6 compiled. */
-    for (id = (uint32_t *)(uintptr_t)(ADDR_TIMER_TABLE + 0xC);
-         (int32_t)(uintptr_t)id < (int32_t)ADDR_TIMER_TABLE_ID_END;
+    for (id = (uint32_t *)(uintptr_t)(((uintptr_t)g_timerTable) + 0xC);
+         (int32_t)(uintptr_t)id < (int32_t)((uintptr_t)g_timerTableIdEnd);
          id = (uint32_t *)((uint8_t *)id + 0x10))
         *id = 0;
 }
@@ -2987,7 +2984,7 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
+    if (*(void *const *)&g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(obj + OBJ_OFF_ARMY)))
         return;
@@ -3053,7 +3050,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     slot = AM2_THE_COMM->CommSlotForArmy(army);
 
     /* The army's list is re-read from the table at every use. */
-#define LIST (((uint8_t **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[slot])
+#define LIST (((uint8_t * *)g_armyObjLists)[slot])
     i = 0;
     while (i < *(const int32_t *)(LIST + LIST_OFF_COUNT)) {
         uint8_t *obj = (uint8_t *)LookupByUID(
@@ -3107,7 +3104,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
     switch (kind) {
     case AM2_OPERAND_VARIABLE:
         return ((const int32_t *)((const uint8_t *)
-                   *(void *const *)(uintptr_t)ADDR_SCRIPT_NAMES
+                   g_scriptNames
                    + (uint32_t)a * AM2_NAME_TABLE_STRIDE))[2];
 
     case AM2_OPERAND_ITEM_FRAME:
@@ -3155,7 +3152,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
     }
 
     case AM2_OPERAND_SLOT_TAKEN: {
-        const uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+        const uint8_t *comm = g_commObject;
 
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                                + (uint32_t)a * COMM_PLAYER_STRIDE
@@ -3373,17 +3370,6 @@ extern "C" void __cdecl StopAudioStream(void);
 
 #define AM2_CHEAT_ITEM_GROUP  0x2D
 
-#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
-#define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
-#define g_regionStride  (*(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE)
-#define g_padCount      (*(const int32_t *)(uintptr_t)ADDR_PAD_COUNT)
-#define g_inputSuppress (*(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
-#define g_objCtxObj      (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ)
-#define g_objCtxObjPrev  (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV)
-#define g_objCtxVal      (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL)
-#define g_objCtxValPrev  (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV)
-#define g_objCtxSet      (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)
-#define g_objCtxSetPrev  (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET_PREV)
 
 /* 0x00420410. Run one parsed action against an owner.
  *
@@ -3448,8 +3434,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x04:                                  /* showfailure */
         if (act->text != 0) {
-            strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
-            strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
+            strcpy(g_messageText, act->text);
+            strcpy(g_messageBmpName,
                    "02_016_00_failure.bmp");
             g_subState = 0x18;
             g_overlayDirty = 1;
@@ -3458,8 +3444,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x05:                                  /* showpda */
         if (act->text != 0) {
-            strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
-            strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
+            strcpy(g_messageText, act->text);
+            strcpy(g_messageBmpName,
                    "02_017_00_hq.bmp");
             g_subState = 0x18;
             g_overlayDirty = 1;
@@ -3539,7 +3525,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x1E:                                  /* restorecamerafocus */
-        g_objCtxObj = g_objCtxObjPrev;
+        (*(int32_t *)&g_objCtxObj) = (*(const int32_t *)&g_objCtxObjPrev);
         g_objCtxVal = g_objCtxValPrev;
         g_objCtxSetPrev = g_objCtxSet;
         return;
@@ -3613,9 +3599,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * worth saying because it is four calls in a fixed order and
          * getting one wrong leaves a trooper holding nothing. */
         weapon = (uint8_t *)CreateWeapon(
-                     (const char *)(uintptr_t)ADDR_DIR_SCRATCH, act->army,
+                     g_dirScratch, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
-                     *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                     g_zeroPoint,
                      4, -1, 0, 0);
         if (weapon == 0)
             return;
@@ -3641,7 +3627,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * They are not the same call and not the same direction. */
         CreateVehicle(act->n0, act->text, at.x, at.y,
                       ((AM2_Comm *)kCommObject)->CommArmyOfSlot(act->army),
-                      ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0)
+                      ((g_mpSession) != 0)
                           ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
                           : act->army,
                       0, 0, 0, 0);
@@ -3813,7 +3799,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x28:                                  /* setbriefvo */
-        strcpy((char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, act->text);
+        strcpy(&g_levelSoundName, act->text);
         return;
 
     case 0x24: {                                /* setobjbitmap */
@@ -3840,11 +3826,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     /* Three level strings, three destinations, one shape. */
     case 0x27:                                  /* setbriefing */
-        strcpy((char *)(uintptr_t)ADDR_LEVEL_STR_C, act->text);
+        strcpy(&g_levelStrC, act->text);
         return;
 
     case 0x29:                                  /* setstratmap */
-        strcpy((char *)(uintptr_t)ADDR_LEVEL_STR_D, act->text);
+        strcpy(g_levelStrD, act->text);
         return;
 
     case 0x2A:                                  /* setaimode, army or object */
@@ -3877,7 +3863,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * through its comm SLOT and single-player passes the army itself. */
         int32_t army = act->army;
 
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
+        if (g_mpSession != 0)
             army = ((AM2_Comm *)kCommObject)->CommSlotForArmy(army);
         EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                         army);
@@ -3970,7 +3956,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x3A: {                                /* setdamagepad */
         /* The pad is indexed afresh at every store, as the image does. */
-#define pad ((uint8_t *)(uintptr_t)ADDR_PADS \
+#define pad (g_pads \
              + (size_t)act->subject * AM2_PAD_STRIDE)
         if (act->subject < 0 || act->subject >= g_padCount)
             return;
@@ -3982,7 +3968,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * number is reached through the pad's own +0x04 rather than by the
          * pad index -- two different arrays with two different strides. */
         if (act->n1 > 0) {
-            uint8_t *num = (uint8_t *)(uintptr_t)ADDR_PAD_NUMBERS
+            uint8_t *num = g_padNumbers
                          + (size_t)*(const int32_t *)(pad + 0x04)
                            * AM2_PAD_NUMBER_STRIDE;
 

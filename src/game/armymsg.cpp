@@ -26,11 +26,11 @@ typedef uint32_t (__stdcall *AM2_TickFn)(void);
 extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 #define orig_get_tick_count GetTickCount
 #else
-#define orig_get_tick_count (*(AM2_TickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
+#define orig_get_tick_count (*(AM2_TickFn *)g_iatGetTickCount)
 #endif
 
-#define kComm       (*(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
-#define kPacket     ((uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET)))
+#define kComm       (g_commObject)
+#define kPacket     (g_armyPacket)
 /* The length is the packet's own +4 field, reached through the packet so
  * VC6 sees one object: a copy into the packet may overwrite it, and the image
  * re-reads it after every memcpy. */
@@ -110,7 +110,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
         return 0;
 
     seq = *(const int32_t *)(me + FLOW_OFF_SEQUENCE);
-    *(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_SEQ)) = seq;
+    g_armyPacketSeq = seq;
 
     for (i = 0; i < kCommField(COMM_OFF_PLAYER_COUNT); i++) {
         /* The slot is read afresh at every use. */
@@ -140,7 +140,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     *(int32_t *)(me + FLOW_OFF_SEQUENCE) += 1;
     *(int32_t *)(kComm + COMM_OFF_SEND_STAMP) = (int32_t)orig_get_tick_count();
     kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
-    (void)MsgField12((const void *)((void *)(uintptr_t)(ADDR_MSG_LIST_POOL)));
+    (void)MsgField12(g_msgListPool);
     return 1;
 }
 
@@ -221,7 +221,7 @@ void __cdecl ArmyMessageSend(const void *msg)
  * literals and reports our own player id, so a capture shows who paused. */
 void __cdecl SendGamePause(int32_t pause, int32_t flags)
 {
-    uint8_t *msg = (uint8_t *)((void *)(uintptr_t)(ADDR_MSG_GAME_PAUSE));
+    uint8_t *msg = g_msgGamePause;
 
     if (kCommField(COMM_OFF_JOINED) == 0)
         return;
@@ -305,7 +305,7 @@ void __cdecl SendObjDestroyed(const void *obj)
 {
     uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+    if (!g_mpSession)
         return;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
@@ -531,7 +531,7 @@ void __cdecl TellOneSlot(int32_t slot)
     h->uid  = 0;
 
     list = (const uint8_t *)
-        ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
+        (g_armyObjLists)[slot];
     if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
         return;
 
@@ -554,7 +554,7 @@ void __cdecl TellOneSlot(int32_t slot)
         }
 
         list = (const uint8_t *)
-            ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
+            (g_armyObjLists)[slot];
         i++;
     } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
 
@@ -592,7 +592,7 @@ void __cdecl ItemGoneMessageSend(const void *obj)
     uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
 
     /* The type and uid are read from the object again at each use. */
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+    if (!g_mpSession)
         return;
 
     if (*(const int32_t *)obj <= 0 || *(const int32_t *)obj > 4)
@@ -744,7 +744,7 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg)
     const uint8_t *it = (const uint8_t *)item;
     const uint8_t *comm;
 
-    if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION)
+    if (!*(void *const *)&g_mpSession)
         return;
 
     *(uint16_t *)(msg + 0)    = AM2_MSG_ITEM_DEPLOY_LEN;
@@ -974,17 +974,17 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
 
     tile = (uint16_t)TileOfPoint(where);
 
-    x = tile & (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
-    y = tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    x = tile & (g_mapTilesW - 1);
+    y = tile >> g_mapRowShift;
 
     x0 = Clamp(x - AM2_REVEAL_RADIUS, 0,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
+               g_mapTilesW - 1);
     x1 = Clamp(x + AM2_REVEAL_RADIUS, 0,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
+               g_mapTilesW - 1);
     y0 = Clamp(y - AM2_REVEAL_RADIUS, 0,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 1);
+               g_mapTilesH - 1);
     y1 = Clamp(y + AM2_REVEAL_RADIUS, 0,
-               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 1);
+               g_mapTilesH - 1);
 
     for (other = 0; other < AM2_COMM_SLOTS; other++) {
         int32_t  at;
@@ -994,19 +994,19 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
             continue;
 
         /* H here and W in the row advance below; see the note above. */
-        at = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H * y0 + x0;
+        at = g_mapTilesH * y0 + x0;
 
         for (row = y0; row <= y1; row++) {
             int32_t col;
 
             for (col = x0; col <= x1; col++) {
                 /* The grid pointer is re-read at every tile. */
-                ((uint8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[other]
+                ((uint8_t *const *)g_tileRevealGrids)[other]
                     [at & 0xFFFF]++;
                 at++;
             }
 
-            at += *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - x1 + x0 - 1;
+            at += g_mapTilesW - x1 + x0 - 1;
         }
     }
 }
@@ -1061,7 +1061,7 @@ void __cdecl SendItemCreate(void *obj)
     int32_t        nameidx;
     const char    *name;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+    if (!g_mpSession)
         return;
 
     memset(msg, 0, sizeof msg);
@@ -1234,11 +1234,11 @@ void __cdecl RecvItemCreate(void *msg)
                           *(const int32_t *)(m + MSG_CREATE_OFF_C),
                           1, uid);
         if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
-            != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
+            != g_createWatchedKind)
             return;
         /* ARMY first, not the object -- see ItemPostCreate above. */
         ItemPostCreate(army, *(const uint32_t *)(m + MSG_CREATE_OFF_A));
-        if (!(*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)->AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
+        if (!(*(AM2_Comm *const *)&g_commObject)->AllyFlag(g_defaultOwner, army))
             ObjConceal(made, 1);
         return;
 
@@ -1278,7 +1278,7 @@ void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
 
     (void)unused;
 
-    if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION)
+    if (!*(void *const *)&g_mpSession)
         return;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_DAMAGE_LEN;
@@ -1478,7 +1478,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
                      *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
 
         *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
 
         if (CanPickUpWeapon(w, t, &slot, &unused)) {
             TrooperHostApprovedPickupItem(
@@ -1488,7 +1488,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
         }
 
         *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            g_gameClockMs
             + AM2_PICKUP_HOLD_MS;
         return;
     }
@@ -1640,7 +1640,7 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
     uint8_t  *veh  = (uint8_t *)vehicle;
     uint8_t  *unt  = (uint8_t *)unit;
     /* The comm object is read at every use. */
-#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
+#define comm ((uint8_t *)(g_commObject))
     struct { AM2_ArmyMsgHdr hdr; uint32_t unitUid; } msg;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -1686,7 +1686,7 @@ void __cdecl SendVehicleFire(void *vehicle)
 {
     uint8_t  *veh  = (uint8_t *)vehicle;
     /* The comm object is read at every use. */
-#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
+#define comm ((uint8_t *)(g_commObject))
     struct {
         AM2_ArmyMsgHdr hdr;
         uint32_t       target;
@@ -1760,7 +1760,7 @@ void __cdecl SendVehicleFire(void *vehicle)
  * cursor happened to end. */
 void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 {
-#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (g_commObject)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out, *outStart;
@@ -2007,7 +2007,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
     h->uid  = 0;
 
     list = (const uint8_t *)
-        ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
+        (g_armyObjLists)[slot];
     if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
         return;
 
@@ -2030,7 +2030,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
         }
 
         list = (const uint8_t *)
-            ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
+            (g_armyObjLists)[slot];
         i++;
     } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
 
@@ -2063,7 +2063,7 @@ void __cdecl SendAllVehicleUpdates(void)
     int32_t slot;
 
     for (slot = 0; slot < 4; slot++) {
-        const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+        const uint8_t *comm = g_commObject;
 
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                                + slot * COMM_PLAYER_STRIDE + 0x50) == 0)
@@ -2108,7 +2108,7 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
     uint8_t  *veh  = (uint8_t *)vehicle;
     uint8_t  *itm  = (uint8_t *)item;
     /* The comm object is read at every use. */
-#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
+#define comm ((uint8_t *)(g_commObject))
     struct {
         AM2_ArmyMsgHdr hdr;
         uint32_t       itemUid;
@@ -2199,7 +2199,7 @@ extern "C" void __cdecl DrawSeqBar(int32_t x, int32_t bottom,
  * offsets within the panel and not screen positions. */
 void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
 {
-    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    const uint8_t *comm = g_commObject;
     const uint8_t *player;
     uint32_t       id;
     int32_t        mean;
@@ -2217,17 +2217,17 @@ void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
     if (player == 0)
         return;
 
-    colour = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    colour = g_hiliteColour;
     mean = CommMean32(player);
     if (mean > 750)
-        colour = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+        colour = g_colourLagMid;
     if (mean > 1250)
-        colour = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
+        colour = g_colourNoMap;
     if (mean > 1750)
-        colour = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+        colour = g_hudColour;
 
-    DrawSeqBar(((const AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)[slot + row * 4].x + 0x37,
-               ((const AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)[slot + row * 4].y + 0x12,
+    DrawSeqBar(((const AM2_Point *)g_mpRowCoords)[slot + row * 4].x + 0x37,
+               ((const AM2_Point *)g_mpRowCoords)[slot + row * 4].y + 0x12,
                colour,
                *(const int32_t *)(player + 0x28u),
                *(const int32_t *)(player + 0x30u));

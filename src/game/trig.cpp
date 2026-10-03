@@ -6,11 +6,11 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-#define kCos   ((float *)((void *)(uintptr_t)(ADDR_TRIG_COS)))
-#define kSin   ((float *)((void *)(uintptr_t)(ADDR_TRIG_SIN)))
+#define kCos   (g_trigCos)
+#define kSin   (g_trigSin)
 /* Centres, so these are indexed by the signed ratio directly -- see orig.h. */
-#define kAtanC ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_COS)))
-#define kAtanS ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_SIN)))
+#define kAtanC (g_atanCos)
+#define kAtanS (g_atanSin)
 
 #define kD(a)  (*(const double *)((void *)(uintptr_t)(a)))
 
@@ -73,11 +73,11 @@ void __cdecl BuildTrigTables(void)
      * is simply i over 0..255. */
     for (int32_t i = 0; i < 256; i++) {
         int32_t step = (i + 0x40) & 0xFF;
-        double angle = (double)step * kD(ADDR_DBL_TWO_PI)
-                       * kD(ADDR_DBL_ONE_256);
+        double angle = (double)step * kD(((uintptr_t)g_dblTwoPi))
+                       * kD(((uintptr_t)g_dblOne256));
 
         kCos[i] = (float)x87cos(angle);
-        kSin[i] = (float)(x87sin(angle) * kD(ADDR_DBL_SIN_SCALE));
+        kSin[i] = (float)(x87sin(angle) * kD(((uintptr_t)g_dblSinScale)));
     }
 
     /* Reverse lookup, twice over, the two differing only in which table is the
@@ -100,10 +100,10 @@ void __cdecl BuildTrigTables(void)
             float bestd = 128.0f;
 
             for (int32_t a = 0; a <= 0x80; a++) {
-                if (den[a] == kD(ADDR_DBL_ZERO))
+                if (den[a] == kD(((uintptr_t)g_dblZero)))
                     continue;
 
-                double d = (double)num[a] * kD(ADDR_DBL_512) / (double)den[a]
+                double d = (double)num[a] * kD(((uintptr_t)g_dbl512)) / (double)den[a]
                            - (double)ratio;
 
                 if (d < 0)
@@ -118,8 +118,6 @@ void __cdecl BuildTrigTables(void)
     }
 }
 
-#define g_trigCos ((const float *)(uintptr_t)ADDR_TRIG_COS)
-#define g_trigSin ((const float *)(uintptr_t)ADDR_TRIG_SIN)
 
 float __cdecl Cos8(uint8_t heading)
 {

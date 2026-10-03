@@ -585,7 +585,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     uint8_t  find[AM2_FINDDATA_BYTES];
     uint8_t  desc[AM2_DIB_DESC_BYTES];
 
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_DF))) {
+    if (g_optDf) {
         LoadMaskPacked(out, set, index, frame);
         return;
     }
@@ -594,8 +594,8 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
         return;
 
     am2_sprintf(dir, "%s\\%s\\masks",
-                (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
-                ((const char *const *)((void *)(uintptr_t)(ADDR_SPRITE_SET_DIRS)))[set]);
+                g_mapBlock,
+                (g_spriteSetDirs)[set]);
     SetGameDir(dir);
 
     am2_sprintf(pattern, "%02d_%03d_%02d_*.msk",
@@ -1215,7 +1215,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 
     (void)comm;
     out = 0;
-    GetVarValue(((const int32_t *)(uintptr_t)ADDR_SVAR_GREENSCORE)[idx], &out);
+    GetVarValue((&g_svarGreenscore)[idx], &out);
     return out;
 }
 
@@ -1247,22 +1247,22 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 void __cdecl ApplyGameSettings(void)
 {
     /* The comm object is read at every use. */
-#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
-    int32_t *pool = (int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
+#define comm ((uint8_t *)(g_commObject))
+    int32_t *pool = g_armyPoints;
     int32_t  i;
 
-    strcpy((char *)(uintptr_t)ADDR_LIVE_PLAYER_NAME,
-               (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
-    strcpy((char *)(uintptr_t)ADDR_LIVE_BATTLE_NAME,
-               (const char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME);
+    strcpy(g_livePlayerName,
+               &g_savedPlayerName);
+    strcpy(g_liveBattleName,
+               &g_savedBattleName);
 
     /* In the order that schedules into the image's stores. */
-    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
-        *(const int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8;
-    *(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
-        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_A;
-    *(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
-        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_B;
+    g_scoreLimit =
+        g_hostValue3e8;
+    g_gameOverFlags =
+        g_hostMaskA;
+    *(uint32_t *)&g_gameSetting22c =
+        g_hostMaskB;
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         pool[i] = AM2_DEFAULT_SCORE_LIMIT;
@@ -1274,11 +1274,11 @@ void __cdecl ApplyGameSettings(void)
                      + COMM_SLOT_OFF_TEAM) = 0;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT != 0) {
-        const uint8_t *rec = *(const uint8_t **)(uintptr_t)ADDR_NAME_TABLE_BASE;
+    if (g_nameTableCount != 0) {
+        const uint8_t *rec = g_nameTableBase;
 
-        strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME, (const char *)rec);
-        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
+        strcpy(&g_mpScriptName, (const char *)rec);
+        strcpy(&g_mapName_,
                    *(const char *const *)(rec + NAMEREC_OFF_MAPS));
     } else {
         /* THE ELSE ARM WAS MISSING. `mov byte [0x511c08], bl` and
@@ -1289,8 +1289,8 @@ void __cdecl ApplyGameSettings(void)
          * Without it our two buffers went out of step: ADDR_MP_SCRIPT_NAME
          * kept a stale "death.txt" while ADDR_MAP_NAME was empty, and the
          * multiplayer panel looks its map list up by the first of them. */
-        *(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME = '\0';
-        *(char *)(uintptr_t)ADDR_MAP_NAME       = '\0';
+        g_mpScriptName = '\0';
+        g_mapName_       = '\0';
     }
 #undef comm
 }
@@ -1437,7 +1437,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotHasPlayer(int32_t slot)
     return id != 0 && id != -1;
 }
 
-#define g_menuRow (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)
 
 
 int32_t __cdecl GetMenuRow(void)
@@ -1511,14 +1510,12 @@ void __cdecl TakeNumberKey(void)
     else if (IsKeyDown(9) && KeyChanged(9)) n = 7;
     else return;
 
-    *(int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT = n;
+    g_numberKeySlot = n;
 }
 
 /* The same spelling device.cpp uses -- PollKeyboard owns these and swaps them
  * each poll, and two names on one address is what checkglobals exists to
  * stop. */
-#define g_curKeys  (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
-#define g_prevKeys (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
 
 /* The two below as the image expands them in their callers. */
 static inline int32_t IsKeyDownInline(uint8_t dik)
@@ -1553,7 +1550,6 @@ void __cdecl FreeIfNotNull(void *p)
         am2_free(p);
 }
 
-#define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
 
 int32_t __cdecl KeyPressed(int32_t dik)
 {
@@ -1572,12 +1568,11 @@ void __cdecl LatchKeyState(void)
  * field, and taking it for the base is what put that table 0x20 bytes late. */
 uint32_t __cdecl UnitTypeCost(int32_t type)
 {
-    return *(const uint32_t *)((uintptr_t)ADDR_UNIT_TYPES
+    return *(const uint32_t *)(((uintptr_t)g_unitTypes)
                                + (uint32_t)type * AM2_UNIT_TYPE_STRIDE
                                + UNIT_TYPE_OFF_COST);
 }
 
-#define g_keyBindings ((const uint8_t *)(uintptr_t)ADDR_KEY_BINDINGS)
 
 void __cdecl ConsumeKey(int32_t dik)
 {
@@ -1862,7 +1857,7 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
  * 856 patch lines, 856 from checkpatches. */
 void __cdecl AiTakeAbandoned(void)
 {
-#define COMM (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define COMM (g_commObject)
     int32_t army;
 
     for (army = 0; army < AM2_COMM_ARMY_COUNT; army++) {
@@ -1902,8 +1897,8 @@ void __cdecl AiTakeAbandoned(void)
  * installs. */
 void __cdecl SeqRunBoth(void)
 {
-    SeqRun((void *)(uintptr_t)ADDR_SEQ_CTX_A);
-    SeqRun((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    SeqRun(g_seqCtxA);
+    SeqRun(g_seqCtxB);
 }
 
 /* 0x0042E310, one caller -- read a sprite's identity back out of its FILENAME.
@@ -1968,8 +1963,8 @@ extern "C" void __cdecl ShowMpResult(int32_t result);
 void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
 {
     /* The comm object and our army are re-read at each use. */
-#define COMM  (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
-#define MINE  (*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define COMM  (g_commObject)
+#define MINE  (g_defaultOwner)
 #define TEAM(slot) (*(const int32_t *)(COMM + (size_t)(slot) * AM2_PLAYER_STRIDE \
                                         + COMM_ARMY_OFF_TEAM))
     int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotForArmy(army);
@@ -2051,8 +2046,7 @@ static inline int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
 {
     const uint8_t *rec;
     int32_t        n    = *(const int32_t *)
-                              ((const uint8_t *)*(void *const *)
-                                   (uintptr_t)ADDR_COMM_OBJECT
+                              ((const uint8_t *)*(void *const *)&g_commObject
                                + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
 
@@ -2167,8 +2161,8 @@ void __cdecl MovieBuildName(char *dst, const char *name)
         && strcmp(name, "credits") != 0
         && strcmp(name, "act2") != 0
         && strcmp(name, "portal") != 0
-        && *(const int32_t *)((void *)(uintptr_t)(ADDR_SLOW_MACHINE))
-        && !*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_BIG_MOVIES)))
+        && g_slowMachine
+        && !g_optBigMovies)
         strcat(dst, "sml");
 
     strcat(dst, ".smk");
@@ -2199,7 +2193,7 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
     if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2217,7 +2211,7 @@ static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
     if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2248,11 +2242,11 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      (const AM2_Point *)at))
         return;
 
-    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND6;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = (uint8_t)variant;
@@ -2267,7 +2261,7 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;
     *(void **)(row + ROW_OFF_SPRITE)     =
-        (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_7)))
+        (g_seqSprites7)
             [variant * *(const int32_t *)((void *)(uintptr_t)(AM2_SEQ_VARIANT_STRIDE))];
     *(int32_t *)(row + ROW_OFF_X)        = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = 0;
@@ -2312,21 +2306,21 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      (const AM2_Point *)at))
         return;
 
-    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    seq = (uint8_t *)SeqAlloc(g_seqCtxB);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_DRIFT_X));
+        g_seqK4DriftX;
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_DRIFT_Y));
+        g_seqK4DriftY;
     *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_STEP_MS));
+        g_seqK4StepMs;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
     row = *(uint8_t **)(seq + SEQ_OFF_ROW);   /* taken after the seq fields */
@@ -2334,11 +2328,11 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;
     *(void **)(row + ROW_OFF_SPRITE)     =
-        **(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5));
+        *g_seqSprites5;
     *(int32_t *)(row + ROW_OFF_X)        = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
     *(void **)(row + ROW_OFF_FIELD_2C)   =
-        *(void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES));
+        g_remapShades;
     *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
 }
 
@@ -2383,14 +2377,14 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
             > *(const uint32_t *)(r + SEQ_OFF_LIFE)) {
 #define GATE (*(uint32_t *)(r + SEQ_OFF_GATE))
 #define CELL (*(uint8_t *)(row + ROW_OFF_CELL))
-        if (++GATE > ((const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_HOLD)))[CELL]) {
+        if (++GATE > (g_seqK4Hold)[CELL]) {
             if (++CELL >= AM2_SEQ_K4_CELLS)
                 return SeqRetire(ctx, rec);
 
             *(void **)(row + ROW_OFF_SPRITE) =
-                (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5)))[CELL];
+                (g_seqSprites5)[CELL];
             *(void **)(row + ROW_OFF_FIELD_2C) =
-                ((void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES)))[CELL];
+                (&g_remapShades)[CELL];
 
             GATE = 1;
         }
@@ -2398,7 +2392,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 #undef CELL
 
         *(int16_t *)(row + ROW_OFF_Y_ADJUST) +=
-            *(const int16_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_RISE));
+            g_seqK4Rise;
         *(int16_t *)(row + ROW_OFF_X) +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
         *(int16_t *)(row + ROW_OFF_Y) +=
@@ -2406,15 +2400,15 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 
         *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
 
-        if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
+        if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                          (const AM2_Point *)(row + ROW_OFF_X)))
             return SeqRetire(ctx, rec);
 
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, g_mapDesc);
     }
 
     *(int32_t *)(row + ROW_OFF_STAMP_54) +=
-        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+        g_frameDeltaMs;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }
@@ -2455,7 +2449,7 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
         return SeqRetire(ctx, rec);
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE)
-            > *(const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_EMIT_MS))) {
+            > g_seqEmitMs) {
         int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
 
         *(int16_t *)&pt = (int16_t)(*(const int16_t *)&pt
@@ -2463,11 +2457,11 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
         SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
 
         *(int32_t *)(r + SEQ_OFF_GATE) -=
-            *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_EMIT_MS));
+            *(const int32_t *)&g_seqEmitMs;
     }
 
-    *(int32_t *)(row + ROW_OFF_STAMP_54) += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
-    *(int32_t *)(r + SEQ_OFF_GATE)       += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(int32_t *)(row + ROW_OFF_STAMP_54) += g_frameDeltaMs;
+    *(int32_t *)(r + SEQ_OFF_GATE)       += g_frameDeltaMs;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }
@@ -2579,11 +2573,11 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      (const AM2_Point *)at))
         return;
 
-    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND5;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
@@ -2601,7 +2595,7 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
     *(int32_t *)(row + 0)                 = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
-        **(void ***)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5));
+        *g_seqSprites5;
     *(int32_t *)(row + ROW_OFF_X)         = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
@@ -2617,11 +2611,11 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     (void)b;
     (void)c;
 
-    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      (const AM2_Point *)at))
         return;
 
-    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND7;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
@@ -2638,7 +2632,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
-        **(void ***)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_7));
+        *g_seqSprites7;
     *(int32_t *)(row + ROW_OFF_X)         = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
@@ -2955,10 +2949,10 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 
     /* The tail count, the stride, the advance and the frame delta are
      * globals, read afresh at every use. */
-#define TAIL    (*(const int32_t *)(uintptr_t)ADDR_SEQ_TAIL_FRAMES)
+#define TAIL    (g_seqTailFrames)
 #define STRIDE  (*(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE)
-#define ADVANCE (*(const uint32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS)
-#define DELTA   (*(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+#define ADVANCE (g_seqAdvanceMs)
+#define DELTA   (*(const uint32_t *)&g_frameDeltaMs)
 #define PHASE   (*(uint8_t *)(row + 0x51u))
 
     (void)at;
@@ -2983,8 +2977,8 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
         }
 
         *(uint32_t *)(row + ROW_OFF_SPRITE) =
-            (*(uint32_t *const *)(uintptr_t)ADDR_SEQ_SPRITES_7)[variant];
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+            (*(uint32_t *const *)&g_seqSprites7)[variant];
+        RowUpdate(row, 0, g_mapDesc);
 
         *(uint32_t *)(r + SEQ_OFF_GATE) -= ADVANCE;
     }
@@ -3063,7 +3057,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
         SeqAddKind6(&pt, variant);
         *(int32_t *)(r + SEQ_OFF_FIELD_0C) += 1;
 
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+        if (g_mpSession != 0
             && !AM2_THE_COMM->CommMustBroadcast(
                     (int16_t)UidArmy(*(const uint32_t *)(r + SEQ_OFF_OWNER))))
             skip = 1;
@@ -3078,7 +3072,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
             box.bottom = *(const int16_t *)(row + ROW_OFF_X + 2) + 0x10;
 
             obj = (uint8_t *)AllObjectsInRect(
-                      &box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                      &box, g_objMapDesc);
             while (obj != 0) {
                 if (ObjIsTypeIn238((const AM2_Object *)obj))
                     DamageObject(obj, 1, 1,
@@ -3096,9 +3090,9 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
     }
 
     *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
-        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+        *(const uint32_t *)&g_frameDeltaMs;
     *(int32_t *)(r + SEQ_OFF_GATE) +=
-        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+        g_frameDeltaMs;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }
@@ -3140,7 +3134,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
     /* The particle kind's record is re-indexed, and the fields re-read, at
      * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
     typedef struct { int32_t frames; const uint32_t *sprites; uint8_t pad[16]; } Kind;
-#define KIND  (((const Kind *)(uintptr_t)ADDR_PARTICLE_KINDS) \
+#define KIND  ((g_particleKinds) \
                [*(const int32_t *)(r + SEQ_OFF_FLAG4)])
 #define LIFE  (*(int32_t *)(r + SEQ_OFF_LIFE))
 #define STAMP (*(uint32_t *)(row + ROW_OFF_STAMP_54))
@@ -3151,7 +3145,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
 
     (void)at;
 
-    STAMP += *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    STAMP += *(const uint32_t *)&g_frameDeltaMs;
 
     if (STAMP > *(const uint32_t *)(r + SEQ_OFF_GATE)) {
         int32_t   tile;
@@ -3173,17 +3167,17 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
          * its height subtracted from z -- not on the ground position. */
         pt = *(const uint32_t *)(row + ROW_OFF_X);
         *((int16_t *)&pt + 1) -= Z;
-        if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
+        if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                          (const AM2_Point *)&pt))
             return SeqRetire(ctx, rec);
 
         tile = TileOfPoint(*(const uint32_t *)(row + ROW_OFF_X)) & 0xFFFF;
-        ground = (*(const char *const *)(uintptr_t)ADDR_TILE_ATTRS)[tile];
+        ground = (*(const char *const *)&g_tileAttrs)[tile];
 
         if (Z + *(const int32_t *)(r + 0x18u) <= ground) {
             Z = (int16_t)((int16_t)ground - *(const int16_t *)(r + 0x18u));
 
-            if ((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1) {
+            if ((g_tileFlags)[tile] & 1) {
                 CreateExplosion(*(const int16_t *)(row + ROW_OFF_X),
                                 *(const int16_t *)(row + ROW_OFF_X + 2),
                                 0x93, 4, 0, 0, 0, 0, 0, 0);
@@ -3207,7 +3201,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
                 *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
                     *(const uint32_t *)(old + ROW_OFF_FIELD_2C);
                 *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
-                RowUpdate(rest, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+                RowUpdate(rest, 0, g_mapDesc);
                 return SeqRetire(ctx, rec);
             }
         } else {
@@ -3216,7 +3210,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         }
     }
 
-    RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(row, 0, g_mapDesc);
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 #undef KIND
 #undef LIFE

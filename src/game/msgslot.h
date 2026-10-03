@@ -617,7 +617,7 @@ static inline int32_t CommMustBroadcast(void *comm, int16_t army)
 /* The one comm object, for a direct member call. Calling through the inline
  * forwarders above changes VC6's register allocation at the call site, so a
  * byte-matched caller spells `AM2_THE_COMM->Method(...)`. */
-#define AM2_THE_COMM ((AM2_Comm *)*(void **)(uintptr_t)ADDR_COMM_OBJECT)
+#define AM2_THE_COMM ((AM2_Comm *)*(void * *)&g_commObject)
 #endif
 
 /* 0x00401050. Append a node to the tail of a mutex-guarded list. Twelve

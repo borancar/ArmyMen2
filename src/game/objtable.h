@@ -34,16 +34,8 @@ typedef struct {
 } AM2_Object;
 
 /* Live globals inside the running image. */
-#define g_objTable (*(AM2_ObjEntry **)(uintptr_t)ADDR_OBJ_TABLE)
-#define g_objCount (*(int32_t *)(uintptr_t)ADDR_OBJ_COUNT)
-#define g_objCap   (*(int32_t *)(uintptr_t)ADDR_OBJ_CAPACITY)
 
-#define g_iterCursor (*(int32_t *)(uintptr_t)ADDR_ITER_CURSOR)
-#define g_iterStamp  (*(uint32_t *)(uintptr_t)ADDR_ITER_STAMP)
 
-#define g_uidCounter  ((uint32_t *)(uintptr_t)ADDR_UID_COUNTERS)   /* [8] */
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_debugItemList (*(int32_t *)(uintptr_t)ADDR_DEBUG_ITEMLIST)
 
 /* UID layout: three owner bits above a 29-bit per-owner counter. */
 #define AM2_UID_OWNER_SHIFT 29

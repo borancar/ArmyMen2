@@ -85,11 +85,6 @@ extern "C" const uint32_t am2_palette_cycle_interval = 160; /* 0x00486168, ms */
 #define PROBE_ORIGIN 0x20
 #define PALETTE_ENTRIES 256
 
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_frameBuf       (*(uint8_t **)(uintptr_t)ADDR_FRAMEBUFFER)
-#define g_pitch          (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
-#define g_originDx       (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
-#define g_originDy       (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
 
 /* 0x0041B7C0. Index of the palette entry nearest `rgb`, searching from
  * `from`. Returns 0 when `from` is already past the end. Not reconstructed --
@@ -111,17 +106,17 @@ void __cdecl CalibratePalette(uint32_t *palette)
     uint32_t scratch[PALETTE_ENTRIES];
     int32_t  i;
 
-    SetDrawTarget(g_primarySurface);
-    if (!LockSurface(g_primarySurface))
+    SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface)))
         return;
 
     /* Paint index i at x = i, one row, so every entry is on screen at once.
      * The buffer and the x origin are read again for every byte. */
     {
-        int32_t row = (g_originDy + PROBE_ORIGIN) * g_pitch;
+        int32_t row = (g_originDY + PROBE_ORIGIN) * g_pitch;
 
         for (i = 0; i < PALETTE_ENTRIES; i++)
-            (g_frameBuf + g_originDx + i)[row + PROBE_ORIGIN] = (uint8_t)i;
+            (g_frameBuf + g_originDX + i)[row + PROBE_ORIGIN] = (uint8_t)i;
     }
 
     /* The strip has to be on the real display before GDI can be asked about
@@ -133,8 +128,8 @@ void __cdecl CalibratePalette(uint32_t *palette)
 
         if (dc) {
             for (i = 0; i < PALETTE_ENTRIES; i++) {
-                COLORREF c = GetPixel(dc, g_originDx + i + PROBE_ORIGIN,
-                                      g_originDy + PROBE_ORIGIN);
+                COLORREF c = GetPixel(dc, g_originDX + i + PROBE_ORIGIN,
+                                      g_originDY + PROBE_ORIGIN);
                 /* Repacked a byte at a time into four bytes whose last is
                  * never written -- NearestPalIndex reads only the three. */
                 struct { uint8_t r, g, b, pad; } q;
@@ -166,12 +161,12 @@ static_assert(SYSPAL_NOSTATIC == 2 && SYSPAL_STATIC == 1, "SYSPAL_*");
 static_assert(PC_NOCOLLAPSE == 4, "PC_NOCOLLAPSE");
 static_assert(sizeof(PALETTEENTRY) == 4, "PALETTEENTRY");
 
-#define g_hWnd          (*(HWND *)(uintptr_t)ADDR_HWND)
-#define g_logPalette    ((LPLOGPALETTE)(uintptr_t)ADDR_LOGPALETTE)
+#define g_hWnd          (*(HWND *)&g_enumContext)
+#define g_logPalette    ((LPLOGPALETTE)((uintptr_t)g_logpalette))
 /* Indexed past the LOGPALETTE header rather than through its one-element
  * array member, which is the same address without the out-of-bounds fiction. */
-#define g_logEntries    ((LPPALETTEENTRY)(uintptr_t)ADDR_LOGPALETTE_ENTRIES)
-#define g_systemPalette ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)
+#define g_logEntries    ((LPPALETTEENTRY)((uintptr_t)g_logpaletteEntries))
+#define g_systemPalette ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))
 
 /* Windows keeps twenty entries of the system palette for itself, ten at each
  * end, and an 8-bit application gets the 236 in between. */
@@ -285,14 +280,7 @@ static_assert(DDPCAPS_ALLOW256 == 0x40, "DDPCAPS_ALLOW256");
 #define REMAP_LIFT        0x80
 #define DARK_SCALE        0.7
 
-#define g_ddraw        (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_windowedMode (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
 typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
-#define g_remapIdent   (*(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY)
-#define g_remapDark    (*(uint8_t **)(uintptr_t)ADDR_REMAP_DARK)
-#define g_remapBright  (*(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT)
-#define g_remapTint    (*(uint8_t **)(uintptr_t)ADDR_REMAP_TINT)
-#define g_remapShades  ((uint8_t **)(uintptr_t)ADDR_REMAP_SHADES)
 
 typedef void (__cdecl *am2_void_fn)(void);
 
@@ -326,25 +314,25 @@ void __cdecl SetGamePalette(uint8_t *pal)
     RealizeSystemPalette((const uint32_t *)pal);
 
     held = (LPDIRECTDRAWPALETTE *)(pal + PALETTE_HOLDER_OFF);
-    if (g_windowedMode)
+    if (g_windowed)
         IDirectDraw_CreatePalette(g_ddraw, DDPCAPS_8BIT,
-                                  (LPPALETTEENTRY)(uintptr_t)ADDR_GDI_PALETTE,
+                                  (LPPALETTEENTRY)((uintptr_t)g_gdiPalette),
                                   held, NULL);
     else
         IDirectDraw_CreatePalette(g_ddraw, DDPCAPS_8BIT | DDPCAPS_ALLOW256,
                                   (LPPALETTEENTRY)pal, held, NULL);
 
-    IDirectDrawSurface_SetPalette(g_primarySurface, *held);
+    IDirectDrawSurface_SetPalette((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), *held);
 
-    memcpy((void *)(uintptr_t)ADDR_PALETTE_COPY, pal, 0x201 * 4);
+    memcpy(g_paletteCopy, pal, 0x201 * 4);
 
-    if (g_windowedMode)
+    if (g_windowed)
         CalibratePalette((uint32_t *)pal);
 
     /* Four 256-byte blocks, back to back. */
-    g_remapShades[0] = (uint8_t *)(((uintptr_t)ADDR_REMAP_SHADE_STORE + 3) & ~3u);
+    ((uint8_t * *)&g_remapShades)[0] = (uint8_t *)((((uintptr_t)g_remapShadeStore) + 3) & ~3u);
     for (k = 1; k < 4; k++)
-        g_remapShades[k] = g_remapShades[k - 1] + PALETTE_ENTRIES;
+        ((uint8_t * *)&g_remapShades)[k] = ((uint8_t * *)&g_remapShades)[k - 1] + PALETTE_ENTRIES;
 
     i = 0;
     {
@@ -380,7 +368,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 c.peGreen = (uint8_t)(g * DARK_SCALE);
                 c.peBlue  = (uint8_t)(b * DARK_SCALE);
             }
-            g_remapBright[i] = MATCH_ENTRY(c);
+            (*(uint8_t * *)&g_remapBright)[i] = MATCH_ENTRY(c);
 
             /* Two colours by parity, so a run of indices alternates. */
             if (i & 1) {
@@ -398,34 +386,34 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 c.peRed   = (uint8_t)(r * shade[k]);
                 c.peGreen = (uint8_t)(g * shade[k]);
                 c.peBlue  = (uint8_t)(b * shade[k]);
-                *(i + g_remapShades[k]) = MATCH_ENTRY(c);
+                *(i + ((uint8_t * *)&g_remapShades)[k]) = MATCH_ENTRY(c);
             }
         }
     }
 
-    NAMED(ADDR_BACKGROUND_COLOUR,  0x00, 0x00, 0x00);
-    NAMED(ADDR_COLOUR_WHITE,       0xFF, 0xFF, 0xFF);
-    NAMED(ADDR_COLOUR_STALE,       0xC0, 0xC0, 0xC0);
-    NAMED(ADDR_VIEW_RECT_COLOUR,   0x00, 0xFF, 0x00);
-    NAMED(ADDR_HUD_MESSAGE_COLOUR, 0xDA, 0x4E, 0x00);
-    NAMED(ADDR_COLOUR_BLUE,        0x00, 0x00, 0xFF);
-    NAMED(ADDR_KIND7_NAMES,        0xAC, 0xE8, 0x00);
-    NAMED(ADDR_LIST_INK_HOT_SEL,   0x88, 0x88, 0x88);
-    NAMED(ADDR_COLOUR_BELOW_BG,    0x00, 0x84, 0x00);
-    NAMED(ADDR_COLOUR_NO_MAP,      0xAC, 0x00, 0x00);
-    NAMED(ADDR_COLOUR_DARK_BLUE,   0x00, 0x00, 0xAC);
-    NAMED(ADDR_VARIATION_END,      0x88, 0xC0, 0x00);
-    NAMED(ADDR_COLOUR_LAG_MID,     0xFF, 0xFF, 0x00);
-    NAMED(ADDR_COLOUR_LIGHT_GREEN, 0x69, 0xA9, 0x52);
-    NAMED(ADDR_COLOUR_DARK_GREEN,  0x32, 0x71, 0x26);
-    NAMED(ADDR_COLOUR_CREAM,       0xEF, 0xD9, 0xA0);
-    NAMED(ADDR_COLOUR_OLIVE,       0x65, 0x57, 0x30);
-    NAMED(ADDR_COLOUR_LIGHT_BLUE,  0x92, 0xB8, 0xDF);
-    NAMED(ADDR_COLOUR_STEEL_BLUE,  0x32, 0x5D, 0x8A);
-    NAMED(ADDR_COLOUR_LIGHT_GREY,  0xAB, 0xAB, 0xAB);
-    NAMED(ADDR_COLOUR_DARK_GREY,   0x54, 0x54, 0x54);
-    NAMED(ADDR_COLOUR_WHITE_B,     0xFF, 0xFF, 0xFF);
-    NAMED(ADDR_COLOUR_BLACK,       0x00, 0x00, 0x00);
+    NAMED(((uintptr_t)&g_backgroundColour),  0x00, 0x00, 0x00);
+    NAMED(((uintptr_t)&g_whiteInk),       0xFF, 0xFF, 0xFF);
+    NAMED(((uintptr_t)&g_colourStale),       0xC0, 0xC0, 0xC0);
+    NAMED(((uintptr_t)&g_hiliteColour),   0x00, 0xFF, 0x00);
+    NAMED(((uintptr_t)&g_hudColour), 0xDA, 0x4E, 0x00);
+    NAMED(((uintptr_t)&g_colourBlue),        0x00, 0x00, 0xFF);
+    NAMED(((uintptr_t)g_kind7Names),        0xAC, 0xE8, 0x00);
+    NAMED(((uintptr_t)&g_listInkHotSel),   0x88, 0x88, 0x88);
+    NAMED(((uintptr_t)&g_colourBelowBg),    0x00, 0x84, 0x00);
+    NAMED(((uintptr_t)&g_colourNoMap),      0xAC, 0x00, 0x00);
+    NAMED(((uintptr_t)g_colourDarkBlue),   0x00, 0x00, 0xAC);
+    NAMED(((uintptr_t)g_variationEnd),      0x88, 0xC0, 0x00);
+    NAMED(((uintptr_t)&g_colourLagMid),     0xFF, 0xFF, 0x00);
+    NAMED(((uintptr_t)&g_colourLightGreen), 0x69, 0xA9, 0x52);
+    NAMED(((uintptr_t)&g_colourDarkGreen),  0x32, 0x71, 0x26);
+    NAMED(((uintptr_t)&g_colourCream),       0xEF, 0xD9, 0xA0);
+    NAMED(((uintptr_t)&g_colourOlive),       0x65, 0x57, 0x30);
+    NAMED(((uintptr_t)&g_colourLightBlue),  0x92, 0xB8, 0xDF);
+    NAMED(((uintptr_t)&g_colourSteelBlue),  0x32, 0x5D, 0x8A);
+    NAMED(((uintptr_t)&g_colourLightGrey),  0xAB, 0xAB, 0xAB);
+    NAMED(((uintptr_t)&g_colourDarkGrey),   0x54, 0x54, 0x54);
+    NAMED(((uintptr_t)&g_colourWhiteB),     0xFF, 0xFF, 0xFF);
+    NAMED(((uintptr_t)&g_colourBlack),       0x00, 0x00, 0x00);
 
     PaletteLoaded();
 }
@@ -626,40 +614,39 @@ void __cdecl CyclePalette(void)
     uint32_t now, elapsed;
     int32_t  i;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+    if (!g_tilesetReserve)
         return;
 
-    now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-    elapsed = now - *(const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP;
+    now     = g_gameClockMs;
+    elapsed = now - g_paletteCycleStamp;
 
-    if (elapsed <= *(const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INTERVAL)
+    if (elapsed <= g_paletteCycleInterval)
         return;
 
-    *(uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP = now;
+    g_paletteCycleStamp = now;
 
-#define IDX (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX)
-    if (++IDX >= *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)
+#define IDX (g_paletteCycleIndex)
+    if (++IDX >= g_paletteCycleCount)
         IDX = 0;
     i = IDX;
 #undef IDX
 
     {
-        uint32_t which = ((const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_SEQ)[i];
+        uint32_t which = (g_paletteCycleSeq)[i];
 
         SetPaletteRange((PALETTEENTRY *)(uintptr_t)
-                            (ADDR_TILESET_PALETTES + which * AM2_TILESET_PALETTE_BYTES),
+                            (((uintptr_t)g_tilesetPalettes) + which * AM2_TILESET_PALETTE_BYTES),
                         1, 8);
     }
 }
 
 /* Spelled as surface.cpp spells it, so the two stay one definition. */
-#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
 void __cdecl PaletteLoaded(void)
 {
     /* The three sets are a table on the stack, walked by pointer. */
     uintptr_t sets[3] = {
-        ADDR_SPRITE_SET_TITLE, ADDR_SPRITE_SET_SHARED, ADDR_SPRITE_SET_THIRD
+        ((uintptr_t)g_spriteSetTitle), ((uintptr_t)g_spriteSetShared), ((uintptr_t)g_spriteSetThird)
     };
     int32_t n;
 
@@ -718,12 +705,12 @@ void __cdecl PaletteLoaded(void)
  */
 void __cdecl LoadTilesetPalettes(void)
 {
-#define TP(n) ((uint8_t *)(uintptr_t)ADDR_TILESET_PALETTES + (n) * AM2_TILESET_PALETTE_BYTES)
-    if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+#define TP(n) (g_tilesetPalettes + (n) * AM2_TILESET_PALETTE_BYTES)
+    if (!g_tilesetReserve)
         return;
 
     /* Six calls written out, as the image has them -- no loop, no table. */
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)));
+    SetGameDir(g_mapBlock);
     LoadPaletteFile("palette0.bmp", TP(0));
     LoadPaletteFile("palette1.bmp", TP(1));
     LoadPaletteFile("palette2.bmp", TP(2));
@@ -775,10 +762,10 @@ typedef int32_t (__cdecl *AM2_PalRandFn)(void);
  */
 void __cdecl BuildRemapTables(void)
 {
-    const uint8_t  *base = (const uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PAL_BASE));
-    const uint8_t  *pal  = (const uint8_t *)(uintptr_t)ADDR_PALETTE_COPY;
-    uint8_t        *obj  = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS;
-    uint8_t        *ramp = (uint8_t *)(uintptr_t)ADDR_ARMY_RAMP_TABLES;
+    const uint8_t  *base = g_armyPalBase;
+    const uint8_t  *pal  = (const uint8_t *)g_paletteCopy;
+    uint8_t        *obj  = g_objTableRecords;
+    uint8_t        *ramp = g_armyRampTables;
     uint8_t       **table;
     int32_t         block;
     int32_t         army;
@@ -792,7 +779,7 @@ void __cdecl BuildRemapTables(void)
             uint32_t c = ((uint32_t)base[army] + (uint32_t)i) * 4;
 
             rec[i] = NearestPalIndexRGB(
-                *(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE,
+                g_activePalette,
                 pal[c], pal[c + 1], pal[c + 2],
                 AM2_PAL_REMAP_FROM);
         }
@@ -805,9 +792,9 @@ void __cdecl BuildRemapTables(void)
             rmp[i] = (uint8_t)i;
     }
 
-    table = (uint8_t **)(uintptr_t)ADDR_VARIATION_TABLE;
-    block = (int32_t)ADDR_VARIATION_BLOCKS;
-    while (block < (int32_t)ADDR_VARIATION_END) {
+    table = g_variationTable;
+    block = (int32_t)((uintptr_t)g_variationBlocks);
+    while (block < (int32_t)((uintptr_t)g_variationEnd)) {
         int32_t row;
 
         *table = (uint8_t *)(uintptr_t)block;
@@ -825,16 +812,16 @@ void __cdecl BuildRemapTables(void)
     }
 
     for (i = 0; i < AM2_REMAP_COLOURS; i++)
-        ((uint8_t *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)[i] =
+        ((uint8_t *)g_rowLutDoubles)[i] =
             NearestPalIndexRGB(
-                *(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE,
+                g_activePalette,
                 (uint32_t)(uint8_t)(0x24 - i * 4),
                 (uint32_t)(uint8_t)(0x28 - i * 4),
                 (uint32_t)(uint8_t)(0x28 - i * 4),
                 AM2_PAL_REMAP_FROM);
 
     for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
-        ((uint8_t *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)[i] = (uint8_t)i;
+        ((uint8_t *)g_rowLutDoubles)[i] = (uint8_t)i;
 }
 
 int palette_install(void)

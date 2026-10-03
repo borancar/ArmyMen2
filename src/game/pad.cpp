@@ -31,9 +31,9 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 };
 #endif
 
-#define kPads        ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_PADS)))
-#define kPadNumbers  ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
-#define kPadCount    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
+#define kPads        ((void *)(uintptr_t)((void *)g_pads))
+#define kPadNumbers  ((void *)(uintptr_t)((void *)g_padNumbers))
+#define kPadCount    (*(int32_t *)(uintptr_t)((void *)&g_padCount))
 
 void __cdecl ResetPads(void)
 {
@@ -296,7 +296,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
 int32_t __cdecl ObjTileHook(void *obj)
 {
     uint8_t       *o = (uint8_t *)obj;
-#define padLayer (*(const uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER)
+#define padLayer (g_mapPadLayer)
     const uint8_t *bitLayer;
     uint32_t tile;
     uint32_t       prev;
@@ -309,7 +309,7 @@ int32_t __cdecl ObjTileHook(void *obj)
      * pad layer here WITHOUT the null test both later passes make. */
     tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
     if (padLayer[tile] > 0) {
-        const uint8_t *num = (const uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
+        const uint8_t *num = g_padNumbers
                              + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
 
         if (*(const int32_t *)(num + PADNUM_OFF_PADS) != 0
@@ -320,11 +320,11 @@ int32_t __cdecl ObjTileHook(void *obj)
              * test above stands for the first. */
             i = 0;
             do {
-                const uint8_t *pad = (const uint8_t *)((void *)(uintptr_t)(ADDR_PADS))
+                const uint8_t *pad = g_pads
                                      + (uint32_t)ids[i] * AM2_PAD_STRIDE;
 
                 if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
-                    && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    && g_gameClockMs
                        > *(const uint32_t *)(pad + PAD_OFF_DAMAGE_DUE))
                     DamageObject(o,
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE),
@@ -340,7 +340,7 @@ int32_t __cdecl ObjTileHook(void *obj)
         return 0;
 
     /* The eight-bit layer. */
-    bitLayer = *(const uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER;
+    bitLayer = g_mapPadbitLayer;
     if (bitLayer != 0) {
         if (tile != 0) curBits  = bitLayer[tile];
         if (prev != 0) prevBits = bitLayer[prev];
@@ -348,8 +348,8 @@ int32_t __cdecl ObjTileHook(void *obj)
         if (curBits != prevBits) {
             uint8_t entered = (uint8_t)(~prevBits & curBits);
             uint8_t left    = (uint8_t)(~curBits  & prevBits);
-            const int32_t *mask = (const int32_t *)((void *)(uintptr_t)(ADDR_PAD_BIT_TABLE));
-            uint8_t *num = (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS));
+            const int32_t *mask = g_padBitTable;
+            uint8_t *num = g_padNumbers;
 
             for (i = 0; i < AM2_PAD_BITS; i++, num += AM2_PAD_NUMBER_STRIDE) {
                 if (mask[i] & entered)
@@ -368,10 +368,10 @@ int32_t __cdecl ObjTileHook(void *obj)
 
         if (curPad != prevPad) {
             if (curPad != 0)
-                PadNumberEnter(o, (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
+                PadNumberEnter(o, g_padNumbers
                                   + (uint32_t)curPad * AM2_PAD_NUMBER_STRIDE);
             if (prevPad != 0)
-                PadNumberLeave(o, (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
+                PadNumberLeave(o, g_padNumbers
                                   + (uint32_t)prevPad * AM2_PAD_NUMBER_STRIDE);
             changed = 1;
         }

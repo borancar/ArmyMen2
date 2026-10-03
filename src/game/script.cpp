@@ -333,15 +333,6 @@ typedef char *(__cdecl *AM2_StrlwrFn)(char *);
 
 /* The nine globals DeclareBuiltinNames fills, each the name table INDEX of
  * one built-in name. */
-#define g_svarId15        (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15)))
-#define g_svarGreen       (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_GREEN)))
-#define g_svarTan         (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_TAN)))
-#define g_svarBlue        (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_BLUE)))
-#define g_svarGrey        (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_GREY)))
-#define g_svarMe          (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ME)))
-#define g_svarDifficulty  (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_DIFFICULTY)))
-#define g_svarSystemSpeed (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_SYSTEMSPEED)))
-#define g_svarNumGreen    (*(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_NUMGREEN)))
 
 /* DeclareBuiltinNames -- original 0x0043F6D0, one caller, and that caller is
  * the state-2 ENTRY, beside LoadDefaultCof. Empty the script name table and
@@ -390,10 +381,10 @@ void __cdecl DeclareBuiltinNames(void)
 
     g_svarDifficulty = AddNameTableName(
         "difficulty", AM2_NAME_TYPE_INTEGER,
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_DIFFICULTY)));
+        g_difficulty);
     g_svarSystemSpeed = AddNameTableName(
         "systemspeed", AM2_NAME_TYPE_INTEGER,
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_FAST_MACHINE)));
+        g_fastMachine);
     g_svarNumGreen = AddNameTableName(
         "numgreen", AM2_NAME_TYPE_INTEGER, 0);
 }
@@ -551,9 +542,9 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
      * they are NOW, not as they were saved. Ours returned without these
      * until the relink showed the two calls. */
     SetVarValueByName("difficulty",
-                      *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY);
+                      g_difficulty);
     SetVarValueByName("systemspeed",
-                      *(const int32_t *)(uintptr_t)ADDR_FAST_MACHINE);
+                      g_fastMachine);
     return 1;
 }
 
@@ -597,7 +588,7 @@ int32_t __cdecl SetVarValueByName(const char *name, int32_t value)
     return SetVarValue(index, value);
 }
 
-#define kNextUid         (*(int32_t *)((void *)(uintptr_t)(ADDR_NEXT_UID)))
+#define kNextUid         (g_nextUid)
 
 int32_t __cdecl AllocUid(void)
 {
@@ -816,12 +807,12 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
         /* Each arm reads its own variable into *out. */
 #define SVAR(a) (*(const int32_t *)((void *)(uintptr_t)(a)))
         switch ((int32_t)(uintptr_t)tok->value) {
-        case 15:            *out = SVAR(ADDR_SVAR_ID15);  break;   /* no keyword maps here */
-        case AM2_TOK_GREEN: *out = SVAR(ADDR_SVAR_GREEN); break;
-        case AM2_TOK_TAN:   *out = SVAR(ADDR_SVAR_TAN);   break;
-        case AM2_TOK_BLUE:  *out = SVAR(ADDR_SVAR_BLUE);  break;
-        case AM2_TOK_GREY:  *out = SVAR(ADDR_SVAR_GREY);  break;
-        case AM2_TOK_ME:    *out = SVAR(ADDR_SVAR_ME);    break;
+        case 15:            *out = SVAR(((uintptr_t)&g_svarId15));  break;   /* no keyword maps here */
+        case AM2_TOK_GREEN: *out = SVAR(((uintptr_t)&g_svarGreen)); break;
+        case AM2_TOK_TAN:   *out = SVAR(((uintptr_t)&g_svarTan));   break;
+        case AM2_TOK_BLUE:  *out = SVAR(((uintptr_t)&g_svarBlue));  break;
+        case AM2_TOK_GREY:  *out = SVAR(((uintptr_t)&g_svarGrey));  break;
+        case AM2_TOK_ME:    *out = SVAR(((uintptr_t)&g_svarMe));    break;
         default:
             if (!quiet)
                 am2_log("Line [%4d]:  Unexpected use of reserved word\n",
@@ -1038,9 +1029,9 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     return 1;
 }
 
-#define kPads       ((AM2_Pad *)((void *)(uintptr_t)(ADDR_PADS)))
-#define kPadCount   (*(int32_t *)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
-#define kPadNumbers ((AM2_PadNumber *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
+#define kPads       ((AM2_Pad *)g_pads)
+#define kPadCount   (g_padCount)
+#define kPadNumbers ((AM2_PadNumber *)g_padNumbers)
 
 /* ScriptLocation: each coordinate is an integer or `refvar <name>`, written
  * out at both uses because the image's two copies differ. X steps past the
@@ -1453,7 +1444,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
 
     /* One call per colour -- VC6 merges them and leaves the constant
      * pushes. */
-#define SLOT(n) (((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)))->CommSlotForArmy(n))
+#define SLOT(n) (((AM2_Comm *)g_armyTable)->CommSlotForArmy(n))
     int32_t rc;
     int32_t v = (int32_t)(uintptr_t)tok->value;
 
@@ -1609,7 +1600,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (TOK.kind == AM2_TOKEN_STRING)
             return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
         /* No name means everyone. */
-        act->subject = *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15));
+        act->subject = g_svarId15;
         return 1;
 
     case AM2_TOK_REVIVEAI:
@@ -1617,7 +1608,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->code = 0x1C;
         if (TOK.kind == AM2_TOKEN_STRING)
             return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
-        act->subject = *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15));
+        act->subject = g_svarId15;
         return 1;
 
     /* The record keeps the token's own string. Nothing copies it and nothing
@@ -2558,11 +2549,11 @@ int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act)
  * shares 0x0200 with `grey`, which is not -- but nothing here can tell
  * whether that was intended, so it stands. */
 #define PAD          (kPads[kPadCount])
-#define PAD_LAYER    (*(const uint8_t **)((void *)(uintptr_t)(ADDR_MAP_PAD_LAYER)))
-#define PADBIT_LAYER (*(const uint8_t **)((void *)(uintptr_t)(ADDR_MAP_PADBIT_LAYER)))
-#define ZERO_POINT   (*(const int32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT)))
-#define MAP_TILES_H  (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_H)))
-#define MAP_TILES_W  (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)))
+#define PAD_LAYER    (g_mapPadLayer)
+#define PADBIT_LAYER (g_mapPadbitLayer)
+#define ZERO_POINT   (*(const int32_t *)&g_zeroPoint)
+#define MAP_TILES_H  (g_mapTilesH)
+#define MAP_TILES_W  (g_mapTilesW)
 
 int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 {
@@ -2766,7 +2757,7 @@ triggers_done:
 
 /* ---------------------------------------------------------------- if ---- */
 
-#define kScriptConds (*(AM2_ScriptCond **)((void *)(uintptr_t)(ADDR_SCRIPT_CONDITIONS)))
+#define kScriptConds (g_scriptConditions)
 
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`?
  *
@@ -3191,12 +3182,12 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
 
     /* Single player only: a multiplayer load goes on to read the rules and
      * the per-army AI scripts, and the summary would be one of four. */
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) == 0) {
+    if (g_mpSession == 0) {
         /* The token count comes from the GLOBAL context, not the one passed
          * in. They are the same object for every caller in the image, but the
          * original reads the global and so does this. */
         const AM2_ScriptCtx *g =
-            (const AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT));
+            (const AM2_ScriptCtx *)g_scriptContext;
         am2_log("lines: %d  tokens: %d  names: %d  compounds: %d\n",
                 lines, g->count, kScriptNameCount, compounds);
         am2_log("Finished Processing Script... "
@@ -3227,11 +3218,11 @@ const AM2_ScriptName *am2_script_name(int32_t i)
 }
 
 
-#define kMapName      ((const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)))
-#define kMapFolder    ((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)))
-#define kMpScriptName ((const char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)))
-#define kLevelIndex   (*(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_INDEX)))
-#define kMpSession    (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)))
+#define kMapName      (&g_mapName_)
+#define kMapFolder    (g_tilesetPath)
+#define kMpScriptName (&g_mpScriptName)
+#define kLevelIndex   (g_levelIndex)
+#define kMpSession    (g_mpSession)
 
 /* Change into one of the game's data directories. Everything the script loader
  * opens is relative to wherever this last left us. */
@@ -3249,7 +3240,7 @@ static inline void ScriptReadWithLog(const char *path)
     if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE))
         am2_log("reading script %s: ", path);
 
-    ok = ReadScript(path, (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
+    ok = ReadScript(path, (AM2_ScriptCtx *)g_scriptContext);
 
     /* Re-read the flag: ReadScript can have changed it. */
     if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE)) {
@@ -3272,26 +3263,26 @@ void __cdecl LoadLevelScript(void)
     else
         sprintf(path, "%s.txt", kMapName);
 
-    ScriptResetTokens((AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
+    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
 
     /* The five score variables, declared before anything can reference them.
      * `gamescorelimit` is seeded with the configured limit and its index is
      * thrown away -- scripts reach it by name and nothing writes it back --
      * while the four army scores keep theirs, because the runtime updates
      * those by index. */
-    AddNameTableName(kImageStr(ADDR_NAME_SCORE_LIMIT), AM2_NAME_TYPE_INTEGER,
-                     *(const int32_t *)((void *)(uintptr_t)(ADDR_SCORE_LIMIT)));
-    *(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_GREENSCORE)) =
-        AddNameTableName(kImageStr(ADDR_NAME_GREENSCORE),
+    AddNameTableName(kImageStr(((uintptr_t)g_nameScoreLimit)), AM2_NAME_TYPE_INTEGER,
+                     g_scoreLimit);
+    g_svarGreenscore =
+        AddNameTableName(kImageStr(((uintptr_t)g_nameGreenscore)),
                          AM2_NAME_TYPE_INTEGER, 0);
-    *(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_TANSCORE)) =
-        AddNameTableName(kImageStr(ADDR_NAME_TANSCORE),
+    g_svarTanscore =
+        AddNameTableName(kImageStr(((uintptr_t)g_nameTanscore)),
                          AM2_NAME_TYPE_INTEGER, 0);
-    *(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_BLUESCORE)) =
-        AddNameTableName(kImageStr(ADDR_NAME_BLUESCORE),
+    g_svarBluescore =
+        AddNameTableName(kImageStr(((uintptr_t)g_nameBluescore)),
                          AM2_NAME_TYPE_INTEGER, 0);
-    *(int32_t *)((void *)(uintptr_t)(ADDR_SVAR_GREYSCORE)) =
-        AddNameTableName(kImageStr(ADDR_NAME_GREYSCORE),
+    g_svarGreyscore =
+        AddNameTableName(kImageStr(((uintptr_t)g_nameGreyscore)),
                          AM2_NAME_TYPE_INTEGER, 0);
 
     ScriptReadWithLog(path);
@@ -3313,7 +3304,7 @@ void __cdecl LoadLevelScript(void)
         const char *colour;
         int32_t     i;
 
-        ScriptSetDataDir(kImageStr(ADDR_RULES_DIR_STR));
+        ScriptSetDataDir(kImageStr(((uintptr_t)g_rulesDirStr)));
         sprintf(path, "%s.txt", kMpScriptName);
         ScriptReadWithLog(path);
 
@@ -3367,9 +3358,9 @@ void __cdecl LoadLevelScript(void)
  * files. */
 static void ScriptResetObjScripts(void)
 {
-    *(int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT)) = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP)) = 0;
-    *(AM2_ObjScript **)((void *)(uintptr_t)(ADDR_OBJ_SCRIPTS)) = 0;
+    g_currentObjScript = 0;
+    g_objScriptCap = 0;
+    g_objScripts = 0;
 }
 
 static void ScriptParseAll(void)
@@ -3399,9 +3390,9 @@ static void ScriptParseAll(void)
     AM2_ScriptName *save_names = kScriptNames;
     int32_t save_ncount = kScriptNameCount, save_ncap = kScriptNameCap;
     int32_t save_pads = kPadCount;
-    int32_t save_obj = *(int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT));
-    AM2_ObjScript *save_objarr = *(AM2_ObjScript **)((void *)(uintptr_t)(ADDR_OBJ_SCRIPTS));
-    int32_t save_objcap = *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP));
+    int32_t save_obj = g_currentObjScript;
+    AM2_ObjScript *save_objarr = g_objScripts;
+    int32_t save_objcap = g_objScriptCap;
     static int16_t save_padnum[256];
     for (int32_t i = 0; i < 256; i++) {
         save_padnum[i] = kPadNumbers[i].count;
@@ -3434,9 +3425,9 @@ static void ScriptParseAll(void)
     kScriptNameCount = save_ncount;
     kScriptNameCap = save_ncap;
     kPadCount = save_pads;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT)) = save_obj;
-    *(AM2_ObjScript **)((void *)(uintptr_t)(ADDR_OBJ_SCRIPTS)) = save_objarr;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP)) = save_objcap;
+    g_currentObjScript = save_obj;
+    g_objScripts = save_objarr;
+    g_objScriptCap = save_objcap;
     for (int32_t i = 0; i < 256; i++)
         kPadNumbers[i].count = save_padnum[i];
 

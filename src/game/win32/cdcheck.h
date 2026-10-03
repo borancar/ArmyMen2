@@ -60,8 +60,8 @@ static_assert(MB_ICONHAND == 0x10, "MB_ICONHAND");
 
 /* The strings are the game's own, not copies -- as with the DirectPlay CLSIDs
  * and the registry key, there is no reason to restate what the image carries. */
-#define kCdRequiredText    ((const char *)(uintptr_t)ADDR_CD_REQUIRED_TEXT)
-#define kCdRequiredCaption ((const char *)(uintptr_t)ADDR_CD_REQUIRED_CAPTION)
+#define kCdRequiredText    (g_cdRequiredText)
+#define kCdRequiredCaption (g_cdRequiredCaption)
 
 #ifdef AM2_COPY_PROTECTION
 

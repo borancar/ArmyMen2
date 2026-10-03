@@ -182,17 +182,17 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src);
  * is expanded at the widget sites and in MedkitHealOne as the original has it. */
 static inline uint8_t *OurLeaderUnit(void)
 {
-    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    int32_t owner = *(const int32_t *)&g_defaultOwner;
 
-    if (owner == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+    if (owner == *(const int32_t *)&g_defaultOwner)
         return (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+            g_ourLeaderUid);
 
     /* Dead. The NULL check lives in here, which is why the live path above
      * has none. The army's list is re-read through its slot each time. */
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         const uint8_t *const *slot =
-            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+            &((const uint8_t *const *)g_armyObjLists)[owner];
         int32_t i;
 
         for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {

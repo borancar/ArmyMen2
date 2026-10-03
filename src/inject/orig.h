@@ -18487,8 +18487,7 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #endif
 
 /* The globals by name and type; see that header. */
-#ifdef __cplusplus
 #include "../game/globals.h"
-#endif
+#include "../game/win32/globals.h"
 
 #endif /* AM2_ORIG_H */

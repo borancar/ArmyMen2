@@ -75,14 +75,11 @@ extern "C" const int32_t am2_shake_presets[44] = {
 #include "aimdisplace.inc"
 #endif
 
-#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 /* The OFFSCREEN surface, not the back buffer. This file used to call it
  * g_backBuffer, which made one identifier mean two different surfaces in two
  * files. The address was always right; the name was the trap, and both ADDR_
  * names involved have since been renamed to what they are. Verified against
  * the original: RedrawMapRegion locks [0x00503100]. */
-#define g_offscreen (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
-#define g_mapDesc    ((void *)(uintptr_t)ADDR_MAP_DESC)
 
 /* 0x0041E440: the recursive tile walker. Shifts the rectangle's edges right by
  * 8 to get tile indices and bounds-checks them against the map descriptor.
@@ -106,11 +103,6 @@ typedef void (__cdecl *am2_draw_map_tiles_fn)(const AM2_Rect *world,
  * buffer and the tile walker draws over it regardless, as in the original. */
 static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
 
-#define g_mapCache (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
-#define g_cameraX  (*(const int32_t *)(uintptr_t)ADDR_CAMERA_X)
-#define g_cameraY  (*(const int32_t *)(uintptr_t)ADDR_CAMERA_Y)
-#define g_viewX  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
-#define g_viewY  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y)
 
 /* Tiles are 16 pixels, so the camera scales by 16 to reach pixels. */
 #define TILE_SHIFT 4
@@ -135,8 +127,8 @@ void __cdecl SetDrawTarget(LPDIRECTDRAWSURFACE surf)
 {
     /* The compare is redundant -- storing unconditionally would behave
      * identically -- but it is what the original does. */
-    if (g_drawTarget != surf)
-        g_drawTarget = surf;
+    if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) != surf)
+        (*(LPDIRECTDRAWSURFACE *)&g_drawTarget) = surf;
 }
 
 void __cdecl RedrawMapRegion(const AM2_Rect *world)
@@ -187,15 +179,10 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world)
  * which is the point of doing it. */
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
-#define g_mapCacheSurf (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
-#define g_mapSprite    (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
-#define g_mapTiles     (*(const uint16_t **)(uintptr_t)ADDR_MAP_TILES)
-#define g_mapRowShift  (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
-#define g_visibleTiles ((const AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES)
 
 void __cdecl PaintMapTiles(const AM2_Rect *tiles)
 {
-    LPDIRECTDRAWSURFACE dest = g_mapCacheSurf;
+    LPDIRECTDRAWSURFACE dest = g_mapCache;
     LPDIRECTDRAWSURFACE sheet;
     AM2_Rect            clipped;
     RECT                to, from;
@@ -208,22 +195,22 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
         return;
 
     if (!IntersectRect((LPRECT)&clipped, (const RECT *)tiles,
-                       (const RECT *)g_visibleTiles))
+                       (const RECT *)((const AM2_Rect *)g_visibleTiles)))
         return;
 
     /* Tile coordinates become pixels relative to the camera. The destination
      * rectangle is itself the loop state: its top and bottom step per row,
      * its left and right per column, from a saved left edge. */
-    to.top    = (clipped.top - g_visibleTiles->top) * MAP_TILE_SIZE;
+    to.top    = (clipped.top - ((const AM2_Rect *)g_visibleTiles)->top) * MAP_TILE_SIZE;
     to.bottom = to.top + MAP_TILE_SIZE;
-    left      = (clipped.left - g_visibleTiles->left) * MAP_TILE_SIZE;
+    left      = (clipped.left - ((const AM2_Rect *)g_visibleTiles)->left) * MAP_TILE_SIZE;
 
     for (row = clipped.top; row < clipped.bottom; row++) {
         const uint16_t *cell;
         int32_t         col;
 
         to.left = left;
-        cell    = g_mapTiles + ((row << g_mapRowShift) + tiles->left);
+        cell    = (*(const uint16_t * *)&g_mapTiles) + ((row << (*(const int32_t *)&g_mapRowShift)) + tiles->left);
         for (col = clipped.left; col < clipped.right; col++) {
             int32_t idx;
 
@@ -302,10 +289,7 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
-#define g_tilesetName    ((const char *)(uintptr_t)ADDR_MAP_NAME)
-#define g_tilesetPath    ((const char *)(uintptr_t)ADDR_MAP_FOLDER)
-#define g_tilesetReserve (*(int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
-#define g_activePalette  (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define g_tilesetName    (&g_mapName_)
 /* LoadAtlFile -- original 0x0042BEA0, 563 bytes, one caller. Read a `.atl`
  * tileset and build the map sprite from its DIB chunk.
  *
@@ -372,7 +356,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
         offset += (int32_t)chunkSize;
 
         spr = (uint8_t *)am2_malloc(AM2_MAP_SPRITE_BYTES);
-        *(void **)(uintptr_t)ADDR_MAP_SURFACE = spr;
+        *(void * *)&g_mapSprite = spr;
         memset(spr, 0, AM2_MAP_SPRITE_BYTES);
 
         *(int32_t *)(rec + BMP_OFF_FLAGS) = 1;
@@ -381,14 +365,14 @@ int32_t __cdecl LoadAtlFile(const char *path)
         if (!pixels)
             goto bad;
 
-        if (*(void *const *)(uintptr_t)ADDR_ACTIVE_PALETTE
-            && *(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+        if (*(void *const *)&g_activePalette
+            && g_tilesetReserve)
             *(int32_t *)(rec + BMP_OFF_FLAGS) |= 0x80;
 
         MakeBitmap(header, pixels, rec, (const uint8_t *)0);
         am2_free(pixels);
 
-#define spr (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
+#define spr (g_mapSprite)
         *(void **)(spr + 0x10) = *(void *const *)(rec + BMP_OFF_SURFACE);
         *(uint8_t *)(spr + 0x2C) = rec[BMP_OFF_KEY];
         *(int32_t *)(spr + 0x18) = 0;
@@ -398,17 +382,17 @@ int32_t __cdecl LoadAtlFile(const char *path)
         *(int32_t *)(spr + 0x0C) |= 1;
 
         shift = Log2Mask((uint32_t)*(const int32_t *)(spr + 0x1C)) & 0xFF;
-        *(int32_t *)(uintptr_t)ADDR_TILE_SHIFT_LOG = shift;
+        g_tileShiftLog = shift;
         if (shift < 1) {
             FreeMapSurfaces();
             goto bad;
         }
 
-        tw = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W >> AM2_TILE_SHIFT) + 2;
-        th = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H >> AM2_TILE_SHIFT) + 2;
-        *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_H = th;
-        *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_W = tw;
-        *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE =
+        tw = (g_screenW >> AM2_TILE_SHIFT) + 2;
+        th = (g_screenH >> AM2_TILE_SHIFT) + 2;
+        g_viewTilesH = th;
+        g_viewTilesW = tw;
+        g_mapCache =
             CreateOffscreenSurface(tw << AM2_TILE_SHIFT,
                                    th << AM2_TILE_SHIFT, 0x40, -1);
 #undef spr
@@ -561,23 +545,12 @@ bad:
  * the addresses differ, nothing observable does.
  *
  * Exercised by every frame, so the Boot Camp pixel budget is what checks it. */
-#define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
 /* Not const: ScrollDecay shifts all four edges every frame. */
-#define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+#define g_viewRect   ((AM2_Rect *)&g_viewX)
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
-#define g_fullRedraw (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)
-#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 typedef void (__cdecl *am2_void_fn)(void);
 
-#define g_shakeTime    (*(int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
-#define g_shakePhaseX  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_X)
-#define g_shakeStepX   (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X)
-#define g_shakePhaseY  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y)
-#define g_shakeStepY   (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y)
-#define g_shakeAmp     (*(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
-#define g_frameDeltaSec (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC)
-#define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
 
 /* One axis of the shake: advance the phase, bounce it off +/-amp reversing
  * the step, and answer the whole-pixel offset. */
@@ -617,9 +590,6 @@ static inline int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
  * constant on the left in the second arm -- `(-amp) > phase` and not
  * `phase < -amp`. For ordinary numbers the two are the same; the original
  * compares in that direction and there is no reason to differ. */
-#define g_depthCount (*(int32_t *)(uintptr_t)ADDR_DEPTH_COUNT)
-#define g_depthHead  (*(int32_t *)(uintptr_t)ADDR_DEPTH_HEAD)
-#define g_depthDC    (*(int32_t *)(uintptr_t)ADDR_DEPTH_FIELD_DC)
 
 
 /* One node of the depth list: the object, and the two links. The array is
@@ -630,8 +600,6 @@ typedef struct AM2_DepthNode {
     struct AM2_DepthNode *next;
 } AM2_DepthNode;
 
-#define g_depthNodes  ((AM2_DepthNode *)(uintptr_t)ADDR_DEPTH_NODES)
-#define g_depthCursor (*(AM2_DepthNode **)(uintptr_t)ADDR_DEPTH_CURSOR)
 
 
 /* 0x0040A090 -- draw one map object, and the last piece of the object
@@ -982,7 +950,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
     }
 
     if (g_depthHead != -1) {
-        const uint8_t *n = (const uint8_t *)(uintptr_t)ADDR_DEPTH_NODES
+        const uint8_t *n = (const uint8_t *)g_depthNodes
                            + (uint32_t)g_depthHead * AM2_DEPTH_NODE_SIZE;
 
         while (n) {
@@ -1079,12 +1047,12 @@ void __cdecl ComposeFrame(void)
                                g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
 
     /* This frame becomes last frame. */
-    *(AM2_Point *)(uintptr_t)ADDR_LISTENER_POS_PREV =
-        *(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS;
-    *(AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV =
-        *(const AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
-    *(AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT_PREV =
-        *(const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT;
+    *(AM2_Point *)&g_listenerPosPrev =
+        *(const AM2_Point *)&g_listenerPos;
+    g_viewRectPrev =
+        *(const AM2_Rect *)&g_viewX;
+    g_secondRectPrev =
+        *(const AM2_Rect *)g_secondRect;
 
     g_fullRedraw = 0;
 }
@@ -1124,8 +1092,7 @@ void __cdecl ComposeFrame(void)
  * Exercised by `tools/ab.sh mission`, which exists because nothing else got
  * here: while either opening dialog is up the game composes no frames at all,
  * so this ran zero times under every earlier configuration. */
-#define g_mapBounds  ((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)
-#define g_viewPrev   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV)
+#define g_viewPrev   (&g_viewRectPrev)
 
 typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
 
@@ -1159,12 +1126,7 @@ typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
  *
  * Exercised by tools/ab.sh mission, which scrolls; nothing else moves the
  * camera. */
-#define g_mapCacheS   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
-#define g_camera      ((AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES)
-#define g_viewTilesW  (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W)
-#define g_viewTilesH  (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H)
-#define g_mapTilesW   (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
-#define g_mapTilesH   (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+#define g_camera      ((AM2_Rect *)g_visibleTiles)
 
 /* The margin, in tiles, the view may drift before the camera follows it. */
 #define CAMERA_MARGIN 2
@@ -1183,19 +1145,19 @@ typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
  * half outside the region redraws only the half inside. */
 void __cdecl RepaintDirtyList(const AM2_Rect *region)
 {
-    uint32_t n = *(const uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD;
+    uint32_t n = g_dirtyHead;
 
     /* The record is indexed afresh at each use, as the original does. */
     while (n) {
         RECT hit;
 
         if (IntersectRect(&hit,
-                          (const RECT *)((uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
+                          (const RECT *)(g_dirtyRects
                                          + n * AM2_DIRTY_RECORD_SIZE),
                           (const RECT *)region))
             RedrawMapRegion((const AM2_Rect *)&hit);
 
-        n = *(const uint16_t *)((uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
+        n = *(const uint16_t *)(g_dirtyRects
                                 + n * AM2_DIRTY_RECORD_SIZE + DIRTY_OFF_NEXT);
     }
 }
@@ -1204,7 +1166,7 @@ void __cdecl ScrollMapCache(void)
 {
     int32_t  dx = 0, dy = 0, adx, ady;
     AM2_Rect wide, tall, src;
-    LPDIRECTDRAWSURFACE cache = g_mapCacheS;
+    LPDIRECTDRAWSURFACE cache = g_mapCache;
 
     if (!cache)
         return;
@@ -1269,7 +1231,7 @@ void __cdecl ScrollMapCache(void)
 
                                    (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),
                                    (DWORD)(((dy > 0) ? 0 : -dy) << TILE_SHIFT),
-                                   g_mapCacheS, (LPRECT)&src, DDBLTFAST_WAIT);
+                                   g_mapCache, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
     wide.left  = g_camera->left;
@@ -1308,9 +1270,9 @@ void __cdecl ScrollView(void)
     int32_t  toX, toY;
 
     IntersectRect((LPRECT)&now, (const RECT *)g_viewRect,
-                  (const RECT *)g_mapBounds);
+                  (const RECT *)((const AM2_Rect *)g_mapBounds));
     IntersectRect((LPRECT)&was, (const RECT *)g_viewPrev,
-                  (const RECT *)g_mapBounds);
+                  (const RECT *)((const AM2_Rect *)g_mapBounds));
 
     if (!IntersectRect((LPRECT)&common, (const RECT *)&now,
                        (const RECT *)&was)) {
@@ -1372,9 +1334,6 @@ void __cdecl ScrollView(void)
 
 /* ------------------------------------------------------ vline ---- */
 
-#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
-#define g_pitch       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
-#define g_framebuffer (*(uint8_t **)(uintptr_t)ADDR_FRAMEBUFFER)
 /* g_drawTarget above is already this address; one name for it. */
 
 /* 0x0041CBA0. Draw a clipped vertical line one byte at a time.
@@ -1406,22 +1365,22 @@ static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
     if (y0 > y1)
         NullStub(y0, y1);
 
-    if (x < g_screenClip.left || x >= g_screenClip.right)
+    if (x < (*(const AM2_Rect *)g_screenClip).left || x >= (*(const AM2_Rect *)g_screenClip).right)
         return;
 
-    if (y0 >= g_screenClip.bottom || y1 < g_screenClip.top)
+    if (y0 >= (*(const AM2_Rect *)g_screenClip).bottom || y1 < (*(const AM2_Rect *)g_screenClip).top)
         return;
 
-    if (y0 < g_screenClip.top)
-        y0 = g_screenClip.top;
+    if (y0 < (*(const AM2_Rect *)g_screenClip).top)
+        y0 = (*(const AM2_Rect *)g_screenClip).top;
 
-    if (y1 >= g_screenClip.bottom)
-        y1 = g_screenClip.bottom - 1;
+    if (y1 >= (*(const AM2_Rect *)g_screenClip).bottom)
+        y1 = (*(const AM2_Rect *)g_screenClip).bottom - 1;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    p   = g_framebuffer + (int32_t)g_pitch * y0 + x;
+    p   = g_frameBuf + (int32_t)g_pitch * y0 + x;
     end = p + (int32_t)g_pitch * (y1 - y0);
 
     if (p > end)
@@ -1459,22 +1418,22 @@ static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
     if (x0 > x1)
         NullStub(x0, x1);
 
-    if (y < g_screenClip.top || y >= g_screenClip.bottom)
+    if (y < (*(const AM2_Rect *)g_screenClip).top || y >= (*(const AM2_Rect *)g_screenClip).bottom)
         return;
 
-    if (x0 >= g_screenClip.right || x1 < g_screenClip.left)
+    if (x0 >= (*(const AM2_Rect *)g_screenClip).right || x1 < (*(const AM2_Rect *)g_screenClip).left)
         return;
 
-    if (x0 < g_screenClip.left)
-        x0 = g_screenClip.left;
+    if (x0 < (*(const AM2_Rect *)g_screenClip).left)
+        x0 = (*(const AM2_Rect *)g_screenClip).left;
 
-    if (x1 >= g_screenClip.right)
-        x1 = g_screenClip.right - 1;
+    if (x1 >= (*(const AM2_Rect *)g_screenClip).right)
+        x1 = (*(const AM2_Rect *)g_screenClip).right - 1;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    p     = g_framebuffer + (int32_t)g_pitch * y + x0;
+    p     = g_frameBuf + (int32_t)g_pitch * y + x0;
     count = x1 - x0 + 1;
 
     memset(p, (uint8_t)colour, (size_t)count);
@@ -1535,16 +1494,16 @@ void __cdecl DrawRectFast(const AM2_Rect *r, uint8_t colour)
     uint8_t  *p;
     int32_t   width;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     if (!IntersectRect((RECT *)&vis, (const RECT *)r,
-                       (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP))
+                       (const RECT *)g_screenClip))
         return;
 
     width  = vis.right - vis.left + 1;
-    top    = g_framebuffer + (int32_t)g_pitch * vis.top    + vis.left;
-    bottom = g_framebuffer + (int32_t)g_pitch * vis.bottom + vis.left;
+    top    = g_frameBuf + (int32_t)g_pitch * vis.top    + vis.left;
+    bottom = g_frameBuf + (int32_t)g_pitch * vis.bottom + vis.left;
 
     memset(top,    (uint8_t)colour, (size_t)width);
     memset(bottom, (uint8_t)colour, (size_t)width);
@@ -1582,16 +1541,16 @@ void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
 
     if (x < 0 || y < 0)
         return;
-    if (x >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - (AM2_BLIP3_SIZE - 1))
+    if (x >= g_bitmapAreaW - (AM2_BLIP3_SIZE - 1))
         return;
-    if (y >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - (AM2_BLIP3_SIZE - 1))
+    if (y >= g_bitmapAreaH - (AM2_BLIP3_SIZE - 1))
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     /* The nine stores written out, the pitch re-read for each row's. */
-    p = (int32_t)g_pitch * y + g_framebuffer + x;
+    p = (int32_t)g_pitch * y + g_frameBuf + x;
     p[0] = colour;
     p[1] = colour;
     p[2] = colour;
@@ -1665,7 +1624,7 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
     *blink = 0;
 
     if (ObjIsType2(obj)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && ObjIsType2(obj)
             && *(const int32_t *)(self + OBJ_OFF_SOLDIER_KIND) == 7)
             return AM2_RADAR_COLOUR_MP7;
@@ -1735,12 +1694,12 @@ void __cdecl DrawBlipPulse(int32_t x, int32_t y, uint8_t colourA,
 
     if (x - 2 < 0 || y - 2 < 0)
         return;
-    if (x + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
+    if (x + 2 >= g_bitmapAreaW)
         return;
-    if (y + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H)
+    if (y + 2 >= g_bitmapAreaH)
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     /* Every pixel written out through a row pointer, the pitch read again
@@ -1756,7 +1715,7 @@ void __cdecl DrawBlipPulse(int32_t x, int32_t y, uint8_t colourA,
     ROW(-1); q[0] = (c);                                                  \
     p[-1] = (c); p[1] = (c);                                              \
     ROW(1);  q[0] = (c);
-    p = g_framebuffer + (int32_t)g_pitch * y + x;
+    p = g_frameBuf + (int32_t)g_pitch * y + x;
 
     switch (phase) {
     case 2:
@@ -1807,12 +1766,12 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
 
     if (x - 2 < 0 || y - 2 < 0)
         return;
-    if (x + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
+    if (x + 2 >= g_bitmapAreaW)
         return;
-    if (y + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H)
+    if (y + 2 >= g_bitmapAreaH)
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     /* Every pixel written out, the pitch read again for each row; the arms
@@ -1828,7 +1787,7 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
     ROW(-1); q[-1] = (c); q[0] = (c); q[1] = (c);                         \
     p[-1] = (c); p[1] = (c);                                              \
     ROW(1);  q[-1] = (c); q[0] = (c); q[1] = (c);
-    p = g_framebuffer + (int32_t)g_pitch * y + x;
+    p = g_frameBuf + (int32_t)g_pitch * y + x;
 
     switch (phase) {
     case 2:
@@ -1851,12 +1810,11 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
 #undef INNER
 }
 
-#define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 /* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
  * g_listenerPos and a second name would be an alias, while a non-const twin of
  * the same name would be a drift. It is written through a cast here, and the
  * one-address-two-readings note lives in orig.h. */
-#define VIEW_EYE ((AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+#define VIEW_EYE ((AM2_Point *)&g_listenerPos)
 
 /* 0x0042B5A0, one caller -- the per-frame path. The CAMERA.
  *
@@ -1897,46 +1855,46 @@ void __cdecl ViewUpdate(void)
     int32_t halfW = w >> 1;
     int32_t halfH;
     /* The map bounds are read from their globals at each clamp. */
-#define BOUND_L (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT)
-#define BOUND_T (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP)
-#define BOUND_R (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT)
-#define BOUND_B (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM)
+#define BOUND_L (g_mapBoundsLeft)
+#define BOUND_T (g_mapBoundsTop)
+#define BOUND_R (g_mapBoundsRight)
+#define BOUND_B (g_mapBoundsBottom)
     int32_t dist, step, dx, dy;
     int16_t tx, ty;                 /* where the eye goes this frame */
     int16_t vx, vy;
     void   *obj;
 
-    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
+    (*(AM2_Point *)&g_viewTarget).x = (int16_t)Clamp((*(AM2_Point *)&g_viewTarget).x, halfW + BOUND_L,
                                     BOUND_R - halfW - 1);
     halfH = h >> 1;
-    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, halfH + BOUND_T,
+    (*(AM2_Point *)&g_viewTarget).y = (int16_t)Clamp((*(AM2_Point *)&g_viewTarget).y, halfH + BOUND_T,
                                     BOUND_B - halfH - 1);
 
-    obj = *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ;
+    obj = g_objCtxObj;
     if (obj) {
         const uint8_t *o = (const uint8_t *)obj;
 
         /* Both copies are a word at a time, as the image makes them. */
-        if (*(const int32_t *)(uintptr_t)ADDR_VIEW_SNAP) {
-            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
-            tx = g_viewTarget.x;
-            ty = g_viewTarget.y;
-            *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 0;
+        if (g_viewSnap) {
+            (*(AM2_Point *)&g_viewTarget).x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            (*(AM2_Point *)&g_viewTarget).y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            tx = (*(AM2_Point *)&g_viewTarget).x;
+            ty = (*(AM2_Point *)&g_viewTarget).y;
+            g_viewSnap = 0;
             goto clamp_eye;
         }
-        if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET) {
-            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+        if (g_objCtxSet) {
+            (*(AM2_Point *)&g_viewTarget).x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            (*(AM2_Point *)&g_viewTarget).y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
         }
     }
 
-    dist = ApproxDist(VIEW_EYE, &g_viewTarget);
-    step = (int32_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
-                     * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+    dist = ApproxDist(VIEW_EYE, &(*(AM2_Point *)&g_viewTarget));
+    step = (int32_t)(g_viewSpeed
+                     * g_frameDeltaSec);
 
-    dx = g_viewTarget.x - VIEW_EYE->x;
-    dy = g_viewTarget.y - VIEW_EYE->y;
+    dx = (*(AM2_Point *)&g_viewTarget).x - VIEW_EYE->x;
+    dy = (*(AM2_Point *)&g_viewTarget).y - VIEW_EYE->y;
 
     /* THE TARGET IS NOT WRITTEN BACK. The step lands in two locals -- x in a
      * register, y in the word at frame +0x16 -- and only the eye moves, so a
@@ -1946,8 +1904,8 @@ void __cdecl ViewUpdate(void)
      * where ApproxDist exceeds the step and the eye moves less than the target
      * did, stopped short where the original carries on. HOLD's arm is the same
      * tail with the deltas unscaled, which lands exactly on the target. */
-    if (*(const int32_t *)(uintptr_t)ADDR_VIEW_HOLD) {
-        *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD = 0;
+    if (g_viewHold) {
+        g_viewHold = 0;
     } else if (dist > step) {
         dx = dx * step / dist;
         dy = dy * step / dist;
@@ -1960,8 +1918,8 @@ clamp_eye:
     vy = (int16_t)Clamp(ty, halfH + BOUND_T, BOUND_B - halfH - 1);
 
     {
-        int32_t *world  = (int32_t *)(uintptr_t)ADDR_SECOND_RECT;
-        int32_t *origin = (int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        int32_t *world  = g_secondRect;
+        int32_t *origin = &g_viewX;
         int32_t  vl = vx - halfW;
         int32_t  vt = vy - halfH;
 
@@ -1972,15 +1930,15 @@ clamp_eye:
 
         origin[1] = vt - g_blitRect->top;
         origin[0] = vl - g_blitRect->left;
-        origin[3] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_H + origin[1];
-        origin[2] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W + origin[0];
+        origin[3] = g_screenH + origin[1];
+        origin[2] = g_screenW + origin[0];
 
         VIEW_EYE->y = (int16_t)vy;
         VIEW_EYE->x = (int16_t)vx;
 
-        IntersectRect((RECT *)(uintptr_t)ADDR_VIEW_CLIPPED,
+        IntersectRect(g_viewClipped,
                       (const RECT *)origin,
-                      (const RECT *)(uintptr_t)ADDR_MAP_BOUNDS);
+                      (const RECT *)g_mapBounds);
     }
 #undef BOUND_B
 #undef BOUND_R
@@ -2004,15 +1962,15 @@ clamp_eye:
  * The colour is a byte read from its own global rather than passed in. */
 void __cdecl DrawViewRect(void)
 {
-#define BOX ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT)
-#define OX  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
-#define OY  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y)
+#define BOX ((const AM2_Rect *)g_viewRect_)
+#define OX  (g_viewX)
+#define OY  (g_viewY)
     AM2_Rect on_screen;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON == 0)
+    if (g_viewRectOn == 0)
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     on_screen.left   = BOX->left   - OX;
@@ -2020,7 +1978,7 @@ void __cdecl DrawViewRect(void)
     on_screen.right  = BOX->right  - OX;
     on_screen.bottom = BOX->bottom - OY;
 
-    DrawRect(&on_screen, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+    DrawRect(&on_screen, g_hiliteColour);
     UnlockSurface();
 #undef BOX
 #undef OX
@@ -2087,58 +2045,58 @@ void __cdecl DrawSelection(void)
     const uint8_t *leader;
     int32_t        i;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     leader = (const uint8_t *)LookupOwnerObj(
-                 *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+                 g_defaultOwner);
 
     if (leader
         && !(*(const uint32_t *)(leader + OBJ_OFF_FLAGS) & AM2_MARK_GONE)
         && *(const int16_t *)(leader + OBJ_OFF_HEALTH) != 0) {
         AM2_Sprite *spr =
-            (*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MARK_SPRITES)
+            (g_markSprites)
                 [AM2_MARK_LEADER];
 
         DrawSprite(spr,
                    *(const int16_t *)(leader + OBJ_OFF_POS)
-                       - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                       - g_viewX,
                    *(const int16_t *)(leader + OBJ_OFF_POS + 2)
-                       - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                       - g_viewY
                        + AM2_LEADER_MARK_DY,
                    0);
     }
 
     UnlockSurface();
 
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+    for (i = 0; i < g_selectedCount; ) {
         uint8_t *obj = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
         int32_t  x, y, wide, drop, fill;
         RECT     box;
         uint8_t  ink;
 
         if (!obj) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;
         }
 
         if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & AM2_MARK_GONE) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
             continue;
         }
 
         if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
             continue;
         }
 
         x = *(const int16_t *)(obj + OBJ_OFF_POS)
-            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+            - g_viewX;
         y = *(const int16_t *)(obj + OBJ_OFF_POS + 2)
-            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+            - g_viewY;
 
         if (ObjIsType2((const AM2_Object *)obj)) {
             drop = AM2_MARK_TROOPER_DY;
@@ -2175,7 +2133,7 @@ void __cdecl DrawSelection(void)
         box.top    = y + drop;
         box.right  = x + wide + 1;
         box.bottom = y + drop + 4;
-        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        ClearRegion(&box, g_backgroundColour);
 
         box.left   = x;
         box.top    = y + drop + 1;
@@ -2183,16 +2141,16 @@ void __cdecl DrawSelection(void)
         box.bottom = y + drop + 3;
 
         if (hp <= (int16_t)(max >> 2))
-            ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+            ink = g_hudColour;
         else if (hp <= (int16_t)(max >> 1))
-            ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+            ink = g_colourLagMid;
         else
-            ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+            ink = g_hiliteColour;
         ClearRegion(&box, ink);
 
         box.left  = x + fill;
         box.right = x + wide;
-        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
+        ClearRegion(&box, g_listInkHotSel);
 
         i++;
 #undef max
@@ -2251,16 +2209,16 @@ void __cdecl DrawSelection(void)
  */
 void __cdecl AirFrameDraw(void)
 {
-#define air ((uint8_t *)(uintptr_t)ADDR_AIR_SAVE_BLOCK)
-#define gauge (*(AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_2)
-#define step (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+#define air ((uint8_t *)g_airSaveBlock)
+#define gauge (g_airSprites2)
+#define step (g_frameDeltaMs)
 
     /* Nothing to draw the gauge with means nothing to draw at all -- the
      * original gives up before it even takes the lock. */
     if (!gauge || (!gauge->image.rle16 && !gauge->overlay))
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     AirPassesDraw();
@@ -2271,7 +2229,7 @@ void __cdecl AirFrameDraw(void)
             *(const uint32_t *)(air + AIR_OFF_EXTRA));
 
         if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
-            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            if (g_gameClockMs
                     - *(const uint32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
                                           + ROW_OFF_STAMP_54)
                     > AM2_AIR_CYCLE_STEP_MS) {
@@ -2285,7 +2243,7 @@ void __cdecl AirFrameDraw(void)
                 ChangeObjectFrame(obj, f, 1);
                 *(int32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
                              + ROW_OFF_STAMP_54) =
-                    *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                    *(const int32_t *)&g_gameClockMs;
 
                 if (f == 2)
                     PlaySoundAt(AM2_AIR_CYCLE_SOUND, 0, 0,
@@ -2296,7 +2254,7 @@ void __cdecl AirFrameDraw(void)
             *(int32_t *)(air + AIR_OFF_FLAG_B) += step;
 
             if (*(const int32_t *)(air + AIR_OFF_FLAG_B)
-                    >= *(const int32_t *)(uintptr_t)ADDR_AIR_CYCLE_MS) {
+                    >= g_airCycleMs) {
                 *(int32_t *)(air + AIR_OFF_FLAG_B) = 0;
                 ChangeObjectFrame(obj, 0, 1);
             }
@@ -2306,16 +2264,16 @@ void __cdecl AirFrameDraw(void)
     /* --- the gauge, on AIR_OFF_ACTIVE ----------------------------------- */
     if (*(const int32_t *)(air + AIR_OFF_ACTIVE) > 0) {
 #define t     (*(const int32_t *)(air + AIR_OFF_ACTIVE))
-#define track (*(const int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE)
-#define span  (*(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_MS)
+#define track (g_airSpritesEdge)
+#define span  (g_airGaugeMs)
         int32_t x, y;
 
-        y = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_Y0
+        y = (int32_t)((double)g_airGaugeY0
                       - (double)track * (double)t
-                        * *(const double *)(uintptr_t)ADDR_AIR_GAUGE_SLOPE
+                        * g_airGaugeSlope
                         / (double)span);
         x = track * t / span
-            + *(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_X0;
+            + g_airGaugeX0;
 
         DrawSprite(gauge, x, y, 0);
 
@@ -2325,7 +2283,7 @@ void __cdecl AirFrameDraw(void)
          * asked -- AIR_OFF_PENDING is what says it has been done. Reading it
          * as "one is queued" survived because nothing else writes it here. */
         if (UidArmy(*(const uint32_t *)(air + AIR_OFF_FROM))
-                == *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+                == g_defaultOwner
             && *(const int32_t *)(air + AIR_OFF_EXTRA) == 0
             && *(const int32_t *)(air + AIR_OFF_PENDING) == 0
             && *(const int32_t *)(air + AIR_OFF_ACTIVE) >= (span >> 1)) {
@@ -2352,28 +2310,28 @@ void __cdecl AirFrameDraw(void)
     /* --- the aircraft, on AIR_OFF_FLAG_A -------------------------------- */
     if (*(const int32_t *)(air + AIR_OFF_FLAG_A) > 0) {
         int32_t t     = *(const int32_t *)(air + AIR_OFF_FLAG_A);
-        int32_t leg1  = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_MS;
-#define leg2 (*(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS)
+        int32_t leg1  = g_airLeg1Ms;
+#define leg2 (g_airLeg2Ms)
         int32_t frame = 0;
         int32_t x, y;
 
         if (t < leg1) {
-            x = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_DX * t / leg1
-                + *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0;
-            y = *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y
-                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_DY * t / leg1;
+            x = g_airLeg1Dx * t / leg1
+                + g_airLeg1X0;
+            y = g_airPathInY
+                - g_airLeg1Dy * t / leg1;
         } else if (t < leg2) {
             int32_t into = t - leg1;
-            int32_t half = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS_SPAN;
+            int32_t half = g_airLeg2MsSpan;
             double  off;
 
-            y = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN
-                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_DY * into / half;
+            y = g_airPathTurnYIn
+                - g_airLeg2Dy * into / half;
 
-            off = (double)y - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y;
+            off = (double)y - g_airPathMidY;
             x = (int32_t)(off * off
-                          / *(const float *)(uintptr_t)ADDR_AIR_LEG2_DIVISOR
-                          + *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_APEX_X);
+                          / g_airLeg2Divisor
+                          + g_airPathApexX);
 
             /* Half the leg maps onto frames 1..5 and half onto 7..9, both
              * rounded to nearest by the half-divisor added before the divide.
@@ -2388,21 +2346,21 @@ void __cdecl AirFrameDraw(void)
                      frame, x, y);
         } else {
 #define into (t - leg2)
-            int32_t span = *(const int32_t *)(uintptr_t)ADDR_AIR_RUN_MS - leg2;
+            int32_t span = g_airRunMs - leg2;
 
-            x = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X
-                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_DX * into / span;
-            y = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT
-                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_DY * into / span;
+            x = g_airPathAwayX
+                - g_airLeg3Dx * into / span;
+            y = g_airPathTurnYOut
+                - g_airLeg3Dy * into / span;
             frame = AM2_AIR_FRAMES - 1;
 #undef into
         }
 
         {
             const int16_t *hot =
-                (const int16_t *)(uintptr_t)ADDR_AIR_FRAME_HOTSPOTS;
+                g_airFrameHotspots;
 
-            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_6)
+            DrawSprite((g_airSprites6)
                            [frame],
                        x - hot[frame * 2],
                        y - hot[frame * 2 + 1],
@@ -2412,7 +2370,7 @@ void __cdecl AirFrameDraw(void)
         *(int32_t *)(air + AIR_OFF_FLAG_A) += step;
 
         if (*(const int32_t *)(air + AIR_OFF_FLAG_A)
-                >= *(const int32_t *)(uintptr_t)ADDR_AIR_RUN_MS)
+                >= g_airRunMs)
             AirSupportPop();
     }
 
@@ -2489,21 +2447,20 @@ typedef int32_t (__cdecl *AM2_MapRandFn)(void);
 void __cdecl DrawEffectLayer(void)
 {
     uint8_t             block[AM2_AIM_BLOCK * AM2_AIM_BLOCK];
-    LPDIRECTDRAWSURFACE target = g_drawTarget;
-    const int16_t      *map    = (const int16_t *)((void *)(uintptr_t)(ADDR_AIM_DISPLACE_MAP));
+    LPDIRECTDRAWSURFACE target = (*(LPDIRECTDRAWSURFACE *)&g_drawTarget);
+    const int16_t      *map    = g_aimDisplaceMap;
     int32_t             army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
-        const int16_t *ptA = (const int16_t *)((uint8_t *)(uintptr_t)
-                                 ADDR_AIM_POINT_A + army * 4);
+        const int16_t *ptA = (const int16_t *)(g_aimPointA + army * 4);
         int32_t x, y, frame;
         RECT    box, hit;
 
-        if (!((const int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army])
+        if (!(g_aimLiveA)[army])
             continue;
 
-        frame = (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                 - ((const int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[army])
+        frame = (*(const int32_t *)&g_gameClockMs
+                 - (g_aimStampA)[army])
                 / AM2_AIM_STEP_MS + 1;
         if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
             frame = AM2_AIM_FRAMES_A;
@@ -2516,7 +2473,7 @@ void __cdecl DrawEffectLayer(void)
         box.right  = x + AM2_AIM_BOX_RIGHT;
         box.bottom = y + AM2_AIM_BOX_BOTTOM;
 
-        if (IntersectRect(&hit, &box, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)))) {
+        if (IntersectRect(&hit, &box, (const RECT *)g_screenClip)) {
             int32_t row, col;
 
             /* Read: every pixel of the visible part of the block, taken from
@@ -2531,19 +2488,19 @@ void __cdecl DrawEffectLayer(void)
                                   + (col - box.left);
                     int32_t  sx = map[at * 2]     + box.left;
                     int32_t  sy = map[at * 2 + 1] + box.top;
-                    int32_t  w  = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W;
+                    int32_t  w  = g_bitmapAreaW;
 
                     if (sx > w - 1)
                         sx = w - 1;
                     else if (sx < 0)
                         sx = 0;
 
-                    if (sy > (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H) - 1)
-                        sy = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H) - 1;
+                    if (sy > (g_bitmapAreaH) - 1)
+                        sy = (g_bitmapAreaH) - 1;
                     else if (sy < 0)
                         sy = 0;
 
-                    block[at] = g_framebuffer[sy * g_pitch + sx];
+                    block[at] = g_frameBuf[sy * g_pitch + sx];
                 }
             }
 
@@ -2555,7 +2512,7 @@ void __cdecl DrawEffectLayer(void)
                 return;
 
             for (row = hit.top; row < hit.bottom; row++)
-                memcpy(g_framebuffer + row * g_pitch + hit.left,
+                memcpy(g_frameBuf + row * g_pitch + hit.left,
                        block + (row - box.top) * AM2_AIM_BLOCK
                              + (hit.left - box.left),
                        (size_t)(hit.right - hit.left));
@@ -2567,21 +2524,20 @@ void __cdecl DrawEffectLayer(void)
         if (!LockSurface(target))
             return;
 
-        DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_A)[frame],
+        DrawSprite((g_aimSpritesA)[frame],
                    x, y, 0);
-        DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_A)[0],
+        DrawSprite((g_aimSpritesA)[0],
                    x + AM2_AIM_BOX_LEFT, y + AM2_AIM_BOX_TOP, 0);
 
         UnlockSurface();
 
-        if (((const int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[army]) {
-            const int16_t *ptB = (const int16_t *)((uint8_t *)(uintptr_t)
-                                     ADDR_AIM_POINT_B + army * 4);
-            int32_t *held = &((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[army];
+        if ((g_aimLiveB)[army]) {
+            const int16_t *ptB = (const int16_t *)(g_aimPointB + army * 4);
+            int32_t *held = &(g_aimFrameB)[army];
             int32_t  frameB;
 
-            frameB = (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                      - ((const int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[army])
+            frameB = (*(const int32_t *)&g_gameClockMs
+                      - (g_aimStampB)[army])
                      / AM2_AIM_B_STEP_MS + 1;
 
             /* Past the fourth step it stops counting and starts flickering. */
@@ -2599,9 +2555,9 @@ void __cdecl DrawEffectLayer(void)
             if (!LockSurface(target))
                 return;
 
-            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_B)[0],
+            DrawSprite((g_aimSpritesB)[0],
                        ptB[0] + AM2_AIM_B_OFF_X, ptB[1] + AM2_AIM_B_OFF_Y, 0);
-            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_B)[frameB],
+            DrawSprite((g_aimSpritesB)[frameB],
                        ptB[0] + AM2_AIM_B_OFF_X2, ptB[1] + AM2_AIM_B_OFF_Y2, 0);
 
             UnlockSurface();
@@ -2650,21 +2606,21 @@ void __cdecl DrawEffectLayer(void)
  */
 void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
 {
-    *(float *)(uintptr_t)ADDR_SHAKE_PHASE_X = 0.0f;
-    *(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y = 0.0f;
+    g_shakePhaseX = 0.0f;
+    g_shakePhaseY = 0.0f;
 
-    if (ms > *(const int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
-        *(int32_t *)(uintptr_t)ADDR_SHAKE_TIME = ms;
+    if (ms > g_shakeTime)
+        g_shakeTime = ms;
 
     /* abs() is the `cdq; xor; sub` the image has, twice per axis. */
-    if (abs(stepX) > abs(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
-        *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X = stepX;
+    if (abs(stepX) > abs(g_shakeStepX))
+        g_shakeStepX = stepX;
 
-    if (abs(stepY) > abs(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
-        *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y = stepY;
+    if (abs(stepY) > abs(g_shakeStepY))
+        g_shakeStepY = stepY;
 
-    if (amp > *(const int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
-        *(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE = amp;
+    if (amp > g_shakeAmp)
+        g_shakeAmp = amp;
 }
 
 /* ShakeAt -- original 0x0042B360, one caller, and the gate in front of
@@ -2713,12 +2669,12 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
         strength = AM2_SHAKE_STRENGTH_MAX;
 
     /* The middle of the view, halved with a shift. */
-    centre.x = (int16_t)(((*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_X
-                           - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X) >> 1)
-                         + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
-    centre.y = (int16_t)(((*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_Y
-                           - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y) >> 1)
-                         + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+    centre.x = (int16_t)(((g_viewFarX
+                           - g_viewX) >> 1)
+                         + g_viewX);
+    centre.y = (int16_t)(((g_viewFarY
+                           - g_viewY) >> 1)
+                         + g_viewY);
 
     dist = ApproxDist(at, &centre);
     if (dist >= AM2_SHAKE_FAR)
@@ -2732,10 +2688,10 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
     if (index < 1)
         return;
 
-    StartShake(((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].a,
-               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].b,
-               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].c,
-               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].d);
+    StartShake((g_shakePresets)[index].a,
+               (g_shakePresets)[index].b,
+               (g_shakePresets)[index].c,
+               (g_shakePresets)[index].d);
 }
 
 /* 0x0042A240, three callers, 400 bytes. Every object in a world rectangle,
@@ -2781,9 +2737,9 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
     RECT           hit;
 
     if (r->right < 0
-        || r->left >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+        || r->left >= g_mapExtentX
         || r->bottom < 0
-        || r->top >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+        || r->top >= g_mapExtentY)
         return (void *)0;
 
     x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
@@ -2889,9 +2845,9 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
     RECT           hit;
 
     if (0 > r->left
-        || r->right >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+        || r->right >= g_mapExtentX
         || r->top < 0
-        || r->bottom >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+        || r->bottom >= g_mapExtentY)
         return (void *)0;
 
     x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
@@ -2984,7 +2940,7 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
     box.bottom = y + AM2_BOAT_EXIT_RANGE;
 
     IntersectRect((LPRECT)&clipped,
-                  (const RECT *)(uintptr_t)ADDR_MAP_BOUNDS,
+                  (const RECT *)g_mapBounds,
                   (const RECT *)&box);
 
     /* Each corner is packed from the LOW words of the clipped rectangle into
@@ -2999,8 +2955,8 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
     /* The rows and columns come from the low words; the row advance below
      * uses the tiles as TileOfPoint returned them. The row shift and the map
      * width are read again at every use. */
-#define SHIFT (*(const uint32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT & 0xFFFF)
-#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define SHIFT (*(const uint32_t *)&g_mapRowShift & 0xFFFF)
+#define MAP_W (g_mapTilesW)
     best  = AM2_BOAT_EXIT_MAX;
     first = (uint32_t)startTile & 0xFFFF;
     last  = (uint32_t)endTile & 0xFFFF;
@@ -3011,7 +2967,7 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
         for (col = (MAP_W - 1) & first; col <= (int32_t)((MAP_W - 1) & last);
              col++) {
             /* Signed, as the image's `jge`. */
-            if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+            if ((g_cellWeights)
                     [tile & 0xFFFF] < AM2_BLOCK_CLEAR) {
                 here = PointOfTile(tile);
                 d = ApproxDist((const AM2_Point *)&here, pos);
@@ -3077,31 +3033,31 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
         *(uint16_t *)(recs + (uint32_t)PREV * AM2_DIRTY_RECORD_SIZE       \
                       + DIRTY_OFF_NEXT) = NEXT;                           \
         if (!NEXT)                                                        \
-            *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = PREV;   \
+            g_dirtyTail = PREV;   \
         else                                                              \
             *(uint16_t *)(recs + (uint32_t)NEXT * AM2_DIRTY_RECORD_SIZE   \
                           + DIRTY_OFF_PREV) = PREV;                       \
     } while (0)
 void __cdecl DirtyCollect(const AM2_Rect *r)
 {
-    uint8_t  *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
+    uint8_t  *recs = g_dirtyRects;
     AM2_Rect  cur;
     AM2_Rect  hit;
     int32_t   at;
 
     if (!IntersectRect((LPRECT)&cur, (const RECT *)r,
-                       (const RECT *)((void *)(uintptr_t)(ADDR_VIEW_RECT_PREV))))
+                       (const RECT *)&g_viewRectPrev))
         return;
 
     /* A dword read masked to the half-word, as the image has it
      * (`mov edx, [tail]; and edx, 0xFFFF`) -- the same value. */
-    if ((int32_t)(*(const uint32_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) & 0xFFFF) + 1
+    if ((int32_t)(*(const uint32_t *)&g_dirtyTail & 0xFFFF) + 1
         >= AM2_DEPTH_MAX) {
-        *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
+        g_fullRedraw = 1;
         return;
     }
 
-    for (at = *(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_HEAD)); at;
+    for (at = g_dirtyHead; at;
          at = *(const uint16_t *)(recs + (uint32_t)at * AM2_DIRTY_RECORD_SIZE
                                   + DIRTY_OFF_NEXT)) {
         AM2_Rect *e = (AM2_Rect *)(recs

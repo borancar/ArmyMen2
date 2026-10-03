@@ -75,20 +75,15 @@ extern "C" const uint8_t am2_unit_types[720] = {
 };
 #endif
 
-#define g_placements     (*(AM2_Placement **)((void *)(uintptr_t)(ADDR_PLACEMENTS)))
-#define g_placementCount (*(int32_t *)((void *)(uintptr_t)(ADDR_PLACEMENT_COUNT)))
-#define g_placementCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_PLACEMENT_CAP)))
-#define g_gameSetting22C (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
-#define g_armyPoints     ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
-#define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define g_gameSetting22C (*(uint32_t *)&g_gameSetting22c)
 /* Spelled as script.cpp spells them, which is the file already reaching
  * these two -- g_mapName is taken, on a DIFFERENT address. */
-#define kMapName      ((const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)))
-#define kMapFolder    ((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)))
+#define kMapName      (&g_mapName_)
+#define kMapFolder    (g_tilesetPath)
 
 #define kSep         (" \t\n;,")
 
-#define kUnitType(i) ((const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES)) \
+#define kUnitType(i) (g_unitTypes \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
 
 /* 0x0043B3D0. The three globals are cleared in the original's order --
@@ -332,7 +327,7 @@ int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n)
     case 4:  return (int32_t)PackKey(0x21, (uint32_t)(n + 1), 0);
     case 5:  return (int32_t)PackKey(0x2A, (uint32_t)(n + 2), 0);
     case 6:  return (int32_t)PackKey(0x1F, (uint32_t)((n + 1) * 10), 0);
-    case 7:  return *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
+    case 7:  return g_createWatchedKind;
     default: return 0;
     }
 }
@@ -423,7 +418,7 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
                ? 1 : 0;
 
     case 7:
-        return code == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND
+        return code == g_createWatchedKind
                ? 1 : 0;
 
     default:
@@ -510,7 +505,7 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
 #pragma GCC diagnostic pop
 #endif
 
-#define ARMY() (((AM2_Comm *)*(void **)(uintptr_t)ADDR_COMM_OBJECT)->CommArmyOfSlot(slot))
+#define ARMY() (((AM2_Comm *)*(void * *)&g_commObject)->CommArmyOfSlot(slot))
     kind = (ARMY() + 1) * AM2_TILE_KIND_ARMY_STEP;
     weight = 0;
 
@@ -580,7 +575,7 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
      * tile-kind compare itself, a setcc in the image. */
     if (weight >= AM2_BLOCK_FULL)
         goto fail;
-    return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+    return ((const uint8_t *)*(void *const *)&g_tileKind)
                [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind;
 
 }
@@ -619,7 +614,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
     /* Nested positively onto one `return found`, the kinds laid out 3, 2, 1,
      * and the type table walked by index (a signed `jl`). */
 #define TYPE(i, off) (((const int32_t (*)[AM2_UNIT_TYPE_STRIDE / 4]) \
-                       (uintptr_t)ADDR_UNIT_TYPES)[i][(off) / 4])
+                       ((uintptr_t)g_unitTypes))[i][(off) / 4])
     uint8_t *o = (uint8_t *)obj;
     int32_t  found = 0;
     int32_t  slot;
@@ -709,7 +704,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
-#define rec ((const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES)) \
+#define rec (g_unitTypes \
              + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE)
 #define kind (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
     uint8_t       *made;
@@ -727,9 +722,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         ObjSetFieldA(made, (uint32_t)group);
 
         weapon = (uint8_t *)CreateWeapon(
-                     (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), slot,
+                     g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
-                     *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT)),
+                     g_zeroPoint,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
@@ -753,7 +748,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         int32_t i;
 
         made = (uint8_t *)CreateVehicle(
-                   kind, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+                   kind, g_dirScratch,
                    ((const AM2_Point *)&where)->x,
                    ((const AM2_Point *)&where)->y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
@@ -789,7 +784,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             *(int16_t *)(row + ROW_OFF_Y) +=
                 *(const int16_t *)(spr + SPR_OFF_OVY);
 
-            RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+            RowUpdate(row, 0, g_mapDesc);
             n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
             i++;
         }
@@ -813,13 +808,13 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
         if (made)
             ApplyHeightItem(made,
-                (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+                (int8_t)(g_tileAttrs)
                     [*(const uint16_t *)(made + OBJ_OFF_TILE)]);
 
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
             if (kind == AM2_PLACE_KIND_POST_CREATE) {
                 ItemPostCreate(slot, where);
-                if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                if (!AllyFlag(g_defaultOwner,
                               (uint32_t)slot))
                     ObjConceal(made, 1);
             }
@@ -840,7 +835,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                                     : AM2_PILLBOX_WEAPON_BAZOOKA;
 
             occupant = (uint8_t *)CreateTrooper(
-                           (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+                           g_dirScratch,
                            ((const AM2_Point *)&where)->x,
                            ((const AM2_Point *)&where)->y,
                            AM2_THE_COMM->CommArmyOfSlot(slot), slot,
@@ -848,10 +843,10 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             ObjSetFieldA(occupant, (uint32_t)group);
 
             weapon = (uint8_t *)CreateWeapon(
-                         (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), slot,
+                         g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),
-                         *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT)),
+                         g_zeroPoint,
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {
@@ -870,9 +865,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
             *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
             *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) =
-                *(const int16_t *)((void *)(uintptr_t)(ADDR_PILLBOX_TROOPER_HEALTH));
+                g_pillboxTrooperHealth;
             *(int16_t *)(occupant + OBJ_OFF_HEALTH) =
-                *(const int16_t *)((void *)(uintptr_t)(ADDR_PILLBOX_TROOPER_HEALTH));
+                g_pillboxTrooperHealth;
             /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
              * apart, and tools/checkoffsetuse.py is what caught the slip. */
             *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;
@@ -1096,7 +1091,7 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
-#define SET_CURSOR(x) (*(void **)(uintptr_t)ADDR_MENU_SPRITES_END = (void *)(x))
+#define SET_CURSOR(x) (g_menuSpritesEnd = (void *)(x))
 
 /* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
  * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump
@@ -1104,7 +1099,7 @@ AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
 static inline void PlaceVehicle(int32_t kind, uint8_t facing)
 {
     SET_CURSOR(VehicleAnimSprite(kind, facing));
-    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+    g_menuOverlayA =
         TurretAnimSprite(kind, facing);
 }
 
@@ -1125,11 +1120,11 @@ static inline AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
 static inline void PlaceEmplacement(int32_t army, uint8_t facing, int32_t kind)
 {
     SET_CURSOR(PlaceSprite(0x26, (uint32_t)(army * 5 + 5) * 2));
-    *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
-    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+    g_menuInk = (uint8_t *)0;
+    g_menuOverlayA =
         PlaceSprite(0x26, (uint32_t)(army * 5) * 2 + 11);
-    *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
-    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B =
+    g_menuOverlayAInk = (uint8_t *)0;
+    g_menuOverlayB =
         SoldierAnimSprite(kind, facing);
 }
 
@@ -1178,39 +1173,39 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army)
 {
     /* The comm object and our slot are re-read for each lookup. */
-#define COMM  (*(void *const *)(uintptr_t)ADDR_ARMY_TABLE)
-#define OWNER ((int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define COMM  (g_armyTable)
+#define OWNER ((int32_t)g_defaultOwner)
     uint8_t *ink;
 
     /* The three draw offsets, zeroed from the image's own {0,0}. */
-    *(int32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX =
-        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
-    *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX =
-        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
-    *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX =
-        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    g_menuCursorDx =
+        *(const int32_t *)&g_zeroPoint;
+    g_menuOverlayADx =
+        *(const int32_t *)&g_zeroPoint;
+    g_menuOverlayBDx =
+        *(const int32_t *)&g_zeroPoint;
 
-    *(int32_t *)(uintptr_t)ADDR_MENU_ROW        = row;
-    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME = -1;
-    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT  = 0;
-    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A    = (void *)0;
-    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B    = (void *)0;
+    g_menuRow        = row;
+    g_animFrame = -1;
+    *(int32_t *)&g_animNext  = 0;
+    g_menuOverlayA    = (void *)0;
+    g_menuOverlayB    = (void *)0;
 
     if (ok) {
-        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        ink = g_objTableRecords
               + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = ink;
-        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        g_menuInk = ink;
+        ink = g_objTableRecords
               + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
-        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        g_menuOverlayAInk = ink;
+        ink = g_objTableRecords
               + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
     } else {
-        ink = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = ink;
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
+        ink = (uint8_t *)g_flameRecord;
+        g_menuInk           = ink;
+        g_menuOverlayAInk = ink;
     }
-    *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK = ink;
+    g_menuOverlayBInk = ink;
 
 #undef COMM
 #undef OWNER
@@ -1241,7 +1236,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
     case 0x20:
         SET_CURSOR(PlaceSprite(0x20, (uint32_t)(army * 5 + 5) * 2));
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+        g_menuInk = (uint8_t *)0;
         break;
 
     /* THE BUILDINGS, and the only arm that consults the def files. The three
@@ -1257,24 +1252,24 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
         if (link) {
             SET_CURSOR(PlaceSprite(0x21, (uint32_t)(army + 1) * 10));
-            *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
-            *(int32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX =
+            g_menuInk = (uint8_t *)0;
+            g_menuCursorDx =
                 *(const int32_t *)&link->dx;
         }
         link = DefFindLink((int32_t)key, 1);
         if (link) {
-            *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+            g_menuOverlayA =
                 PlaceSprite(0x21, (uint32_t)army * 10 + 11);
-            *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
-            *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX =
+            g_menuOverlayAInk = (uint8_t *)0;
+            g_menuOverlayADx =
                 *(const int32_t *)&link->dx;
         }
         link = DefFindLink((int32_t)key, 2);
         if (link) {
-            *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B =
+            g_menuOverlayB =
                 PlaceSprite(0x21, (uint32_t)army * 10 + 12);
-            *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK = (uint8_t *)0;
-            *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX =
+            g_menuOverlayBInk = (uint8_t *)0;
+            g_menuOverlayBDx =
                 *(const int32_t *)&link->dx;
         }
         break;
@@ -1282,34 +1277,34 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
     case 0x22:
         SET_CURSOR(PlaceSprite(0x2A, 1));
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+        g_menuInk = (uint8_t *)0;
         /* `army + 0x3D5` -- see the header. */
-        *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+        g_menuOverlayA =
             PlaceSprite(0x2B, (uint32_t)army + 0x3D5);
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        g_menuOverlayAInk = (uint8_t *)0;
         break;
 
     case 0x23:
         SET_CURSOR(PlaceSprite(0x1F, (uint32_t)(army * 5 + 5) * 2));
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        g_menuInk           = (uint8_t *)0;
+        g_menuOverlayAInk = (uint8_t *)0;
         break;
 
     /* The watched-object kind, whose key is already packed in a global. */
     case 0x24:
         SET_CURSOR(PreloadSpriteByKey(
-            *(const uint32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND,
+            *(const uint32_t *)&g_createWatchedKind,
             AM2_PLACE_SPRITE_SET, 1));
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        g_menuInk           = (uint8_t *)0;
+        g_menuOverlayAInk = (uint8_t *)0;
         break;
 
     /* Anything else gets the menu's own first sprite, so the cursor is never
      * left holding whatever the last row put there. */
     default:
-        SET_CURSOR(*(void *const *)(uintptr_t)ADDR_MENU_SPRITES);
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        SET_CURSOR(g_menuSprites);
+        g_menuInk           = (uint8_t *)0;
+        g_menuOverlayAInk = (uint8_t *)0;
         break;
     }
 
@@ -1318,15 +1313,15 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
      * deliberately keeps it even on a refusal -- only the cleared ones turn. */
     if (ok)
         return;
-    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_INK)
-        *(uint8_t **)(uintptr_t)ADDR_MENU_INK =
-            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
-    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK =
-            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
-    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)
-        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK =
-            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+    if (!g_menuInk)
+        g_menuInk =
+            g_paletteGlyphs;
+    if (!g_menuOverlayAInk)
+        g_menuOverlayAInk =
+            g_paletteGlyphs;
+    if (!g_menuOverlayBInk)
+        g_menuOverlayBInk =
+            g_paletteGlyphs;
 }
 
 int place_install(void)

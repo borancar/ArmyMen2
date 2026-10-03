@@ -146,7 +146,7 @@ extern "C" const AM2_DefKeyword am2_def_keywords[101] = {
     {"", 0, 0},
 };
 #endif
-#define kDefKeywords ((const AM2_DefKeyword *)((void *)(uintptr_t)(ADDR_DEF_NAME_TABLE)))
+#define kDefKeywords (g_defNameTable)
 
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
@@ -238,21 +238,21 @@ int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
 {
     /* Six spellings each way, every comparison an inline strcmp. */
     if (tok) {
-        if (!strcmp(tok, (const char *)(uintptr_t)ADDR_STR_TRUE)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_TRUE_LOW)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_TRUE_CAP)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_UT)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_LT)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_1)) {
+        if (!strcmp(tok, g_strTrue)
+            || !strcmp(tok, g_strBoolTrueLow)
+            || !strcmp(tok, g_strBoolTrueCap)
+            || !strcmp(tok, g_strBoolUt)
+            || !strcmp(tok, g_strBoolLt)
+            || !strcmp(tok, g_strBool1)) {
             *out = 1;
             return 1;
         }
-        if (!strcmp(tok, (const char *)(uintptr_t)ADDR_STR_FALSE)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_FALSE_LOW)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_FALSE_CAP)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_UF)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_LF)
-            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_0)) {
+        if (!strcmp(tok, g_strFalse)
+            || !strcmp(tok, g_strBoolFalseLow)
+            || !strcmp(tok, g_strBoolFalseCap)
+            || !strcmp(tok, g_strBoolUf)
+            || !strcmp(tok, g_strBoolLf)
+            || !strcmp(tok, g_strBool0)) {
             *out = 0;
             return 1;
         }
@@ -425,7 +425,7 @@ void __cdecl LoadDefTables(void)
                  "Game.aai");
 
     /* The override pass. */
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+    SetGameDir(g_tilesetPath);
     if (!DefParseInfoFile("Object.aai"))
         orig_log("Couldn't parse %s!\n",
                  "Object.aai");
@@ -437,7 +437,7 @@ void __cdecl LoadDefTables(void)
     /* Indexed by id; VC6 walks it as a pointer and tests the pointer. */
     for (id = 0; id < AM2_MISSILE_DEF_COUNT; id++) {
         const uint8_t *src;
-#define dst ((uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS)) \
+#define dst (g_missileDefs \
              + id * AM2_MISSILE_DEF_BYTES)
 
         memset(dst, 0, AM2_MISSILE_DEF_BYTES);
@@ -467,7 +467,7 @@ void __cdecl LoadDefTables(void)
      * [ptr - 4], which is why ADDR_RANK_RECORDS is where it is. Written here
      * against the record base, which is the same addresses. */
     for (id = 0; id < AM2_RANK_COUNT; id++) {
-        uint8_t       *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+        uint8_t       *rec = g_rankRecords
                              + (uint32_t)id * RANK_REC_BYTES;
         const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
 
@@ -516,8 +516,8 @@ typedef void (__cdecl *AM2_QsortFn)(void *base, size_t n, size_t width,
 
 void __cdecl SortVehicleDefs(void)
 {
-    orig_qsort(*(void *const *)(uintptr_t)ADDR_VEHICLE_DEFS,
-               (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
+    orig_qsort(*(void *const *)&g_vehicleDefs,
+               (size_t)g_vehicleDefCount,
                AM2_VEHICLE_DEF_REC_SIZE,
                (const void *)CompareDword);
     orig_log_noargs();
@@ -580,9 +580,9 @@ static inline void FreeDefTable(void **recs, int32_t *count, int32_t *other)
 
 void __cdecl FreeVehicleDefs(void)
 {
-    FreeDefTable((void **)(uintptr_t)ADDR_VEHICLE_DEFS,
-                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
-                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP);
+    FreeDefTable((void * *)&g_vehicleDefs,
+                 &g_vehicleDefCount,
+                 &g_vehicleDefCap);
 }
 
 /* 0x004607D0. The same function again for the missile def table -- diffed
@@ -592,9 +592,9 @@ void __cdecl FreeVehicleDefs(void)
  * apart. Diff before sharing AND before declining to share. */
 void __cdecl FreeMissileDefs(void)
 {
-    FreeDefTable((void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
-                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
-                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP);
+    FreeDefTable((void * *)&g_defMissileRecs,
+                 &g_defMissileCount,
+                 &g_defMissileCap);
 }
 
 /* AddVehicleDef -- original 0x0045EB40, one caller. Append one record to the
@@ -613,7 +613,7 @@ void __cdecl FreeMissileDefs(void)
  * the table policy, not the trooper's -- and the record size is not. */
 void __cdecl AddVehicleDef(const void *rec)
 {
-    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS;
+    uint8_t *tab = g_vehicleDefs;
     int32_t  cap;
     int32_t  n;
 
@@ -621,25 +621,25 @@ void __cdecl AddVehicleDef(const void *rec)
         tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
                                     * AM2_VEHICLE_DEF_REC_SIZE);
         cap = AM2_DEF_LINK_INITIAL;
-        *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS = tab;
-        *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP = cap;
+        g_vehicleDefs = tab;
+        g_vehicleDefCap = cap;
     } else {
-        cap = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP;
+        cap = g_vehicleDefCap;
     }
 
-    n = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT;
+    n = g_vehicleDefCount;
     if (n >= cap) {
         cap += AM2_DEF_LINK_GROW;
-        *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP = cap;
+        g_vehicleDefCap = cap;
         tab = (uint8_t *)am2_realloc(tab,
                   (size_t)cap * AM2_VEHICLE_DEF_REC_SIZE);
-        *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS = tab;
-        n = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT;
+        g_vehicleDefs = tab;
+        n = g_vehicleDefCount;
     }
 
     memcpy(tab + n * AM2_VEHICLE_DEF_REC_SIZE, rec, AM2_VEHICLE_DEF_REC_SIZE);
 
-    (*(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT)++;
+    (g_vehicleDefCount)++;
 }
 
 /* AddMissileDef -- original 0x00460200, one caller. The same append for the
@@ -661,7 +661,7 @@ void __cdecl AddVehicleDef(const void *rec)
  * chose not to make general. */
 void __cdecl AddMissileDef(const void *rec)
 {
-    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS;
+    uint8_t *tab = g_defMissileRecs;
     int32_t  cap;
     int32_t  n;
 
@@ -669,25 +669,25 @@ void __cdecl AddMissileDef(const void *rec)
         tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
                                     * AM2_MISSILE_DEF_REC_SIZE);
         cap = AM2_DEF_LINK_INITIAL;
-        *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS = tab;
-        *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP = cap;
+        g_defMissileRecs = tab;
+        g_defMissileCap = cap;
     } else {
-        cap = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP;
+        cap = g_defMissileCap;
     }
 
-    n = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT;
+    n = g_defMissileCount;
     if (n >= cap) {
         cap += AM2_DEF_LINK_GROW;
-        *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP = cap;
+        g_defMissileCap = cap;
         tab = (uint8_t *)am2_realloc(tab,
                   (size_t)cap * AM2_MISSILE_DEF_REC_SIZE);
-        *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS = tab;
-        n = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT;
+        g_defMissileRecs = tab;
+        n = g_defMissileCount;
     }
 
     memcpy(tab + n * AM2_MISSILE_DEF_REC_SIZE, rec, AM2_MISSILE_DEF_REC_SIZE);
 
-    (*(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT)++;
+    (g_defMissileCount)++;
 }
 
 /* The image's bsearch and the dword comparator both def-find uses. Neither is
@@ -724,8 +724,8 @@ void *__cdecl VehicleDefFind(int32_t id)
 
     *(int32_t *)key = id;
     return orig_bsearch(key,
-                        *(void *const *)(uintptr_t)ADDR_VEHICLE_DEFS,
-                        (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
+                        *(void *const *)&g_vehicleDefs,
+                        (size_t)g_vehicleDefCount,
                         AM2_VEHICLE_DEF_REC_SIZE,
                         (const void *)CompareDword);
 }
@@ -744,8 +744,8 @@ void *__cdecl MissileDefFind(int32_t id)
 
     *(int32_t *)key = id;
     return orig_bsearch(key,
-                        *(void *const *)(uintptr_t)ADDR_DEF_MISSILE_RECS,
-                        (size_t)*(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
+                        *(void *const *)&g_defMissileRecs,
+                        (size_t)g_defMissileCount,
                         AM2_MISSILE_DEF_REC_SIZE,
                         (const void *)CompareDword);
 }

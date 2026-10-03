@@ -17,9 +17,9 @@
  * ZERO's own prev and next, and the third is the tail. See ADDR_DIRTY_TAIL. */
 void __cdecl ResetDirtyList(void)
 {
-    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_HEAD))  = 0;
-    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_PREV_HEAD)) = 0;
-    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = 0;
+    g_dirtyHead  = 0;
+    g_dirtyPrevHead = 0;
+    g_dirtyTail = 0;
 }
 
 
@@ -68,11 +68,11 @@ void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
      * the image reads the tail again after them. */
     struct Rec { int32_t l, t, r, b; uint16_t prev, next; };
     struct List { uint16_t tail; uint16_t pad; struct Rec recs[AM2_DEPTH_MAX]; };
-#define DL (*(struct List *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)))
+#define DL (*(struct List *)&g_dirtyTail)
     uint16_t next = (uint16_t)(DL.tail + 1);
 
     if (next >= AM2_DEPTH_MAX) {
-        *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
+        g_fullRedraw = 1;
         return;
     }
 

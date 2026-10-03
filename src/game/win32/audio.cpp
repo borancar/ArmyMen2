@@ -79,18 +79,7 @@ extern "C" const AM2_VoiceGroup am2_voice_groups[30] = {
 
 static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 
-#define g_audioEnabled  (*(const int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED)
-#define g_buffer        (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_AUDIO_BUFFER)
-#define g_playBuffer    (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_AUDIO_BUFFER_2)
-#define g_timerId       (*(UINT *)(uintptr_t)ADDR_AUDIO_TIMER_ID)
-#define g_timerRunning  (*(int32_t *)(uintptr_t)ADDR_AUDIO_TIMER_RUN)
-#define g_period        (*(uint32_t *)(uintptr_t)ADDR_AUDIO_PERIOD)
-#define g_inCallback    (*(LONG *)(uintptr_t)ADDR_AUDIO_IN_CALLBACK)
-#define g_looping       (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)
-#define g_hmmio         (*(HMMIO *)(uintptr_t)ADDR_AUDIO_HMMIO)
-#define g_waveFormat    (*(WAVEFORMATEX **)(uintptr_t)ADDR_AUDIO_WAVEFORMAT)
-#define g_pathArg       (*(const char **)(uintptr_t)ADDR_AUDIO_PATH_ARG)
-#define g_hWnd          (*(HWND *)(uintptr_t)ADDR_HWND)
+#define g_hWnd          (*(HWND *)&g_enumContext)
 
 /* The timer resolution is stored multiplied by four. */
 #define AUDIO_PERIOD_SHIFT 2
@@ -166,9 +155,7 @@ void __cdecl StartAudioStream(void *track, int32_t which)
                              AudioTimerProc, 0, TIME_PERIODIC);
 }
 
-#define g_dsound     (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
-#define g_dsPrimary  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DS_PRIMARY)
-#define g_dsListener (*(LPDIRECTSOUND3DLISTENER *)(uintptr_t)ADDR_DS_LISTENER)
+#define g_dsound     (*(LPDIRECTSOUND *)&g_movieDSound)
 
 /* It does not release three buffers. It releases the PRIMARY BUFFER, the 3D
  * LISTENER and the DEVICE -- one of each, in that order -- which is what
@@ -193,8 +180,7 @@ void __cdecl ReleaseSoundObjects(void)
     if (g_dsound)
         IDirectSound_Release(g_dsound);
 }
-#define g_streamVolume  (*(int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
-#define kIID_DS3DListener (*(const IID *)(uintptr_t)ADDR_IID_DS3D_LISTENER)
+#define kIID_DS3DListener (g_iidDs3dListener)
 
 typedef HRESULT (WINAPI *am2_dsound_create_fn)(GUID *, LPDIRECTSOUND *, IUnknown *);
 #define orig_DirectSoundCreate (*(am2_dsound_create_fn)ADDR_DIRECTSOUNDCREATE)
@@ -326,8 +312,8 @@ void __cdecl StopAllSounds(void)
      * garbage to test -- and that is reproduced for the VC6 build only; the
      * others keep StopIfPlaying's zero. */
 #define SLOTSND(i) (((uint8_t *(*)[SOUND_SLOT_STRIDE / 4]) \
-                     (uintptr_t)ADDR_SOUND_SLOTS)[i][0])
-#define DYN(i)     (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+                     ((uintptr_t)g_soundSlots))[i][0])
+#define DYN(i)     ((g_dynamic)[i])
 #define SBUF(p)    sfld(p, SOUND_BUFFER, LPDIRECTSOUNDBUFFER)
 #if defined(_MSC_VER)
     DWORD   status;
@@ -411,8 +397,8 @@ void __cdecl FreeWaveSounds(void)
     uint8_t **slot;
 
     /* signed address compare, as the original walked it (`jl`, not `jb`) */
-    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS;
-         (int32_t)(uintptr_t)slot < (int32_t)ADDR_SOUND_SLOTS_END;
+    for (slot = (uint8_t * *)g_soundSlots;
+         (int32_t)(uintptr_t)slot < (int32_t)((uintptr_t)g_soundSlotsEnd);
          slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
         if (*slot) {
             FreeSound(*slot);
@@ -447,7 +433,7 @@ void __cdecl FreeWaveSounds(void)
  */
 void __cdecl ShutdownAudio(void)
 {
-    if (!*(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED)
+    if (!g_audioEnabled)
         return;
 
     StopAudioStream();
@@ -460,14 +446,6 @@ void __cdecl ShutdownAudio(void)
  * a dword to fill with `rep stosd`. */
 #define SILENCE_8BIT  0x80u
 
-#define g_bufferSize (*(uint32_t *)(uintptr_t)ADDR_AUDIO_BUFFER_SIZE)
-#define g_readFailed  (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)
-#define g_atEnd       (*(int32_t *)(uintptr_t)ADDR_AUDIO_AT_END)
-#define g_validBytes  (*(uint32_t *)(uintptr_t)ADDR_AUDIO_VALID_BYTES)
-#define g_dataChunk   ((MMCKINFO *)(uintptr_t)ADDR_AUDIO_DATA_CHUNK)
-#define g_riffChunk   ((MMCKINFO *)(uintptr_t)ADDR_AUDIO_RIFF_CHUNK)
-#define g_cursorA     (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_A)
-#define g_cursorB     (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_B)
 
 /* Original: 0x0040CD20. Top the streaming buffer up from the .WAV.
  *
@@ -698,7 +676,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 /* Posted to the game window when the stream runs dry. WM_USER + 0x100. */
 #define AUDIO_STREAM_DONE 0x0500u
 
-#define g_hwnd        (*(HWND *)(uintptr_t)ADDR_HWND)
+#define g_hwnd        (*(HWND *)&g_enumContext)
 
 /* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit, smeared over the region
  * by an inline memset. The original writes it out at all four sites. */
@@ -991,9 +969,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
-#define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
-#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
-#define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+#define g_defaultPos    (*(const AM2_Point *)&g_zeroPoint)
 
 /* ParseWave -- original 0x0040C220, one caller, and that caller is
  * ReadWaveFile below. The RIFF chunk walk: given the whole file in memory,
@@ -1226,8 +1202,6 @@ int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
  *
  * Exercisable: a Boot Camp mission plays voice-overs, which is how
  * FillSoundBuffer gets its one call in an otherwise fixed-table run. */
-#define g_voiceVolume   (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
-#define g_dynamic     ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)
 
 void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
                               int16_t x, int16_t y, int32_t slot,
@@ -1272,8 +1246,8 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     if (x != 0) {
         AM2_Point ear, where;
 
-        ear.x   = g_listenerPos.x;
-        ear.y   = g_listenerPos.y;
+        ear.x   = (*(const AM2_Point *)&g_listenerPos).x;
+        ear.y   = (*(const AM2_Point *)&g_listenerPos).y;
         where.x = x;
         where.y = y;
         dist = ApproxDist(&ear, &where);
@@ -1510,7 +1484,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
         return;
 
     /* The slot, its record and the buffer are re-read at every use. */
-#define SLOT (((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS) + index * SOUND_SLOT_STRIDE)
+#define SLOT ((g_soundSlots) + index * SOUND_SLOT_STRIDE)
 #define REC  (*(uint8_t **)SLOT)
 #define BUF  (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
     if (!REC || !BUF)
@@ -1523,8 +1497,8 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
         AM2_Point where;
 
         /* Both points copied a field at a time before they are measured. */
-        ear.x   = g_listenerPos.x;
-        ear.y   = g_listenerPos.y;
+        ear.x   = (*(const AM2_Point *)&g_listenerPos).x;
+        ear.y   = (*(const AM2_Point *)&g_listenerPos).y;
         where.x = x;
         where.y = y;
         dist  = ApproxDist(&ear, &where);
@@ -1611,7 +1585,7 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
     if (index < 0 || index > SOUND_DYNAMIC_MAX_INDEX)
         return;
 
-    rec = ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[index];
+    rec = (g_dynamic)[index];
     if (!rec)
         return;
 
@@ -1684,7 +1658,7 @@ void __cdecl Update3DAudioVolumes(void)
         return;
 
     /* The record is re-read from its slot at every use, as the image does. */
-#define REC (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+#define REC ((g_dynamic)[i])
 #define BUF (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
     /* From the second slot, not the first -- 0x004FA3C4, not 0x004FA3C0. */
     for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
@@ -1715,8 +1689,8 @@ void __cdecl Update3DAudioVolumes(void)
              * path does NOT clear the active flag, unlike the two above. Both
              * points are copied a field at a time before they are measured. */
             if (where.x != 0) {
-                ear.x = g_listenerPos.x;
-                ear.y = g_listenerPos.y;
+                ear.x = (*(const AM2_Point *)&g_listenerPos).x;
+                ear.y = (*(const AM2_Point *)&g_listenerPos).y;
                 at.x  = where.x;
                 at.y  = where.y;
                 dist = ApproxDist(&ear, &at);
@@ -1885,19 +1859,17 @@ extern "C" const char *const am2_wave_names[56] = {
 };
 #endif
 
-#define g_waveNames    ((const char *const *)(uintptr_t)ADDR_WAVE_NAMES)
-#define g_soundSlots   ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)
-#define g_dsound       (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
+#define g_dsound       (*(LPDIRECTSOUND *)&g_movieDSound)
 
 #define WAVE_COUNT \
-    ((ADDR_WAVE_NAMES_END - ADDR_WAVE_NAMES) / sizeof(const char *))
+    ((((uintptr_t)g_waveNamesEnd) - ((uintptr_t)g_waveNames)) / sizeof(const char *))
 
 int32_t __cdecl InitWaveSounds(void)
 {
     int32_t i;
 
     /* The directory is probed and the answer thrown away, exactly as written. */
-    SetGameDir(*(const char **)(uintptr_t)ADDR_WAVE_DIR);
+    SetGameDir(g_waveDir);
 
     /* The slot is indexed afresh at each use, as the image does. */
 #define slot (g_soundSlots + i * SOUND_SLOT_STRIDE)
@@ -1944,7 +1916,7 @@ void __cdecl FreeDynamicSounds(void)
 
     /* An index loop over the slots (the image's signed `jle` against the end
      * address), each slot re-read at every use. */
-#define SLOT (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+#define SLOT ((g_dynamic)[i])
     for (i = 0; i <= AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
         if (!SLOT)
             continue;
@@ -1984,7 +1956,7 @@ int32_t __cdecl SaveAudioSection(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVETAG_AUDIO);
 
     /* The record is re-read from its slot at every use, as the image does. */
-#define SND (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+#define SND ((g_dynamic)[i])
     for (i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
         if (SND
             && (name = *(const char **)(SND + SOUND_REC_OFF_NAME)) != NULL
@@ -2066,7 +2038,7 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
 void __cdecl SpeakLine(int32_t group, int32_t owner)
 {
     struct VoiceGroup { int32_t count; const char *names[4]; };
-#define GROUPS ((const struct VoiceGroup *)(uintptr_t)ADDR_VOICE_GROUPS)
+#define GROUPS (g_voiceGroups)
     if ((int32_t)g_defaultOwner != owner)
         return;
 

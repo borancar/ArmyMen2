@@ -193,7 +193,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotRemote(int16_t slot)
     return -1;
 }
 
-#define g_mpSession (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
 {
@@ -217,7 +216,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
 void *__cdecl FindPlayerById(uint32_t id)
 {
     void    *found = 0;
-    int32_t  rec = (int32_t)ADDR_PLAYER_RECORDS;
+    int32_t  rec = (int32_t)((uintptr_t)g_playerRecords);
     int32_t  end = rec + AM2_FLOW_RECORDS * AM2_FLOW_STRIDE;
 
     /* No break: every record is looked at and the last match is the answer.
@@ -241,8 +240,7 @@ void *__cdecl FindPlayerById(uint32_t id)
  * here is enough; `extern "C"` because that is how dplay.h declares it. */
 extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
-#define kMsgCommObj  (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define kMsgCommObj  (g_commObject)
 
 /* 0x00411E90, and the one message in this family that is not a value.
  *
@@ -260,7 +258,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
  * `system` is only ever tested for zero, so the 4 is not a flag value. */
 void __cdecl SendChatMsg(char *text, int32_t system)
 {
-    uint8_t *record = (uint8_t *)((void *)(uintptr_t)(ADDR_MSG_CHAT));
+    uint8_t *record = g_msgChat;
     uint8_t  sender;
 
     if (strlen(text) > 0xFF)

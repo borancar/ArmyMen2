@@ -66,11 +66,20 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1480 of
-  1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1479 of
+  1645 byte-identical (2026-10-04), piecewise 399.** 1480 before the globals
+  rename; the one lost is PlacementScreenClick, the known symbol-count coin
+  flip (cursor + view origin load order), not a source change of its own. Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1480:
+  - **Game code names globals, never addresses** (2026-10-04): every data
+    `ADDR_` use in src/game (900 globals) goes through a `g_` name bound in
+    `src/game/globals.h` (Win32-typed ones in `win32/globals.h`); 405 local
+    `g_` defines folded into it, checkglobals' drifts 15 -> 0. Bindings are
+    still the address dereference except g_pathNodes, which is typed per
+    build; uses at another width read `*(T *)&g_x` and bare addresses
+    `((uintptr_t)&g_x)` -- 613 and 326 of them, to clean up per function.
   - **Global tables are arrays of structs** (2026-10-03): FindPath's path
     nodes are AM2_PathNode[0x10000] indexed by tile, as the image addresses
     them (`[tile*16 + base + field]`), not through an element pointer

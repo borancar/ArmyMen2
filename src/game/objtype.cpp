@@ -133,7 +133,7 @@ AM2_Object *__cdecl LookupType3ByUID(uint32_t uid)
     return ObjIsType3(obj) ? obj : 0;
 }
 
-#define kEventComm (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define kEventComm (*(void *const *)&g_commObject)
 
 /* 0x00427D40, fifteen callers. The event MASK for an object: the top bit
  * always, one more bit for the owner's ARMY, and then a bit per type property.
@@ -347,10 +347,10 @@ int32_t __cdecl AddRecordList(void *list)
         return -1;
 
     /* Every global is re-read where it is used, as the original does. */
-#define COUNT (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT)
-#define CAP   (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP)
-#define LISTS (*(void ***)(uintptr_t)ADDR_RECORD_LISTS)
-#define INDEX (*(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX)
+#define COUNT (g_recordListCount)
+#define CAP   (g_recordListCap)
+#define LISTS (g_recordLists)
+#define INDEX (*(uint32_t * *)&g_recordListIndex)
     hi    = COUNT;
     owner = *(const uint32_t *)((uint8_t *)list + LISTHDR_OFF_OWNER);
     lo    = 0;
@@ -412,10 +412,10 @@ int32_t __cdecl AddRecordList(void *list)
 int32_t __cdecl FindRecordList(uint32_t owner)
 {
     int32_t lo = 0;
-    int32_t hi = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    int32_t hi = g_recordListCount;
 
     /* {owner, list} pairs, sorted by owner; the midpoint is a shift. */
-#define IX (*(const uint32_t *const *)(uintptr_t)ADDR_RECORD_LIST_INDEX)
+#define IX (*(const uint32_t *const *)&g_recordListIndex)
     while (hi > lo) {
         int32_t mid = ((hi - lo) >> 1) + lo;
 
@@ -545,27 +545,27 @@ void __cdecl BuildAaiBuiltins(void)
     REC_A = 0;
     REC_B = 0;
     REC_C = 1;
-    KEY(ADDR_AAI_KEY_980000) = 0x980000;
+    KEY(((uintptr_t)&g_aaiKey980000)) = 0x980000;
     list = MakeRecordList(1, rec, (void *)0x980000);
     slot = AddRecordList(list);
-    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980000), slot,
+    AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)&g_aaiKey980000)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x14, -5, 0x3C, 0x23)));
 
     /* The SAME record again -- no second load -- under another key. */
-    KEY(ADDR_AAI_KEY_980100) = 0x980100;
+    KEY(((uintptr_t)g_aaiKey980100)) = 0x980100;
     list = MakeRecordList(1, rec, (void *)0x980100);
     slot = AddRecordList(list);
-    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980100), slot,
+    AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)g_aaiKey980100)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 1, 1)));
 
     REC_SPR = (uint8_t *)PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = -2;
     REC_B = -2;
     REC_C = 0x5DC;
-    KEY(ADDR_AAI_KEY_980080) = 0x980080;
+    KEY(((uintptr_t)g_aaiKey980080)) = 0x980080;
     list = MakeRecordList(1, rec, (void *)0x980080);
     slot = AddRecordList(list);
-    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980080), slot,
+    AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)g_aaiKey980080)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -2, -2, 2, 2)));
 
     i = 0;
@@ -601,24 +601,24 @@ void __cdecl BuildAaiBuiltins(void)
     REC_A = 0;
     REC_B = 0;
     REC_C = 3;
-    KEY(ADDR_CREATE_WATCHED_KIND) = 0xE80580;
+    KEY(((uintptr_t)&g_createWatchedKind)) = 0xE80580;
     list = MakeRecordList(1, rec, (void *)0xE80580);
     *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
         RectMake(-0x10, -0x10, 0x10, 0x10);
     slot = AddRecordList(list);
-    AddAaiRecord(MakeAaiRecord(0x1D, KEY(ADDR_CREATE_WATCHED_KIND), slot,
+    AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_createWatchedKind)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 
     REC_SPR = (uint8_t *)PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = 0;
     REC_B = 0;
     REC_C = 3;
-    KEY(ADDR_WATCHED_TYPE_ID) = 0xE80609;
+    KEY(((uintptr_t)&g_watchedTypeId)) = 0xE80609;
     list = MakeRecordList(1, rec, (void *)0xE80609);
     *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
         RectMake(-0x10, -0x10, 0x10, 0x10);
     slot = AddRecordList(list);
-    AddAaiRecord(MakeAaiRecord(0x1D, KEY(ADDR_WATCHED_TYPE_ID), slot,
+    AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_watchedTypeId)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 #undef KEY
 #undef REC_C
@@ -711,7 +711,7 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
             /* The count and the record array are read afresh each pass: the
              * store could alias either. */
             uint8_t *list = (uint8_t *)
-                (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot];
+                (g_recordLists)[slot];
             int32_t  i;
 
             for (i = 0; i < *(const int32_t *)(list + LISTHDR_OFF_COUNT); i++)
@@ -767,10 +767,10 @@ int32_t __cdecl AddAaiRecord(void *rec)
 
     /* AddRecordList's twin, over the key table: every global re-read where
      * it is used, a shifted midpoint, a `while` on hi > lo. */
-#define COUNT (*(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
-#define CAP   (*(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP)
-#define RECS  (*(void ***)(uintptr_t)ADDR_AAI_RECORDS)
-#define INDEX (*(uint32_t **)(uintptr_t)ADDR_KEY_TABLE)
+#define COUNT (g_keyTableN)
+#define CAP   (g_aaiRecordCap)
+#define RECS  (g_aaiRecords)
+#define INDEX (*(uint32_t * *)&g_keyTable)
     hi  = COUNT;
     key = *(const uint32_t *)((uint8_t *)rec + AAIREC_OFF_KEY);
     lo  = 0;
@@ -855,10 +855,10 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
     const uint8_t *rec;
     int32_t        i;
 
-    if (index < 0 || index >= *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+    if (index < 0 || index >= g_keyTableN)
         return 0;
 
-    rec = (*(const uint8_t *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[index];
+    rec = (*(const uint8_t *const *const *)&g_aaiRecords)[index];
     if (!rec)
         return 0;
 
@@ -880,10 +880,10 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
         *(const uint8_t *)(rec + AAI_OFF_RANK);
 
     *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(const int32_t *)&g_gameClockMs;
 
     BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
-                     (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
+                     (g_recordLists)
                          [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
                      (int32_t)((const AM2_Point *)&at)->x,
                      (int32_t)((const AM2_Point *)&at)->y,
@@ -954,9 +954,9 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
          * itself is one dereference short -- the same mistake as the loop
          * below, made twice more in the same function. */
         const uint8_t *aai = (const uint8_t *)
-            (*(void *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[slot];
+            (g_aaiRecords)[slot];
         const uint8_t *l = (const uint8_t *)
-            (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
+            (g_recordLists)
                 [*(const int32_t *)(aai + AAIREC_OFF_LIST_SLOT)];
 
         for (i = 0; i < *(const int32_t *)(l + LISTHDR_OFF_COUNT); i++) {
@@ -1174,7 +1174,7 @@ named:
     }
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
-        ItemLinkCells(obj, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
+        ItemLinkCells(obj, g_objMapDesc);
 
     return bytes;
 #undef cells
@@ -1312,7 +1312,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
     sub = o + OBJ_OFF_SUBRECORD;
     FreeSubrecordRows(sub);
     BuildRowsFromDef(sub,
-                     (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot],
+                     (g_recordLists)[slot],
                      (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
                      (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
                      *(const uint32_t *)(o + OBJ_OFF_FLAGS));
@@ -1379,7 +1379,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
         ApplyObjHeight(obj,
                        (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
         RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,
-                  (void *)(uintptr_t)ADDR_MAP_DESC);
+                  g_mapDesc);
     }
 
     ObjAfterMove(obj, 1,

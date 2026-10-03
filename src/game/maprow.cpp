@@ -334,8 +334,6 @@ struct AM2_RowPoolB {
     int32_t     tail;
     AM2_RowSlot slots[AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET];
 };
-#define g_rowPoolA  (*(AM2_RowPoolA *)(uintptr_t)ADDR_ROWPOOL_A_COUNT)
-#define g_rowPoolB  (*(AM2_RowPoolB *)(uintptr_t)ADDR_ROWPOOL_B_COUNT)
 
 /* Each role is written once, inline, and each pool's function passes its own
  * globals and constants -- after inlining they are immediates and absolute
@@ -373,7 +371,7 @@ static inline void RowPoolInit(int32_t *count, int32_t *tail,
         row = am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         slots[i].row = row;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(dim, dim, row, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowAlloc(dim, dim, row, g_mapDesc);
     }
 }
 
@@ -387,7 +385,7 @@ static inline void RowPoolTeardown(int32_t *count, int32_t *tail,
 
     for (i = 0; i < n; i++) {
         if (slots[i].row != 0) {
-            RowRelease(slots[i].row, (void *)(uintptr_t)ADDR_MAP_DESC);
+            RowRelease(slots[i].row, g_mapDesc);
             am2_free(slots[i].row);
             slots[i].row = 0;
         }
@@ -457,7 +455,7 @@ static inline int32_t RowPoolRelease(int32_t *count, int32_t *tail,
 
     if ((*(uint32_t *)row & 1) != 0) {
         *(uint32_t *)row &= ~1u;
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, g_mapDesc);
     }
 
     /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
@@ -534,7 +532,7 @@ extern "C" __declspec(dllimport) int32_t __stdcall IntersectRect(
 typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
                                                  const void *b);
 #define orig_intersect_rect \
-    (*(AM2_IntersectRectFn *)((void *)(uintptr_t)(ADDR_IAT_INTERSECT_RECT)))
+    (g_iatIntersectRect)
 #endif
 
 static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
@@ -552,7 +550,7 @@ static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
     i = slots[0].next;
     do {
         if (!orig_intersect_rect(scratch,
-                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                                 (const void *)&g_viewX,
                                  (const uint8_t *)slots[i].row + ROW_OFF_RECT)) {
             i = release(&slots[i]);
             if (--left <= 0)
@@ -668,7 +666,7 @@ void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
     *(void **)(r + ROW_OFF_SPRITE) = sprite;
     *(uint32_t *)(r + ROW_OFF_X)   = MakePoint((uint32_t)x, (uint32_t)y);
     *(void **)(r + MAPOBJ_OFF_PALETTE) =
-        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+        g_defaultPalette;
 }
 
 /* RowAnimField4 -- original 0x0040A130, two callers.
@@ -728,7 +726,7 @@ found:
     value = (int16_t)table->entries[i].anim->field4;
 
     if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
-        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        == g_rowLutDoubles)
         value += value;
 
     return value;
@@ -838,7 +836,7 @@ found:
     *(int16_t *)(r + ROW_OFF_FRAME) = frame;
     *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = t->entries[i].anim;
     *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
-        ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[frame];
+        (g_frameHeadingBias)[frame];
     *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)t->entries[i].next;
 
     heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
@@ -846,15 +844,15 @@ found:
 
     dir = RoundTo8(heading, PLAYING->directionBits);
     RowSetSprite(row,
-                 (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
+                 (g_spriteList)
                      [PLAYING->cells[dir * PLAYING->frames
                                      + *(const uint8_t *)(r + ROW_OFF_CELL)].sprite],
-                 (void *)(uintptr_t)ADDR_MAP_DESC);
+                 g_mapDesc);
 
     v = PLAYING->field4;
     *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
     if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
-        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        == g_rowLutDoubles)
         *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
 #undef PLAYING
 }
@@ -1567,7 +1565,7 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
         spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
         RowAlloc(*(const int32_t *)(spr + SPR_OFF_W),
                  *(const int32_t *)(spr + SPR_OFF_H),
-                 row, (void *)(uintptr_t)ADDR_MAP_DESC);
+                 row, g_mapDesc);
     }
 #undef SPEC
 
@@ -1630,7 +1628,7 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
 
         RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
         ObjFlagSet0(row);
-        RowAlloc(spec[2], spec[3], row, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
+        RowAlloc(spec[2], spec[3], row, g_mapDesc);
     }
 
     *(int32_t *)(h + 0x0C) = 0;
@@ -1647,9 +1645,9 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind)
 {
     uint32_t mask;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
-        && (mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind]) != 0
-        && (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) == 0)
+    if (g_mpSession != 0
+        && (mask = (g_respawnKindMask)[kind]) != 0
+        && (g_gameOverFlags & mask) == 0)
         return 0;
     return 1;
 }
@@ -1678,7 +1676,7 @@ void __cdecl BuildRespawnPool(int32_t seed)
 {
     /* The kind records, 0x34 bytes each, their first field the count. */
 #define KINDS 44   /* (ADDR_SPAWN_KIND_TABLE_END - ADDR_SPAWN_KIND_TABLE) / 0x34 */
-#define COUNT(k) (*(const int32_t *)((const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE \
+#define COUNT(k) (*(const int32_t *)(g_spawnKindTable \
                                      + (uint32_t)(k) * AM2_SPAWN_KIND_STRIDE))
     int32_t  kind;
     int32_t  total;
@@ -1688,8 +1686,8 @@ void __cdecl BuildRespawnPool(int32_t seed)
 
     GameSrand(seed);
 
-    if (*(void **)(uintptr_t)ADDR_RESPAWN_KINDS != 0)
-        am2_free(*(void **)(uintptr_t)ADDR_RESPAWN_KINDS);
+    if (*(void * *)&g_respawnKinds != 0)
+        am2_free(*(void * *)&g_respawnKinds);
 
     total = 0;
     for (kind = 0; kind < (int32_t)KINDS; kind++)
@@ -1697,14 +1695,14 @@ void __cdecl BuildRespawnPool(int32_t seed)
             total += COUNT(kind);
 
     bag = (int32_t *)am2_malloc((size_t)total * 4);
-    *(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT = total;
+    g_respawnKindCount = total;
     at = 0;
-    *(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS = bag;
+    g_respawnKinds = bag;
 
     for (kind = 0; kind < (int32_t)KINDS; kind++)
         if (RespawnKindAllowed(kind))
             for (n = 0; n < COUNT(kind); n++)
-                (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
+                (g_respawnKinds)[at++] = kind;
 #undef KINDS
 #undef COUNT
 }
@@ -1727,10 +1725,10 @@ void __cdecl BuildRespawnPool(int32_t seed)
 int32_t __cdecl RandomRespawnKind(int32_t *out)
 {
     int32_t r = orig_game_rand()
-                % *(const int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT;
-    int32_t kind = (*(int32_t *const *)(uintptr_t)ADDR_RESPAWN_KINDS)[r];
+                % g_respawnKindCount;
+    int32_t kind = (g_respawnKinds)[r];
 
-    *out = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS))
+    *out = *(const int32_t *)(g_missileDefs
                                + kind * AM2_MISSILE_DEF_BYTES
                                + MISSILEDEF_OFF_FIELD_30);
     return kind;
@@ -1828,7 +1826,7 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
         ROW = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         row = ROW;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(w, h, row, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowAlloc(w, h, row, g_mapDesc);
     }
 #undef REC
 #undef ROW
@@ -1863,7 +1861,7 @@ void __cdecl SeqCtxFree(void *ctxv)
     if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) != 0) {
         for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
             if (ROW(i) != 0) {
-                RowRelease(ROW(i), (void *)(uintptr_t)ADDR_MAP_DESC);
+                RowRelease(ROW(i), g_mapDesc);
                 am2_free(ROW(i));
                 ROW(i) = 0;
             }
@@ -1908,7 +1906,7 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
 #define COUNT   (*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT))
     if ((*(uint32_t *)row & 1) != 0) {
         *(uint32_t *)row &= ~1u;
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, g_mapDesc);
     }
 
     next = NEXT(rec);
@@ -1982,7 +1980,7 @@ void __cdecl SeqEvict(void *ctxv)
         uint8_t scratch[16];
 
         if (!orig_intersect_rect(scratch,
-                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                                 (const void *)&g_viewX,
                                  *(uint8_t **)(RECB(i) + SEQ_OFF_ROW)
                                      + ROW_OFF_RECT)) {
             i = SeqRetire(ctx, RECB(i));
@@ -2046,8 +2044,8 @@ void __cdecl SeqSubsystemInit(void)
 {
     RowPoolAInit();
     RowPoolBInit();
-    SeqCtxInit((void *)(uintptr_t)ADDR_SEQ_CTX_A, 200, 40, 0x20, 0x20);
-    SeqCtxInit((void *)(uintptr_t)ADDR_SEQ_CTX_B, 100, 25, 0x40, 0x40);
+    SeqCtxInit(g_seqCtxA, 200, 40, 0x20, 0x20);
+    SeqCtxInit(g_seqCtxB, 100, 25, 0x40, 0x40);
 }
 
 /* 0x00461120. The same subsystem coming down, and it is LIFO: the contexts
@@ -2057,8 +2055,8 @@ void __cdecl SeqSubsystemInit(void)
  * teardowns, which had no names when it was written. */
 void __cdecl FreeSeqContexts(void)
 {
-    SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_B);
-    SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    SeqCtxFree(g_seqCtxB);
+    SeqCtxFree(g_seqCtxA);
     RowPoolBFree();
     RowPoolAFree();
 }
@@ -2091,9 +2089,9 @@ void __cdecl FreeSeqContexts(void)
 void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 {
     /* The tile flags and the decal sprites are read at each use. */
-#define FLAGS (*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)
-#define DECAL ((const uint8_t *)(*(void *const *const *)(uintptr_t)ADDR_DECAL_SPRITES)[variant])
-    const int32_t *step = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
+#define FLAGS (g_tileFlags)
+#define DECAL ((const uint8_t *)(g_decalSprites)[variant])
+    const int32_t *step = g_tileStep8;
     AM2_Point      point;
     const uint8_t *flags;
     uint16_t       tile;
@@ -2124,7 +2122,7 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(DECAL + 0x34u);
     *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
 
-    RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(row, 0, g_mapDesc);
 #undef FLAGS
 #undef DECAL
 }
@@ -2170,15 +2168,15 @@ void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
     typedef struct {
         int32_t frames; const uint32_t *sprites; int32_t x, y, z, pad;
     } Kind;
-#define KIND (((const Kind *)(uintptr_t)ADDR_PARTICLE_KINDS)[kind])
+#define KIND ((g_particleKinds)[kind])
     int32_t        half;
     uint8_t       *row;
 
-    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      (const AM2_Point *)at))
         return;
 
-    ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    ctx = (uint8_t *)SeqAlloc(g_seqCtxA);
 
     /* The row is read through the record at every use. */
 #define ROW (*(uint8_t **)(ctx + 0x1C))
@@ -2371,7 +2369,7 @@ void __cdecl LeaveRemainsRow(const void *src)
         *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
     *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
 
-    RowUpdate(r, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(r, 0, g_mapDesc);
 }
 
 /* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.
@@ -2407,9 +2405,9 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
                                int32_t field26)
 {
     /* The group's record, indexed afresh at each use as the image does. */
-#define GRP ((const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C \
+#define GRP (g_spriteGroupsC \
              + (uint32_t)group * AM2_SPRITEGRP_C_BYTES)
-    uint8_t *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    uint8_t *ctx = (uint8_t *)SeqAlloc(g_seqCtxB);
     int32_t  step;
     int32_t  frame;
     uint8_t *row;
@@ -2468,12 +2466,12 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
 int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
 {
     /* The grid's width is re-read at each use, as the image does. */
-#define COLS (*(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS)
+#define COLS (g_spriteGridCols)
     uint8_t *r = (uint8_t *)rows;
     int32_t  elapsed;
     int32_t  col;
 
-    elapsed = (int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+    elapsed = (int32_t)((g_gameClockMs
                          - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u);
 
     col = COLS - 1;
@@ -2481,7 +2479,7 @@ int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
         col = elapsed;
 
     *(uint32_t *)(r + ROW_OFF_SPRITE) =
-        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)
+        (g_spriteGrid)
             [(RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF) * COLS + col];
 
     return col < COLS - 1;
@@ -2504,5 +2502,5 @@ int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
  * address. */
 void __cdecl GameSrand(int32_t seed)
 {
-    *(uint32_t *)(uintptr_t)ADDR_RAND_SEED = (uint32_t)seed;
+    g_randSeed = (uint32_t)seed;
 }

@@ -17,21 +17,21 @@
 
 #define kSep (" \t\n;,")
 
-#define kDefObjRecCap  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_OBJ_REC_CAP)))
+#define kDefObjRecCap  (g_defObjRecCap)
 
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 #define orig_qsort (*(AM2_QsortFn)((void *)(uintptr_t)(ADDR_CRT_QSORT)))
 #define orig_bsearch (*(AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))
-#define kDefLinkCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_LINK_CAP)))
-#define kDefObjRecs      (*(void **)((void *)(uintptr_t)(ADDR_DEF_OBJ_RECS)))
-#define kDefTrooperRecs  (*(void **)((void *)(uintptr_t)(ADDR_DEF_TROOPER_RECS)))
-#define kDefTrooperCount (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_TROOPER_COUNT)))
-#define kDefTrooperCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_TROOPER_CAP)))
-#define kDefObjRecCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_OBJ_REC_COUNT)))
+#define kDefLinkCap    (g_defLinkCap)
+#define kDefObjRecs      (g_defObjRecs)
+#define kDefTrooperRecs  (g_defTrooperRecs)
+#define kDefTrooperCount (g_defTrooperCount)
+#define kDefTrooperCap   (g_defTrooperCap)
+#define kDefObjRecCount  (g_defObjRecCount)
 
-#define kDefLinks      (*(AM2_DefLink **)((void *)(uintptr_t)(ADDR_DEF_LINKS)))
-#define kDefLinkCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_LINK_COUNT)))
+#define kDefLinks      (g_defLinks)
+#define kDefLinkCount  (g_defLinkCount)
 
 /* Read the next whitespace-delimited field. Only the first call passes the
  * line; the rest continue from strtok's own state. */
@@ -684,8 +684,8 @@ typedef void (__cdecl *AM2_DefLogFn)(void);
  */
 void __cdecl DefSortObjRecs(void)
 {
-    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_OBJ_RECS,
-               *(const uint32_t *)(uintptr_t)ADDR_DEF_OBJ_REC_COUNT,
+    orig_qsort(g_defObjRecs,
+               *(const uint32_t *)&g_defObjRecCount,
                AM2_DEF_OBJ_REC_SIZE,
                (const void *)CompareTriple);
     orig_def_log();
@@ -701,8 +701,8 @@ void __cdecl DefSortObjRecs(void)
  * qsorts is a binary search. */
 void __cdecl DefSortMissileRecs(void)
 {
-    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
-               *(const uint32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
+    orig_qsort(*(void * *)&g_defMissileRecs,
+               *(const uint32_t *)&g_defMissileCount,
                AM2_MISSILE_DEF_BYTES,
                (const void *)CompareDword);
     orig_def_log();
@@ -710,8 +710,8 @@ void __cdecl DefSortMissileRecs(void)
 
 void __cdecl DefSortTrooperRecs(void)
 {
-    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_TROOPER_RECS,
-               *(const uint32_t *)(uintptr_t)ADDR_DEF_TROOPER_COUNT,
+    orig_qsort(g_defTrooperRecs,
+               *(const uint32_t *)&g_defTrooperCount,
                AM2_DEF_TROOPER_REC_SIZE,
                (const void *)CompareDword);
     orig_def_log();
@@ -756,37 +756,37 @@ void __cdecl FreeAaiTables(void)
 {
     int32_t i;
 
-    if (*(void *const *)(uintptr_t)ADDR_RECORD_LISTS) {
-        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    if (*(void *const *)&g_recordLists) {
+        for (i = 0; i < g_recordListCount;
              i++)
             FreeRecordList(
-                (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[i]);
+                (g_recordLists)[i]);
 
-        am2_free(*(void **)(uintptr_t)ADDR_RECORD_LISTS);
-        *(void **)(uintptr_t)ADDR_RECORD_LISTS         = (void *)0;
-        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT  = 0;
-        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP    = 0;
+        am2_free(*(void * *)&g_recordLists);
+        *(void * *)&g_recordLists         = (void *)0;
+        g_recordListCount  = 0;
+        g_recordListCap    = 0;
     }
 
-    if (*(void *const *)(uintptr_t)ADDR_RECORD_LIST_INDEX) {
-        am2_free(*(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX);
-        *(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX = (void *)0;
+    if (g_recordListIndex) {
+        am2_free(g_recordListIndex);
+        g_recordListIndex = (void *)0;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT) {
-        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT; i++)
+    if (g_keyTableN) {
+        for (i = 0; i < g_keyTableN; i++)
             FreeIfNotNull(
-                (*(void *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[i]);
+                (g_aaiRecords)[i]);
 
-        am2_free(*(void **)(uintptr_t)ADDR_AAI_RECORDS);
-        *(void **)(uintptr_t)ADDR_AAI_RECORDS       = (void *)0;
-        *(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT = 0;
-        *(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP  = 0;
+        am2_free(*(void * *)&g_aaiRecords);
+        *(void * *)&g_aaiRecords       = (void *)0;
+        g_keyTableN = 0;
+        g_aaiRecordCap  = 0;
     }
 
-    if (*(void *const *)(uintptr_t)ADDR_KEY_TABLE) {
-        am2_free(*(void **)(uintptr_t)ADDR_KEY_TABLE);
-        *(void **)(uintptr_t)ADDR_KEY_TABLE = (void *)0;
+    if (g_keyTable) {
+        am2_free(g_keyTable);
+        g_keyTable = (void *)0;
     }
 }
 

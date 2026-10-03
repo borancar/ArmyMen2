@@ -25,9 +25,6 @@
 
 #include <stdint.h>
 
-#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
-#define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
-#define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)
 
 /* The scratch square the glyph is rendered into, wiped after each encode. */
 #define SCRATCH_SIDE 25
@@ -247,13 +244,11 @@ extern "C" const AM2_FontDesc am2_font_descs[3] = {
 };
 #endif
 
-#define g_fontDescs   ((const AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)
-#define g_backgroundColour  (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
 /* Per-font record fields, `f` records apart. */
-#define font_size(f)    (*(uint32_t *)(uintptr_t)(ADDR_GLYPH_SIZE + (f) * ADDR_FONT_STRIDE))
-#define font_offsets(f) ((uint16_t *)(uintptr_t)(ADDR_GLYPH_OFFSETS + (f) * ADDR_FONT_STRIDE))
-#define font_base(f)    (*(uint8_t **)(uintptr_t)(ADDR_FONT_BASES + (f) * ADDR_FONT_STRIDE))
+#define font_size(f)    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_glyphSize) + (f) * ADDR_FONT_STRIDE))
+#define font_offsets(f) ((uint16_t *)(uintptr_t)(((uintptr_t)g_glyphOffset) + (f) * ADDR_FONT_STRIDE))
+#define font_base(f)    (*(uint8_t **)(uintptr_t)(((uintptr_t)g_fontBase) + (f) * ADDR_FONT_STRIDE))
 
 
 int32_t __cdecl BuildFont(int32_t font)
@@ -319,13 +314,13 @@ int32_t __cdecl BuildFontAlias(int32_t fontIndex)
 void __cdecl FreeFont(int32_t fontIndex)
 {
     uint32_t off = (uint32_t)fontIndex * ADDR_FONT_STRIDE;
-    uint8_t **base = (uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
+    uint8_t **base = (uint8_t **)(((uintptr_t)g_fontBase) + off);
 
     if (!*base)
         return;
     am2_free(*base);
     *base = 0;
-    *(uint32_t *)((uintptr_t)ADDR_GLYPH_SIZE + off) = 0;
+    *(uint32_t *)(((uintptr_t)g_glyphSize) + off) = 0;
 }
 
 void __cdecl FreeAllFonts(void)
@@ -340,7 +335,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 {
     int32_t        width = 0;
     uint32_t       off   = (uint32_t)font * ADDR_FONT_STRIDE;
-    const uint8_t *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
+    const uint8_t *base  = *(const uint8_t **)(((uintptr_t)g_fontBase) + off);
     int32_t        i;
 
     for (i = 0; text[i]; i++) {
@@ -352,7 +347,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
                                          * and up are skipped too */
             /* The glyph table indexed afresh, by the signed character. */
             width += *(const uint16_t *)(base
-                         + ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
+                         + (g_glyphOffset)
                                [font * (ADDR_FONT_STRIDE / 2) + ch]);
         }
 #undef ch
@@ -363,7 +358,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
         /* The line height is the space glyph's, whatever the string was. */
         out[1] = *(const uint16_t *)(base
                                      + *(const uint16_t *)
-                                           ((uintptr_t)ADDR_GLYPH_OFFSET_SPACE + off)
+                                           (((uintptr_t)g_glyphOffsetSpace) + off)
                                      + 2);
     }
     return width;
@@ -394,8 +389,6 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
  * Nothing is drawn at all unless a surface is locked -- the very first test,
  * before even measuring the string. */
 /* Spelled as surface.cpp spells them, so the three stay one definition. */
-#define g_drawTarget     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 
 void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
                              int32_t font, RECT clip, int32_t colour)
@@ -404,7 +397,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
     int32_t         i;
     int32_t         penX;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
+    if (!g_surfaceLocked)
         return;
 
     len  = (int32_t)strlen(text);
@@ -438,12 +431,12 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
         dx = penX;
         dy = y;
 
-        if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+        if (ClipRect(&src, (const AM2_Rect *)g_screenClip,
                      &dx, &dy, &mid)
             && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
-            if (g_drawTarget == g_primarySurface) {
-                dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
-                dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
+            if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
+                dx += g_originDX;
+                dy += g_originDY;
             }
             BlitGlyph(dx, dy, glyph, src, colour);
         }
@@ -489,7 +482,7 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
     int32_t         i;
     int32_t         penY;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
+    if (!g_surfaceLocked)
         return;
 
     len  = (int32_t)strlen(text);
@@ -523,12 +516,12 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
         dx = x - src.right / 2;
         dy = penY;
 
-        if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+        if (ClipRect(&src, (const AM2_Rect *)g_screenClip,
                      &dx, &dy, &mid)
             && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
-            if (g_drawTarget == g_primarySurface) {
-                dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
-                dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
+            if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
+                dx += g_originDX;
+                dy += g_originDY;
             }
             BlitGlyph(dx, dy, glyph, src, colour);
         }

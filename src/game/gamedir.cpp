@@ -27,21 +27,21 @@ int32_t __cdecl SetGameDir(const char *subdir)
 {
     char path[0x100];
 
-    strcpy(path, (const char *)((void *)(uintptr_t)(ADDR_GAME_DIR)));
+    strcpy(path, g_gameDir);
     strcat(path, "\\");
     strcat(path, subdir);
 
     if (am2_chdir(path) == 0) {
         /* Latched, never cleared here: leaving the directory again does not
          * put it back. Only the name matters, not where we ended up. */
-        if (strcmp(subdir, *(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR))) == 0)
-            *(int32_t *)((void *)(uintptr_t)(ADDR_OPT_BIG_MOVIES)) = 1;
+        if (strcmp(subdir, g_strAviDir) == 0)
+            g_optBigMovies = 1;
         return 1;
     }
 
-    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_CD_PRESENT))) {
+    if (g_cdPresent) {
         /* No separator appended -- the fallback base already ends in one. */
-        strcpy(path, (const char *)((void *)(uintptr_t)(ADDR_CD_PATH)));
+        strcpy(path, g_cdPath);
         strcat(path, subdir);
 
         return am2_chdir(path) == 0;

@@ -111,7 +111,7 @@ extern "C" const int16_t am2_air_path_away_x     = 300; /* 0x00473F70 */
  * stay at their writable .origdat placement rather than a read-only C const. */
 #endif
 
-#define kAirSaveBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK)))
+#define kAirSaveBlock ((void *)(uintptr_t)(g_airSaveBlock))
 
 int32_t __cdecl SaveAirSection(am2_FILE *fp)
 {
@@ -153,7 +153,7 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 
 typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
 #define orig_get_tick_count \
-    (*(AM2_GetTickCountFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
+    (*(AM2_GetTickCountFn *)g_iatGetTickCount)
 
 /* PeerShouldNack -- original 0x00402C30, one caller. Should a NACK go out for
  * this sequence number, or has one gone recently enough? It names itself twice
@@ -243,7 +243,7 @@ found:
 
         if (now > *t + capped) {
             if (*(const int32_t *)((const uint8_t *)
-                    *(void *const *)(uintptr_t)ADDR_COMM_OBJECT + COMM_OFF_VERBOSE))
+                    *(void *const *)&g_commObject + COMM_OFF_VERBOSE))
                 am2_log("Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d count = %d nackinterval = %d\n",
                         seq, *(const uint32_t *)(p + PEER_OFF_ID), now,
                         *t + capped, now - *t - capped,
@@ -278,7 +278,7 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     box.top    = ((const AM2_Point *)&where)->y - AM2_AIR_ENEMY_RADIUS;
     box.bottom = ((const AM2_Point *)&where)->y + AM2_AIR_ENEMY_RADIUS;
 
-    o = (uint8_t *)ObjectsInRect(&box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+    o = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
                                  (int32_t (__cdecl *)(void *))MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
@@ -332,7 +332,7 @@ void __cdecl RevealObj(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, g_mapDesc);
     }
 }
 
@@ -380,7 +380,7 @@ void __cdecl ObjConceal(void *obj, int32_t force)
              && *(const int32_t *)((uint8_t *)obj + OBJ_OFF_FIELD_530) != 5)
         *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_REVEALED;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_FOG_OF_WAR && !force)
+    if (g_fogOfWar && !force)
         return;
 
     *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_CONCEALED;
@@ -390,7 +390,7 @@ void __cdecl ObjConceal(void *obj, int32_t force)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row |= (uint32_t)ROW_FLAG_REMOVED;
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, g_mapDesc);
     }
 }
 
@@ -433,10 +433,10 @@ void __cdecl SetFogOfWar(int32_t fogOn)
     void *obj;
 
     if (fogOn) {
-        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
+        g_fogOfWar = 0;
         return;
     }
-    *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 1;
+    g_fogOfWar = 1;
 
     for (obj = FirstItem(); obj; obj = NextItem()) {
         uint8_t *o = (uint8_t *)obj;
@@ -458,7 +458,7 @@ void __cdecl SetFogOfWar(int32_t fogOn)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
             *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
-            RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+            RowUpdate(row, 0, g_mapDesc);
         }
     }
 }
@@ -487,8 +487,8 @@ void __cdecl SetFogOfWar(int32_t fogOn)
  * stores to nothing, eighteen thousand times a mission. */
 void __cdecl ClearFrameCounts(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_A = 0;
-    *(int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_B = 0;
+    g_perframeCountA = 0;
+    g_perframeCountB = 0;
 }
 
 /* 0x00403AF0, three callers. The object's position, moved by its sprite's
@@ -511,7 +511,7 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
     AM2_Point      pt;
 
     if (!p)
-        return *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT));
+        return g_zeroPoint;
 
     pt = *(const AM2_Point *)(p + OBJ_OFF_POS);
     if (*(const int32_t *)(p + OBJ_OFF_ROW_COUNT) == 1)
@@ -531,10 +531,6 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
 }
 
 
-#define g_mapBoundsLeft   (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)))
-#define g_mapBoundsTop    (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_TOP)))
-#define g_mapBoundsRight  (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_RIGHT)))
-#define g_mapBoundsBottom (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_BOTTOM)))
 
 /* FormationPointFar -- original 0x004042A0, one caller, which is
  * FormationPoint below. It is what happens past slot 11, where the twelve-entry
@@ -684,7 +680,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         break;
     }
 
-    rec    = (const uint8_t *)((void *)(uintptr_t)(ADDR_FORMATION_SLOTS))
+    rec    = g_formationSlots
              + (uint32_t)slot * AM2_FORMATION_SLOT_STRIDE;
     dist   = (int32_t)*(const int16_t *)(rec + 2) << shift;
     facing = (uint8_t)(*rec + leaderFacing);
@@ -844,7 +840,6 @@ void __cdecl ResolveFormationPoint(void *follower, void *leader,
 
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
  * stay one definition. */
-#define g_gameClockMs (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 
 void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
@@ -879,9 +874,6 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr);   /* C++ linkage, as sprite.h decla
 void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y,
                                    int32_t mode);
 
-#define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
-#define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
-#define g_spriteListCap (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)
 
 void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
                              int32_t from)
@@ -949,13 +941,13 @@ void __cdecl FreeSpriteList(void)
 {
     int32_t i;
 
-    if (g_spriteList) {
+    if ((*(AM2_Sprite ** *)&g_spriteList)) {
         /* The count is re-read every iteration, not held. */
         for (i = 0; i < g_spriteListN; i++)
-            ReleaseSprite(g_spriteList[i]);
+            ReleaseSprite((*(AM2_Sprite ** *)&g_spriteList)[i]);
 
-        am2_free(g_spriteList);
-        g_spriteList    = (AM2_Sprite **)0;
+        am2_free((*(AM2_Sprite ** *)&g_spriteList));
+        (*(AM2_Sprite ** *)&g_spriteList)    = (AM2_Sprite **)0;
         g_spriteListN   = 0;
         g_spriteListCap = 0;
     } else {
@@ -970,7 +962,7 @@ void __cdecl GrowSpriteList(void)
     /* A hundred more, and the COUNT is not consulted -- this is "make room",
      * not "grow if full". The realloc is not checked. */
     g_spriteListCap += AM2_SPRITE_LIST_GROW;
-    g_spriteList = (AM2_Sprite **)am2_realloc(g_spriteList,
+    (*(AM2_Sprite ** *)&g_spriteList) = (AM2_Sprite **)am2_realloc((*(AM2_Sprite ** *)&g_spriteList),
                                               (size_t)g_spriteListCap * 4u);
 }
 
@@ -1279,7 +1271,7 @@ void __cdecl ToggleFogOfWar(void)
 {
     void *o;
 
-    int32_t *fog = (int32_t *)(uintptr_t)ADDR_FOG_OF_WAR;
+    int32_t *fog = &g_fogOfWar;
 
     *fog = (*fog == 0);
 
@@ -1301,7 +1293,7 @@ void __cdecl ToggleFogOfWar(void)
             /* `<= 0` on an unsigned, i.e. == 0: the original's `jbe` after
              * `test`, where `== 0` compiles `je`. */
             if (until <= 0u
-                || *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS < until)
+                || g_gameClockMs < until)
                 ObjConceal(p, 0);
         }
     }
@@ -1379,21 +1371,21 @@ void __cdecl AirDeliver(void)
                          - AM2_AIR_STRIKE_HALF;
             int32_t dy = orig_air_rand() % AM2_AIR_STRIKE_HALF
                          - (int32_t)((double)dx
-                                     * *(const double *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_SLOPE)))
+                                     * g_airStrikeSlope)
                          - AM2_AIR_STRIKE_Y_BIAS;
             int32_t delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
                             + dx * AM2_AIR_STRIKE_SLIDE + AM2_AIR_STRIKE_BASE_MS;
 
             orig_spawn_at((int16_t)g_airWhere[0] + dx,
                           (int16_t)g_airWhere[1] + dy,
-                          ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
+                          (g_airStrikeKinds)
                               [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                           (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
                           AM2_AIR_STRIKE_EXTRA, delay, 0, 0, 0);
         }
 
         orig_spawn_at((int16_t)g_airWhere[0], (int16_t)g_airWhere[1],
-                      ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
+                      (g_airStrikeKinds)
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                       (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
                       AM2_AIR_STRIKE_EXTRA, AM2_AIR_STRIKE_JITTER, 0, 0, 0);
@@ -1435,16 +1427,16 @@ void __cdecl AirPassesDraw(void)
     int32_t half;
 
     /* The pass time is re-read, and halved with a shift, at every use. */
-#define MS (*(const int32_t *)((void *)(uintptr_t)(ADDR_AIR_PASS_MS)))
+#define MS (g_airPassMs)
     if (g_airPassCount <= 0)
         return;
 
     for (i = 0; i < g_airPassCount; i++) {
         y = g_airPassWhere[i * 2 + 1]
-            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+            - g_viewY
             - AM2_AIR_PASS_LIFT;
         x = g_airPassWhere[i * 2]
-            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+            - g_viewX;
         half = MS >> 1;
 
         if (g_airPassTimer[i] < half) {
@@ -1454,17 +1446,17 @@ void __cdecl AirPassesDraw(void)
             frame = ((g_airPassTimer[i] - half) * AM2_AIR_PASS_FRAMES) / half;
         }
 
-        DrawSprite(((AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3)[frame],
+        DrawSprite((g_airSprites3)[frame],
                    x, y, 0);
 
-        g_airPassTimer[i] += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+        g_airPassTimer[i] += g_frameDeltaMs;
     }
 
     if (g_airPassTimer[0] < MS)
         return;
 #undef MS
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
                              g_airPassArmy[0]))
         AirPassStrike(*(const uint32_t *)g_airPassWhere,
@@ -1505,9 +1497,9 @@ void __cdecl AirPassesDraw(void)
 void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
                                 uint32_t *out)
 {
-    int32_t  *isVehicle = (int32_t *)((void *)(uintptr_t)(ADDR_SLOT_IS_VEHICLE));
-    uint32_t *slotPos   = (uint32_t *)((void *)(uintptr_t)(ADDR_SLOT_POSITIONS));
-    uint8_t  *headings  = (uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_HEADINGS));
+    int32_t  *isVehicle = g_slotIsVehicle;
+    uint32_t *slotPos   = g_slotPositions;
+    uint8_t  *headings  = g_slotHeadings;
     const uint8_t *o = (const uint8_t *)obj;
     uint8_t   heading;
     int32_t   parent;
@@ -1524,7 +1516,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
         heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
                                (const AM2_Point *)&leaderPos);
     } else if (slot < 9) {
-        const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_RECS))
+        const uint8_t *rec = g_slotRecs
                              + (uint32_t)slot * AM2_SLOT_REC_BYTES;
 
         /* Each arm places the point itself, through `out`: fmul, then fiadd,
@@ -1537,7 +1529,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
         if (isVehicle[parent] || isVehicle[slot])
             dist += dist;
         /* The angle is indexed off the table afresh, not through `rec`. */
-        heading = (uint8_t)(((const uint8_t *)(uintptr_t)ADDR_SLOT_RECS)
+        heading = (uint8_t)((g_slotRecs)
                                 [slot * AM2_SLOT_REC_BYTES + SLOT_REC_OFF_ANGLE]
                             + headings[parent]);
         fdist = (float)dist;
@@ -1717,7 +1709,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         dist += AM2_SIGHT_DIST_PAD;
     }
 
-    rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+    rank = g_rankRecords
          + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES;
 
     if ((int32_t)(int16_t)dist
@@ -1739,7 +1731,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     if ((int16_t)span <= 0)
         return;
 
-    gen   = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+    gen   = g_sightGeneration;
     steps = ((uint32_t)(int32_t)(int16_t)span + 3) >> 2;
     d     = (int16_t)dist;
 
@@ -1747,11 +1739,11 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     do {
         uint32_t idx = (uint32_t)(a0 & 0xFF) >> 2;
 
-#define REC(off) (*(int16_t *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR   \
+#define REC(off) (*(int16_t *)(((uintptr_t)g_sightBlockByDir)   \
                                + idx * AM2_SIGHT_DIR_STRIDE + (off)))
-#define STAMP    (*(int32_t *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR   \
+#define STAMP    (*(int32_t *)(((uintptr_t)g_sightBlockByDir)   \
                                + idx * AM2_SIGHT_DIR_STRIDE + SIGHTDIR_OFF_STAMP))
-#define range (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS)) \
+#define range (*(const int32_t *)(g_rankRecords \
         + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES   \
         + RANK_REC_OFF_SIGHT_RANGE))
 
@@ -1794,8 +1786,6 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
 }
 #undef AngleOfDelta3
 
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_fogOfWar     (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)
 
 /* AirPassStrike -- original 0x00409540, 256 bytes, one caller: what an air
  * pass does when its timer runs out. It DROPS THREE PARATROOPERS, which the
@@ -1824,8 +1814,8 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
  * -- the guard is around the four calls, not around the creation. */
 void __cdecl AirPassStrike(uint32_t at, int32_t army)
 {
-#define OFF  ((const int16_t *)(uintptr_t)ADDR_AIR_DROP_OFFSETS)
-#define FACE ((const uint8_t *)(uintptr_t)ADDR_AIR_DROP_FACINGS)
+#define OFF  (g_airDropOffsets)
+#define FACE (g_airDropFacings)
     int32_t flags = 0;
     int32_t i;
 
@@ -1837,15 +1827,15 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
         void *trooper;
         void *weapon;
 
-        trooper = CreateTrooper((char *)(uintptr_t)ADDR_DIR_SCRATCH,
+        trooper = CreateTrooper(g_dirScratch,
                                 ((const AM2_Point *)&at)->x + OFF[i * 2],
                                 ((const AM2_Point *)&at)->y + OFF[i * 2 + 1],
                                 AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
-        weapon = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, army,
+        weapon = CreateWeapon(g_dirScratch, army,
                               KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
-                              *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                              g_zeroPoint,
                               4, -1, 0, 0);
         if (!weapon)
             continue;
@@ -1894,42 +1884,42 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
 
 void __cdecl AirInitTurnYIn(void)
 {
-    *(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y + *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y);
+    g_airPathTurnYIn = (int16_t)(g_airPathMidY + g_airPathHalfY);
 }
 
 void __cdecl AirInitTurnYOut(void)
 {
-    *(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y);
+    g_airPathTurnYOut = (int16_t)(g_airPathMidY - g_airPathHalfY);
 }
 
 void __cdecl AirInitLeg1X0(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0 =
-        (int32_t)((double)*(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - (double)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN)
-                                   * *(const double *)(uintptr_t)ADDR_AIR_LEG1_SLOPE);
+    g_airLeg1X0 =
+        (int32_t)((double)g_airPathTurnX - (double)(g_airPathInY - g_airPathTurnYIn)
+                                   * g_airLeg1Slope);
 }
 
 void __cdecl AirInitLeg1Dx(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_DX =
-        *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0;
+    g_airLeg1Dx =
+        g_airPathTurnX - g_airLeg1X0;
 }
 
 void __cdecl AirInitLeg1Dy(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_DY = *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN;
+    g_airLeg1Dy = g_airPathInY - g_airPathTurnYIn;
 }
 
 void __cdecl AirInitLeg2MsSpan(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS_SPAN =
-        *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS
-        - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_MS;
+    g_airLeg2MsSpan =
+        g_airLeg2Ms
+        - g_airLeg1Ms;
 }
 
 void __cdecl AirInitLeg2Dy(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG2_DY = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT;
+    g_airLeg2Dy = g_airPathTurnYIn - g_airPathTurnYOut;
 }
 
 /* (rise * rise) / run, the parabola leg 2 follows, with the run measured from
@@ -1937,30 +1927,30 @@ void __cdecl AirInitLeg2Dy(void)
  * than loading it twice, so both factors are necessarily the same value. */
 void __cdecl AirInitLeg2Divisor(void)
 {
-    int32_t rise = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y;
-    int32_t run  = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_APEX_X;
+    int32_t rise = g_airPathTurnYIn - g_airPathHalfY;
+    int32_t run  = g_airPathTurnX - g_airPathApexX;
 
-    *(float *)(uintptr_t)ADDR_AIR_LEG2_DIVISOR =
+    g_airLeg2Divisor =
         (float)rise * rise / run;         /* float, as the original: fidiv */
 }
 
 void __cdecl AirInitLeg3X1(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_X1 =
-        (int32_t)((double)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_OUT_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT)
-                  * *(const double *)(uintptr_t)ADDR_AIR_LEG3_SLOPE
-                  + (double)*(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X);
+    g_airLeg3X1 =
+        (int32_t)((double)(g_airPathOutY - g_airPathTurnYOut)
+                  * g_airLeg3Slope
+                  + (double)g_airPathAwayX);
 }
 
 void __cdecl AirInitLeg3Dx(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_DX =
-        *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_X1;
+    g_airLeg3Dx =
+        g_airPathAwayX - g_airLeg3X1;
 }
 
 void __cdecl AirInitLeg3Dy(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_DY = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_OUT_Y;
+    g_airLeg3Dy = g_airPathTurnYOut - g_airPathOutY;
 }
 
 void air_install(void)

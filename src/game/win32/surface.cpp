@@ -44,11 +44,6 @@
 
 /* Writable views of the globals LockSurface publishes. blit.c takes the same
  * two read-only, which is why it declares its own const versions. */
-#define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_drawTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_frameBuf       (*(void **)(uintptr_t)ADDR_FRAMEBUFFER)
-#define g_pitch          (*(int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 
 /* The game hardcodes dwSize = 0x6C, which is DDSURFACEDESC and not
  * DDSURFACEDESC2 (124 bytes). Check the SDK agrees rather than assume it. */
@@ -62,7 +57,7 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
     /* Locks do not nest. Re-locking the surface already held is a no-op that
      * succeeds; asking for a different one while holding this is refused. */
     if (g_surfaceLocked) {
-        if (surf == g_drawTarget)
+        if (surf == (*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return 1;
         orig_log("another surface already locked!\n");
         return 0;
@@ -73,7 +68,7 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
 
     if (hr != DD_OK) {
         if (hr == DDERR_SURFACELOST)
-            hr = IDirectDrawSurface_Restore(g_primarySurface);
+            hr = IDirectDrawSurface_Restore((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
         if (hr != DD_OK)
             return 0;
 
@@ -85,9 +80,9 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
          * mode change), which is presumably why it was never noticed. */
     }
 
-    g_drawTarget = surf;
+    (*(LPDIRECTDRAWSURFACE *)&g_drawTarget) = surf;
     g_surfaceLocked = 1;
-    g_frameBuf      = desc.lpSurface;
+    (*(void * *)&g_frameBuf)      = desc.lpSurface;
     g_pitch         = desc.lPitch;
     return 1;
 }
@@ -95,13 +90,13 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
 int32_t __cdecl UnlockSurface(void)
 {
     if (g_surfaceLocked) {
-        LPDIRECTDRAWSURFACE surf = g_drawTarget;
+        LPDIRECTDRAWSURFACE surf = (*(LPDIRECTDRAWSURFACE *)&g_drawTarget);
 
         /* Unlock takes back the same pointer Lock handed out. */
-        IDirectDrawSurface_Unlock(surf, g_frameBuf);
+        IDirectDrawSurface_Unlock(surf, (*(void * *)&g_frameBuf));
 
         g_surfaceLocked = 0;
-        g_frameBuf      = NULL;
+        (*(void * *)&g_frameBuf)      = NULL;
         g_pitch         = 0;
     }
     return 1;
@@ -109,8 +104,6 @@ int32_t __cdecl UnlockSurface(void)
 
 /* ---- creating and clearing --------------------------------------------- */
 
-#define g_ddraw2     (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
-#define g_screenRect (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)
 
 static_assert(DDSD_CAPS + DDSD_HEIGHT + DDSD_WIDTH + DDSD_PIXELFORMAT == 0x1007,
               "the descriptor fields it fills in");
@@ -133,7 +126,7 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
      * without anyone naming one. */
     memset(&ddsd, 0, sizeof ddsd);
     ddsd.dwSize = sizeof ddsd;
-    hr = IDirectDrawSurface_GetSurfaceDesc(g_primarySurface, &ddsd);
+    hr = IDirectDrawSurface_GetSurfaceDesc((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), &ddsd);
     if (hr) {
         ReportError(hr, "GetSurfaceDesc()");
         return NULL;
@@ -190,7 +183,7 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
 
     /* The primary is the entire desktop in windowed mode, so it is filled
      * through the screen rectangle. Everything else is ours entirely. */
-    if (surf == g_primarySurface)
+    if (surf == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface))
         return IDirectDrawSurface_Blt(surf, &dest, NULL, NULL,
                                       DDBLT_COLORFILL | DDBLT_WAIT, &fx) == DD_OK;
     return IDirectDrawSurface_Blt(surf, NULL, NULL, NULL,
@@ -200,11 +193,7 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
 static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
 static_assert(PM_NOREMOVE == 0, "PM_NOREMOVE");
 
-#define g_presentEnabled (*(const int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
-#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
-#define g_screenClip     ((LPRECT)(uintptr_t)ADDR_SCREEN_CLIP)
-#define g_hWnd           (*(HWND *)(uintptr_t)ADDR_HWND)
-#define g_windowed       (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
+#define g_hWnd           (*(HWND *)&g_enumContext)
 
 void __cdecl PresentFrame(void)
 {
@@ -217,17 +206,17 @@ void __cdecl PresentFrame(void)
     if (g_windowed) {
         /* No flipping chain in a window, so the back buffer is copied up to
          * the primary at wherever the client area happens to be. */
-        IDirectDrawSurface_BltFast(g_primarySurface,
+        IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
                                    (DWORD)g_screenRect.left,
                                    (DWORD)g_screenRect.top,
-                                   g_backBuffer, g_screenClip, DDBLTFAST_WAIT);
+                                   g_backBuffer, ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
         return;
     }
 
-    hr = IDirectDrawSurface_Flip(g_primarySurface, NULL, 0);
+    hr = IDirectDrawSurface_Flip((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), NULL, 0);
     while (hr != DD_OK) {
         if (hr == DDERR_SURFACELOST) {
-            IDirectDrawSurface_Restore(g_primarySurface);
+            IDirectDrawSurface_Restore((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
             return;
         }
 
@@ -241,7 +230,7 @@ void __cdecl PresentFrame(void)
 
         if (hr != DDERR_WASSTILLDRAWING)
             return;
-        hr = IDirectDrawSurface_Flip(g_primarySurface, NULL, 0);
+        hr = IDirectDrawSurface_Flip((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), NULL, 0);
         /* Tested here as well as by the loop: the original leaves through a
          * `je` and loops with a plain `jmp`. */
         if (hr == DD_OK)
@@ -249,10 +238,6 @@ void __cdecl PresentFrame(void)
     }
 }
 
-#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_clipper     (*(LPDIRECTDRAWCLIPPER *)(uintptr_t)ADDR_DD_CLIPPER)
-#define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
-#define g_palHolder   (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
 #define MOVIE_PALETTE_OFF 0x800u
 
 void __cdecl ShutdownDirectDraw(void)
@@ -272,20 +257,20 @@ void __cdecl ShutdownDirectDraw(void)
 
     /* The palette is not a global of its own -- it hangs off the same holder
      * the movie player reads it from. */
-    if (g_palHolder) {
+    if (g_moviePaletteOwner) {
         LPDIRECTDRAWPALETTE pal =
-            *(LPDIRECTDRAWPALETTE *)(g_palHolder + MOVIE_PALETTE_OFF);
+            *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner + MOVIE_PALETTE_OFF);
 
         if (pal) {
             IDirectDrawPalette_Release(pal);
-            *(LPDIRECTDRAWPALETTE *)(g_palHolder + MOVIE_PALETTE_OFF) = NULL;
+            *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner + MOVIE_PALETTE_OFF) = NULL;
         }
-        g_palHolder = NULL;
+        g_moviePaletteOwner = NULL;
     }
 
-    if (g_primarySurface) {
-        IDirectDrawSurface_Release(g_primarySurface);
-        g_primarySurface = NULL;
+    if ((*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
+        IDirectDrawSurface_Release((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
+        (*(LPDIRECTDRAWSURFACE *)&g_primarySurface) = NULL;
         /* Cleared rather than released: fullscreen it was attached to the
          * primary and never separately owned, and windowed it is the offscreen
          * surface already let go above. */
@@ -306,8 +291,6 @@ release_v2:
     }
 }
 
-#define g_mapCache      (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
-#define g_mapSurfaceDesc (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
 #define MAP_DESC_FLAG    0x08u
 #define MAP_DESC_SURFACE 0x10u
 
@@ -323,21 +306,21 @@ typedef void (__cdecl *am2_void_fn)(void);
 
 void __cdecl RestoreLostSurfaces(void)
 {
-    RESTORE_IF_LOST(g_primarySurface)
+    RESTORE_IF_LOST((*(LPDIRECTDRAWSURFACE *)&g_primarySurface))
     RESTORE_IF_LOST(g_offscreen)
     RESTORE_IF_LOST(g_mapCache)
 
     /* The map keeps its surface in a descriptor, and only wants it restored
      * while the flag at +8 is clear. */
-    if (g_mapSurfaceDesc &&
-        *(int32_t *)(g_mapSurfaceDesc + MAP_DESC_FLAG) == 0) {
+    if (g_mapSprite &&
+        *(int32_t *)(g_mapSprite + MAP_DESC_FLAG) == 0) {
         LPDIRECTDRAWSURFACE surf =
-            *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
+            *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAP_DESC_SURFACE);
 
         if (surf && IDirectDrawSurface_IsLost(surf) != DD_OK) {
             /* Reload through the descriptor rather than the local: the restore
              * is what the original re-reads it for. */
-            surf = *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
+            surf = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAP_DESC_SURFACE);
             if (IDirectDrawSurface_Restore(surf) == DD_OK)
                 RestoreTileSet();   /* the pixels are gone; redraw them */
         }
@@ -345,28 +328,27 @@ void __cdecl RestoreLostSurfaces(void)
 }
 
 typedef void (__cdecl *am2_gate_fn)(int32_t);
-#define g_presentEnabledRW (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
 
 void __cdecl RefreshScreen(void)
 {
     /* Saved rather than assumed: presenting may already have been off. */
-    const int32_t wasEnabled = g_presentEnabledRW;
+    const int32_t wasEnabled = g_presentEnabled;
 
     RefreshGate(0);
-    g_presentEnabledRW = 0;
+    g_presentEnabled = 0;
 
     /* Twice, because the scene is double buffered and one pass would leave the
      * other buffer holding whatever was there before. */
     RefreshDraw();
     RefreshDraw();
 
-    IDirectDrawSurface_BltFast(g_primarySurface,
+    IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
                                (DWORD)g_screenRect.left,
                                (DWORD)g_screenRect.top,
-                               g_backBuffer, g_screenClip, DDBLTFAST_WAIT);
+                               g_backBuffer, ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
 
     RefreshGate(1);
-    g_presentEnabledRW = wasEnabled;
+    g_presentEnabled = wasEnabled;
 }
 
 void __cdecl ReleasePalette(void *holder)
@@ -389,10 +371,10 @@ void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
      * every other window on the screen. */
     if (g_windowed)
         return;
-    if (!g_palHolder)
+    if (!g_moviePaletteOwner)
         return;
 
-    pal = *(LPDIRECTDRAWPALETTE *)(g_palHolder + PALETTE_HOLDER_OFF);
+    pal = *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner + PALETTE_HOLDER_OFF);
     if (!pal)
         return;
 
@@ -545,10 +527,10 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
     /* A locked surface cannot be Blt'd to. Silently nothing, as the original. */
     if (g_surfaceLocked)
         return;
-    if (!IntersectRect(&dest, r, g_screenClip))
+    if (!IntersectRect(&dest, r, ((LPRECT)((uintptr_t)g_screenClip))))
         return;
 
-    if (g_drawTarget == g_primarySurface) {
+    if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
         /* Game coordinates are relative to the client area; the primary is the
          * whole desktop. Shift, or the fill lands somewhere else entirely. */
         dest.left   += g_screenRect.left;
@@ -559,7 +541,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 
     fx.dwSize      = sizeof fx;
     fx.dwFillColor = colour;
-    IDirectDrawSurface_Blt(g_drawTarget, &dest, NULL, NULL,
+    IDirectDrawSurface_Blt((*(LPDIRECTDRAWSURFACE *)&g_drawTarget), &dest, NULL, NULL,
                            DDBLT_COLORFILL | DDBLT_WAIT, &fx);
 }
 
@@ -584,7 +566,6 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 static_assert(sizeof(DDBLTFX) == 0x64, "DDBLTFX");
 static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
 
-#define g_backgroundColour       (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
 #define SEQ_BAR_WIDTH  3
 #define SEQ_BAR_HEIGHT 16
@@ -647,8 +628,8 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
  * without knowing it: +0x10 is `image`, exactly where ReleaseSprite looks. */
 void __cdecl FreeMapSurfaces(void)
 {
-    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_MAP_SURFACE);
-    *(AM2_Sprite **)(uintptr_t)ADDR_MAP_SURFACE = NULL;
+    ReleaseSprite(*(AM2_Sprite * *)&g_mapSprite);
+    *(AM2_Sprite * *)&g_mapSprite = NULL;
 
     if (g_mapCache) {
         IDirectDrawSurface_Release(g_mapCache);
@@ -677,8 +658,6 @@ void __cdecl FreeMapSurfaces(void)
  * it is recorded rather than reproduced. */
 static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
 
-#define g_originDx (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
-#define g_originDy (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
 
 void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 {
@@ -690,14 +669,14 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 #define DESC   (*(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC))
 #define WIDTH  (DESC[1])
 #define HEIGHT (DESC[2])
-    if (dest == g_primarySurface) {
-        to.left = (uint32_t)(g_screenClip->right - g_screenClip->left - WIDTH) / 2
-                  + g_originDx;
-        to.top  = (uint32_t)(g_screenClip->bottom - g_screenClip->top - HEIGHT) / 2
-                  + g_originDy;
+    if (dest == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
+        to.left = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->right - ((LPRECT)((uintptr_t)g_screenClip))->left - WIDTH) / 2
+                  + g_originDX;
+        to.top  = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->bottom - ((LPRECT)((uintptr_t)g_screenClip))->top - HEIGHT) / 2
+                  + g_originDY;
     } else {
-        to.left = (uint32_t)(g_screenClip->right - g_screenClip->left - WIDTH) / 2;
-        to.top  = (uint32_t)(g_screenClip->bottom - g_screenClip->top - HEIGHT) / 2;
+        to.left = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->right - ((LPRECT)((uintptr_t)g_screenClip))->left - WIDTH) / 2;
+        to.top  = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->bottom - ((LPRECT)((uintptr_t)g_screenClip))->top - HEIGHT) / 2;
     }
     to.right  = WIDTH + to.left;
     to.bottom = HEIGHT + to.top;
@@ -710,7 +689,7 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
     /* Two arms on the current movie's field at +0x10, and both make the
      * same call: VC6 merges them and leaves the test in the image with
      * nothing reading it. */
-    if (*(const int32_t *)(*(const uint8_t *const *)(uintptr_t)ADDR_MOVIE_CURRENT + 0x10))
+    if (*(const int32_t *)(g_movieCurrent + 0x10))
         IDirectDrawSurface_Blt(dest, &to,
                                *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
@@ -758,8 +737,6 @@ static_assert((DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH) == 7, "the descriptor flags
 static_assert(DDSCAPS_OFFSCREENPLAIN == 0x40, "DDSCAPS_OFFSCREENPLAIN");
 static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
 
-#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
-#define g_ddraw2obj       (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
 
 /* 0x00422FF0, four callers -- read ONE bitmap out of a stream that may hold
  * several, and answer its pixels in a buffer the caller frees.
@@ -1117,7 +1094,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         /* Ask before taking: if the card has not got room, do not make it say
          * so by failing. */
         if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
-            IDirectDraw2_GetAvailableVidMem(g_ddraw2obj, &want, &total, &freeVid);
+            IDirectDraw2_GetAvailableVidMem(g_ddraw2, &want, &total, &freeVid);
             if (freeVid < (DWORD)(W * H))
                 *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
         }
@@ -1127,12 +1104,12 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         /* One "CreateSurface failed" for both attempts; the retry in system
          * memory is only worth making when video memory was what we asked
          * for. */
-        if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
+        if (IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL) != DD_OK) {
             if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
                 orig_log("Failed to put surface into video memory!\n");
                 *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
                 ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
-                if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL)
+                if (IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL)
                         == DD_OK)
                     goto made;
             }
@@ -1193,37 +1170,33 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
-#define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
-#define g_menuPending   (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
-#define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
-#define g_presenting    (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
-#define g_screenRectPtr ((LPRECT)(uintptr_t)ADDR_SCREEN_RECT)
+#define g_paintObj      (*(uint8_t * *)&g_paintObject)
+#define g_screenRectPtr ((LPRECT)((uintptr_t)&g_screenRect))
 
 void __cdecl DrawMenuOverlay(void)
 {
     /* The paint object is re-read at every use, as the image does. */
-    if (g_menuPending) {
+    if (g_menuRequestSet) {
         /* Going back to the game: drop the overlay and let frames through. */
         if (g_paintObj) {
             ObjVDelete(g_paintObj, 1);
             g_paintObj = NULL;
         }
         g_subState     = MENU_MODE_PLAYING;
-        g_menuPending  = 0;
+        g_menuRequestSet  = 0;
         g_overlayDirty = 0;
-        g_presenting   = 1;
+        g_presentEnabled   = 1;
         return;
     }
 
     if (g_overlayDirty) {
-        g_presenting = 0;
+        g_presentEnabled = 0;
         if (g_paintObj) {
-            SetDrawTarget(g_primarySurface);
+            SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
             ObjVPaint(g_paintObj, *(const AM2_Rect *)(g_paintObj + 0x14));
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
-        IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, g_primarySurface,
+        IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, (*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
                                    g_screenRectPtr, DDBLTFAST_WAIT);
         g_overlayDirty = 0;
     }
@@ -1236,9 +1209,9 @@ void __cdecl DrawMenuOverlay(void)
     OverlayPrepare(0, 1);
     DrawMenuCursor();
 
-    IDirectDrawSurface_BltFast(g_primarySurface, (DWORD)g_originDx,
-                               (DWORD)g_originDy, g_backBuffer,
-                               g_screenClip, DDBLTFAST_WAIT);
+    IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), (DWORD)g_originDX,
+                               (DWORD)g_originDY, g_backBuffer,
+                               ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
 }
 
 /* The animated menu cursor -- 0x00412FE0.
@@ -1284,36 +1257,23 @@ void __cdecl DrawMenuOverlay(void)
  */
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
-#define g_menuEnabled   (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)
-#define g_menuRow       (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)
-#define g_animFrame     (*(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME)
-#define g_animNext      (*(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT)
-#define g_menuSprites2  ((uint8_t **)(uintptr_t)ADDR_MENU_SPRITES)
-#define g_cursorSprite  (*(uint8_t **)(uintptr_t)ADDR_MENU_SPRITES_END)
-#define g_savedValid    (*(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID)
-#define g_savedRect     ((AM2_Rect *)(uintptr_t)ADDR_MENU_SAVED_RECT)
+#define g_menuSprites2  ((uint8_t * *)&g_menuSprites)
+#define g_cursorSprite  (*(uint8_t * *)&g_menuSpritesEnd)
 #ifdef AM2_STANDALONE
 /* The fixed 32x32 corner of the menu surface the cursor save-under occupies
  * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
 extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #endif
-#define g_saveSlot      ((RECT *)(uintptr_t)ADDR_MENU_SAVE_SLOT)
-#define g_cursorRect    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT)
-#define g_cursorPrev    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV)
-#define g_menuSurface2  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
-#define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_clipRect      ((const RECT *)(uintptr_t)ADDR_SCREEN_CLIP)
-#define g_curX          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
-#define g_curY          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
-#define g_overlayA      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A)
-#define g_overlayB      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B)
-#define g_cursorInk    (*(int32_t *)(uintptr_t)ADDR_MENU_INK)
-#define g_overlayAInk   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)
-#define g_overlayBInk   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)
+#define g_cursorRect    ((AM2_Rect *)g_menuCursorRect)
+#define g_cursorPrev    ((AM2_Rect *)g_menuCursorPrev)
+#define g_paintObj      (*(uint8_t * *)&g_paintObject)
+#define g_clipRect      ((const RECT *)g_screenClip)
+#define g_overlayA      (*(uint8_t * *)&g_menuOverlayA)
+#define g_overlayB      (*(uint8_t * *)&g_menuOverlayB)
+#define g_cursorInk    (*(int32_t *)&g_menuInk)
+#define g_overlayAInk   (*(int32_t *)&g_menuOverlayAInk)
+#define g_overlayBInk   (*(int32_t *)&g_menuOverlayBInk)
 
-#define g_netGame       (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
-#define g_gameClockMs   (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
-#define g_menuRowStamp  (*(uint32_t *)(uintptr_t)ADDR_MENU_ROW_STAMP)
 
 /* 0x00412D30, thirty callers -- everything that highlights a menu row goes
  * through it. Choose the row whose sprites the cursor animates, and reset the
@@ -1353,16 +1313,16 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
     g_animFrame    = 0;
     g_animNext     = Ticks();
 
-    origin = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    origin = g_zeroPoint;
 
     g_overlayA    = (uint8_t *)0;
     g_overlayB    = (uint8_t *)0;
     g_cursorInk  = 0;
     g_overlayAInk = 0;
     g_overlayBInk = 0;
-    *(uint32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX    = origin;
-    *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX = origin;
-    *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX = origin;
+    *(uint32_t *)&g_menuCursorDx    = origin;
+    *(uint32_t *)&g_menuOverlayADx = origin;
+    *(uint32_t *)&g_menuOverlayBDx = origin;
 }
 
 typedef uint32_t (__cdecl *am2_ticks_fn)(void);
@@ -1422,9 +1382,9 @@ static inline void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t 
     if (!spr)
         return;
     swr32(spr, SPR_OFF_MODE) = fld;
-    x = g_curX + sfld16(cursor, SPR_OFF_OVX)
+    x = g_cursorX + sfld16(cursor, SPR_OFF_OVX)
       + *(const int16_t *)(uintptr_t)dxAddr;
-    y = g_curY + sfld16(cursor, SPR_OFF_OVY)
+    y = g_cursorY + sfld16(cursor, SPR_OFF_OVY)
       + *(const int16_t *)(uintptr_t)(dxAddr + 2);
     DrawSprite((AM2_Sprite *)spr, x, y, g_cursorInk != 0);
 }
@@ -1439,8 +1399,8 @@ void __cdecl DrawMenuCursor(void)
     TickMenuAnimation();
     row = g_menuRow;
 
-    if (g_paintObj && !g_presenting) {
-        LPDIRECTDRAWSURFACE target = g_drawTarget;
+    if (g_paintObj && !g_presentEnabled) {
+        LPDIRECTDRAWSURFACE target = (*(LPDIRECTDRAWSURFACE *)&g_drawTarget);
         AM2_Rect            cur, clipped;   /* `clipped` doubles as the shifted rect */
 
         SetDrawTarget(g_backBuffer);
@@ -1459,8 +1419,8 @@ void __cdecl DrawMenuCursor(void)
          * side-by-side, pump 104). The platform is fixed; the call is the
          * original's again. */
         if (g_savedValid)
-            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)g_savedRect,
-                                   g_menuSurface2, g_saveSlot,
+            IDirectDrawSurface_Blt((*(LPDIRECTDRAWSURFACE *)&g_drawTarget), (LPRECT)g_savedRect,
+                                   g_menuSurface, g_saveSlot,
                                    DDBLT_WAIT, NULL);
 
         {
@@ -1468,8 +1428,8 @@ void __cdecl DrawMenuCursor(void)
         }
 
         /* The sprite pointer is read again for each field. */
-        cur.left   = g_curX - sfld16(g_cursorSprite, SPR_OFF_HOTX);
-        cur.top    = g_curY - sfld16(g_cursorSprite, SPR_OFF_HOTY);
+        cur.left   = g_cursorX - sfld16(g_cursorSprite, SPR_OFF_HOTX);
+        cur.top    = g_cursorY - sfld16(g_cursorSprite, SPR_OFF_HOTY);
         cur.right  = cur.left + sfld32(g_cursorSprite, SPR_OFF_W);
         cur.bottom = cur.top  + sfld32(g_cursorSprite, SPR_OFF_H);
 
@@ -1478,13 +1438,13 @@ void __cdecl DrawMenuCursor(void)
          * other half of the round trip the restore above stretches back down.
          * Exact under centre-sampled nearest neighbour; see the restore. */
         if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
-            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_backBuffer,
+            IDirectDrawSurface_Blt(g_menuSurface, g_saveSlot, g_backBuffer,
                                    (LPRECT)&clipped, DDBLT_WAIT, NULL);
             *g_savedRect = clipped;
             g_savedValid = 1;
         }
 
-        DrawSprite((AM2_Sprite *)g_cursorSprite, g_curX, g_curY, 0);
+        DrawSprite((AM2_Sprite *)g_cursorSprite, g_cursorX, g_cursorY, 0);
         SetDrawTarget(target);
 
         /* And restore last tick's area, which the redraw above may have left
@@ -1492,7 +1452,7 @@ void __cdecl DrawMenuCursor(void)
         if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
                           g_clipRect)) {
             clipped = cur;
-            if (g_drawTarget == g_primarySurface) {
+            if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
                 /* The primary is the whole desktop when windowed, so only the
                  * DESTINATION moves; the back buffer it reads from does not. */
                 clipped.left   += g_screenRect.left;
@@ -1500,31 +1460,31 @@ void __cdecl DrawMenuCursor(void)
                 clipped.right  += g_screenRect.left;
                 clipped.bottom += g_screenRect.top;
             }
-            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)&clipped, g_backBuffer,
+            IDirectDrawSurface_Blt((*(LPDIRECTDRAWSURFACE *)&g_drawTarget), (LPRECT)&clipped, g_backBuffer,
                                    (LPRECT)&cur, DDBLT_WAIT, NULL);
         }
     } else {
         g_savedValid = 0;
 
         if (row >= MENU_ROW_DIRECT) {
-            if (!LockSurface(g_drawTarget))
+            if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
                 return;
             if (g_cursorSprite) {
                 uint8_t *spr = g_cursorSprite;
 
                 swr32(spr, SPR_OFF_MODE) = g_cursorInk;
                 DrawSprite((AM2_Sprite *)spr,
-                           g_curX + *(const int16_t *)(uintptr_t)ADDR_MENU_CURSOR_DX,
-                           g_curY + *(const int16_t *)(uintptr_t)(ADDR_MENU_CURSOR_DX + 2),
+                           g_cursorX + *(const int16_t *)&g_menuCursorDx,
+                           g_cursorY + *(const int16_t *)(uintptr_t)(((uintptr_t)&g_menuCursorDx) + 2),
                            g_cursorInk != 0);
-                DrawMenuOverlaySprite(g_overlayA, ADDR_MENU_OVERLAY_A_DX,
+                DrawMenuOverlaySprite(g_overlayA, ((uintptr_t)&g_menuOverlayADx),
                                       g_overlayAInk);
-                DrawMenuOverlaySprite(g_overlayB, ADDR_MENU_OVERLAY_B_DX,
+                DrawMenuOverlaySprite(g_overlayB, ((uintptr_t)&g_menuOverlayBDx),
                                       g_overlayBInk);
             }
             UnlockSurface();
         } else {
-            DrawSprite((AM2_Sprite *)g_cursorSprite, g_curX, g_curY, 0);
+            DrawSprite((AM2_Sprite *)g_cursorSprite, g_cursorX, g_cursorY, 0);
         }
     }
 
@@ -1537,17 +1497,17 @@ void __cdecl DrawMenuCursor(void)
         int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
         int32_t        hy = sfld16(spr, SPR_OFF_HOTY);
 
-        r = RectMake(g_curX - hx, g_curY - hy,
-                     g_curX + sfld32(spr, SPR_OFF_W) - hx,
-                     g_curY + sfld32(spr, SPR_OFF_H) - hy);
+        r = RectMake(g_cursorX - hx, g_cursorY - hy,
+                     g_cursorX + sfld32(spr, SPR_OFF_W) - hx,
+                     g_cursorY + sfld32(spr, SPR_OFF_H) - hy);
         *g_cursorRect = r;
     }
 }
 
 void __cdecl RefreshGate(int32_t enabled)
 {
-    *(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID = 0;
-    *(int32_t *)(uintptr_t)ADDR_MENU_ENABLED = enabled;
+    g_savedValid = 0;
+    g_menuEnabled = enabled;
 }
 
 void __cdecl ProgressBar(int32_t percent)
@@ -1559,8 +1519,8 @@ void __cdecl ProgressBar(int32_t percent)
     bar.right  = AM2_PROGRESS_X0 + percent * AM2_PROGRESS_WIDTH / 100;
     bar.bottom = AM2_PROGRESS_Y1;
 
-    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
-    ClearRegion(&bar, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
+    ClearRegion(&bar, g_hiliteColour);
 }
 /* 0x0041ADB0, four callers -- both state entry actions among them. Clears the
  * PRIMARY and the BACK BUFFER to ADDR_BACKGROUND_COLOUR and nothing else.
@@ -1572,7 +1532,7 @@ void __cdecl ProgressBar(int32_t percent)
  * two calls can change it, so this is transcription rather than a claim. */
 void __cdecl ClearBothSurfaces(void)
 {
-    ClearSurface(g_primarySurface, g_backgroundColour);
+    ClearSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), g_backgroundColour);
     ClearSurface(g_backBuffer, g_backgroundColour);
 }
 
@@ -1597,26 +1557,26 @@ void __cdecl ClearBothSurfaces(void)
 
 void __cdecl InitViewColourCopy(void)
 {
-    *(uint8_t *)(uintptr_t)ADDR_VIEW_COLOUR_COPY =
-        *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    g_viewColourCopy =
+        g_hiliteColour;
 }
 
 void __cdecl InitRemapIdentity(void)
 {
-    *(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY =
-        (uint8_t *)((ADDR_REMAP_IDENTITY_BUF + 3u) & ~3u);
+    g_remapIdent =
+        (uint8_t *)((((uintptr_t)g_remapIdentityBuf) + 3u) & ~3u);
 }
 
 void __cdecl InitDefaultPalette(void)
 {
-    *(void **)(uintptr_t)ADDR_DEFAULT_PALETTE =
-        (void *)((ADDR_DEFAULT_PALETTE_BUF + 3u) & ~3u);
+    g_defaultPalette =
+        (void *)((((uintptr_t)g_defaultPaletteBuf) + 3u) & ~3u);
 }
 
 void __cdecl InitRemapBright(void)
 {
-    *(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT =
-        (uint8_t *)((ADDR_REMAP_BRIGHT_BUF + 3u) & ~3u);
+    *(uint8_t * *)&g_remapBright =
+        (uint8_t *)((((uintptr_t)g_remapBrightBuf) + 3u) & ~3u);
 }
 
 /* The overlay starts out sharing the default palette. It is the only one of
@@ -1625,8 +1585,8 @@ void __cdecl InitRemapBright(void)
  * guarantees that. */
 void __cdecl InitOverlayPalette(void)
 {
-    *(void **)(uintptr_t)ADDR_OVERLAY_PALETTE =
-        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+    g_overlayPalette =
+        g_defaultPalette;
 }
 
 int surface_install(void)

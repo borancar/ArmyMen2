@@ -62,16 +62,13 @@ uint8_t am2_key_bindings[42] = {
 };
 #endif
 
-#define kBlock  ((char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)))
-#define kStrB   ((char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)))
-#define kVolZero   (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)))
-#define kVolStream (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)))
-#define kVolVoice  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)))
+#define kBlock  ((char *)(uintptr_t)((void *)&g_gameprocBlock))
+#define kStrB   ((char *)(uintptr_t)((void *)&g_gameprocStrB))
+#define kVolZero   (*(int32_t *)(uintptr_t)((void *)&g_volumeAtZero))
+#define kVolStream (*(int32_t *)(uintptr_t)((void *)&g_streamVolume))
+#define kVolVoice  (*(int32_t *)(uintptr_t)((void *)&g_voiceVolume))
 /* SaveDefaultCof's three. The first two are spelled as army.cpp spells them,
  * so checkglobals sees one name per address and not two. */
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
-#define g_levelId      (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
 
 /* The original's frame is 0x80 and holds nothing but the two stashes, at
  * +0 and +0x40 (the three volumes live in registers), so each has 64 bytes
@@ -198,7 +195,7 @@ void __cdecl LoadOptions(void)
     int32_t   i;
     int32_t   len;
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     fp = orig_fopen("Options.cfg",
                     "r");
@@ -209,40 +206,40 @@ void __cdecl LoadOptions(void)
     if (fp && orig_fseek(fp, AM2_OPTIONS_MIN_BYTES, 0) == 0) {
         orig_fseek(fp, 0, 0);
 
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
+        orig_fread((void *)&g_volumeAtZero, 4, 1, fp);
+        orig_fread((void *)&g_streamVolume, 4, 1, fp);
+        orig_fread((void *)&g_voiceVolume, 4, 1, fp);
+        orig_fread((void *)&g_movieCount, 4, 1, fp);
 
         /* Index loops, as SaveOptions': the pointer VC6 walks compares signed. */
-        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
-            orig_fread(&((uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0], 1, 1, fp);
+        for (i = 0; i < (int32_t)(((uintptr_t)g_keyBindingsEnd) - ((uintptr_t)g_keyBindings)) / 2; i++)
+            orig_fread(&((uint8_t (*)[2])((uintptr_t)g_keyBindings))[i][0], 1, 1, fp);
 
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
+        orig_fread((void *)&g_difficulty, 4, 1, fp);
+        orig_fread((void *)&g_hostMaskA, 4, 1, fp);
+        orig_fread((void *)&g_hostMaskB, 4, 1, fp);
+        orig_fread((void *)&g_hostValue3e8, 4, 1, fp);
 
         len = 0;
         orig_fread(&len, 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)), 1, (size_t)len, fp);
-        ((char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)))[len] = '\0';
+        orig_fread((void *)&g_savedPlayerName, 1, (size_t)len, fp);
+        (&g_savedPlayerName)[len] = '\0';
 
         /* Not re-zeroed: a short read here keeps the first length. */
         orig_fread(&len, 4, 1, fp);
-        orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)), 1, (size_t)len, fp);
-        ((char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)))[len] = '\0';
+        orig_fread((void *)&g_savedBattleName, 1, (size_t)len, fp);
+        (&g_savedBattleName)[len] = '\0';
 
         orig_fflush(fp);
         orig_fclose(fp);
 
         /* Migrate an old file's "quiet" to "silent". Only these three. */
-        if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) == AM2_VOLUME_SENTINEL)
-            *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = AM2_VOLUME_SILENT;
-        if (*(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) == AM2_VOLUME_SENTINEL)
-            *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) = AM2_VOLUME_SILENT;
-        if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) == AM2_VOLUME_SENTINEL)
-            *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) = AM2_VOLUME_SILENT;
+        if (g_volumeAtZero == AM2_VOLUME_SENTINEL)
+            g_volumeAtZero = AM2_VOLUME_SILENT;
+        if (g_streamVolume == AM2_VOLUME_SENTINEL)
+            g_streamVolume = AM2_VOLUME_SILENT;
+        if (g_voiceVolume == AM2_VOLUME_SENTINEL)
+            g_voiceVolume = AM2_VOLUME_SILENT;
     } else {
         /* BOTH failure exits land here, and it is not a bare return: the settings
          * are reset and the key bindings rebuilt from ADDR_KEY_DEFAULTS. The
@@ -251,14 +248,14 @@ void __cdecl LoadOptions(void)
          * each binding is restored and the alternate is left as it was. */
         orig_log("Failed to open Options.cfg for reading\n");
 
-        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = 0;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME))  = 0;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE))   = 0;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT))    = 0;
+        g_volumeAtZero = 0;
+        g_streamVolume  = 0;
+        g_voiceVolume   = 0;
+        g_movieCount    = 0;
 
-        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
-            ((uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0] =
-                ((const uint8_t *)(uintptr_t)ADDR_KEY_DEFAULTS)[i];
+        for (i = 0; i < (int32_t)(((uintptr_t)g_keyBindingsEnd) - ((uintptr_t)g_keyBindings)) / 2; i++)
+            ((uint8_t (*)[2])((uintptr_t)g_keyBindings))[i][0] =
+                (g_keyDefaults)[i];
     }
 }
 
@@ -299,37 +296,37 @@ void __cdecl SaveOptions(void)
     int32_t   i;
     int32_t   len;
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     orig_chmod("Options.cfg", AM2_CHMOD_RW);
 
     fp = orig_fopen("Options.cfg",
                     "w");
     if (fp) {
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
+        orig_fwrite((const void *)&g_volumeAtZero, 4, 1, fp);
+        orig_fwrite((const void *)&g_streamVolume, 4, 1, fp);
+        orig_fwrite((const void *)&g_voiceVolume, 4, 1, fp);
+        orig_fwrite((const void *)&g_movieCount, 4, 1, fp);
 
         /* An index loop over the scancode pairs: VC6 walks a pointer but
          * compares it signed, which is what an int index strength-reduces to. */
-        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
-            orig_fwrite(&((const uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0],
+        for (i = 0; i < (int32_t)(((uintptr_t)g_keyBindingsEnd) - ((uintptr_t)g_keyBindings)) / 2; i++)
+            orig_fwrite(&((const uint8_t (*)[2])((uintptr_t)g_keyBindings))[i][0],
                         1, 1, fp);
 
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
+        orig_fwrite((const void *)&g_difficulty, 4, 1, fp);
+        orig_fwrite((const void *)&g_hostMaskA, 4, 1, fp);
+        orig_fwrite((const void *)&g_hostMaskB, 4, 1, fp);
+        orig_fwrite((const void *)&g_hostValue3e8, 4, 1, fp);
 
-        len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)));
+        len = (int32_t)strlen(&g_savedPlayerName);
         orig_fwrite(&len, 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)),
+        orig_fwrite((const void *)&g_savedPlayerName,
                     1, (size_t)len, fp);
 
-        len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
+        len = (int32_t)strlen(&g_savedBattleName);
         orig_fwrite(&len, 4, 1, fp);
-        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)),
+        orig_fwrite((const void *)&g_savedBattleName,
                     1, (size_t)len, fp);
 
         orig_fflush(fp);
@@ -427,7 +424,7 @@ int32_t __cdecl SaveDefaultCof(void)
 
             Type238Action(obj, (g_levelId * 5 + 5) * 2);
             *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
+                *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
 
             if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
                 *(uint32_t *)(obj + OBJ_OFF_RIDING) = 0;
@@ -614,14 +611,14 @@ int32_t __cdecl SaveGame(const char *name)
     am2_FILE  *fp;
     int32_t    h;
 
-    if (!*(const char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)))
+    if (!*(const char *)(uintptr_t)((void *)&g_gameprocBlock))
         return 0;
     if (!*name)
         return 0;
 
     SetGameDir("save");
 
-    strcpy(lvl, (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+    strcpy(lvl, &g_gameprocBlock);
 
     h = orig_findfirst(lvl, fd);
     if (h == -1) {
@@ -633,7 +630,7 @@ int32_t __cdecl SaveGame(const char *name)
     }
 
     orig_sprintf(path, "save\\%s",
-                 (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+                 &g_gameprocBlock);
     SetGameDir(path);
 
     fp = orig_fopen(name, "wb");
@@ -668,7 +665,7 @@ int32_t __cdecl LoadGame(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\gameproc.cpp", 0x53D))
         goto fail;
 
-    ScriptResetTokens((AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
+    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
 
     if (!LoadGameProcSection(fp))   goto fail;
     if (!LoadMapSection(fp))        goto fail;
@@ -695,7 +692,7 @@ fail:
 typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 #define orig_strtok (*(AM2_StrtokFn)((void *)(uintptr_t)(ADDR_CRT_STRTOK)))
 #define kSep        (" \t\n;,")
-#define kGameConst  ((int32_t *)((void *)(uintptr_t)(ADDR_GAME_CONSTANTS)))
+#define kGameConst  ((int32_t *)&g_gameConstants)
 
 /* 0x00424780. The .aai handler for twenty game-constant keywords.
  *
@@ -752,9 +749,6 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
     return 0;
 }
 
-#define g_endState       (*(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE)
-#define g_gameOverSaved  ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SAVED)
-#define g_gameOverSource ((const int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)
 
 /* StateLeave lives in win32/movie.cpp -- it clears the primary surface, so it
  * cannot live in the flat half -- and this module cannot include movie.h for
@@ -789,10 +783,6 @@ void __cdecl StateLeaveAlias(void)
     StateLeave();
 }
 
-#define g_statePending (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)
-#define g_stateWanted  (*(int32_t *)(uintptr_t)ADDR_STATE_WANTED)
-#define g_gameState    (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
-#define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 
 void __cdecl RequestState(int32_t state)
 {
@@ -834,12 +824,12 @@ void __cdecl CommitState(void)
  * attribute rather than leaving as a suspicion. */
 void __cdecl ShowInfoMp(void)
 {
-    int32_t *on = (int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON;
+    int32_t *on = &g_infoOverlayOn;
 
     *on = (*on == 0) ? 1 : 0;
 }
 
-#define kItemHeaderSize (*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE)
+#define kItemHeaderSize (g_itemHeaderSize)
 
 typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
 
@@ -933,7 +923,6 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
  */
 /* Reconstructed in item.cpp, declared there rather than in item.h. */
 void __cdecl SelectInventorySlot(void *unit, int32_t slot);
-#define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
 
 /* The kind a scenario row's KIND field selects, for the five it names. Read
  * out of the image's own jump table at 0x0043E130 rather than off the arms:
@@ -981,14 +970,14 @@ static inline int32_t ScenRowWeapon(int32_t kind)
  * time. */
 int32_t __cdecl PlaceScenario(void)
 {
-    uint8_t *scen = *(uint8_t **)(uintptr_t)ADDR_SCENARIOS;
+    uint8_t *scen = g_scenarios;
     int32_t  slot;
 
     if (!scen)
         return 0;
 
     /* The comm object is read afresh at each use. */
-#define comm (*(void **)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (*(void * *)&g_commObject)
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
         uint8_t *part = scen + SCENARIO_OFF_PARTS
                       + (size_t)slot * SCENARIO_PART_BYTES;
@@ -997,7 +986,7 @@ int32_t __cdecl PlaceScenario(void)
         int32_t  army;
         int32_t  i;
 
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+        if (g_mpSession != 0
             && !CommWasHereForArmy(comm, slot))
             continue;
 
@@ -1031,22 +1020,22 @@ int32_t __cdecl PlaceScenario(void)
             flags = 0;
             if (!*(const uint8_t *)(row + SCEN_ROW_OFF_FLAG))
                 flags = 4;
-            if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF
+            if (g_haveDefaultCof
                 && (uint32_t)army == g_defaultOwner) {
                 if (kind == AM2_SCEN_KIND_LEADER) {
                     uint8_t amt;
 
                     (void)LookupOwnerObj(g_defaultOwner);
-                    *(int16_t *)(uintptr_t)ADDR_LEADER_POS =
+                    *(int16_t *)&g_leaderPos =
                         *(const int16_t *)(row + SCEN_ROW_OFF_POS);
-                    *(int16_t *)((uintptr_t)ADDR_LEADER_POS + 2) =
+                    *(int16_t *)(((uintptr_t)&g_leaderPos) + 2) =
                         *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
                     amt = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
-                    *(uint8_t *)(uintptr_t)ADDR_LEADER_FACING =
+                    g_leaderFacing =
                         amt < 1 ? 1 : amt;
-                    *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD = 1;
-                    *(uint32_t *)(uintptr_t)ADDR_VIEW_TARGET =
-                        *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+                    g_viewHold = 1;
+                    g_viewTarget =
+                        g_leaderPos;
                 }
                 continue;
             }
@@ -1080,10 +1069,10 @@ int32_t __cdecl PlaceScenario(void)
             *(unit + OBJ_OFF_FACING_COPY) = (uint8_t)amount;
 
             if (kind == AM2_SCEN_KIND_LEADER) {
-                void *w = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                void *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, 9, 0),
-                                       *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                                       g_zeroPoint,
                                        4, -1, 1, 0);
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
@@ -1093,24 +1082,24 @@ int32_t __cdecl PlaceScenario(void)
 
                 if ((uint32_t)army == g_defaultOwner) {
                     g_ourLeaderUid = *(const uint32_t *)(unit + OBJ_OFF_UID);
-                    *(int16_t *)(uintptr_t)ADDR_LEADER_POS =
+                    *(int16_t *)&g_leaderPos =
                         *(const int16_t *)(row + SCEN_ROW_OFF_POS);
-                    *(int16_t *)((uintptr_t)ADDR_LEADER_POS + 2) =
+                    *(int16_t *)(((uintptr_t)&g_leaderPos) + 2) =
                         *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
-                    *(uint8_t *)(uintptr_t)ADDR_LEADER_FACING =
+                    g_leaderFacing =
                         *(const uint8_t *)(unit + OBJ_OFF_FACING);
                     DeselectAll();
                     SelectUnit(unit);
-                    *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD   = 1;
-                    *(uint32_t *)(uintptr_t)ADDR_VIEW_TARGET =
-                        *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+                    g_viewHold   = 1;
+                    g_viewTarget =
+                        g_leaderPos;
                 }
                 SelectInventorySlot(unit, 0);
             } else {
-                void *w = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                void *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, ScenRowWeapon(kind), 0),
-                                       *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                                       g_zeroPoint,
                                        4, -1, 1, 0);
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
@@ -1121,7 +1110,7 @@ int32_t __cdecl PlaceScenario(void)
         }
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF == 0)
+    if (g_haveDefaultCof == 0)
         return 1;
 
     /* The .cof pass: put the leader where the save says, then form up on it. */
@@ -1134,16 +1123,16 @@ int32_t __cdecl PlaceScenario(void)
             return 1;
 
         *(uint32_t *)(lead + OBJ_OFF_POS) =
-            *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+            g_leaderPos;
         *(uint8_t *)(lead + OBJ_OFF_FACING) =
-            *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
+            g_leaderFacing;
         ObjTileChanged(lead, 0, 0);
         SetUnitPose(lead, 1);
         DeselectAll();
         SelectUnit(lead);
 
         for (i = 0; ; ) {
-            uint8_t **list = ((uint8_t ***)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+            uint8_t **list = ((uint8_t ** *)g_armyObjLists)
                                  [g_defaultOwner];
             uint8_t  *obj;
 
@@ -1165,7 +1154,7 @@ int32_t __cdecl PlaceScenario(void)
                 && ObjIsTypeIn238((const AM2_Object *)obj)
                 && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0) {
                 *(uint32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
-                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                    g_zeroPoint;
                 if (*(const int32_t *)obj == 2
                     && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
                     AM2_Point p;
@@ -1174,7 +1163,7 @@ int32_t __cdecl PlaceScenario(void)
                     /* The point is copied as one dword. */
                     *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
                     *(uint8_t *)(obj + OBJ_OFF_FACING) =
-                        *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
+                        g_leaderFacing;
                     ObjTileChanged(obj, 0, 0);
                     SetUnitPose(obj, 1);
                     formed++;
@@ -1191,49 +1180,49 @@ int32_t __cdecl PlaceScenario(void)
 
 void __cdecl ResetLevelState(void)
 {
-    int32_t  *matrix = (int32_t *)(uintptr_t)ADDR_ALLY_MATRIX;
+    int32_t  *matrix = g_allyMatrix;
     uint8_t  *comm;
     int32_t   i, j;
 
-    *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
-    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP      = 1;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET    = 1;
+    g_levelFlagE30 = 1;
+    g_viewSnap      = 1;
+    g_objCtxSet    = 1;
 
-    *(int32_t *)(uintptr_t)ADDR_NEXT_UID          = 0x186A0;
-    *(int32_t *)(uintptr_t)ADDR_PAD_COUNT         = 0;
-    *(int32_t *)(uintptr_t)ADDR_CLOCK_BASE_MS     = 0;
-    *(int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS     = 0;
-    *(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS    = 0;
-    *(int32_t *)(uintptr_t)ADDR_LAST_TICK_MS      = 0;
-    *(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID      = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A     = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL       = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV  = 0;
-    *(int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG     = 0;
+    g_nextUid          = 0x186A0;
+    g_padCount         = 0;
+    g_clockBaseMs     = 0;
+    *(int32_t *)&g_gameClockMs     = 0;
+    g_frameDeltaMs    = 0;
+    *(int32_t *)&g_lastTickMs      = 0;
+    g_evtId15Uid      = 0;
+    g_objCtxValA     = 0;
+    g_objCtxVal       = 0;
+    g_objCtxValPrev  = 0;
+    g_evtId15Flag     = 0;
 
-    *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS =
-        *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY * AM2_TICK_PER_STEP
+    g_tickIntervalMs =
+        g_difficulty * AM2_TICK_PER_STEP
         + AM2_TICK_BASE_MS;
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
-        *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS = AM2_TICK_NET_MS;
-    *(int32_t *)(uintptr_t)ADDR_SECOND_DEADLINE =
-        *(const int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS;
+    if (g_mpSession != 0)
+        g_tickIntervalMs = AM2_TICK_NET_MS;
+    g_secondDeadline =
+        g_tickIntervalMs;
 
-    *(int32_t *)(uintptr_t)ADDR_OUR_LEADER_UID   = 0;
-    *(int32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID  = 0;
-    *(int32_t *)(uintptr_t)ADDR_WEAPON_SLOT      = 0;
-    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS   = 0;
+    *(int32_t *)&g_ourLeaderUid   = 0;
+    *(int32_t *)&g_weaponOwnerId  = 0;
+    g_weaponSlot      = 0;
+    g_inputSuppress   = 0;
 
-    ClearPtrList((void *)(uintptr_t)ADDR_SELECTED_UIDS);
+    ClearPtrList(g_selectedUids);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
-        *(int32_t *)(uintptr_t)ADDR_NET_GAME = 0;
+    if (g_mpSession == 0)
+        g_netGame = 0;
 
     for (i = 0; i < AM2_COMM_PLAYERS; i++)
         for (j = 0; j < AM2_COMM_PLAYERS; j++)
             matrix[i * AM2_COMM_PLAYERS + j] = (i == j) ? 1 : 0;
 
-    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    comm = g_commObject;
 
     for (i = 0; i < AM2_COMM_PLAYERS; i++) {
         const uint8_t *a = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
@@ -1258,8 +1247,8 @@ void __cdecl ResetLevelState(void)
         }
     }
 
-    *(int32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE   = 0;
-    *(int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE  = 0;
+    g_throttleDeadline   = 0;
+    g_invulnerable  = 0;
 }
 
 /* TimedDirFrame is reconstructed now; maprow.h declares it. */
@@ -1344,20 +1333,20 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     }
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
-    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+    ObjInitCommon(o, g_dirScratch,
                   AM2_OBJ_TYPE_MISSILE, at,
-                  (const int32_t *)((void *)(uintptr_t)(ADDR_MISSILE_BOX)),
+                  g_missileBox,
                   initUnused, uid);
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
+                g_missileRowSpec,
                 (int16_t)at, ((const AM2_Point *)&at)->y,
-                (const void *)(uintptr_t)ADDR_ZERO_RECT);
+                g_zeroRect);
 
     *(int32_t *)(o + MISSILE_OFF_GROUND) = a5;
     *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)a5;
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        g_gameClockMs;
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = *(const int32_t *)(b + OBJ_OFF_FIELD_44);
 
     {
@@ -1387,7 +1376,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                           (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
         *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
         *(uint32_t *)(rows + ROW_OFF_STAMP_54) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
         TimedDirFrame(rows, heading);
 
         if (*(const uint32_t *)(w + MISSILE_OFF_LAST_UID)) {
@@ -1396,7 +1385,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                             (w + MISSILE_OFF_LAST_UID));
 
             if (prev
-                && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                && g_gameClockMs
                    - *(const uint32_t *)
                        (*(const uint8_t *const *)(prev + OBJ_OFF_ROWS)
                         + ROW_OFF_STAMP_54) < AM2_FRAME_PERIOD_MS)
@@ -1410,7 +1399,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     }
 
     *(const void **)(rows + ROW_OFF_ANIM_CUR) =
-        (const void *)(uintptr_t)ADDR_MISSILE_ANIMS;
+        g_missileAnims;
     *(int16_t *)(rows + ROW_OFF_FIELD_26) =
         (int16_t)(ScaleBy32Blocks(*(const int16_t *)
                       (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
@@ -1459,17 +1448,17 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
 
-    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+    ObjInitCommon(o, g_dirScratch,
                          AM2_OBJ_TYPE_MISSILE,
                          *(const uint32_t *)(h + OBJ_OFF_POS),
-                         (const int32_t *)((void *)(uintptr_t)(ADDR_MISSILE_BOX)),
+                         g_missileBox,
                          1, *(const int32_t *)(h + 4));
 
-    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o, h, (size_t)g_itemHeaderSize);
 
     orig_fread(&def, 4, 1, fp);
     *(const void **)(o + OBJ_OFF_FIELD_94) =
-        (const uint8_t *)(uintptr_t)ADDR_MISSILE_DEFS
+        g_missileDefs
         + def * AM2_MISSILE_DEF_BYTES;
 
     orig_fread(o + OBJ_OFF_RANK, 4, 1, fp);
@@ -1488,15 +1477,15 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
     }
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
+                g_missileRowSpec,
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
-                (const void *)(uintptr_t)ADDR_ZERO_RECT);
+                g_zeroRect);
 
     /* The row pointer is re-read at every use. */
 #define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
     *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
-        (const void *)(uintptr_t)ADDR_MISSILE_ANIMS;
+        g_missileAnims;
     *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
     *(uint8_t *)(ROWS + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
 
@@ -1557,14 +1546,14 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
     o = (uint8_t *)CreateRoach(
             *(const int32_t *)(rec + 0x498),
-            (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+            g_dirScratch,
             *(const int16_t *)(h + OBJ_OFF_POS),
             *(const int16_t *)(h + OBJ_OFF_POS + 2),
             *(const int8_t *)(h + OBJ_OFF_ARMY),
             *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
             *(const int32_t *)(h + 4));
 
-    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o, h, (size_t)g_itemHeaderSize);
     memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
@@ -1572,7 +1561,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_HEALTH)));
+        SetMaxHealth(o, g_roachHealth);
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
@@ -1657,7 +1646,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 
     if (renumber) {
         o = (uint8_t *)CreateTrooper(
-                (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+                g_dirScratch,
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
@@ -1674,7 +1663,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4DC) = 0;
     } else {
         o = (uint8_t *)CreateTrooper(
-                (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+                g_dirScratch,
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
@@ -1683,7 +1672,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
                 *(const uint32_t *)(h + 4), 0, 0);
     }
 
-    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o, h, (size_t)g_itemHeaderSize);
     memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE2_RECORD_SIZE);
 
     if (!(*(const uint32_t *)(h + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)) {
@@ -1707,8 +1696,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
-                                           ((void *)(uintptr_t)(ADDR_RANK_RECORDS))
+        SetMaxHealth(o, *(const int32_t *)(g_rankRecords
                                            + (uintptr_t)rank * RANK_REC_BYTES
                                            + RANK_REC_OFF_MAX_HEALTH));
 
@@ -1719,7 +1707,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     }
 
     *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_KIND) =
-        (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        g_objTableRecords
         + *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT) * AM2_OBJ_TABLE_REC_SIZE;
 
     memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
@@ -1783,7 +1771,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     memset((void *)&obj.list, 0, sizeof obj.list);
 
     if (*(const int32_t *)(o + OBJ_OFF_SARGE))
-        *(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID =
+        g_ourLeaderUid =
             *(const uint32_t *)(o + 4);
 
     ResetObjOnCof(o);
@@ -1863,7 +1851,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
     o = (uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
-                                 (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
+                                 g_dirScratch,
                                  *(const int16_t *)(h + OBJ_OFF_POS),
                                  *(const int16_t *)(h + OBJ_OFF_POS + 2),
                                  *(const int32_t *)(rec + TYPE3_REC_OFF_SLOT),
@@ -1871,7 +1859,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
                                  *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
                                  *(const int32_t *)(h + 4), 0);
 
-    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o, h, (size_t)g_itemHeaderSize);
 
     ClearPtrList(o + OBJ_OFF_PTR_LIST);
     ClearPtrList(o + VEHICLE_OFF_PTR_LIST);
@@ -1879,7 +1867,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
 
     *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_SLOT) =
-        (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        g_objTableRecords
         + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
            * AM2_OBJ_TABLE_REC_SIZE);
     *(int32_t *)(o + OBJ_OFF_RANK) = AM2_TYPE3_LOAD_RANK;
@@ -1993,7 +1981,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     orig_fread(&tag, 4, 1, fp);
 
     obj = (uint8_t *)CreateItem(
-        (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL,
+        g_dirScratch, AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         *(const AM2_Point *)((const uint8_t *)hdr + OBJ_OFF_POS),
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,
@@ -2082,7 +2070,7 @@ int32_t __cdecl SaveType2(am2_FILE *fp, void *obj)
     rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC2);
     if (rec)
         *(int32_t *)(o + SAVED_OFF_TABLE_REC2) =
-            (int32_t)(((uint32_t)rec - ADDR_OBJ_TABLE_RECORDS) >> 8);
+            (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
     orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE2_RECORD_SIZE, 1, fp);
 
@@ -2115,7 +2103,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
     rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC3);
     if (rec)
         *(int32_t *)(o + SAVED_OFF_TABLE_REC3) =
-            (int32_t)(((uint32_t)rec - ADDR_OBJ_TABLE_RECORDS) >> 8);
+            (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
     orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
@@ -2422,9 +2410,6 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
 
 /* ---------------------------------------------- the uid remap table ---- */
 
-#define g_uidRemapCap   (*(int32_t *)(uintptr_t)ADDR_UID_REMAP_CAP)
-#define g_uidRemapCount (*(int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT)
-#define g_uidRemap      (*(uint32_t **)(uintptr_t)ADDR_UID_REMAP)
 
 /* 0x00427650 and 0x00427680, two callers each: the two halves of a growable
  * array of (from, to) uid pairs.
@@ -2475,7 +2460,7 @@ void __cdecl UidRemapClear(void)
 
     /* {cap, count, table}: one 12-byte clear, as the image's single
      * zeroed register stored three times says. */
-    memset((void *)(uintptr_t)ADDR_UID_REMAP_CAP, 0, 12);
+    memset((void *)&g_uidRemapCap, 0, 12);
 }
 
 void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
@@ -2539,7 +2524,7 @@ extern "C" void __cdecl BuildRemapTables(void);
  * first thing to go wrong if something starts reading it. */
 void __cdecl ZeroUnread50C34C(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_UNREAD_50C34C = 0;
+    g_unread50c34c = 0;
 }
 
 /* 0x00402670. Its answer is always 0 and its one caller ignores it, so the
@@ -2547,7 +2532,7 @@ void __cdecl ZeroUnread50C34C(void)
 int32_t __cdecl NoteKind31(void *rec)
 {
     if (**(const int32_t *const *)((const uint8_t *)rec + 0x20) == AM2_KIND_31)
-        *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+        *(int32_t *)(g_commObject
                      + COMM_OFF_SAW_KIND_31) = 1;
 
     return 0;
@@ -2633,7 +2618,7 @@ void __cdecl InitArmyObjLists(void)
     void **slot;
     int32_t i;
 
-    slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
+    slot = g_armyObjLists;
     for (i = 0; i < AM2_COMM_SLOTS; i++)
         slot[i] = new AM2_PtrList;
 }
@@ -2643,7 +2628,7 @@ void __cdecl FreeArmyObjLists(void)
     void **slot;
     int32_t i;
 
-    slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
+    slot = g_armyObjLists;
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         void *list = slot[i];
 
@@ -2751,7 +2736,7 @@ void *__cdecl WalkCellWrapper(void *unused, uint32_t at)
 
     /* The callback is ours now, so it goes in by NAME. It used to be handed
      * over by address, as a typed function pointer rather than a void *. */
-    return WalkCellAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+    return WalkCellAtPoint(&at, g_objMapDesc,
                            WalkCellKeepEnemy);
 }
 
@@ -2762,12 +2747,12 @@ void *__cdecl WalkCellWrapper(void *unused, uint32_t at)
  * the reset rather than an unrelated three-global write. */
 void __cdecl ResetHostState(void)
 {
-    ResetPairMask((uint32_t *)(uintptr_t)ADDR_HOST_MASK_A,
-                  (uint32_t *)(uintptr_t)ADDR_HOST_MASK_B);
+    ResetPairMask(&g_hostMaskA,
+                  &g_hostMaskB);
 
-    *(int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8 = 1000;
-    *(char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME = '\0';
-    *(char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME = '\0';
+    g_hostValue3e8 = 1000;
+    g_savedPlayerName = '\0';
+    g_savedBattleName = '\0';
 }
 
 /* OpenSaveForLoad -- original 0x00425950, one caller.
@@ -2812,16 +2797,16 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
     char      path[AM2_SAVE_PATH_BYTES];
     am2_FILE *fp;
 
-    if (!*(const char *)(uintptr_t)ADDR_GAMEPROC_STR_B)
+    if (!g_gameprocStrB)
         return (am2_FILE *)0;
-    if (!*(const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+    if (!g_gameprocBlock)
         return (am2_FILE *)0;
 
     am2_sprintf(path, "save\\%s",
-                 (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+                 &g_gameprocBlock);
     SetGameDir(path);
 
-    fp = orig_fopen((const char *)(uintptr_t)ADDR_GAMEPROC_STR_B,
+    fp = orig_fopen(&g_gameprocStrB,
                     "rb");
     if (fp) {
         if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
@@ -2875,12 +2860,12 @@ void __attribute__((thiscall)) AM2_SelList::SelListDestruct()
  * mentioned. */
 void *__cdecl SelListConstructThunk(void)
 {
-    return SelListConstruct((void *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+    return SelListConstruct((void *)&g_gameprocBlock);
 }
 
 void __cdecl SelListDestructThunk(void)
 {
-    SelListDestruct((void *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+    SelListDestruct((void *)&g_gameprocBlock);
 }
 
 /* 0x004248B0. Hands the destructor thunk to the CRT's atexit and returns its
@@ -2932,13 +2917,13 @@ int32_t __cdecl SelListInit(void)
  * not overlap. */
 void __cdecl InitStartupColours(void)
 {
-    uint8_t *out = (uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS;
+    uint8_t *out = g_startupColours;
 
-    out[0] = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-    out[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
-    out[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BLUE;
-    out[3] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
-    out[4] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+    out[0] = g_hiliteColour;
+    out[1] = g_colourLagMid;
+    out[2] = g_colourBlue;
+    out[3] = g_colourStale;
+    out[4] = g_hudColour;
 }
 
 
@@ -2956,12 +2941,12 @@ void __cdecl InitStartupColours(void)
  * had a habit rather than a slip. */
 void __cdecl InitStartupColoursB(void)
 {
-    uint8_t *out = (uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS_B;
+    uint8_t *out = g_startupColoursB;
 
-    out[0] = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-    out[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
-    out[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
-    out[3] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+    out[0] = g_hiliteColour;
+    out[1] = g_colourLagMid;
+    out[2] = g_colourNoMap;
+    out[3] = g_hudColour;
 }
 
 void gameproc_install(void)
@@ -3130,7 +3115,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
 
     if (renumber) {
         w = (uint8_t *)CreateWeapon(
-                (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL, aai,
+                g_dirScratch, AM2_ARMY_NEUTRAL, aai,
                 *(const int32_t *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1, 0);
@@ -3139,7 +3124,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
         *(uint32_t *)(h + OBJ_OFF_UID) = *(const uint32_t *)(w + OBJ_OFF_UID);
     } else {
         w = (uint8_t *)CreateWeapon(
-                (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL, aai,
+                g_dirScratch, AM2_ARMY_NEUTRAL, aai,
                 *(const int32_t *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1,
@@ -3147,7 +3132,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
     }
 
     ownRec = *(void **)(w + OBJ_OFF_FIELD_94);
-    memcpy(w, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(w, h, (size_t)g_itemHeaderSize);
     memcpy(w + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE1_RECORD_SIZE);
     *(void **)(w + OBJ_OFF_FIELD_94) = ownRec;
 

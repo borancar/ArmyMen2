@@ -22,11 +22,6 @@ extern "C" const char *const am2_vehicle_names[6] = {   /* 0x0048BE50 */
 };
 #endif
 
-#define g_allyMatrix   ((int32_t *)(uintptr_t)ADDR_ALLY_MATRIX)
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_mpSession    (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
-#define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
-#define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 
 
 /* Reached by offset rather than through a struct, as item.cpp does: only a
@@ -130,13 +125,9 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
     }
 }
 
-#define g_difficulty     (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)
-#define g_levelAttempt   (*(const int32_t *)(uintptr_t)ADDR_LEVEL_ATTEMPT)
 /* Both constants come out of the image rather than being written here: same
  * bits, and nothing to mistype. The table is FLOATS and the share is a
  * DOUBLE, which is what `fmul dword` and `fmul qword` say. */
-#define g_difficultyScale ((const float *)((void *)(uintptr_t)(ADDR_DIFFICULTY_SCALE)))
-#define g_enemyHealthShare (*(const double *)((void *)(uintptr_t)(ADDR_ENEMY_HEALTH_SHARE)))
 
 void __cdecl SetMaxHealth(void *obj, int32_t amount)
 {
@@ -258,7 +249,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
     if (!vehicle)
         return 0;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               *(const int8_t *)(v + OBJ_OFF_ARMY)))
         return 0;
@@ -429,7 +420,7 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
 
     /* The kind-7 pair rule, then ArmyAlliedWithObj's body with the army
      * taken from the first object; every "allied" exit shares one return. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && ObjIsType2Inline(a)
         && *(const int32_t *)(oa + OBJ_OFF_SOLDIER_KIND) == 7) {
         if (ObjIsType2Inline(b)
@@ -445,7 +436,7 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
         goto allied;
 
     if (ObjIsType2Inline(b)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
             return 0;
 
@@ -454,23 +445,23 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
               ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
-        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)((*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
+                + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
                                  ->CommArmyOfSlot(army) << 8)) == rec)
             goto allied;
 
-        if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+        if (rec == g_objTableRecords)
             idx = 0;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x100))
             idx = 1;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x200))
             idx = 2;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x300))
             idx = 3;
         else
             return 0;
 
-        if (AllyFlag(army, (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if (AllyFlag(army, (*(AM2_Comm *const *)&g_commObject)
                                ->CommSlotForArmy(idx)))
             goto allied;
     }
@@ -573,7 +564,7 @@ void __cdecl ObjAttachTo(void *subject, void *target)
          * expanded in place. The session flag is ADDR_MP_SESSION, NOT the comm
          * object -- an earlier draft read them as one, and no A/B could have seen
          * it: the flag is 0 on every drive this project has. */
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && ObjIsType2Inline(s)
             && *(const int32_t *)(s + OBJ_OFF_SOLDIER_KIND) == 7) {
             if (ObjIsType2Inline(t)
@@ -658,7 +649,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
         goto allied;
 
     if (ObjIsType2Inline(b)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
             return 0;
 
@@ -667,23 +658,23 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
               ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
-        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)((*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
+                + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
                                  ->CommArmyOfSlot(army) << 8)) == rec)
             goto allied;
 
-        if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+        if (rec == g_objTableRecords)
             idx = 0;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x100))
             idx = 1;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x200))
             idx = 2;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x300))
             idx = 3;
         else
             return 0;
 
-        if (AllyFlag(army, (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if (AllyFlag(army, (*(AM2_Comm *const *)&g_commObject)
                                ->CommSlotForArmy(idx)))
             goto allied;
     }
@@ -728,13 +719,13 @@ int32_t __cdecl ObjIsOurs(void *obj, int32_t allies)
     int32_t  army;
     int32_t  mine;
 
-    if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
+    if (*(void *const *)&g_mpSession
         && ObjIsType2((const AM2_Object *)o)
         && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
         return 0;
 
     army = *(const int8_t *)(o + OBJ_OFF_ARMY);
-    mine = (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    mine = (int32_t)g_defaultOwner;
 
     if (army == mine)
         return 1;
@@ -879,7 +870,7 @@ int army_install(void)
 const char *__cdecl VehicleKindName(const void *vehicle)
 {
     const char *const *names =
-        (const char *const *)((void *)(uintptr_t)(ADDR_VEHICLE_NAMES));
+        g_vehicleNames;
 
     if (vehicle == 0)
         return names[AM2_VEHICLE_NAME_UNKNOWN];

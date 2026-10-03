@@ -35,7 +35,7 @@
  * incremented the count, so the one being built is the last. */
 static inline AM2_ObjScript *ScriptCurrentObj(void)
 {
-    return &kObjScripts[*(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT))
+    return &kObjScripts[g_currentObjScript
                         - 1];
 }
 
@@ -235,7 +235,7 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
 static inline void ScriptAttachTo(uint8_t *obj)
 {
     *(int32_t *)(obj + AM2_OBJ_SCRIPT) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT));
+        g_currentObjScript;
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_PC) = 0;
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_WAIT) = -1;
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_STATE) = 0;
@@ -338,7 +338,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
  * frame. This comment used to say the opposite -- "It is NOT a clock, probed
  * at 500 for twelve seconds of play" -- on a probe taken with a dialog up,
  * which pauses it. See ADDR_GAME_CLOCK_MS in orig.h. */
-#define kScriptTiming (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
+#define kScriptTiming (g_gameClockMs)
 
 /* SetObjScriptState -- original 0x004372A0, one caller, which is
  * RunScriptAction: the `setobjstate` action. It names itself twice, in two
@@ -642,7 +642,7 @@ void __cdecl FreeObjScripts(void)
  * against it. Reproduced; no name in a shipped script comes close. */
 int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 {
-    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT));
+    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)g_scriptContext;
     char           buf[2048];
     int32_t        n;
     int32_t        i, j, k, m;
@@ -777,8 +777,8 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
 
     if (byName) {
 #define SCRIPT_NAME(i) ((*(const AM2_ScriptName *const *) \
-                         ((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))[i])
-        if (sel >= 0 && sel < *(const int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT))) {
+                         ((void *)&g_scriptNames))[i])
+        if (sel >= 0 && sel < g_scriptNameCount) {
             if (SCRIPT_NAME(sel).type == AM2_NAME_TYPE_REF
                 && SCRIPT_NAME(sel).value == (int32_t)((const AM2_Object *)obj)->uid)
                 return 1;
@@ -803,7 +803,7 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
 
     if ((sel & AM2_SEL_ARMY_LOCAL)
         && *(const int8_t *)(o + OBJ_OFF_ARMY)
-           != *(const int32_t *)((void *)(uintptr_t)(ADDR_DEFAULT_OWNER)))
+           != *(const int32_t *)&g_defaultOwner)
         return 0;
     if ((sel & AM2_SEL_ARMY_1) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 1)
         return 0;

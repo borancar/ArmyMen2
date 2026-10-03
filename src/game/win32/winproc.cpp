@@ -92,21 +92,13 @@ static_assert((RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN |
 static_assert(WA_INACTIVE == 0, "WA_INACTIVE");
 static_assert(sizeof(PAINTSTRUCT) == 64, "the 0x40 bytes of frame it reserves");
 
-#define g_hWnd        (*(HWND *)(uintptr_t)ADDR_HWND)
-#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_screenRect  (*(AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)
-#define g_windowed    (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
-#define g_lastMessage (*(const uint32_t *)(uintptr_t)ADDR_LAST_MESSAGE)
-#define g_appActive   (*(int32_t *)(uintptr_t)ADDR_APP_ACTIVE)
-#define g_gameState   (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
-#define g_stateArg    (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG)
+#define g_hWnd        (*(HWND *)&g_enumContext)
 
 /* 0x0065A058, the screen object: its vtable's slot 1 paints a rectangle
  * (thiscall, the RECT by value) and slot 2 updates. Both are called through
  * misc.h's ObjVPaint / ObjVUpdate. */
 #define PAINT_OFF_DAMAGE 0x14u
 typedef struct { void *const *slots; } AM2_PaintObject;
-#define g_paintObject (*(AM2_PaintObject **)(uintptr_t)ADDR_PAINT_OBJECT)
 
 /* 0x00486550. Records of three dwords, the first a function to run for the
  * current state. Indexed by whatever 0x0042E5D0 answers. */
@@ -114,11 +106,9 @@ typedef void (__cdecl *am2_state_fn)(void);
 /* AM2_StateAction is orig.h's, so frame.cpp and this file share one layout.
  * It used to be based one column late here -- see ADDR_STATE_ACTIONS -- which
  * read correctly only because `fn` was the single field anything touched. */
-#define g_stateActions ((const AM2_StateAction *)(uintptr_t)ADDR_STATE_ACTIONS)
 
 /* 0x005125B8. Null until the game installs a keyboard consumer. */
 typedef void (__cdecl *am2_char_fn)(uint32_t ch, uint32_t lo, uint32_t hi);
-#define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
 
 typedef void    (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_int_fn)(void);
@@ -142,21 +132,12 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
  * both post it -- so it is the only one the ordinary A/B covers. The other
  * five need a live DirectPlay session with a second player.
  */
-#define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
 /* The multiplayer-session flag, and it is spelled that way here because that
  * is what it IS -- OnHostChanged writing 1 into it is not a second meaning,
  * it is a machine that has just become the host asserting there is a session.
  * It was g_hostChanged, which read as a different global; commmsg.cpp's
  * CommMustBroadcast needed the same address under the honest name and
  * checkglobals refused to let both exist. */
-#define g_mpSession    (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
-#define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
-#define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
-#define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
-#define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
-#define g_overlayDirty (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
-#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 
 typedef void    (__attribute__((thiscall)) *am2_comm_void_fn)(void *comm);
 typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
@@ -240,15 +221,15 @@ AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
                 SendPlayerMsg(1);
         }
 
-        if (g_paintObject) {
+        if ((*(AM2_PaintObject * *)&g_paintObject)) {
             /* Slot 2 (update) then slot 1 (paint the damage rectangle), both
              * thiscall on the object, which the original re-reads from the
              * global for the second (`mov ecx, [0x0065A058]` at 0x0040AC73).
              * The paint was once called with no `this` at all, from a reading
              * that missed that load. */
-            ObjVUpdate(g_paintObject);
+            ObjVUpdate((*(AM2_PaintObject * *)&g_paintObject));
             {
-                uint8_t *obj = (uint8_t *)g_paintObject;
+                uint8_t *obj = (uint8_t *)(*(AM2_PaintObject * *)&g_paintObject);
 
                 ObjVPaint(obj, *(const AM2_Rect *)(obj + PAINT_OFF_DAMAGE));
             }
@@ -386,7 +367,7 @@ static inline LRESULT OnPaint(void)
 
     BeginPaint(g_hWnd, &ps);
     /* thiscall on the screen object (`mov ecx, [0x0065A058]` at 0x0040A86B). */
-    ObjVPaint(g_paintObject, *(const AM2_Rect *)&damage);
+    ObjVPaint((*(AM2_PaintObject * *)&g_paintObject), *(const AM2_Rect *)&damage);
     EndPaint(g_hWnd, &ps);
     return 0;
 }
@@ -416,7 +397,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_PAINT:
-        if (!g_ddraw || !g_paintObject)
+        if (!g_ddraw || !(*(AM2_PaintObject * *)&g_paintObject))
             break;
         return OnPaint();
 
@@ -425,9 +406,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
          * arriving twice for one keystroke is recognised and dropped. */
         if (g_lastMessage == uMsg)
             return 0;
-        if (!g_charHandler)
+        if (!(*(am2_char_fn *)&g_charHandler))
             break;
-        g_charHandler((uint32_t)wParam, (uint32_t)lParam & 0xFFFFu,
+        (*(am2_char_fn *)&g_charHandler)((uint32_t)wParam, (uint32_t)lParam & 0xFFFFu,
                       (uint32_t)lParam >> 16);
         return 0;
 

@@ -33,9 +33,7 @@
 
 static_assert(WM_CLOSE == 0x10, "WM_CLOSE");
 
-#define g_hWnd      (*(HWND *)(uintptr_t)ADDR_HWND)
-#define g_errorText ((char *)(uintptr_t)ADDR_ERROR_TEXT)
-#define g_errorTextDD ((char *)(uintptr_t)ADDR_ERROR_TEXT_DD)
+#define g_hWnd      (*(HWND *)&g_enumContext)
 
 /* The game's CRT, not ours -- see the note above. */
 typedef int32_t (__cdecl *am2_vsprintf_fn)(char *buf, const char *fmt, va_list ap);

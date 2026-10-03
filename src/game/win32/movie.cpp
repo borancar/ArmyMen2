@@ -111,15 +111,15 @@ typedef void (__stdcall *am2_smack_tobuffer_fn)(void *smack, uint32_t left,
                                                 uint32_t flags);
 typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlags,
                                                  uint32_t volume, uint32_t pan);
-#define smack_close     (*(am2_smack_close_fn *)(uintptr_t)ADDR_IAT_SMACK_CLOSE)
-#define smack_volumepan (*(am2_smack_volumepan_fn *)(uintptr_t)ADDR_IAT_SMACK_VOLUMEPAN)
-#define smack_tobuffer  (*(am2_smack_tobuffer_fn *)(uintptr_t)ADDR_IAT_SMACK_TO_BUFFER)
-#define smack_doframe   (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_DO_FRAME)
-#define smack_nextframe (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_NEXT_FRAME)
-#define smack_open      (*(am2_smack_open_fn *)(uintptr_t)ADDR_IAT_SMACK_OPEN)
-#define smack_wait      (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_WAIT)
-#define smack_ddtype    (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_DDTYPE)
-#define smack_use_dsound (*(am2_smack_use_dsound_fn *)(uintptr_t)ADDR_IAT_SMACK_USE_DSOUND)
+#define smack_close     (g_iatSmackClose)
+#define smack_volumepan (g_iatSmackVolumepan)
+#define smack_tobuffer  (g_iatSmackToBuffer)
+#define smack_doframe   (g_iatSmackDoFrame)
+#define smack_nextframe (g_iatSmackNextFrame)
+#define smack_open      (g_iatSmackOpen)
+#define smack_wait      (g_iatSmackWait)
+#define smack_ddtype    (g_iatSmackDdtype)
+#define smack_use_dsound (g_iatSmackUseDsound)
 #if defined(_MSC_VER)
 /* Under VC6 the imports are what the original declared: dllimport, so a
  * function called repeatedly has its IAT slot loaded into a register once. */
@@ -175,19 +175,14 @@ typedef void (__cdecl *am2_delete_fn)(void *);
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
 #define orig_operator_new     ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
 
-#define g_movieDSound (*(void **)(uintptr_t)ADDR_DSOUND)
-#define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
 
 /* Still in the original image: the palette apply and the blit to screen are
  * game logic, and the timer callback that drives all this is never ours. */
 
-#define g_moviePaletteOwner (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
 #define MOVIE_PALETTE_OFF 0x800u
-#define g_hWnd (*(HWND *)(uintptr_t)ADDR_HWND)
+#define g_hWnd (*(HWND *)&g_enumContext)
 
 /* Non-zero once the movie subsystem has handed Smacker a DirectSound object. */
-#define g_movieSoundReady (*(const int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
-#define g_movieCurrent (*(void **)(uintptr_t)ADDR_MOVIE_CURRENT)
 
 /* 0x00445690, one caller. The movie's own offscreen surface.
  *
@@ -231,7 +226,7 @@ void __attribute__((thiscall)) AM2_Movie::MovieStop()
 
     /* Re-stamped before anything else, and unconditionally -- so it happens
      * even on the early returns below. */
-    fld(movie, MOVIE_VTABLE, uint32_t) = ADDR_MOVIE_VTABLE;
+    fld(movie, MOVIE_VTABLE, uint32_t) = ((uintptr_t)g_movieVtable);
 
     if (!fld(movie, MOVIE_SMACK, void *))
         return;
@@ -256,7 +251,7 @@ void __attribute__((thiscall)) AM2_Movie::MovieSetVolume(int32_t volume)
 {
     void *movie = this;
 
-    if (!g_movieSoundReady)
+    if (!g_soundReady)
         return;
 
     /* Seven calls written out, one per track bit -- no loop in the image. */
@@ -285,7 +280,7 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
 
     LPDIRECTDRAWPALETTE pal = NULL;
     const uint8_t      *src;
-    LPPALETTEENTRY      dst = (LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE;
+    LPPALETTEENTRY      dst = (LPPALETTEENTRY)((uintptr_t)g_systemPalette_);
     int32_t             i;
 
     src = (const uint8_t *)fld(movie, MOVIE_SMACK, void *) + SMACK_PALETTE;
@@ -293,9 +288,9 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
     /* Indexed through the global itself, and bounded `< LAST + 1`: both are
      * what put the loop pointer and its test where the original has them. */
     for (i = MOVIE_PALETTE_FIRST; i < MOVIE_PALETTE_LAST + 1; i++) {
-        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peRed   = *src++;
-        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peGreen = *src++;
-        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peBlue  = *src++;
+        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peRed   = *src++;
+        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peGreen = *src++;
+        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peBlue  = *src++;
     }
 
     IDirectDrawSurface_GetPalette(surf, &pal);
@@ -326,7 +321,7 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
         fld(movie, MOVIE_TIMER_RUN, int32_t) = 1;
 
         /* Slot 0 of the current movie's own table, a thiscall on it. */
-        ObjVPoll(g_movieCurrent);
+        ObjVPoll((*(void * *)&g_movieCurrent));
 
         fld(movie, MOVIE_TIMER_ID, UINT) =
             timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
@@ -336,8 +331,8 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
         if (!fld(movie, MOVIE_TIMER_ID, UINT)) {
             /* No timer, so no movie. Tear it down and let the game carry
              * on. */
-            delete (AM2_Movie *)g_movieCurrent;
-            g_movieCurrent = NULL;
+            delete (AM2_Movie *)(*(void * *)&g_movieCurrent);
+            (*(void * *)&g_movieCurrent) = NULL;
             PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
             return 0;
         }
@@ -366,7 +361,7 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
 
     void *smack;
 
-    fld(movie, MOVIE_VTABLE, uint32_t)    = ADDR_MOVIE_VTABLE;
+    fld(movie, MOVIE_VTABLE, uint32_t)    = ((uintptr_t)g_movieVtable);
     fld(movie, MOVIE_ACTIVE, int32_t)     = 0;
     fld(movie, MOVIE_BIG, int32_t)        = big;
     fld(movie, MOVIE_WANT_W, int32_t)     = wantW;
@@ -547,7 +542,7 @@ int32_t __attribute__((thiscall)) AM2_Movie::MoviePoll()
 
     if (fld(movie, MOVIE_TIMER_RUN, int32_t) &&
         smack_wait(fld(movie, MOVIE_SMACK, void *)) == 0)
-        ::MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        ::MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)&g_primarySurface);
     return 1;
 }
 
@@ -558,12 +553,12 @@ int32_t __attribute__((thiscall)) AM2_Movie::MoviePoll()
 
 void __cdecl MovieSetCurrent(void *movie)
 {
-    g_movieCurrent = movie;
+    (*(void * *)&g_movieCurrent) = movie;
 }
 
 void __cdecl MovieStepCurrent(void)
 {
-    void *movie = g_movieCurrent;
+    void *movie = (*(void * *)&g_movieCurrent);
 
     if (!movie)
         return;
@@ -573,32 +568,31 @@ void __cdecl MovieStepCurrent(void)
     /* Re-read the global, as the original does -- but NOT tested again: the
      * original stores through it unconditionally (end of 0x00445630), so a poll
      * that cleared it would fault there too. It never does. */
-    *(int32_t *)((uint8_t *)g_movieCurrent + MOVIE_OFF_FLAG_14) = 0;
+    *(int32_t *)((uint8_t *)(*(void * *)&g_movieCurrent) + MOVIE_OFF_FLAG_14) = 0;
 }
 
 void __cdecl MovieEndCurrent(void)
 {
-    void *movie = g_movieCurrent;
+    void *movie = (*(void * *)&g_movieCurrent);
 
     if (!movie)
         return;
     *(int32_t *)((uint8_t *)movie + MOVIE_OFF_FLAG_0C) = 0;
     MovieFinished();
-    g_movieCurrent = 0;
+    (*(void * *)&g_movieCurrent) = 0;
 }
 
 void __cdecl MovieForget(void)
 {
     /* The test cannot change the outcome -- both arms leave the global at
      * zero -- and is reproduced rather than removed. */
-    if (!g_movieCurrent)
+    if (!(*(void * *)&g_movieCurrent))
         return;
-    g_movieCurrent = 0;
+    (*(void * *)&g_movieCurrent) = 0;
 }
 
 /* Spelled as device.cpp and surface.cpp spell it, so the three stay one
  * definition rather than a drift. */
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 
 /* 0x0042E720, four callers -- what leaving a game state does about the movie
  * and the screen.
@@ -617,17 +611,17 @@ void __cdecl MovieForget(void)
  * without -- so leaving a state always blanks the primary. */
 void __cdecl StateLeave(void)
 {
-    if (*(void **)(uintptr_t)ADDR_STATE_MOVIE) {
+    if (g_stateMovie) {
         void *movie;
 
         MovieForget();
 
-        movie = *(void **)(uintptr_t)ADDR_STATE_MOVIE;
+        movie = g_stateMovie;
         delete (AM2_Movie *)movie;
-        *(void **)(uintptr_t)ADDR_STATE_MOVIE = (void *)0;
+        g_stateMovie = (void *)0;
     }
 
-    ClearSurface(g_primarySurface, 0);
+    ClearSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), 0);
 }
 
 /* PlayMovie -- original 0x0042E5E0, four call sites.
@@ -668,12 +662,12 @@ void __cdecl PlayMovie(const char *name, int32_t big)
     if (strncmp("3do", name, 3) == 0
         || strncmp("credits",
                    name, 7) == 0)
-        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+        SetGameDir(g_dirScratch);
     else
-        SetGameDir(*(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR)));
+        SetGameDir(g_strAviDir);
 
     if (!FileExists(name)
-        || *(const int32_t *)(uintptr_t)ADDR_OPT_NO_MOVIES) {
+        || g_optNoMovies) {
         /* MovieFinished's body, inline here -- the image posts directly at
          * 0x0042E705 where its other two callers call 0x00445600. */
         PostMessageA(g_hWnd, WM_USER, 0, 0);
@@ -682,17 +676,17 @@ void __cdecl PlayMovie(const char *name, int32_t big)
 
     StateLeave();
 
-    *(void **)(uintptr_t)ADDR_STATE_MOVIE = new AM2_Movie(name, -1, -1, big);
+    g_stateMovie = new AM2_Movie(name, -1, -1, big);
 
-    ClearSurface(g_primarySurface, 0);
-    MovieSetCurrent(*(void **)(uintptr_t)ADDR_STATE_MOVIE);
+    ClearSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), 0);
+    MovieSetCurrent(g_stateMovie);
 
-    volume = *(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE;
+    volume = g_voiceVolume;
     if (volume <= AM2_MOVIE_VOLUME_FLOOR)
-        MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE, 0);
+        MovieSetVolume(g_stateMovie, 0);
     else
-        MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE, volume * 3 + 0x8000);
-    MovieStart(*(void **)(uintptr_t)ADDR_STATE_MOVIE, (void *)0);
+        MovieSetVolume(g_stateMovie, volume * 3 + 0x8000);
+    MovieStart(g_stateMovie, (void *)0);
 }
 
 
@@ -751,7 +745,7 @@ int32_t __cdecl StateEnterAct1Movie(void)
     char name[0x20];
 
     /* The directory table's first entry, which is "avi". */
-    SetGameDir(*(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR)));
+    SetGameDir(g_strAviDir);
     MovieBuildName(name, "act1");
     PlayMovie(name, 0);
     return 0;
@@ -798,7 +792,7 @@ int32_t __cdecl StateMessageMovieToMenu(void)
 void CALLBACK MovieTimerProc(UINT id, UINT msg, DWORD_PTR user,
                              DWORD_PTR dw1, DWORD_PTR dw2)
 {
-    uint8_t *movie = *(uint8_t **)(uintptr_t)ADDR_MOVIE_CURRENT;
+    uint8_t *movie = g_movieCurrent;
 
     (void)id; (void)msg; (void)user; (void)dw1; (void)dw2;
 

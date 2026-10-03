@@ -38,7 +38,7 @@
 /* GetTickCount through the game's own IAT slot, the same seam air.cpp uses:
  * an import of our own would resolve through our IAT, and this file is flat. */
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
-#define orig_get_tick_count (*(AM2_TickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
+#define orig_get_tick_count (*(AM2_TickFn *)g_iatGetTickCount)
 /* SendPlayerMsg is reconstructed, in win32/dplay.cpp. Declared here rather
  * than by including that header because commmsg.cpp is on the flat side of
  * the split; its signature names no Win32 type. */
@@ -105,7 +105,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 #define AM2_MSG_VALUE        8
 
 
-#define kCommObj (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define kCommObj (g_commObject)
 
 static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
 {
@@ -128,13 +128,13 @@ static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt
 
 void __cdecl SendColorMsg(int32_t colour)
 {
-    SendValueMsg((uintptr_t)ADDR_MSG_COLOR, colour,
+    SendValueMsg(((uintptr_t)g_msgColor), colour,
                  "SendColorMsg from %x , Color =%d \n");
 }
 
 void __cdecl SendTeamMsg(int32_t team)
 {
-    SendValueMsg((uintptr_t)ADDR_MSG_TEAM, team,
+    SendValueMsg(((uintptr_t)g_msgTeam), team,
                  "SendTeamMsg from %x , Team =%d \n");
 }
 
@@ -292,14 +292,14 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
                 ready ? "TRUE" : "FALSE");
 #undef COMM
 
-    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD + AM2_MSG_VALUE)
+    *(int32_t *)(g_msgReadyToLoad + AM2_MSG_VALUE)
         = ready;
-    SendGameMsg((void *)(uintptr_t)ADDR_MSG_READY_TO_LOAD, 0, 1);
+    SendGameMsg((void *)g_msgReadyToLoad, 0, 1);
 
     /* No null test on the dialog, unlike the host half. The original's. */
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     ObjVUpdate(dlg);
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
@@ -325,14 +325,14 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
     int32_t        rc   = 0;
 
     (void)unused;   /* pushed by every call site, read by none. */
-    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_MAP + AM2_MSG_VALUE) = result;
+    *(int32_t *)(g_msgMap + AM2_MSG_VALUE) = result;
 
     /* The host has nobody to tell, and says so with a 1 rather than a 0. */
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return 1;
 
     if (*(const int32_t *)(comm + AM2_COMM_CONNECTED)) {
-        rc   = SendGameMsg((void *)(uintptr_t)ADDR_MSG_MAP, 0, 1);
+        rc   = SendGameMsg((void *)g_msgMap, 0, 1);
         comm = kCommObj;
         if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
             /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is
@@ -385,11 +385,11 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
  * pointer it just called through. */
 static inline void RepaintDialogAndSendPlayers(void)
 {
-    void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    void *dlg = g_paintObject;
 
     if (dlg) {
         ObjVUpdate(dlg);
-        dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        dlg = g_paintObject;
         ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
     SendPlayerMsg(0);
@@ -469,8 +469,8 @@ static inline void CommEndSetupInline(void)
         am2_log("Sending EndSetupMessage\n");
 #undef comm
 
-    SendGameMsg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
-    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
+    SendGameMsg(g_msgEndSetup, 0, 1);
+    orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
 }
 
 void __cdecl CommEndSetup(void)
@@ -506,9 +506,9 @@ void __cdecl SendGameReadyMsg(int32_t ready)
 
     /* The value is stored into the record BEFORE the arguments are complete --
      * the original writes it between the last push and the call. */
-    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_GAME_READY + AM2_MSG_VALUE)
+    *(int32_t *)(g_msgGameReady + AM2_MSG_VALUE)
         = ready;
-    SendGameMsg((void *)(uintptr_t)ADDR_MSG_GAME_READY, 0, 1);
+    SendGameMsg((void *)g_msgGameReady, 0, 1);
 
 #undef comm
     CommEndSetupInline();
@@ -563,10 +563,10 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
     }
 
     /* Repaint the lobby through the widget layer's update-then-paint pair. */
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     if (dlg) {
         ObjVUpdate(dlg);
-        dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        dlg = g_paintObject;
         ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
 
@@ -585,7 +585,7 @@ void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from)
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("ReceiveEndSetupMsg\n");
 
-    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
+    orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
 }
 
 void *__cdecl MsgListRemHead(void *list)
@@ -610,7 +610,7 @@ void *__cdecl MsgListRemHead(void *list)
         *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
         if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
             orig_log("RemHead: Impossible List Size %d \n", count);
-    } else if (l == (uint8_t *)(uintptr_t)ADDR_MSG_LIST_POOL) {
+    } else if (l == (uint8_t *)g_msgListPool) {
         /* Only the POOL is worth complaining about: no message buffers left.
          * An empty ordinary queue is simply an idle one. */
         orig_log("Empty List! l->first = %d listsize = %d \n", node,
@@ -683,7 +683,7 @@ void __cdecl MsgListRemove(void *list, void *node)
     if (--COUNT < 0 || COUNT > AM2_MSGLIST_SANE_MAX)
         orig_log("RemMsg: Impossible List Size %d \n", COUNT);
 
-    if (l == (uint8_t *)(uintptr_t)ADDR_MSG_LIST_POOL) {
+    if (l == (uint8_t *)g_msgListPool) {
         /* The pool still has buffers: neither remaining complaint applies,
          * and the original jumps straight to the unlock. */
         if (*(void *const *)(l + MSGLIST_OFF_HEAD))
@@ -702,12 +702,12 @@ unlock:
 
 void __cdecl ExitGamePostClose(void)
 {
-    *(int32_t *)((void *)(uintptr_t)(ADDR_EXIT_GAME_FLAG)) = 1;
+    g_exitGameFlag = 1;
 
     /* Three trailing zeros, as the original pushes them: `add esp, 0x10`. */
     orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n", 0, 0, 0);
 
-    orig_post_message(*(void **)((void *)(uintptr_t)(ADDR_HWND)), AM2_WM_CLOSE, 0, 0);
+    orig_post_message(g_enumContext, AM2_WM_CLOSE, 0, 0);
 }
 
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
@@ -736,7 +736,7 @@ static inline void DispatchChat(const uint8_t *msg)
      * SIGNED and then shifted left eight for the HUD's table -- a negative
      * sender would index backwards out of it. The original's, and the table
      * is 256-byte records of which only the first byte is read. */
-    int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
+    int32_t screen = g_subState;
 
     if (screen == 7 || screen == 9 || screen == 8) {
         MenuMessage((const char *)(msg + AM2_MSG_TEXT),
@@ -745,7 +745,7 @@ static inline void DispatchChat(const uint8_t *msg)
     }
 
     HudMessage((const char *)(msg + AM2_MSG_TEXT),
-               *(const uint8_t *)((uintptr_t)ADDR_CHAT_COLOUR_TABLE
+               *(const uint8_t *)(((uintptr_t)g_chatColourTable)
                                   + (uintptr_t)((int32_t)*(const int8_t *)
                                                 (msg + AM2_MSG_SENDER) << 8)));
 }
@@ -800,12 +800,12 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
      * all of them. A zero player count skips this test entirely. */
     if (ok) {
         /* Nothing in the image handles 0x0469. */
-        orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_START_GAME, 0, 0);
+        orig_post_message(g_enumContext, AM2_WM_START_GAME, 0, 0);
         SendGamePause(1, 0x10000);
         RequestState(2);
-        *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
-        *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
-        *(int32_t *)(uintptr_t)ADDR_GAME_SEED =
+        g_stateEnterOnce = 1;
+        g_netGame         = 1;
+        g_gameSeed =
             *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
     } else {
         AM2_THE_COMM->CommGetSessionDesc();
@@ -999,8 +999,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
         return;
 
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              *(const uint32_t *)(*(uint8_t *const *)(uintptr_t)
-                  ADDR_COMM_OBJECT + COMM_OFF_OUR_PLAYER_ID))
+              *(const uint32_t *)(g_commObject + COMM_OFF_OUR_PLAYER_ID))
               + FLOW_OFF_SEQUENCE);
 
     if (*(const uint32_t *)(o + TROOPER_OFF_LAST_SEQ) == seq)
@@ -1020,7 +1019,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
 
     {
         /* The comm object is read at every use. */
-#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
+#define comm ((uint8_t *)(g_commObject))
         interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
         if (*(const int32_t *)(o + OBJ_OFF_SARGE) && interval > 1)
             interval = 1;
@@ -1661,7 +1660,6 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 
 /* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
  * two stay one definition. checkglobals refused the first attempt. */
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
 #define AM2_ARMYMSG_SIZE 0x00   /* uint16_t */
 #define AM2_ARMYMSG_TYPE 0x02   /* uint16_t */
@@ -1671,9 +1669,9 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
  * raise the pending flag by hand rather than through RequestState. */
 static inline void RecordGameOver(int32_t winner)
 {
-    *(int32_t *)(uintptr_t)ADDR_GAME_WINNER   = winner;
-    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST  = AM2_MENU_REQUEST_GAME_OVER;
-    *(int32_t *)(uintptr_t)ADDR_STATE_PENDING = 1;
+    g_gameWinner   = winner;
+    g_menuRequest  = AM2_MENU_REQUEST_GAME_OVER;
+    g_statePending = 1;
 }
 
 void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
@@ -1731,12 +1729,12 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         am2_log("Received GAME_WON_MESSAGE\n");
         /* With winning disabled, a win is recorded exactly as a loss. Our
          * own win is recorded as winner 1. */
-        if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
-            *(int32_t *)(uintptr_t)ADDR_GAME_WINNER = 1;
+        if (g_winEnabled) {
+            g_gameWinner = 1;
             if ((int32_t)g_defaultOwner != army)
-                *(int32_t *)(uintptr_t)ADDR_GAME_WINNER = army;
-            *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST  = AM2_MENU_REQUEST_GAME_OVER;
-            *(int32_t *)(uintptr_t)ADDR_STATE_PENDING = 1;
+                g_gameWinner = army;
+            g_menuRequest  = AM2_MENU_REQUEST_GAME_OVER;
+            g_statePending = 1;
         } else {
             RecordGameOver(army);
         }
@@ -1833,18 +1831,17 @@ extern "C" int32_t __cdecl CheckMapRules(uint32_t rulesSum,
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
 #define orig_sprintf ((AM2_SprintfFn)(uintptr_t)ADDR_GAME_SPRINTF)
 
-#define g_ourSlot      (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
 /* Update the current dialog and repaint it, with no player list sent after --
  * which is what separates this from RepaintDialogAndSendPlayers. */
 static inline void RepaintDialog(void)
 {
-    void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    void *dlg = g_paintObject;
 
     if (!dlg)
         return;
     ObjVUpdate(dlg);
-    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = g_paintObject;
     ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
@@ -1861,7 +1858,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
     /* Every use re-reads the comm object, as the original does. */
 #define comm kCommObj
 #define REC_ID (*(const int32_t *)(rec + REC_PLAYER_ID - REC_PLAYER_COLOUR))
-#define SETTING_END ((int32_t)(uintptr_t)ADDR_SCORE_LIMIT)
+#define SETTING_END ((int32_t)((uintptr_t)&g_scoreLimit))
 
     /* The host sends it. */
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
@@ -1884,11 +1881,11 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
 
     *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
         *(const int32_t *)(m + MSG_PLAYER_COUNT);
-    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
+    g_scoreLimit =
         *(const int32_t *)(m + MSG_PLAYER_SCORE_LIMIT);
-    *(int32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
+    *(int32_t *)&g_gameOverFlags =
         *(const int32_t *)(m + MSG_PLAYER_OVER_FLAGS);
-    *(int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
+    g_gameSetting22c =
         *(const int32_t *)(m + MSG_PLAYER_SETTING_22C);
 
     /* Four entries, and the end is the address of the next global, compared
@@ -1899,7 +1896,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
      * record through the log and CommSetSlotRemote.) */
     for (i = 0,
          rec = m + MSG_PLAYER_RECORDS + REC_PLAYER_COLOUR,
-         slotSetting = (int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
+         slotSetting = g_armyPoints;
          (int32_t)(uintptr_t)slotSetting < SETTING_END;
          i++, rec += MSG_PLAYER_STRIDE, slotSetting++) {
         if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
@@ -1955,9 +1952,9 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
     if (*(const int32_t *)(m + MSG_PLAYER_HAS_MAP)) {
         int32_t rules;
 
-        strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
+        strcpy(&g_mpScriptName,
                (const char *)(m + MSG_PLAYER_MAP_NAME));
-        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
+        strcpy(&g_mapName_,
                (const char *)(m + MSG_PLAYER_LEVEL_NAME));
         rules = CheckMapRules(
                     *(const uint32_t *)(m + MSG_PLAYER_RULE_ARG),
@@ -1967,9 +1964,9 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
     }
 
     if (*(const int32_t *)(m + MSG_PLAYER_VERSION)
-            != *(const int32_t *)(uintptr_t)ADDR_GAME_VERSION
+            != g_gameVersion
         || *(const int32_t *)(m + MSG_PLAYER_CHECKSUM)
-            != *(const int32_t *)(uintptr_t)ADDR_DATA_CHECKSUM) {
+            != g_dataChecksum) {
         char buf[0x40];
 
         /* OUR name, from ADDR_DEFAULT_OWNER -- the disagreeing client
@@ -2036,9 +2033,9 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
      * keeps; the table at 0x00410044 is in TYPE order. */
     switch (type) {
     case 1:
-        *(int32_t *)(uintptr_t)ADDR_LAST_MSG_VALUE =
+        g_lastMsgValue =
             *(const int32_t *)(m + AM2_MSG_VALUE);
-        *(uint32_t *)(uintptr_t)ADDR_LAST_MSG_CHECKSUM = XorChecksum(m);
+        g_lastMsgChecksum = XorChecksum(m);
         return;
 
     case 11:
@@ -2196,7 +2193,7 @@ extern "C" {
 
 void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator)
 {
-    uint8_t *log = *(uint8_t **)(uintptr_t)ADDR_MENU_MSG_LIST;
+    uint8_t *log = *(uint8_t * *)&g_menuMsgList;
     uint8_t *screen;
     uint8_t *chatbox;
 
@@ -2207,10 +2204,10 @@ void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator)
     if (*(const int32_t *)log > AM2_MENU_MSG_MAX)
         ListDropOldest(log);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE == AM2_MENU_MODE_NO_CHAT)
+    if (g_subState == AM2_MENU_MODE_NO_CHAT)
         return;
 
-    screen = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    screen = *(uint8_t * *)&g_paintObject;
     if (!screen)
         return;
 
@@ -2284,9 +2281,9 @@ void __cdecl CommDrainMsgs(void)
     if (!*(const int32_t *)(kCommObj + AM2_COMM_OFF_ACTIVE))
         return;
 
-    for (node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B);
+    for (node = (uint8_t *)MsgListRemHead(g_msgListB);
          node;
-         node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B)) {
+         node = (uint8_t *)MsgListRemHead(g_msgListB)) {
         /* The node: +0x08 sender, +0x0C addressee, +0x20 message, +0x24
          * its length -- what IDirectPlay::Receive filled in. */
         int32_t  from = *(const int32_t *)(node + MSGNODE_OFF_FROM);
@@ -2303,7 +2300,7 @@ void __cdecl CommDrainMsgs(void)
                                 *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN),
                                 from, to);
 
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+        MsgListAdd(g_msgListPool, node);
     }
 #undef to
 }
@@ -2316,7 +2313,7 @@ void __cdecl DrainMsgList(void *list)
     void *node;
 
     while ((node = MsgListRemHead(list)) != (void *)0)
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+        MsgListAdd(g_msgListPool, node);
 }
 
 /* TellEachSlot -- original 0x0044C550, one caller.
@@ -2417,14 +2414,14 @@ const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army)
     if (head & AM2_TROOPSUB_HAS_FACING) {
         *(uint8_t *)(obj + UNIT_OFF_FIRE_F40) = *p++;
         *(uint32_t *)(obj + UNIT_OFF_FIRE_STAMP) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
         *(int32_t *)(obj + UNIT_OFF_FIRE_ACTIVE) = 1;
     }
 
     if (head & AM2_TROOPSUB_HAS_MODE) {
         *(int32_t *)(obj + UNIT_OFF_FIRE_MODE) = (int32_t)*p++;
         *(uint32_t *)(obj + UNIT_OFF_FIRE_STAMP) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            g_gameClockMs;
         *(int32_t *)(obj + UNIT_OFF_FIRE_ACTIVE) = 1;
     }
 
@@ -2486,7 +2483,7 @@ extern "C"
 void __cdecl FlushDelayedSends(void)
 {
     uint32_t  now  = orig_get_tick_count();
-    uint8_t  *list = (uint8_t *)(uintptr_t)ADDR_MSG_LIST_DELAYED;
+    uint8_t  *list = (uint8_t *)g_msgListDelayed;
 
     while (*(void *const *)(list + MSGLIST_OFF_HEAD)) {
         uint8_t *node = (uint8_t *)*(void *const *)(list + MSGLIST_OFF_HEAD);
@@ -2521,7 +2518,7 @@ void __cdecl FlushDelayedSends(void)
             return;
         }
 
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+        MsgListAdd(g_msgListPool, node);
     }
 }
 
@@ -2560,27 +2557,27 @@ void __cdecl CommInitDefaults(void)
 #define MSG_SIZE(addr, size) \
     *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_SIZE) = (size);
 #define MSG_INIT(addr, kind, size) MSG_KIND(addr, kind) MSG_SIZE(addr, size)
-    MSG_KIND(ADDR_PLAYER_MSG       , 0x08)
-    MSG_INIT(ADDR_MSG_KIND01       , 0x01, 0x404)
-    MSG_INIT(ADDR_MSG_KIND02       , 0x02, 0x010)
-    MSG_INIT(ADDR_MSG_CHAT         , 0x03, 0x108)
-    MSG_INIT(ADDR_MSG_KIND04       , 0x04, 0x010)
-    MSG_INIT(ADDR_MSG_GAME_START   , 0x05, 0x194)
-    MSG_SIZE(ADDR_PLAYER_MSG       , 0x238)
-    MSG_INIT(ADDR_MSG_GAME_PAUSE   , 0x06, 0x010)
-    MSG_INIT(ADDR_MSG_READY_TO_LOAD, 0x12, 0x00C)
-    MSG_INIT(ADDR_MSG_GAME_READY   , 0x07, 0x00C)
-    MSG_INIT(ADDR_MSG_MAP          , 0x0F, 0x010)
-    MSG_INIT(ADDR_MSG_COLOR        , 0x09, 0x00C)
-    MSG_INIT(ADDR_MSG_TEAM         , 0x11, 0x00C)
-    MSG_INIT(ADDR_MSG_END_SETUP    , 0x0A, 0x008)
-    MSG_INIT(ADDR_MSG_KIND0D       , 0x0D, 0x10C)
-    MSG_INIT(ADDR_RESEND_BUF       , 0x0B, 0x400)
-    MSG_INIT(ADDR_ARMY_PACKET      , 0x0B, 0x014)
-    MSG_INIT(ADDR_ARMY_PACKET_B    , 0x0B, 0x014)
-    MSG_INIT(ADDR_RESEND_SCRATCH   , 0x0B, 0x400)
-    MSG_INIT(ADDR_MSG_KIND0C       , 0x0C, 0x010)
-    MSG_INIT(ADDR_MSG_KIND10       , 0x10, 0x014)
+    MSG_KIND(((uintptr_t)g_playerMsg)       , 0x08)
+    MSG_INIT(((uintptr_t)g_msgKind01)       , 0x01, 0x404)
+    MSG_INIT(((uintptr_t)g_msgKind02)       , 0x02, 0x010)
+    MSG_INIT(((uintptr_t)g_msgChat)         , 0x03, 0x108)
+    MSG_INIT(((uintptr_t)g_msgKind04)       , 0x04, 0x010)
+    MSG_INIT(((uintptr_t)g_msgGameStart)   , 0x05, 0x194)
+    MSG_SIZE(((uintptr_t)g_playerMsg)       , 0x238)
+    MSG_INIT(((uintptr_t)g_msgGamePause)   , 0x06, 0x010)
+    MSG_INIT(((uintptr_t)g_msgReadyToLoad), 0x12, 0x00C)
+    MSG_INIT(((uintptr_t)g_msgGameReady)   , 0x07, 0x00C)
+    MSG_INIT(((uintptr_t)g_msgMap)          , 0x0F, 0x010)
+    MSG_INIT(((uintptr_t)g_msgColor)        , 0x09, 0x00C)
+    MSG_INIT(((uintptr_t)g_msgTeam)         , 0x11, 0x00C)
+    MSG_INIT(((uintptr_t)g_msgEndSetup)    , 0x0A, 0x008)
+    MSG_INIT(((uintptr_t)g_msgKind0d)       , 0x0D, 0x10C)
+    MSG_INIT(((uintptr_t)g_resendBuf)       , 0x0B, 0x400)
+    MSG_INIT(((uintptr_t)g_armyPacket)      , 0x0B, 0x014)
+    MSG_INIT(((uintptr_t)g_armyPacketB)    , 0x0B, 0x014)
+    MSG_INIT(((uintptr_t)g_resendScratch)   , 0x0B, 0x400)
+    MSG_INIT(((uintptr_t)g_msgKind0c)       , 0x0C, 0x010)
+    MSG_INIT(((uintptr_t)g_msgKind10)       , 0x10, 0x014)
 #undef MSG_KIND
 #undef MSG_SIZE
 #undef MSG_INIT
@@ -2613,7 +2610,7 @@ void __cdecl CommInitDefaults(void)
  */
 void __cdecl SendChatTo(char *text, int32_t slot)
 {
-    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_MSG_CHAT;
+    uint8_t *rec = g_msgChat;
 
     if (strlen(text) > AM2_CHAT_TEXT_MAX)
         text[AM2_CHAT_TEXT_MAX - 1] = 0;
@@ -2623,13 +2620,13 @@ void __cdecl SendChatTo(char *text, int32_t slot)
     /* Stored, then tested and overwritten: the image writes the ink
      * before it knows whether it is zero. */
     rec[MSG_CHAT_OFF_INK] =
-        *((const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        *(g_objTableRecords
           + (uint32_t)((AM2_Comm *)kCommObj)->CommArmyOfSlot(
-                *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+                *(const int32_t *)&g_defaultOwner)
             * AM2_OBJ_TABLE_REC_SIZE
           + OBJ_TABLE_REC_OFF_INK);
     if (!rec[MSG_CHAT_OFF_INK])
-        rec[MSG_CHAT_OFF_INK] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE;
+        rec[MSG_CHAT_OFF_INK] = g_whiteInk;
 
     SendGameMsg(rec, ((AM2_Comm *)kCommObj)->CommPlayerId(slot), 0);
 }
@@ -2659,7 +2656,7 @@ void __cdecl SendChatTo(char *text, int32_t slot)
 void __cdecl CommTuneChangeLimit(void)
 {
     /* The comm object is read at every use. */
-#define COMM  (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define COMM  (g_commObject)
 #define LIMIT (*(uint32_t *)(COMM + COMM_OFF_ENOUGH_CHANGE_LIMIT))
     uint32_t seq;
     uint32_t sent;
@@ -2668,7 +2665,7 @@ void __cdecl CommTuneChangeLimit(void)
               *(const uint32_t *)(COMM + COMM_OFF_OUR_PLAYER_ID))
           + FLOW_OFF_SEQUENCE);
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ < seq) {
+    if (g_bandwidthLastSeq < seq) {
         sent = (uint32_t)AM2_THE_COMM->CommRecentTotal();
 
         if (sent > AM2_BANDWIDTH_HIGH) {
@@ -2676,13 +2673,13 @@ void __cdecl CommTuneChangeLimit(void)
                 LIMIT += 2u;
             else
                 LIMIT += 1u;
-            *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
+            g_bandwidthLastSeq = seq;
             orig_log("Exceeded bandwidth (%d), enoughChangeLimit increased to %d\n",
                      sent, LIMIT);
-        } else if (LIMIT > *(const uint32_t *)(uintptr_t)ADDR_CHANGE_LIMIT_FLOOR
+        } else if (LIMIT > g_changeLimitFloor
                    && sent < AM2_BANDWIDTH_LOW) {
             LIMIT -= 1u;
-            *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
+            g_bandwidthLastSeq = seq;
             orig_log("Less than half bandwidth (%d), enoughChangeLimit decreased to %d\n",
                      sent, LIMIT);
         }
@@ -2864,9 +2861,9 @@ int commmsg_install(void)
 /* The NACK message this side sends, kind 0xC: the range lives where a data
  * message keeps its sequence and checksum. */
 #define FLOW_NACK_OUT_FIRST \
-    (*(uint32_t *)(uintptr_t)(ADDR_MSG_KIND0C + FLOWMSG_NACK_FIRST))
+    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_msgKind0c) + FLOWMSG_NACK_FIRST))
 #define FLOW_NACK_OUT_LAST \
-    (*(uint32_t *)(uintptr_t)(ADDR_MSG_KIND0C + FLOWMSG_NACK_LAST))
+    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_msgKind0c) + FLOWMSG_NACK_LAST))
 
 /* Both live in win32/dplay.cpp and win32/air.h's C++ half, and this is the
  * flat half, so they are declared here rather than included -- the same
@@ -2916,7 +2913,7 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
  * it is verified by reading and by the byte comparison. */
 int32_t __cdecl FlowRecvMessage(void *nodev)
 {
-#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (g_commObject)
 #define VERBOSE (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
 #define FROM (*(const uint32_t *)(node + MSGNODE_OFF_FROM))
 #define MINE (*(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
@@ -2959,7 +2956,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                 am2_log(" Got Pulse Ack for  seq %d\n", seq);
 
                 sent = (uint8_t *)MsgListSetFlag(
-                    (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq, 0,
+                    g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
                     if (VERBOSE)
@@ -2999,12 +2996,12 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                 RingPush32(sender, lat);
 
                 /* Nobody else is still waiting on it: the buffer goes home. */
-                if ((*(const uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK
+                if ((g_playerSlotMask
                      & *(const uint32_t *)(sent + MSGNODE_OFF_FLAGS)) == 0) {
                     am2_log("PULSE Adding to freelist from sendque Buffer seq %d  elelment %x \n",
                             *(const uint32_t *)(sent + MSGNODE_OFF_KEY), sent);
-                    MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, sent);
-                    MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, sent);
+                    MsgListRemove(g_msgListSendq, sent);
+                    MsgListAdd(g_msgListPool, sent);
                 }
             }
             *(uint32_t *)(sender + FLOW_OFF_HE_HAS) =
@@ -3045,8 +3042,8 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         for (seq = *(const uint32_t *)(msg + FLOWMSG_NACK_FIRST);
              seq <= *(const uint32_t *)(msg + FLOWMSG_NACK_LAST); seq++) {
             copy = (uint8_t *)MsgListCopyByKey(
-                (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq,
-                (void *)(uintptr_t)ADDR_RESEND_SCRATCH);
+                g_msgListSendq, (int32_t)seq,
+                g_resendScratch);
             if (!copy) {
                 /* Unconditional, like the pulse ack line. */
                 am2_log("Flow Nack Resend: Msg not found seq %d hehas %d\n",
@@ -3075,13 +3072,13 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                             *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
                 *(uint32_t *)(sender + FLOW_OFF_RESENDS) += 1;
                 resent++;
-                MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
+                MsgListSetFlag(g_msgListSendq,
                                (int32_t)seq, 0, (int32_t)mask);
             } else {
                 if (VERBOSE)
                     am2_log("ADDING to Resend Queue seq %d to id %x  mask %x\n",
                             seq, FROM, mask);
-                MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
+                MsgListSetFlag(g_msgListSendq,
                                (int32_t)seq, 1, (int32_t)mask);
             }
         }
@@ -3180,7 +3177,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                             *(const uint32_t *)(msg + PACKET_OFF_ACK),
                             *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
                 /* The dump is NOT behind the verbose flag; only the line. */
-                DumpMsgList((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ);
+                DumpMsgList(g_msgListSendq);
             }
             /* A WARNING, NOT A GUARD: it proceeds either way. */
             if (*(const uint32_t *)(msg + PACKET_OFF_ACK)
@@ -3193,7 +3190,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
             for (seq = *(const uint32_t *)(sender + FLOW_OFF_HE_HAS) + 1;
                  seq <= *(const uint32_t *)(msg + PACKET_OFF_ACK); seq++) {
                 sent = (uint8_t *)MsgListSetFlag(
-                    (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq, 0,
+                    g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
                     if (VERBOSE)
@@ -3232,9 +3229,9 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
 
                 /* No "Adding to freelist" line in this copy. */
                 if ((*(const uint32_t *)(sent + MSGNODE_OFF_FLAGS)
-                     & *(const uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK) == 0) {
-                    MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, sent);
-                    MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, sent);
+                     & g_playerSlotMask) == 0) {
+                    MsgListRemove(g_msgListSendq, sent);
+                    MsgListAdd(g_msgListPool, sent);
                 }
             }
         }
@@ -3292,7 +3289,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                     am2_log("Flow Nacking %d thru %d  to %x at time %d I am good thru %d \n",
                             expected, last, FROM, now,
                             *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED));
-                SendGameMsg((void *)(uintptr_t)ADDR_MSG_KIND0C, (int32_t)FROM, 0);
+                SendGameMsg(g_msgKind0c, (int32_t)FROM, 0);
                 for (; expected <= last; expected++)
                     MsgSlotB2(sender, expected);
             }
@@ -3303,7 +3300,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * every queued message that now follows on. */
         if (*(const uint32_t *)(msg + PACKET_OFF_SEQ) != expected)
             return 0;
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_B, node);
+        MsgListAdd(g_msgListB, node);
         if (expected == 1) {
             *(uint32_t *)(sender + FLOW_OFF_GAP_TOTAL)    = 0;
             *(uint32_t *)(sender + FLOW_OFF_GAP_MIN)      = 10000;
@@ -3336,7 +3333,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
             void *m = MsgListRemHead(sender + FLOW_OFF_QUEUE);
 
             if (m)
-                MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_B, m);
+                MsgListAdd(g_msgListB, m);
             CommRemoveKeyed(sender, expected);
             *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = expected;
             expected++;
@@ -3346,7 +3343,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
     return 0;
 
 pool:
-    MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+    MsgListAdd(g_msgListPool, node);
     return 1;
 #undef comm
 #undef VERBOSE
@@ -3432,7 +3429,7 @@ void __cdecl RecvVehicle1E(void *msg)
 void __cdecl RecvVehicle24(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
-    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t       *comm = g_commObject;
     void          *vehicle;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -3541,10 +3538,10 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
     /* A received update always clears the destination: a remote vehicle is
      * driven by its owner's packets, not by a route of ours. */
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        g_zeroPoint;
     ObjSetFootprint(o);
 
-    if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+    if (*(const int32_t *)(g_commObject
                            + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)"-->vehicleUpdateMessageUnpack: ID:%x, Change:%d%d%d, Pos (%d,%d), facing:%d, gunfacing:%d, intent.facing:%d, intent.gunfacing:%d, action:%d, rev:%d, half:%d, slow:%d\n",
                 *(const uint32_t *)(o + OBJ_OFF_UID),
@@ -3600,7 +3597,7 @@ void __cdecl RecvVehicle1D(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
     /* The comm object and the request are read afresh at every use. */
-#define comm    (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm    (g_commObject)
 #define request (*(const int32_t *)(m + 0x10))
     uint8_t       *vehicle;
     uint8_t       *item;
@@ -3716,7 +3713,7 @@ void __cdecl RecvVehicle1F(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
     /* The comm object is read at every use. */
-#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (g_commObject)
     uint8_t       *vehicle;
     void          *item;
 
@@ -3810,7 +3807,7 @@ void __cdecl RecvVehicle1C(void *msg)
     /* +0x529 is the spread seed; see SendVehicleFire on why it stays raw. */
     *(uint8_t *)(veh + 0x529u)               = *(const uint8_t *)(m + 0x14);
 
-    if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+    if (*(const int32_t *)(g_commObject
                            + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)"Vehicle Fire Rec, vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x\n",
                 vehUid,

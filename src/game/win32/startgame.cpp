@@ -37,10 +37,7 @@
 
 #include <stdint.h>
 
-#define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_commObject    (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_menuRequest   (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
-#define g_menuRequestSet (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
+#define g_paintObj      (*(uint8_t * *)&g_paintObject)
 
 typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
                                           int32_t);
@@ -168,8 +165,6 @@ typedef void *(__cdecl *am2_operator_new_fn)(size_t);
 
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
 
-#define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_sessionObject  (*(void **)(uintptr_t)ADDR_SESSION_OBJECT)
 
 #define SESSION_OBJECT_SIZE 0x0C
 
@@ -245,13 +240,11 @@ void __cdecl StartMultiplayerGame(void)
  * reading. */
 #define REQUEST_HOSTED 7
 
-#define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 
 
 void __cdecl HostBattle(void)
 {
-    uint8_t    *dlg    = g_paintObject;
+    uint8_t    *dlg    = (*(uint8_t * *)&g_paintObject);
     const char *battle = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
 #define player ((const char *)(dlg + DLG_OFF_PLAYER_NAME))
 
@@ -280,8 +273,8 @@ void __cdecl HostBattle(void)
     g_menuRequest    = REQUEST_HOSTED;
     g_menuRequestSet = 1;
 
-    strcpy((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, player);
-    strcpy((char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME, battle);
+    strcpy(&g_savedPlayerName, player);
+    strcpy(&g_savedBattleName, battle);
 #undef player
 }
 
@@ -299,10 +292,6 @@ void __cdecl HostBattle(void)
  * block carries a line the others do not.
  * ------------------------------------------------------------------ */
 
-#define g_winEnabled       (*(int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
-#define g_levelId          (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
-#define g_levelIndex       (*(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX)
-#define g_cheatLevelSelect (*(int32_t *)(uintptr_t)ADDR_CHEAT_LEVEL_SELECT)
 
 /* IsKeyDown, RequestState and SetGameOver are ours -- misc.cpp and
  * gameproc.cpp -- so they are called by name, not through the image. */
@@ -443,7 +432,7 @@ void __cdecl OnEnterNameOk(void)
     void       *level;
     int32_t     handle;
 
-    if ((dlg = g_paintObject) == (uint8_t *)0)
+    if ((dlg = (*(uint8_t * *)&g_paintObject)) == (uint8_t *)0)
         return;
 
     name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
@@ -467,7 +456,7 @@ void __cdecl OnEnterNameOk(void)
     /* widget.cpp already names this address g_currentPlayer, which is what
      * it holds: a second `g_` name here would be an alias, and the ratchet
      * caught it. Written inline instead. */
-    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK, name);
+    strcpy(&g_gameprocBlock, name);
     PlaySoundAt(2, 0, 0, 0, 0);
     SelectLevel(level);
     g_levelId    = 1;

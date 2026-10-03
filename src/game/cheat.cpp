@@ -57,20 +57,9 @@ extern "C" const char *const am2_cheat_words[41] = {
     "xxx",
 };
 #endif
-#define kCheatWords  ((const char *const *)(uintptr_t)ADDR_CHEAT_WORDS)
+#define kCheatWords  (g_cheatWords)
 
-#define g_cheatEnabled  (*(int32_t *)(uintptr_t)ADDR_CHEAT_ENABLED)
-#define g_defaultOwner  (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_invulnerable  (*(int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE)
-#define g_cheatLevelSelect (*(int32_t *)(uintptr_t)ADDR_CHEAT_LEVEL_SELECT)
-#define g_fogOfWar      (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)
-#define g_flameOn       (*(int32_t *)(uintptr_t)ADDR_FLAME_ON)
-#define g_flameNextMs   (*(int32_t *)(uintptr_t)ADDR_FLAME_NEXT_MS)
-#define g_movieCount      (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
-#define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
-#define g_cursorPoint  (*(int32_t *)(uintptr_t)ADDR_CURSOR_POINT)
-#define g_secondRect    (*(const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT)
+#define g_viewRect   ((AM2_Rect *)&g_viewX)
 
 /* Every arm's reply colour is one byte read from one of ten globals. */
 #define kColour(a)      (*(const uint8_t *)(uintptr_t)(a))
@@ -94,7 +83,7 @@ static void __cdecl CheatHealOne(void *obj)
  * written as an argument, which is why it is looked up after the other
  * arguments are pushed. */
 #define CHEAT_GIVE_ITEM(kind, ammo)                                          \
-    CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, 0,               \
+    CreateWeapon(g_dirScratch, 0,               \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
                  *(const uint32_t *)(u + OBJ_OFF_POS), 0, (ammo), 0, 0)
 
@@ -111,9 +100,9 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * write happens before or after the swap.  Written out in each arm, as the
  * image has them; the no-old-weapon exit is one block both arms reach. */
 #define CHEAT_NEW_WEAPON(kind)                                               \
-    ((uint8_t *)CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, 0,   \
+    ((uint8_t *)CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
-                 *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT, 4, -1, 0, 0))
+                 g_zeroPoint, 4, -1, 0, 0))
 
 /* 0x00417B80. */
 void __cdecl CheatLine(const char *line)
@@ -135,7 +124,7 @@ void __cdecl CheatLine(const char *line)
          * NOT a colour table of its own -- 0x004F9ACD is
          * ADDR_OBJ_TABLE_RECORDS + 1 and the shift by 8 is the record size. */
         HudMessage("Cheat!!!",
-                   *((const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+                   *(g_objTableRecords
                               + army * AM2_OBJ_TABLE_REC_SIZE + 1));
         g_cheatEnabled = 1;
         return;
@@ -155,15 +144,15 @@ void __cdecl CheatLine(const char *line)
 again:
     switch (n) {
     case 1:                                     /* santini */
-        HudMessage("I am the Juggernaut!", kColour(ADDR_COLOUR_LAG_MID));
+        HudMessage("I am the Juggernaut!", kColour(((uintptr_t)&g_colourLagMid)));
         g_invulnerable = 1;
         return;
     case 2:                                     /* warp 6 */
-        HudMessage("Aye aye Captain!", kColour(ADDR_COLOUR_BLUE));
+        HudMessage("Aye aye Captain!", kColour(((uintptr_t)&g_colourBlue)));
         g_cheatLevelSelect = 1;
         return;
     case 3:                                     /* jumpjets */
-        HudMessage("I can fly!", kColour(ADDR_COLOUR_BLUE));
+        HudMessage("I can fly!", kColour(((uintptr_t)&g_colourBlue)));
         PlayDynamicSound("portal2_8bit.wav", 0, 0, 0, 0, 0x10, 3, 0);
 
         /* x adds the two PACKED dwords and keeps the low word; y adds the
@@ -171,7 +160,7 @@ again:
         where.x = (int16_t)(g_cursorPoint + g_viewRect->left);
         where.y = (int16_t)(((const int16_t *)&g_cursorPoint)[1]
                             + *(const int16_t *)&g_viewRect->top);
-        if (!PointInRect(&g_secondRect, &where))
+        if (!PointInRect(&(*(const AM2_Rect *)g_secondRect), &where))
             return;
 
         CreateExplosion(where.x, where.y, 0x85, 0, 0, 0, 0, 0, 0, 0);
@@ -179,37 +168,37 @@ again:
         ObjTileChanged(u, 0, 0);
         return;
     case 4:                                     /* spidey senses tingling */
-        HudMessage("I see everything!", kColour(ADDR_COLOUR_WHITE));
+        HudMessage("I see everything!", kColour(((uintptr_t)&g_whiteInk)));
         g_fogOfWar = 0;
         ToggleFogOfWar();
         return;
     case 5:                                     /* moleman */
         HudMessage("I bury my head 'neath the sand.",
-                   kColour(ADDR_BACKGROUND_COLOUR));
+                   kColour(((uintptr_t)&g_backgroundColour)));
         g_fogOfWar = 1;
         ToggleFogOfWar();
         return;
     case 6:                                     /* doctor doctor */
-        HudMessage("Avoid the agony...", kColour(ADDR_COLOUR_WHITE));
+        HudMessage("Avoid the agony...", kColour(((uintptr_t)&g_whiteInk)));
         ForEachArmyObject((int32_t)g_defaultOwner, CheatHealOne);
         return;
     case 7:                                     /* ucla -- reply only */
-        HudMessage("Goooooo Bruins!", kColour(ADDR_COLOUR_BLUE));
+        HudMessage("Goooooo Bruins!", kColour(((uintptr_t)&g_colourBlue)));
         return;
     case 8:                                     /* armageddon */
-        HudMessage("Duck and cover!", kColour(ADDR_HUD_MESSAGE_COLOUR));
+        HudMessage("Duck and cover!", kColour(((uintptr_t)&g_hudColour)));
         SpawnRandomBarrage();
         return;
     case 9:                                     /* surprise party */
-        HudMessage("Holy smokes!", kColour(ADDR_COLOUR_STALE));
+        HudMessage("Holy smokes!", kColour(((uintptr_t)&g_colourStale)));
         PortalSpawn();
         return;
     case 10:                                     /* phoenix! */
         if (g_flameOn != 0)
             return;
-        HudMessage("Flame On!", kColour(ADDR_HUD_MESSAGE_COLOUR));
+        HudMessage("Flame On!", kColour(((uintptr_t)&g_hudColour)));
         g_flameOn = 1;
-        g_flameNextMs = 0;
+        (*(int32_t *)&g_flameNextMs) = 0;
         old = (uint8_t *)WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
         fresh = CHEAT_NEW_WEAPON(3);
         if (old) {
@@ -221,22 +210,22 @@ again:
             SoldierKindForWeapon(u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
             SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
             SetFieldInAll(u + OBJ_OFF_SUBRECORD,
-                          (void *)(uintptr_t)ADDR_FLAME_RECORD);
+                          g_flameRecord);
             RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
-                      (void *)(uintptr_t)ADDR_MAP_DESC);
+                      g_mapDesc);
             return;
         }
         goto no_old;
     case 11:                                    /* cliche ending */
         if (g_flameOn == 0)
             return;
-        HudMessage("Flame Off!", kColour(ADDR_HUD_MESSAGE_COLOUR));
+        HudMessage("Flame Off!", kColour(((uintptr_t)&g_hudColour)));
         g_flameOn = 0;
-        g_flameNextMs = 0;
+        (*(int32_t *)&g_flameNextMs) = 0;
         SetFieldInAll(u + OBJ_OFF_SUBRECORD,
                       *(void **)(u + OBJ_OFF_TABLE_REC_KIND));
         RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
-                  (void *)(uintptr_t)ADDR_MAP_DESC);
+                  g_mapDesc);
         old = (uint8_t *)WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
         fresh = CHEAT_NEW_WEAPON(9);
         if (old) {
@@ -259,53 +248,53 @@ again:
     /* The nineteen item cheats.  Reply, colour, kind, ammo -- nothing else
      * differs between them, which is what reading them side by side showed
      * and reading them in sequence did not. */
-    case 12: HudMessage("Hear me roar!", kColour(ADDR_COLOUR_STALE));
+    case 12: HudMessage("Hear me roar!", kColour(((uintptr_t)&g_colourStale)));
              CHEAT_GIVE_ITEM(0x02, -1); return;
-    case 13: HudMessage("Flame forever!", kColour(ADDR_HUD_MESSAGE_COLOUR));
+    case 13: HudMessage("Flame forever!", kColour(((uintptr_t)&g_hudColour)));
              CHEAT_GIVE_ITEM(0x03, -1); return;
-    case 14: HudMessage("Sigh...", kColour(ADDR_COLOUR_LAG_MID));
+    case 14: HudMessage("Sigh...", kColour(((uintptr_t)&g_colourLagMid)));
              CHEAT_GIVE_ITEM(0x04, -1); return;
     case 15: HudMessage("May your gun never jam",
-                        kColour(ADDR_VIEW_RECT_COLOUR));
+                        kColour(((uintptr_t)&g_hiliteColour)));
              CHEAT_GIVE_ITEM(0x1D, -1); return;
-    case 16: HudMessage("Follow the blueprints!", kColour(ADDR_COLOUR_BLUE));
+    case 16: HudMessage("Follow the blueprints!", kColour(((uintptr_t)&g_colourBlue)));
              CHEAT_GIVE_ITEM(0x0B, 0x2C); return;
     case 17: HudMessage("Tinker away with these...",
-                        kColour(ADDR_COLOUR_NO_MAP));
+                        kColour(((uintptr_t)&g_colourNoMap)));
              CHEAT_GIVE_ITEM(0x0C, 0x0D); return;
-    case 18: HudMessage("To clean up the mess.", kColour(ADDR_COLOUR_NO_MAP));
+    case 18: HudMessage("To clean up the mess.", kColour(((uintptr_t)&g_colourNoMap)));
              CHEAT_GIVE_ITEM(0x14, -1); return;
-    case 19: HudMessage("Feel small...", kColour(ADDR_KIND7_NAMES));
+    case 19: HudMessage("Feel small...", kColour(((uintptr_t)g_kind7Names)));
              CHEAT_GIVE_ITEM(0x24, 0x0C); return;
-    case 20: HudMessage("Not!", kColour(ADDR_COLOUR_STALE));
+    case 20: HudMessage("Not!", kColour(((uintptr_t)&g_colourStale)));
              CHEAT_GIVE_ITEM(0x26, 0x0C); return;
-    case 21: HudMessage("La la la la la la!", kColour(ADDR_COLOUR_BLUE));
+    case 21: HudMessage("La la la la la la!", kColour(((uintptr_t)&g_colourBlue)));
              CHEAT_GIVE_ITEM(0x25, 0x0C); return;
-    case 22: HudMessage("I kid you not.", kColour(ADDR_COLOUR_STALE));
+    case 22: HudMessage("I kid you not.", kColour(((uintptr_t)&g_colourStale)));
              CHEAT_GIVE_ITEM(0x1C, -1); return;
     case 23: HudMessage("To see you better with my dear",
-                        kColour(ADDR_COLOUR_WHITE));
+                        kColour(((uintptr_t)&g_whiteInk)));
              CHEAT_GIVE_ITEM(0x27, -1); return;
-    case 24: HudMessage("Begone all ye vermin!", kColour(ADDR_COLOUR_LAG_MID));
+    case 24: HudMessage("Begone all ye vermin!", kColour(((uintptr_t)&g_colourLagMid)));
              CHEAT_GIVE_ITEM(0x28, -1); return;
     case 25: HudMessage("Rockets bursting in air",
-                        kColour(ADDR_HUD_MESSAGE_COLOUR));
+                        kColour(((uintptr_t)&g_hudColour)));
              CHEAT_GIVE_ITEM(0x2A, -1); return;
     case 26: HudMessage("For my darling professional...",
-                        kColour(ADDR_COLOUR_BLUE));
+                        kColour(((uintptr_t)&g_colourBlue)));
              CHEAT_GIVE_ITEM(0x1E, -1); return;
-    case 27: HudMessage("Death from above", kColour(ADDR_COLOUR_WHITE));
+    case 27: HudMessage("Death from above", kColour(((uintptr_t)&g_whiteInk)));
              CHEAT_GIVE_ITEM(0x18, 0x0C); return;
     case 28: HudMessage("Take heart my comrade.",
-                        kColour(ADDR_VIEW_RECT_COLOUR));
+                        kColour(((uintptr_t)&g_hiliteColour)));
              CHEAT_GIVE_ITEM(0x1A, 3); return;
-    case 29: HudMessage("Paper cuts.", kColour(ADDR_VIEW_RECT_COLOUR));
+    case 29: HudMessage("Paper cuts.", kColour(((uintptr_t)&g_hiliteColour)));
              CHEAT_GIVE_ITEM(0x19, 3); return;
-    case 30: HudMessage("And super glue too.", kColour(ADDR_COLOUR_WHITE));
+    case 30: HudMessage("And super glue too.", kColour(((uintptr_t)&g_whiteInk)));
              CHEAT_GIVE_ITEM(0x17, -1); return;
 
     case 31:                                    /* techno */
-        HudMessage("Rocks.", kColour(ADDR_COLOUR_STALE));
+        HudMessage("Rocks.", kColour(((uintptr_t)&g_colourStale)));
         PlayDynamicSound("portal1_8bit.wav", 1, 0, 0, 0, 0x10, 2,
                          *(const uint32_t *)(u + OBJ_OFF_UID));
         return;
@@ -315,43 +304,43 @@ again:
          * guard is `cmp edx, 0x26; jbe` and the modulus is exactly the table
          * size, so it can never fail -- an unconditional branch spelled as a
          * conditional one.  It can pick itself. */
-        HudMessage("No luck whatsover.", kColour(ADDR_COLOUR_LAG_MID));
+        HudMessage("No luck whatsover.", kColour(((uintptr_t)&g_colourLagMid)));
         n = orig_rand() % AM2_CHEAT_COUNT + 1;
         goto again;
 
     case 33:                                    /* ninja arts */
-        HudMessage("Stealth mode on!", kColour(ADDR_COLOUR_DARK_BLUE));
+        HudMessage("Stealth mode on!", kColour(((uintptr_t)g_colourDarkBlue)));
         SetFieldInAll(u + OBJ_OFF_SUBRECORD,
-                      (void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES);
+                      g_rowLutDoubles);
         RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
-                  (void *)(uintptr_t)ADDR_MAP_DESC);
+                  g_mapDesc);
         return;
     case 34:                                    /* suicide kings */
-        HudMessage("And you're the king!", kColour(ADDR_COLOUR_LAG_MID));
+        HudMessage("And you're the king!", kColour(((uintptr_t)&g_colourLagMid)));
         *(uint16_t *)(u + OBJ_OFF_HEALTH) = 1;
         g_invulnerable = 0;
         DamageObject(u, 0x64, 2, *(const int32_t *)(u + OBJ_OFF_UID), 0, 0);
         return;
     case 35:                                    /* night of the walking dead */
-        HudMessage("Brains, Brains!", kColour(ADDR_COLOUR_DARK_BLUE));
+        HudMessage("Brains, Brains!", kColour(((uintptr_t)g_colourDarkBlue)));
         Type2ActionAll();
         return;
     case 36:                                    /* fond memories */
-        HudMessage("Memories...", kColour(ADDR_COLOUR_LAG_MID));
+        HudMessage("Memories...", kColour(((uintptr_t)&g_colourLagMid)));
         g_movieCount = 3;
         return;
     case 37:                                    /* veni vidi vinci */
         HudMessage("Victory is belongs to Caesar!",
-                   kColour(ADDR_VIEW_RECT_COLOUR));
+                   kColour(((uintptr_t)&g_hiliteColour)));
         ScriptRunLine("trigger greenwins");
         return;
     case 38:                                    /* i give up */
-        HudMessage("Why so glum?", kColour(ADDR_KIND7_NAMES));
+        HudMessage("Why so glum?", kColour(((uintptr_t)g_kind7Names)));
         ScriptRunLine("trigger tanwins");
         return;
     case 39:                                    /* patton's speach */
         HudMessage("You've inspired your troops!",
-                   kColour(ADDR_VIEW_RECT_COLOUR));
+                   kColour(((uintptr_t)&g_hiliteColour)));
         AwardOwnArmyXp();
         return;
 

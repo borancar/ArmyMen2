@@ -39,8 +39,6 @@ uint32_t __cdecl KeyFieldC(uint32_t key)
 
 typedef struct { uint32_t key; int32_t value; } AM2_KeyEntry;
 
-#define g_keyTableN (*(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
-#define g_keyTable  (*(const AM2_KeyEntry **)(uintptr_t)ADDR_KEY_TABLE)
 
 int32_t __cdecl KeyLookup(uint32_t key)
 {
@@ -50,9 +48,9 @@ int32_t __cdecl KeyLookup(uint32_t key)
     while (hi > lo) {
         int32_t mid = lo + ((hi - lo) >> 1);
 
-        if (g_keyTable[mid].key == key)
-            return g_keyTable[mid].value;
-        if (g_keyTable[mid].key < key)
+        if ((*(const AM2_KeyEntry * *)&g_keyTable)[mid].key == key)
+            return (*(const AM2_KeyEntry * *)&g_keyTable)[mid].value;
+        if ((*(const AM2_KeyEntry * *)&g_keyTable)[mid].key < key)
             lo = mid + 1;
         else
             hi = mid;

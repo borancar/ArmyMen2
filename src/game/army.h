@@ -170,7 +170,7 @@ int army_install(void);
 #include "../inject/orig.h"
 /* Through the comm object, as every original caller does (see above). */
 static inline int32_t AllyFlag(int32_t a, int32_t b)
-{ return (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)->AllyFlag(a, b); }
+{ return (*(AM2_Comm *const *)&g_commObject)->AllyFlag(a, b); }
 
 #include "objtype.h"   /* ObjIsType2Inline */
 /* ArmyAlliedWithObj written in place, which is how the pointer-pick
@@ -190,7 +190,7 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army, void *b,
         return 1;
 
     if (ObjIsType2Inline(b)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        if (g_mpSession
             && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
             return 0;
 
@@ -199,23 +199,23 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army, void *b,
               ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
-        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)((*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
+                + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
                                  ->CommArmyOfSlot(army) << 8)) == rec)
             return 1;
 
-        if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+        if (rec == g_objTableRecords)
             idx = 0;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x100))
             idx = 1;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x200))
             idx = 2;
-        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+        else if (rec == (const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords) + 0x300))
             idx = 3;
         else
             return 0;
 
-        if (AllyFlag(army, (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+        if (AllyFlag(army, (*(AM2_Comm *const *)&g_commObject)
                                ->CommSlotForArmy(idx)))
             return 1;
     }

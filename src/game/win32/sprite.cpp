@@ -120,16 +120,7 @@ extern "C" const char *const am2_sprite_set_dirs[46] = {   /* 0x00489554 */
 };
 #endif
 
-#define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
-#define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_drawTarget  (*(void *const *)(uintptr_t)ADDR_DRAW_TARGET)
-#define g_primarySurface (*(void *const *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_frameBuf       (*(void *const *)(uintptr_t)ADDR_FRAMEBUFFER)
-#define g_originDX       (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
-#define g_originDY       (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
-#define g_overlayPalette (*(void **)(uintptr_t)ADDR_OVERLAY_PALETTE)
-#define g_defaultPalette (*(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE)
 
 /* 0x00445EB0, the surface-lost recovery chain: calls Restore through the
  * sprite's own surface and falls back through several drawing paths. Not
@@ -152,7 +143,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
     x -= spr->hotX;
     y -= spr->hotY;
 
-    if (!ClipRect(&spr->bounds, &g_screenClip, &x, &y, &clipped))
+    if (!ClipRect(&spr->bounds, &(*(const AM2_Rect *)g_screenClip), &x, &y, &clipped))
         return;
 
 #if !defined(AM2_RELINK)   /* harness trace, not the original's */
@@ -249,7 +240,7 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
 
         if (g_surfaceLocked) {
             IDirectDrawSurface_Unlock((LPDIRECTDRAWSURFACE)g_drawTarget,
-                                      g_frameBuf);
+                                      (*(void *const *)&g_frameBuf));
             g_surfaceLocked = 0;
         }
         dest = (LPDIRECTDRAWSURFACE)g_drawTarget;
@@ -268,7 +259,6 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
 
 /* The three reload routines and the -df switch that picks between two of
  * them. All original; this function only decides which applies. */
-#define g_optDf                  (*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
 
 /* Put a lost sprite back. See sprite.h.
  *
@@ -312,9 +302,6 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
  * with `rep stosd` for 0x10 dwords. */
 static_assert(sizeof(AM2_Sprite) == 0x40, "AM2_Sprite is 64 bytes");
 
-#define g_spriteTable       (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)
-#define g_spriteRegCount    (*(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT)
-#define g_spriteRegPairs    (*(const uint32_t *const *)(uintptr_t)ADDR_SPRITE_REG_PAIRS)
 
 /* 0x00445990. The sprite id to its SLOT in g_spriteTable, or -1.
  *
@@ -331,9 +318,9 @@ int32_t __cdecl SpriteSlotOf(uint32_t id)
 
     while (hi > lo) {
         mid = ((hi - lo) >> 1) + lo;
-        if (g_spriteRegPairs[(uint32_t)mid * 2] == id)
-            return (int32_t)g_spriteRegPairs[(uint32_t)mid * 2 + 1];
-        if (g_spriteRegPairs[(uint32_t)mid * 2] < id)
+        if ((*(const uint32_t *const *)&g_spriteRegPairs)[(uint32_t)mid * 2] == id)
+            return (int32_t)(*(const uint32_t *const *)&g_spriteRegPairs)[(uint32_t)mid * 2 + 1];
+        if ((*(const uint32_t *const *)&g_spriteRegPairs)[(uint32_t)mid * 2] < id)
             lo = mid + 1;
         else
             hi = mid;
@@ -428,9 +415,6 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
  * The slot immediately past the array is cleared too, without being released.
  * That is the original's, and it is a slot rather than a stray write: the loop
  * stops at that address precisely because it is the end of the array. */
-#define g_menuSprites  ((AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES)
-#define g_menuSpritesEnd (*(uint32_t *)(uintptr_t)ADDR_MENU_SPRITES_END)
-#define g_menuSurface  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
 
 #define MENU_SPRITE_COUNT 190   /* (ADDR_MENU_SPRITES_END - ADDR_MENU_SPRITES) / 4 */
 
@@ -438,7 +422,7 @@ void __cdecl FreeMenuSprites(void)
 {
     /* 19 rows of ten: the image's inner counter of ten inside an outer
      * bound check is this two-dimensional walk. */
-    AM2_Sprite *(*rows)[10] = (AM2_Sprite *(*)[10])(uintptr_t)ADDR_MENU_SPRITES;
+    AM2_Sprite *(*rows)[10] = (AM2_Sprite *(*)[10])((uintptr_t)&g_menuSprites);
     int32_t     i, j;
 
     for (i = 0; i < MENU_SPRITE_COUNT / 10; i++) {
@@ -449,7 +433,7 @@ void __cdecl FreeMenuSprites(void)
             }
         }
     }
-    g_menuSpritesEnd = 0;
+    (*(uint32_t *)&g_menuSpritesEnd) = 0;
 
     if (g_menuSurface) {
         IDirectDrawSurface_Release(g_menuSurface);
@@ -496,8 +480,8 @@ void __cdecl InitMenuScreen(void)
 {
     /* The same buffer ADDR_FLAME_RECORD names -- see orig.h. Two subsystems,
      * one 256 bytes, and neither is up while the other is. */
-    uint8_t       *digits  = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
-    uint8_t       *shades  = (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+    uint8_t       *digits  = (uint8_t *)g_flameRecord;
+    uint8_t       *shades  = g_paletteGlyphs;
     AM2_Rect       r;
     int32_t        i, row, frame, rows;
 
@@ -509,7 +493,7 @@ void __cdecl InitMenuScreen(void)
         digits[i] = (uint8_t)i;
 
     /* The palette pointer is read afresh for every entry. */
-#define palette (*(const uint8_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define palette (*(const uint8_t *const *)&g_activePalette)
     for (i = 0; i < 256; i++) {
         int32_t hi = palette[i * 4];
 
@@ -523,13 +507,13 @@ void __cdecl InitMenuScreen(void)
     }
 #undef palette
 
-    if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
+    if (g_gameState == 2)
         rows = AM2_MENU_SPRITE_ROWS;
     else
         rows = 0;
 
     for (row = 0; row <= rows; row++) {
-        AM2_Sprite **dst = (AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES + row * 10;
+        AM2_Sprite **dst = (AM2_Sprite * *)&g_menuSprites + row * 10;
 
         for (frame = 0; frame < 10; frame++) {
             dst[frame] = PreloadSprite(0, row, frame, 0, 1);
@@ -538,13 +522,13 @@ void __cdecl InitMenuScreen(void)
         }
     }
 
-    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME = 0;
-    g_menuSpritesEnd = *(const uint32_t *)(uintptr_t)ADDR_MENU_SPRITES;
-    *(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT = Ticks() + MENU_ANIM_PERIOD;
+    g_animFrame = 0;
+    (*(uint32_t *)&g_menuSpritesEnd) = *(const uint32_t *)&g_menuSprites;
+    g_animNext = Ticks() + MENU_ANIM_PERIOD;
 
     r = RectMake(0, 0, 0, 0);
-    *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV = r;
-    *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT = r;
+    *(AM2_Rect *)g_menuCursorPrev = r;
+    *(AM2_Rect *)g_menuCursorRect = r;
 
     g_menuSurface = CreateOffscreenSurface(0x20, 0x20, 0x40, -1);
 }
@@ -584,7 +568,7 @@ AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
         return PreloadSprite(set, index, frame, flags, addref);
 
     id  = (uint32_t)(((AM2_SPRITE_SET_BY_NAME << 12)
-                      + *(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT + 1)
+                      + g_spriteRegCount + 1)
                      << 7);
     spr = LoadBitmap(name, flags);
     if (!spr)
@@ -619,10 +603,10 @@ void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id)
     int32_t lo, hi, grown;
 
     /* Every global is re-read where it is used; the midpoint is a shift. */
-#define PAIRS (*(AM2_SpritePair **)(uintptr_t)ADDR_SPRITE_REG_PAIRS)
-#define SLOTS (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)
-#define COUNT (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT)
-#define CAP   (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP)
+#define PAIRS (*(AM2_SpritePair * *)&g_spriteRegPairs)
+#define SLOTS (g_spriteTable)
+#define COUNT (g_spriteRegCount)
+#define CAP   (g_spriteRegCap)
     hi = COUNT;
     lo = 0;
     while (hi > lo) {
@@ -667,7 +651,6 @@ typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
 /* LoadShadowBmp is reconstructed above and called by name. */
 #define orig_findfirst      ((am2_findfirst_fn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
 #define orig_findclose      ((am2_findclose_fn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
-#define g_spriteSetDirs     ((const char *const *)((void *)(uintptr_t)(ADDR_SPRITE_SET_DIRS)))
 
 /* LoadShadowBmp -- original 0x00423300, one caller: SpriteLoadTriple's loose
  * `.sha` half, so it runs only under -df. orig.h had it as "a 1-bit DIB read
@@ -808,7 +791,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     len = (int32_t)(out - stream);
     spr->overlay = (AM2_Rle16 *)am2_malloc((size_t)len);
     memcpy(spr->overlay, stream, (size_t)len);
-    spr->palette = *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+    spr->palette = g_defaultPalette;
 
     if (!spr->image.surface) {
         int16_t hx = *(const int16_t *)(infoHdr + BMPINFO_OFF_XPELS);
@@ -877,7 +860,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
 
     if (set >= 20)
         orig_sprintf(dir, "%s\\%s",
-                     (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
+                     g_mapBlock,
                      g_spriteSetDirs[set]);
     else
         orig_sprintf(dir, "%s",
@@ -1064,10 +1047,10 @@ void *__cdecl SpriteSetForKey(uint32_t key)
 
     if (set < 20) {
         if (set >= 1 && set <= 9)
-            return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
-        return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_SHARED));
+            return (void *)(g_spriteSetTitle);
+        return (void *)(g_spriteSetShared);
     }
-    return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
+    return (void *)(g_spriteSetThird);
 }
 
 /* 0x00423D50. The directory index for a key, or -1.
@@ -1124,7 +1107,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     char file[0x40];
 
     if (strcmp(name, "title") == 0) {
-        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
+        void *rec = g_spriteSetTitle;
 
         *set = rec;
         *id  = AM2_DAT_ID_TITLE;
@@ -1137,7 +1120,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     if (strcmp(name, "shared") == 0) {
-        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_SHARED));
+        void *rec = g_spriteSetShared;
 
         *set = rec;
         *id  = AM2_DAT_ID_SHARED;
@@ -1150,7 +1133,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     {
-        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
+        void *rec = g_spriteSetThird;
 
         *set = rec;
         *id  = AM2_DAT_ID_OBJECTS;
@@ -1213,7 +1196,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     char      file[0x100];
     int32_t   i;
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     if (SpriteSetResolve(name, (void **)&set, &want))
         return SET_FILE(set) != 0;
@@ -1245,7 +1228,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     {
 #define pal ((const uint32_t *)(set + SPRITE_SET_OFF_PALETTE))
 #define remap (set + SPRITE_SET_OFF_REMAP)
-#define display (*(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define display (g_activePalette)
 
         if (display) {
             /* The original pushes ONE argument here, not two -- `add esp, 0x10`
@@ -1466,7 +1449,7 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
 
     if (set >= 20)
         orig_sprintf(dir, "%s\\%s",
-                     (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
+                     g_mapBlock,
                      g_spriteSetDirs[set]);
     else
         orig_sprintf(dir, "%s",
@@ -1620,9 +1603,6 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
 /* orig_fread comes from orig.h, where map.cpp and air.cpp already reach it --
  * a second definition here is how one name becomes two. */
 
-#define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
-#define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
-#define g_spriteListCap (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)
 
 void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
                            uint32_t flags)
@@ -1642,10 +1622,10 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
             GrowSpriteList();
 
         spr = (AM2_Sprite *)am2_malloc(0x40);
-        g_spriteList[g_spriteListN] = spr;
+        (*(AM2_Sprite ** *)&g_spriteList)[g_spriteListN] = spr;
         /* Re-read from the list rather than reusing the pointer, as the
          * original does -- twice, once for each of the next two uses. */
-        spr = g_spriteList[g_spriteListN];
+        spr = (*(AM2_Sprite ** *)&g_spriteList)[g_spriteListN];
         memset(spr, 0, 0x40);
 
         /* Each field has its own local, read in pairs and then stored. */
@@ -1701,7 +1681,6 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
 }
 
 /* orig_fopen and orig_fclose come from orig.h, like orig_fread. */
-#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
 int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
                                const AM2_AnimTable *fallback,
@@ -1782,9 +1761,6 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
  * On this side of the split rather than in anim.cpp because the return is an
  * AM2_Sprite, which carries an LPDIRECTDRAWSURFACE.
  */
-#define g_soldierAnims ((AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)
-#define g_turretAnims  ((AM2_AnimTable *)(uintptr_t)ADDR_TURRET_ANIMS)
-#define g_vehicleAnims ((AM2_AnimTable *)(uintptr_t)ADDR_VEHICLE_ANIMS)
 
 /* Written once and used three times, where the original writes it out three
  * times. The index it returns is the caller's business: two of them fall back
@@ -1803,12 +1779,12 @@ static inline AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
 {
     int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->directionBits) & 0xFF;
 
-    return g_spriteList[a->cells[(int32_t)a->frames * facing].sprite];
+    return (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing].sprite];
 }
 
 AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &g_soldierAnims[kind];
+    const AM2_AnimTable *t = &((AM2_AnimTable *)g_soldierAnims)[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_STAND);
 
     if (i >= t->count)
@@ -1818,7 +1794,7 @@ AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
 
 AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &g_vehicleAnims[kind];
+    const AM2_AnimTable *t = &((AM2_AnimTable *)g_vehicleAnims)[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
 
     if (i >= t->count)
@@ -1835,7 +1811,7 @@ AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading)
  * Reproduced for the bytes; it never fires. */
 AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &g_turretAnims[kind];
+    const AM2_AnimTable *t = &((AM2_AnimTable *)g_turretAnims)[kind];
     int32_t              i;
 
     if (!t)
@@ -1868,13 +1844,10 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading)
  * roach's table and no fallback difference -- except that this one leaves the
  * index at 0 when nothing matches, like the soldier and vehicle versions.
  */
-#define g_roachAnims        ((AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)
-#define g_roachMaskDirs      (*(int32_t *)(uintptr_t)ADDR_ROACH_MASK_DIRECTIONS)
-#define g_roachMask   ((uint8_t *)(uintptr_t)ADDR_ROACH_MASK)
 
 void __cdecl BuildRoachMask(void)
 {
-    const AM2_AnimTable *t = g_roachAnims;
+    const AM2_AnimTable *t = ((AM2_AnimTable *)g_roachAnims);
     AM2_Anim            *a;
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
     int32_t              facing;
@@ -1890,7 +1863,7 @@ void __cdecl BuildRoachMask(void)
 
     out = g_roachMask;
     for (facing = 0; facing < a->directions; facing++) {
-        AM2_Sprite *spr = g_spriteList[a->cells[(int32_t)a->frames * facing]
+        AM2_Sprite *spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
         AM2_Point   found[AM2_MASK_POINTS];
         int32_t     count = 0;
@@ -1951,13 +1924,10 @@ void __cdecl BuildRoachMask(void)
  * ADDR_VEHICLE_ANIMS. If a layout does not tile, one of the bases is wrong --
  * which is how the roach table's was found to be.
  */
-#define g_vehicleMaskDirs ((int32_t *)(uintptr_t)ADDR_VEHICLE_MASK_DIRECTIONS)
-#define g_vehicleMask     ((uint8_t *)(uintptr_t)ADDR_VEHICLE_MASK)
-#define g_traceVeh        (*(const int32_t *)(uintptr_t)ADDR_OPT_TRACE_VEH)
 
 void __cdecl BuildVehicleMask(int32_t kind)
 {
-    const AM2_AnimTable *t = &g_vehicleAnims[kind];
+    const AM2_AnimTable *t = &((AM2_AnimTable *)g_vehicleAnims)[kind];
     AM2_Anim            *a;
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
     int32_t              dir;
@@ -1980,7 +1950,7 @@ void __cdecl BuildVehicleMask(int32_t kind)
         if (g_traceVeh)
             am2_log("vehicle mask direction: %d\n", dir);
 
-        spr = g_spriteList[a->cells[(int32_t)a->frames * dir].sprite];
+        spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * dir].sprite];
 
         /* Block centres, as BuildRoachMask. */
         for (y = AM2_MASK_STEP / 2; y < spr->bounds.bottom - AM2_MASK_STEP / 2;
@@ -2118,8 +2088,7 @@ AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags)
 int32_t __cdecl ArmySpriteBase(void)
 {
     int32_t army = AM2_THE_COMM->CommArmyOfSlot(
-                                  (int32_t)*(const uint32_t *)
-                                      (uintptr_t)ADDR_DEFAULT_OWNER);
+                                  (int32_t)g_defaultOwner);
 
     if (army > 3)
         army = 0;
@@ -2218,18 +2187,18 @@ void __cdecl LoadAirSprites(void)
     AM2_Sprite **p;
     int32_t      i;
 
-    *(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2 =
+    g_airSprites2 =
         PreloadSprite(AM2_AIR_SPRITE_SET, 2, 0, 0x1000, 1);
 
     /* signed address compares, as the original walked them (`jl`, not `jb`) */
     i = 0;
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
-         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_6; p++, i++)
+    for (p = g_airSprites3;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)g_airSprites6); p++, i++)
         *p = PreloadSprite(AM2_AIR_SPRITE_SET, 3, i, 0x1000, 1);
 
     i = 0;
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
-         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_EDGE; p++, i++)
+    for (p = g_airSprites6;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)&g_airSpritesEdge); p++, i++)
         *p = PreloadSprite(AM2_AIR_SPRITE_SET, 6, i, 0x1000, 1);
 }
 
@@ -2237,19 +2206,19 @@ void __cdecl FreeAirSprites(void)
 {
     AM2_Sprite **p;
 
-    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2);
+    ReleaseSprite(g_airSprites2);
 
     /* signed address compares, as the original walked them (`jl`, not `jb`) */
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
-         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_6; p++)
+    for (p = g_airSprites3;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)g_airSprites6); p++)
         ReleaseSprite(*p);
 
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
-         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_EDGE; p++)
+    for (p = g_airSprites6;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)&g_airSpritesEdge); p++)
         ReleaseSprite(*p);
 
     /* 179 dwords, not the 32 released above -- see the note. */
-    memset((void *)(uintptr_t)ADDR_AIR_SPRITES_2, 0,
+    memset((void *)&g_airSprites2, 0,
            AM2_AIR_SPRITES_CLEAR * 4);
 }
 
@@ -2284,15 +2253,15 @@ void __cdecl ResetAirSupport(void)
 
     FreeAirSpritesAlias();
 
-    *(int32_t *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK + AIR_OFF_COUNT) = 0;
-    *(int32_t *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK + AIR_OFF_PASS_COUNT) = 0;
+    *(int32_t *)(uintptr_t)(((uintptr_t)g_airSaveBlock) + AIR_OFF_COUNT) = 0;
+    *(int32_t *)(uintptr_t)(((uintptr_t)g_airSaveBlock) + AIR_OFF_PASS_COUNT) = 0;
 
     LoadAirSprites();
 
-    first = *(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2;
+    first = g_airSprites2;
     if (first)
-        *(int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE =
-            *(int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W + first->bounds.right * 2;
+        g_airSpritesEdge =
+            g_bitmapAreaW + first->bounds.right * 2;
 }
 
 /* FreeSpriteRegistry -- original 0x00445F40, three callers.
@@ -2328,22 +2297,22 @@ void __cdecl ResetAirSupport(void)
  */
 void __cdecl FreeSpriteRegistry(void)
 {
-    am2_FILE *fp = *(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE;
+    am2_FILE *fp = g_spriteFile;
     AM2_Sprite **table;
 
     if (fp) {
         orig_fclose(fp);
-        *(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE = (am2_FILE *)0;
+        g_spriteFile = (am2_FILE *)0;
     }
 
-    table = *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE;
+    table = g_spriteTable;
     if (table) {
         int32_t i;
 
-        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT;
+        for (i = 0; i < g_spriteRegCount;
              i++) {
             AM2_Sprite *spr =
-                (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)[i];
+                (g_spriteTable)[i];
 
             if (!spr)
                 continue;
@@ -2351,20 +2320,20 @@ void __cdecl FreeSpriteRegistry(void)
             if (spr->refs > 1)
                 spr->refs = 1;
 
-            ReleaseSprite((*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)[i]);
+            ReleaseSprite((g_spriteTable)[i]);
         }
 
-        am2_free(*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE);
-        *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE = (AM2_Sprite **)0;
+        am2_free(g_spriteTable);
+        g_spriteTable = (AM2_Sprite **)0;
     }
 
-    if (*(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS) {
-        am2_free(*(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS);
-        *(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS = (void *)0;
+    if (g_spriteRegPairs) {
+        am2_free(g_spriteRegPairs);
+        g_spriteRegPairs = (void *)0;
     }
 
-    *(int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT = 0;
-    *(int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP   = 0;
+    g_spriteRegCount = 0;
+    g_spriteRegCap   = 0;
 }
 
 int sprite_install(void)
@@ -2582,23 +2551,23 @@ static inline void FreeGroupRange(AM2_SpriteGroup *groups, int32_t n)
  * functions despite sitting under a perfectly uniform dispatcher. */
 void __cdecl LoadSpriteGroups(void)
 {
-    LoadGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS,
-                   (int32_t)((ADDR_SPRITE_GROUPS_END - ADDR_SPRITE_GROUPS) / AM2_SPRITEGRP_BYTES));
+    LoadGroupRange(g_spriteGroups,
+                   (int32_t)((((uintptr_t)g_spriteGroupsEnd) - ((uintptr_t)g_spriteGroups)) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl FreeSpriteGroups(void)
 {
-    FreeGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS,
-                   (int32_t)((ADDR_SPRITE_GROUPS_END - ADDR_SPRITE_GROUPS) / AM2_SPRITEGRP_BYTES));
+    FreeGroupRange(g_spriteGroups,
+                   (int32_t)((((uintptr_t)g_spriteGroupsEnd) - ((uintptr_t)g_spriteGroups)) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl LoadSpriteGroupsB(void)
 {
     LoadGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
-                   (int32_t)((ADDR_SPRITE_GROUPS_B_END - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
+                   (int32_t)((((uintptr_t)g_spriteGroupsBEnd) - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl FreeSpriteGroupsB(void)
 {
     FreeGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
-                   (int32_t)((ADDR_SPRITE_GROUPS_B_END - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
+                   (int32_t)((((uintptr_t)g_spriteGroupsBEnd) - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
 }
 
 /* 0x00462BE0. The third group table's loader. NOT a copy of the first two --
@@ -2616,9 +2585,8 @@ struct AM2_SpriteGroupC {
     AM2_Sprite **sprites;    /* SPRITEGRP_C_OFF_SPRITES */
     uint8_t      rest[AM2_SPRITEGRP_C_BYTES - 8];
 };
-#define g_spriteGroupsC ((AM2_SpriteGroupC *)(uintptr_t)ADDR_SPRITE_GROUPS_C)
 #define AM2_SPRITEGRP_C_COUNT \
-    ((int32_t)((ADDR_SPRITE_GROUPS_C_END - ADDR_SPRITE_GROUPS_C) \
+    ((int32_t)((((uintptr_t)g_spriteGroupsCEnd) - ((uintptr_t)g_spriteGroupsC)) \
                / AM2_SPRITEGRP_C_BYTES))
 
 void __cdecl LoadSpriteGroupsC(void)
@@ -2626,16 +2594,16 @@ void __cdecl LoadSpriteGroupsC(void)
     int32_t k, i;
 
     for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
-        if (g_spriteGroupsC[k].sprites != 0)
+        if (((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites != 0)
             continue;
 
-        g_spriteGroupsC[k].sprites = (AM2_Sprite **)am2_malloc(
-            (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
-        memset(g_spriteGroupsC[k].sprites, 0,
-               (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
+        ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites = (AM2_Sprite **)am2_malloc(
+            (size_t)((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count * sizeof(AM2_Sprite *));
+        memset(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites, 0,
+               (size_t)((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count * sizeof(AM2_Sprite *));
 
-        for (i = 0; i < g_spriteGroupsC[k].count; i++)
-            g_spriteGroupsC[k].sprites[i] =
+        for (i = 0; i < ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count; i++)
+            ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites[i] =
                 PreloadSprite(AM2_SPRITEGRP_SET, AM2_SPRITEGRP_C_BASE + k, i,
                               AM2_SPRITEGRP_C_FLAGS, 1);
     }
@@ -2650,14 +2618,14 @@ void __cdecl FreeSpriteGroupsC(void)
     int32_t k, n, i;
 
     for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
-        if (g_spriteGroupsC[k].sprites == 0)
+        if (((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites == 0)
             continue;
 
-        n = g_spriteGroupsC[k].count;
+        n = ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count;
         for (i = 0; i < n; i++)
-            ReleaseSprite(g_spriteGroupsC[k].sprites[i]);
-        am2_free(g_spriteGroupsC[k].sprites);
-        g_spriteGroupsC[k].sprites = 0;
+            ReleaseSprite(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites[i]);
+        am2_free(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites);
+        ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites = 0;
     }
 }
 
@@ -2723,26 +2691,24 @@ static inline void FreeGrid(const int32_t *rowsAt, const int32_t *colsAt,
  *
  * The divide is `cdq; sub; sar` -- SIGNED, so a negative bound rounds toward
  * zero where a shift would not. */
-#define g_decalSprites     (*(AM2_Sprite ***)(uintptr_t)ADDR_DECAL_SPRITES)
-#define g_decalSpriteCount (*(int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT)
 
 void __cdecl LoadDecalSprites(void)
 {
     int32_t i;
 
-    g_decalSprites = (AM2_Sprite **)am2_malloc((size_t)g_decalSpriteCount
+    (*(AM2_Sprite ** *)&g_decalSprites) = (AM2_Sprite **)am2_malloc((size_t)g_decalSpriteCount
                                                * sizeof(AM2_Sprite *));
-    memset(g_decalSprites, 0, (size_t)g_decalSpriteCount * sizeof(AM2_Sprite *));
+    memset((*(AM2_Sprite ** *)&g_decalSprites), 0, (size_t)g_decalSpriteCount * sizeof(AM2_Sprite *));
 
     for (i = 0; i < g_decalSpriteCount; i++) {
-        g_decalSprites[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+        (*(AM2_Sprite ** *)&g_decalSprites)[i] = PreloadSprite(AM2_SPRITEGRP_SET,
                                           AM2_DECAL_SPRITE_INDEX, i,
                                           AM2_SPRITE_FLAGS_FLAT, 1);
-        if (g_decalSprites[i] != 0) {
-            g_decalSprites[i]->hotX =
-                (int16_t)(g_decalSprites[i]->bounds.right / 2);
-            g_decalSprites[i]->hotY =
-                (int16_t)(g_decalSprites[i]->bounds.right / 2);
+        if ((*(AM2_Sprite ** *)&g_decalSprites)[i] != 0) {
+            (*(AM2_Sprite ** *)&g_decalSprites)[i]->hotX =
+                (int16_t)((*(AM2_Sprite ** *)&g_decalSprites)[i]->bounds.right / 2);
+            (*(AM2_Sprite ** *)&g_decalSprites)[i]->hotY =
+                (int16_t)((*(AM2_Sprite ** *)&g_decalSprites)[i]->bounds.right / 2);
         }
     }
 }
@@ -2751,13 +2717,13 @@ void __cdecl FreeDecalSprites(void)
 {
     int32_t i;
 
-    if (g_decalSprites == 0)
+    if ((*(AM2_Sprite ** *)&g_decalSprites) == 0)
         return;
 
     for (i = 0; i < g_decalSpriteCount; i++)
-        ReleaseSprite(g_decalSprites[i]);
-    am2_free(g_decalSprites);
-    g_decalSprites = 0;
+        ReleaseSprite((*(AM2_Sprite ** *)&g_decalSprites)[i]);
+    am2_free((*(AM2_Sprite ** *)&g_decalSprites));
+    (*(AM2_Sprite ** *)&g_decalSprites) = 0;
 }
 
 /* 0x00462EA0 and 0x00462F10. The seq kind-5 sprites, the same flat shape at
@@ -2768,19 +2734,17 @@ void __cdecl FreeDecalSprites(void)
  * ADDR_SEQ_SPRITE_5_COUNT has NO WRITER in the image and reads 4, so the two
  * agree permanently. Written with the loop bound spelled the way each half
  * spells it, because the two are different facts that happen to coincide. */
-#define g_seqSprites5     (*(AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_5)
-#define g_seqSprite5Count (*(int32_t *)(uintptr_t)ADDR_SEQ_SPRITE_5_COUNT)
 
 void __cdecl LoadSeqSprites5(void)
 {
     int32_t i;
 
-    g_seqSprites5 = (AM2_Sprite **)am2_malloc((size_t)g_seqSprite5Count
+    (*(AM2_Sprite ** *)&g_seqSprites5) = (AM2_Sprite **)am2_malloc((size_t)g_seqSprite5Count
                                               * sizeof(AM2_Sprite *));
-    memset(g_seqSprites5, 0, (size_t)g_seqSprite5Count * sizeof(AM2_Sprite *));
+    memset((*(AM2_Sprite ** *)&g_seqSprites5), 0, (size_t)g_seqSprite5Count * sizeof(AM2_Sprite *));
 
     for (i = 0; i < g_seqSprite5Count; i++)
-        g_seqSprites5[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+        (*(AM2_Sprite ** *)&g_seqSprites5)[i] = PreloadSprite(AM2_SPRITEGRP_SET,
                                          AM2_SEQ_SPRITE_5_INDEX, i,
                                          AM2_SPRITE_FLAGS_FLAT, 1);
 }
@@ -2789,13 +2753,13 @@ void __cdecl FreeSeqSprites5(void)
 {
     int32_t i;
 
-    if (g_seqSprites5 == 0)
+    if ((*(AM2_Sprite ** *)&g_seqSprites5) == 0)
         return;
 
     for (i = 0; i < 4; i++)          /* the original's literal, not the count */
-        ReleaseSprite(g_seqSprites5[i]);
-    am2_free(g_seqSprites5);
-    g_seqSprites5 = 0;
+        ReleaseSprite((*(AM2_Sprite ** *)&g_seqSprites5)[i]);
+    am2_free((*(AM2_Sprite ** *)&g_seqSprites5));
+    (*(AM2_Sprite ** *)&g_seqSprites5) = 0;
 }
 
 /* The two grid subsystems. Pair 7 diffs 1.000 against pair 4 on BOTH halves,
@@ -2805,29 +2769,29 @@ void __cdecl FreeSeqSprites5(void)
  * among the rest. */
 void __cdecl LoadSpriteGrid(void)
 {
-    LoadGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
-             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
-             (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID,
+    LoadGrid(&g_spriteGridCols,
+             g_spriteGridRows,
+             (AM2_Sprite ** *)&g_spriteGrid,
              AM2_SPRITE_GRID_BASE);
 }
 void __cdecl FreeSpriteGrid(void)
 {
-    FreeGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
-             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
-             (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID);
+    FreeGrid(g_spriteGridRows,
+             &g_spriteGridCols,
+             (AM2_Sprite ** *)&g_spriteGrid);
 }
 void __cdecl LoadSeqGrid(void)
 {
     LoadGrid((const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
-             (const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
-             (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7,
+             g_seqGridRows,
+             (AM2_Sprite ** *)&g_seqSprites7,
              AM2_SEQ_GRID_BASE);
 }
 void __cdecl FreeSeqGrid(void)
 {
-    FreeGrid((const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
+    FreeGrid(g_seqGridRows,
              (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
-             (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7);
+             (AM2_Sprite ** *)&g_seqSprites7);
 }
 
 /* 0x00463060 and 0x00463200. The mark sprites, and the largest pair in the
@@ -2847,14 +2811,6 @@ void __cdecl FreeSeqGrid(void)
  *
  * Pair 6's releaser has the same literal 0x10 with `jl` instead of `jle` and
  * is correct for its four. One bit apart, one leaks and one does not. */
-#define g_markSprites     (*(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES)
-#define g_markSpriteCount (*(int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT)
-#define g_mpMarkGrid      (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_MARK_GRID)
-#define g_mpMarkCols      (*(int32_t *)(uintptr_t)ADDR_MP_MARK_COLS)
-#define g_mpMarkA         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A)
-#define g_mpMarkB         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B)
-#define g_mpMarkC         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C)
-#define g_mpTeamSprites   (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES)
 
 void __cdecl LoadMarkSprites(void)
 {
@@ -2869,14 +2825,14 @@ void __cdecl LoadMarkSprites(void)
                                          AM2_SPRITE_FLAGS_FLAT, 1);
         if (g_markSprites[i] != 0) {
             g_markSprites[i]->palette =
-                *(void *const *)(uintptr_t)ADDR_REMAP_BRIGHT;
+                g_remapBright;
             g_markSprites[i]->hotX =
                 (int16_t)(g_markSprites[i]->bounds.right / 2);
             g_markSprites[i]->hotY = 0;
         }
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+    if (g_mpSession == 0)
         return;
 
     g_mpMarkGrid = (AM2_Sprite **)am2_malloc((size_t)g_mpMarkCols * 4
@@ -2909,7 +2865,7 @@ void __cdecl FreeMarkSprites(void)
         g_markSprites = 0;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+    if (g_mpSession == 0)
         return;
 
     if (g_mpMarkGrid != 0) {

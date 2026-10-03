@@ -42,7 +42,7 @@ extern "C" uint32_t am2_map_field_descs[14] = {   /* NOT const: LoadMap freads t
  * this at 181, outside it. */
 int32_t __cdecl LoadAtlFile(const char *path);
 
-#define kMapSaveBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_MAP_BLOCK)))
+#define kMapSaveBlock ((void *)(uintptr_t)((void *)g_mapBlock))
 
 int32_t __cdecl SaveMapSection(am2_FILE *fp)
 {
@@ -105,11 +105,11 @@ int32_t __cdecl TileOfPoint(uint32_t packed)
 #define PT (*(const AM2_Point *)&packed)
     if (PT.x < 0 || PT.y < 0)
         return 0;
-    if (PT.x >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
+    if (PT.x >= g_mapExtentX)
         return 0;
-    if (PT.y >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+    if (PT.y >= g_mapExtentY)
         return 0;
-    return (PT.y >> AM2_TILE_SHIFT) * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+    return (PT.y >> AM2_TILE_SHIFT) * g_mapTilesW
            + (PT.x >> AM2_TILE_SHIFT);
 #undef PT
 }
@@ -119,13 +119,13 @@ uint32_t __cdecl PointOfTile(int32_t tile)
     AM2_Point p;   /* built in memory -- the original reuses `tile`'s slot */
 
     /* The globals are read where they are used, mask before index. */
-    p.x = (int16_t)((((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+    p.x = (int16_t)((((uint32_t)g_mapTilesW
                        << AM2_TILE_SHIFT) - 16)
                     & ((uint32_t)tile << AM2_TILE_SHIFT)) + 8;
     /* A 16-BIT shift of the tile index, then scaled -- the original does
      * `shr ax, cl` and not `shr eax, cl`. */
     p.y = (int16_t)((((uint16_t)tile
-                      >> *(const int16_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+                      >> *(const int16_t *)&g_mapRowShift)
                      << AM2_TILE_SHIFT) + 8);
     return *(const uint32_t *)&p;
 }
@@ -156,10 +156,10 @@ void __cdecl TileToXY(uint16_t tile, int32_t *x, int32_t *y)
     uint32_t t = tile;
 
     /* The globals are read where they are used, mask before index. */
-    *x = (int32_t)((((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+    *x = (int32_t)((((uint32_t)g_mapTilesW
                      << AM2_TILE_SHIFT) - 16)
                    & (t << AM2_TILE_SHIFT)) + 8;
-    *y = (int32_t)(((t >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+    *y = (int32_t)(((t >> g_mapRowShift)
                     << AM2_TILE_SHIFT) + 8);
 }
 
@@ -195,12 +195,12 @@ uint32_t __cdecl MpScriptChecksum(void)
 {
     char path[0x100];
 
-    if (!ScriptListFind((char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME))))
+    if (!ScriptListFind(&g_mpScriptName))
         return 0;
 
     SetGameDir("rules");
     sprintf(path, "%s.txt",
-            (const char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)));
+            &g_mpScriptName);
     return Checksum(path);
 }
 
@@ -209,10 +209,10 @@ uint32_t __cdecl MpScriptChecksum(void)
  * object table the map was authored against. */
 uint32_t __cdecl MapChecksum(void)
 {
-    uint32_t sum = AmmChecksum((const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)),
-                               (const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+    uint32_t sum = AmmChecksum(&g_mapName_,
+                               g_tilesetPath);
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+    SetGameDir(g_tilesetPath);
     return sum ^ Checksum("object.aai");
 }
 
@@ -240,15 +240,15 @@ void __cdecl SelectLevel(const void *record)
     if (!r)
         return;
 
-    strcpy((char *)((void *)(uintptr_t)(ADDR_MAP_NAME)),          r + LEVEL_OFF_MAP_NAME);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)),        r + LEVEL_OFF_FOLDER);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_B)),       r + LEVEL_OFF_LOAD_SCREEN);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_A)),       r + LEVEL_OFF_LOAD_MUSIC);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_C)),       r + LEVEL_OFF_BRIEFING);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_SOUND_NAME)),  r + LEVEL_OFF_BRIEF_SFX);
-    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_D)),       r + LEVEL_OFF_STRAT_MAP);
+    strcpy(&g_mapName_,          r + LEVEL_OFF_MAP_NAME);
+    strcpy(g_tilesetPath,        r + LEVEL_OFF_FOLDER);
+    strcpy(g_levelStrB,       r + LEVEL_OFF_LOAD_SCREEN);
+    strcpy(g_levelStrA,       r + LEVEL_OFF_LOAD_MUSIC);
+    strcpy(&g_levelStrC,       r + LEVEL_OFF_BRIEFING);
+    strcpy(&g_levelSoundName,  r + LEVEL_OFF_BRIEF_SFX);
+    strcpy(g_levelStrD,       r + LEVEL_OFF_STRAT_MAP);
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_TILESET_RESERVE)) =
+    g_tilesetReserve =
         *(const int32_t *)(r + LEVEL_OFF_CYCLE);
 }
 
@@ -263,22 +263,22 @@ void __cdecl SelectLevel(const void *record)
  * could not have said. */
 void __cdecl FreeLevelTables(void)
 {
-    void *levels = *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
+    void *levels = g_levelTable;
     void *names;
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP))   = 0;
+    g_levelCount = 0;
+    g_levelTableCap   = 0;
     if (levels)
         am2_free(levels);
 
-    names = *(void **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
-    *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) = (void *)0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)) = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP))   = 0;
+    names = *(void * *)&g_nameTableBase;
+    g_levelTable = (void *)0;
+    g_nameTableCount = 0;
+    g_nameTableCap   = 0;
     if (names)
         am2_free(names);
 
-    *(void **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = (void *)0;
+    *(void * *)&g_nameTableBase = (void *)0;
 }
 
 /* 0x0043E1F0 -- find a level record by id, with the CRT's own bsearch over
@@ -295,8 +295,8 @@ void *__cdecl FindLevelRecord(int32_t id)
     *(int32_t *)key = id;
 
     return ((AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))(
-               key, *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)),
-               (uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)),
+               key, g_levelTable,
+               (uint32_t)g_levelCount,
                AM2_LEVEL_RECORD_SIZE,
                (const void *)CompareDword);
 }
@@ -315,7 +315,7 @@ void *__cdecl FindLevelRecord(int32_t id)
 static inline void ReadLevelFile(const char *name)
 {
     FreeLevelTables();
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     if (!DefParseInfoFile(name))
         am2_log("Couldn't parse %s!\n", name);
@@ -366,7 +366,7 @@ typedef char *(__cdecl *AM2_StrlwrFn)(char *);
 void *__cdecl FindLevelByName(char *name)
 {
     /* The level table, read afresh wherever it is used. */
-#define LEVEL(i) (*(char **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) \
+#define LEVEL(i) (*(char * *)&g_levelTable \
                   + (uint32_t)(i) * AM2_LEVEL_RECORD_SIZE)
     int32_t i;
 
@@ -375,7 +375,7 @@ void *__cdecl FindLevelByName(char *name)
 
     orig_strlwr(name);
 
-    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)); i++)
+    for (i = 0; i < g_levelCount; i++)
         if (!strcmp(LEVEL(i) + LEVEL_OFF_MAP_NAME, name))
             return LEVEL(i);
 
@@ -401,7 +401,7 @@ void *__cdecl FindLevelByName(char *name)
     if (!tok)                                                                 \
         return (missing);                                                     \
     if (!strcmp("none", tok))                                                 \
-        strcpy((dst), (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));       \
+        strcpy((dst), g_dirScratch);       \
     else                                                                      \
         strcpy((dst), tok)
 
@@ -477,7 +477,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
 
     memset(rec, 0, sizeof rec);
     *(int32_t *)(rec + LEVEL_OFF_ID) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) + 1;
+        g_levelCount + 1;
 
     tok = am2_strtok(line, " \t\n;,");
     if (!tok)
@@ -529,7 +529,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
         if (!strcmp("none", tok))
             strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
                    + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES,
-                   (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+                   g_dirScratch);
         else
             strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
                    + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES, tok);
@@ -579,15 +579,15 @@ void *__cdecl ScriptListFind(char *name)
     if (!name)
         return (void *)0;
 
-    if (!*(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)))
+    if (!g_nameTableCount)
         ReadMpMapList();
 
     orig_strlwr(name);
 
     /* The name table, read afresh wherever it is used. */
-#define REC(i) (*(char **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) \
+#define REC(i) (*(char * *)&g_nameTableBase \
                 + (uint32_t)(i) * AM2_NAME_RECORD_SIZE)
-    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)); i++)
+    for (i = 0; i < g_nameTableCount; i++)
         if (!strcmp(REC(i), name))
             return REC(i);
 
@@ -655,7 +655,7 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
     int32_t stepX = dx < 0 ? -1 : 1;
     int32_t stepY = dy < 0 ? -1 : 1;
 
-    int32_t stepDown = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * stepY;
+    int32_t stepDown = g_mapTilesW * stepY;
     /* Called as the `int` every file but this one declares it. */
     int32_t tile = ((int32_t (__cdecl *)(uint32_t))TileOfPoint)(from);
 
@@ -707,7 +707,7 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
  * that path does not reach. The counter is not blind. */
 int32_t __cdecl LevelCount(void)
 {
-    return *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
+    return g_levelCount;
 }
 
 /* ParseScenarioPart -- original 0x0043DAA0, one caller, which is
@@ -826,7 +826,7 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
         row[SCEN_ROW_OFF_FIELD_68] = 0;
         q++;
         *(uint32_t *)(row + SCEN_ROW_OFF_AT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            g_zeroPoint;
         if (!row[SCEN_ROW_OFF_FIELD_12])
             row[SCEN_ROW_OFF_FIELD_12] = 1;
 
@@ -889,16 +889,16 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
     uint8_t       *table;
     int32_t        i;
 
-    *(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD = 0;
-    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
+    g_scenarioUnread = 0;
+    g_scenarios      = (uint8_t *)0;
 
     count = *(const int32_t *)at;
     at += 4;
     remaining -= 4;
 
     table = (uint8_t *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
-    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS = table;
-    *(uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT = (uint16_t)count;
+    g_scenarios = table;
+    g_scenarioCount = (uint16_t)count;
 
     for (i = 0; i < count; i++) {
         struct ScenHdr { uint32_t w[AM2_SCENARIO_HDR_BYTES / 4]; } hdr;
@@ -964,7 +964,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
 void __cdecl FreeScenarios(void)
 {
     /* The table pointer is re-read after every free, as the original does. */
-#define TAB (*(uint8_t **)(uintptr_t)ADDR_SCENARIOS)
+#define TAB (g_scenarios)
 #define PART_ROWS(i, k) (*(void **)(TAB + (size_t)(i) * AM2_SCENARIO_BYTES     \
                                     + SCENARIO_OFF_PARTS                       \
                                     + (size_t)(k) * SCENARIO_PART_BYTES        \
@@ -972,7 +972,7 @@ void __cdecl FreeScenarios(void)
     int32_t i, k;
 
     if (TAB) {
-        for (i = 0; i < *(const uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT; i++)
+        for (i = 0; i < g_scenarioCount; i++)
             for (k = 0; k < (int32_t)AM2_SCENARIO_PARTS; k++)
                 if (PART_ROWS(i, k))
                     am2_free(PART_ROWS(i, k));
@@ -981,7 +981,7 @@ void __cdecl FreeScenarios(void)
 
     /* Both are cleared with or without a table to free, as one eight-byte
      * memset over the header (ADDR_SCENARIO_UNREAD, the count, the table). */
-    memset((void *)(uintptr_t)ADDR_SCENARIO_UNREAD, 0, 8);
+    memset((void *)&g_scenarioUnread, 0, 8);
 #undef PART_ROWS
 #undef TAB
 }
@@ -1018,7 +1018,7 @@ void __cdecl FreeScenarios(void)
  */
 void __cdecl AddLevelRecord(const void *record)
 {
-    uint8_t *table = *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
+    uint8_t *table = *(uint8_t * *)&g_levelTable;
     int32_t  cap;
     int32_t  count;
 
@@ -1026,31 +1026,31 @@ void __cdecl AddLevelRecord(const void *record)
         table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
                                       * AM2_LEVEL_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
-        *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE))    = table;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP)) = cap;
+        *(uint8_t * *)&g_levelTable    = table;
+        g_levelTableCap = cap;
     } else {
-        cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP));
+        cap = g_levelTableCap;
     }
 
-    count = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
+    count = g_levelCount;
 
     if (count >= cap) {
         cap += AM2_LEVEL_TABLE_GROW;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP)) = cap;
+        g_levelTableCap = cap;
 
         table = (uint8_t *)am2_realloc(table,
                                        (size_t)cap * AM2_LEVEL_RECORD_SIZE);
-        *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) = table;
+        *(uint8_t * *)&g_levelTable = table;
 
-        count = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
+        count = g_levelCount;
     }
 
     /* The count is read again for the copy and incremented in place. */
-    memcpy(table + (size_t)*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT
+    memcpy(table + (size_t)g_levelCount
                        * AM2_LEVEL_RECORD_SIZE,
            record, AM2_LEVEL_RECORD_SIZE);
 
-    (*(int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)++;
+    (g_levelCount)++;
 }
 
 /* The `rules` / `rulemap` trio -- originals 0x0043EA30, 0x0043EAC0 and
@@ -1200,7 +1200,7 @@ int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line)
  */
 void __cdecl AddNameRecord(const void *record)
 {
-    uint8_t *table = *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
+    uint8_t *table = g_nameTableBase;
     int32_t  cap;
     int32_t  count;
 
@@ -1208,31 +1208,31 @@ void __cdecl AddNameRecord(const void *record)
         table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
                                       * AM2_NAME_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
-        *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = table;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP))   = cap;
+        g_nameTableBase = table;
+        g_nameTableCap   = cap;
     } else {
-        cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP));
+        cap = g_nameTableCap;
     }
 
-    count = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT));
+    count = g_nameTableCount;
 
     if (count >= cap) {
         cap += AM2_LEVEL_TABLE_GROW;
-        *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP)) = cap;
+        g_nameTableCap = cap;
 
         table = (uint8_t *)am2_realloc(table,
                                        (size_t)cap * AM2_NAME_RECORD_SIZE);
-        *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = table;
+        g_nameTableBase = table;
 
-        count = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT));
+        count = g_nameTableCount;
     }
 
     /* The count is read again for the copy and incremented in place. */
-    memcpy(table + (size_t)*(const int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT
+    memcpy(table + (size_t)g_nameTableCount
                        * AM2_NAME_RECORD_SIZE,
            record, AM2_NAME_RECORD_SIZE);
 
-    (*(int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT)++;
+    (g_nameTableCount)++;
 }
 
 /* AmmChecksum -- original 0x0042C350, one caller.
@@ -1286,7 +1286,7 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
     uint32_t  len;
     am2_FILE *fp;
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+    SetGameDir(g_tilesetPath);
 
     am2_sprintf(name, "%s.amm", map);
 
@@ -1354,19 +1354,19 @@ void __cdecl FreeMapLayers(void)
 
     FreeMapSurfaces();
 
-    if (*(void *const *)(uintptr_t)ADDR_REGIONS) {
+    if (g_regions) {
         int32_t n;
 
-        for (n = 0; n < *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE; n++) {
-            uint8_t *r = (uint8_t *)*(void *const *)(uintptr_t)ADDR_REGIONS
+        for (n = 0; n < g_regionStride; n++) {
+            uint8_t *r = (uint8_t *)g_regions
                          + (uint32_t)n * AM2_REGION_SIZE;
 
             if (*(const uint8_t *)(r + REGION_OFF_NLINKS) > 0)
                 am2_free(*(void **)(r + REGION_OFF_LINKS));
         }
 
-        am2_free(*(void **)(uintptr_t)ADDR_REGIONS);
-        *(void **)(uintptr_t)ADDR_REGIONS = 0;
+        am2_free(g_regions);
+        g_regions = 0;
     }
 
     /* Each layer written out, as the image has them; only the reveal
@@ -1376,27 +1376,27 @@ void __cdecl FreeMapLayers(void)
         am2_free(*(void **)(uintptr_t)(a));             \
         *(void **)(uintptr_t)(a) = 0;                   \
     }
-    FREE_LAYER(ADDR_REGION_NEXT)
-    FREE_LAYER(ADDR_REGION_COST)
-    FREE_LAYER(ADDR_MAP_TILES)
-    FREE_LAYER(ADDR_TILE_ATTRS)
-    FREE_LAYER(ADDR_CELL_WEIGHTS)
-    FREE_LAYER(ADDR_MAP_PADBIT_LAYER)
-    FREE_LAYER(ADDR_MAP_PAD_LAYER)
-    FREE_LAYER(ADDR_TILE_KIND)
-    FREE_LAYER(ADDR_REGION_OF_CELL)
-    FREE_LAYER(ADDR_TILE_FLAGS)
+    FREE_LAYER(((uintptr_t)&g_regionNext))
+    FREE_LAYER(((uintptr_t)&g_regionCost))
+    FREE_LAYER(((uintptr_t)&g_mapTiles))
+    FREE_LAYER(((uintptr_t)&g_tileAttrs))
+    FREE_LAYER(((uintptr_t)&g_cellWeights))
+    FREE_LAYER(((uintptr_t)&g_mapPadbitLayer))
+    FREE_LAYER(((uintptr_t)&g_mapPadLayer))
+    FREE_LAYER(((uintptr_t)&g_tileKind))
+    FREE_LAYER(((uintptr_t)&g_regionOfCell))
+    FREE_LAYER(((uintptr_t)&g_tileFlags))
 #undef FREE_LAYER
 
     for (i = 0; i < AM2_REVEAL_ARMIES; i++) {
-        if (((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i]) {
-            am2_free(((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i]);
-            ((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i] = 0;
+        if ((g_tileRevealGrids)[i]) {
+            am2_free((g_tileRevealGrids)[i]);
+            (g_tileRevealGrids)[i] = 0;
         }
     }
 
     {
-        void **p = (void **)(uintptr_t)ADDR_TILE_COVER;
+        void **p = (void * *)&g_tileCover;
 
         if (*p) {
             am2_free(*p);
@@ -1415,8 +1415,8 @@ void __cdecl FreeMapLayers(void)
      * of the five is idempotent (each guards its pointer and clears it), so
      * running them here as well as at load is safe. */
     ItemsReset();
-    MapDescFree((void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-    MapDescFree((void *)(uintptr_t)ADDR_MAP_DESC);
+    MapDescFree(g_objMapDesc);
+    MapDescFree(g_mapDesc);
     FreeAaiTables();
     FreeSpriteRegistry();
 }
@@ -1499,8 +1499,8 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
  * after the walk if the file did not supply them, so every consumer
  * downstream may assume its layer exists. Two of the nine have no chunk arm
  * at all and are created only here. */
-#define MAP_PLANE ((*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) \
-                   * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H))
+#define MAP_PLANE ((g_mapTilesW) \
+                   * (g_mapTilesH))
 /* Allocate and zero a layer the file did not supply; the size is re-read
  * for each of the two uses, as the original does. */
 #define DEFAULT_LAYER(slot)                     \
@@ -1521,8 +1521,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     int32_t   objCount = 0, nfields = 0, tlayDone = 0;
 
     SetGameDir(folder);
-    memset(((char *)(uintptr_t)ADDR_MAP_BLOCK), 0, 0x1A0);
-    strcpy(((char *)(uintptr_t)ADDR_MAP_BLOCK), folder);
+    memset((g_mapBlock), 0, 0x1A0);
+    strcpy((g_mapBlock), folder);
 
     sprintf(path, "%s.atl", base);
     if (LoadAtlFile(path) == 0) {
@@ -1562,8 +1562,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         case AM2_IFF_NPAD:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane, 1, f);
+            g_mapPadLayer = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_mapPadLayer, plane, 1, f);
             consumed += plane;
             break;
 
@@ -1573,36 +1573,36 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (size != 0xC) MISMATCH();
             orig_map_fread(hdr, 0xC, 1, f);
             consumed += 0xC;
-            (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W)      = hdr[0];
-            (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)      = hdr[1];
-            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) << 4;
-            (*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)    = Log2Mask(hdr[0]) & 0xFF;
-            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H) << 4;
-            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_SHIFT) = Log2Mask((*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)) & 0xFF;
-            if ((*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT) < 1) {
+            (g_mapTilesW)      = hdr[0];
+            (g_mapTilesH)      = hdr[1];
+            (g_mapExtentX)     = (g_mapTilesW) << 4;
+            (*(int32_t *)&g_mapRowShift)    = Log2Mask(hdr[0]) & 0xFF;
+            (g_mapExtentY)     = (g_mapTilesH) << 4;
+            (g_mapExtentShift) = Log2Mask((g_mapExtentX)) & 0xFF;
+            if ((*(int32_t *)&g_mapRowShift) < 1) {
                 FreeMapLayers();
                 goto bad;
             }
             {
                 AM2_Rect r;
 
-                (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)    = *RectSet(&r, 0, 0, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+                (*(AM2_Rect *)g_mapBounds)    = *RectSet(&r, 0, 0, (g_mapExtentX), (g_mapExtentY));
                 /* The inset rect already has four field names in this tree rather than
                  * one rect name, so it is written a field at a time -- adding a second
                  * base over storage that is already named is the mistake orig.h opens
                  * with. */
-                RectSet(&r, 0x40, 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X) - 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y) - 0x40);
-                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT   = r.left;
-                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP    = r.top;
-                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT  = r.right;
-                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM = r.bottom;
-                (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  = MakePoint(0x10, 0x10);
-                (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV) = (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS);
-                (*(AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES) = *RectSet(&r, 1, 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W) + 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H) + 1);
+                RectSet(&r, 0x40, 0x40, (g_mapExtentX) - 0x40, (g_mapExtentY) - 0x40);
+                g_mapBoundsLeft   = r.left;
+                g_mapBoundsTop    = r.top;
+                g_mapBoundsRight  = r.right;
+                g_mapBoundsBottom = r.bottom;
+                (g_listenerPos)  = MakePoint(0x10, 0x10);
+                (g_listenerPosPrev) = (g_listenerPos);
+                (*(AM2_Rect *)g_visibleTiles) = *RectSet(&r, 1, 1, (g_viewTilesW) + 1, (g_viewTilesH) + 1);
 
-                MapDescInit((void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
-                MapDescInit((void *)(uintptr_t)ADDR_MAP_DESC, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+                MapDescInit(g_objMapDesc,
+                            (g_mapExtentX), (g_mapExtentY));
+                MapDescInit(g_mapDesc, (g_mapExtentX), (g_mapExtentY));
                 BuildTileDeltas();
             }
             break;
@@ -1611,43 +1611,43 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         case AM2_IFF_BPAD:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER, plane, 1, f);
+            g_mapPadbitLayer = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_mapPadbitLayer, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_MOVE:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS, plane, 1, f);
+            *(uint8_t * *)&g_cellWeights = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t * *)&g_cellWeights, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_OWNR:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_KIND = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_KIND, plane, 1, f);
+            g_tileKind = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_tileKind, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_TRIG:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS, plane, 1, f);
+            g_tileFlags = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_tileFlags, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_REGN:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL, plane, 1, f);
+            g_regionOfCell = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_regionOfCell, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_ELEV:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS, plane, 1, f);
+            g_tileAttrs = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(g_tileAttrs, plane, 1, f);
             consumed += plane;
             break;
 
@@ -1689,7 +1689,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 break;
             /* Both refusals are FATAL and skip nothing, each with its own
              * line -- not the planes' "chunksize/targetsize different". */
-            if (w != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) || h != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)) {
+            if (w != (g_mapTilesW) || h != (g_mapTilesH)) {
                 am2_log("tile layer size different from map size\n");
                 goto bad;
             }
@@ -1697,8 +1697,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 am2_log("mismatched chunk and target size\n");
                 goto bad;
             }
-            *(uint8_t **)(uintptr_t)ADDR_MAP_TILES = (uint8_t *)am2_malloc((uint32_t)bytes);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_TILES, (uint32_t)bytes, 1, f);
+            g_mapTiles = (uint8_t *)am2_malloc((uint32_t)bytes);
+            orig_map_fread(g_mapTiles, (uint32_t)bytes, 1, f);
             consumed += bytes;
             tlayDone++;
             break;
@@ -1731,8 +1731,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             for (;;) {
                 if (i >= nfields)
                     break;
-                orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag, 4, 1, f);
-                orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size, 4, 1, f);
+                orig_map_fread(&(g_mapFieldDescs)[i].tag, 4, 1, f);
+                orig_map_fread(&(g_mapFieldDescs)[i].size, 4, 1, f);
                 consumed += 8;
                 i++;
             }
@@ -1752,8 +1752,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     for (i = 0; i < nfields; i++) {
                         v = 0;
 
-                        tag  = (int32_t)((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag;
-                        size = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size;
+                        tag  = (int32_t)(g_mapFieldDescs)[i].tag;
+                        size = (g_mapFieldDescs)[i].size;
 
                         orig_map_fread(&v, size, 1, f);
                         consumed += (int32_t)size;
@@ -1823,27 +1823,27 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     } while (consumed < (int32_t)formSize);
 
     /* Nine layers every consumer may assume exists. */
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_CELL_WEIGHTS);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_ATTRS);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_REGION_OF_CELL);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_MAP_PADBIT_LAYER);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_MAP_PAD_LAYER);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_KIND);
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_FLAGS);
+    DEFAULT_LAYER((void * *)&g_cellWeights);
+    DEFAULT_LAYER((void * *)&g_tileAttrs);
+    DEFAULT_LAYER((void * *)&g_regionOfCell);
+    DEFAULT_LAYER((void * *)&g_mapPadbitLayer);
+    DEFAULT_LAYER((void * *)&g_mapPadLayer);
+    DEFAULT_LAYER((void * *)&g_tileKind);
+    DEFAULT_LAYER((void * *)&g_tileFlags);
     /* AND A LOOP, WHICH IS WHY ENUMERATING THE EXPLICIT BLOCKS MISSED THESE.
      * The original walks every pointer from ADDR_TILE_REVEAL_GRIDS up to
      * ADDR_TILE_COVER four bytes at a time -- the four per-army reveal grids
      * -- and fills each null one.  Leaving them null does not fault: it makes
      * SettlePointInRegion spiral for a passable tile it can never find. */
     {
-        void **slot = (void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS;
+        void **slot = g_tileRevealGrids;
 
-        while (slot < (void **)(uintptr_t)ADDR_TILE_COVER) {
+        while (slot < (void * *)&g_tileCover) {
             DEFAULT_LAYER(slot);
             slot++;
         }
     }
-    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_COVER);
+    DEFAULT_LAYER((void * *)&g_tileCover);
 
     /* FOUR THINGS THE DEFAULTING IS FOLLOWED BY, and leaving them out is what
      * cost this function four attempts.  ADDR_LOAD_PENDING is a FLAG tested
@@ -1853,17 +1853,17 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     RebuildTileCover();
     BuildAaiBuiltins();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0) {
+    if (g_loadPending == 0) {
         void *cam = CreateItem((char *)"camera", 4,
-                               *(const int32_t *)(uintptr_t)ADDR_AAI_KEY_980000,
-                               *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT,
+                               g_aaiKey980000,
+                               *(const AM2_Point *)&g_zeroPoint,
                                0, 1, 0);
 
-        *(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID =
+        g_evtId15Uid =
             *(const int32_t *)((const uint8_t *)cam + 4);
     }
 
-    BuildRespawnPool(*(const int32_t *)(uintptr_t)ADDR_GAME_SEED);
+    BuildRespawnPool(g_gameSeed);
 
     /* Only build the map's objects on a FRESH start. On a load the objects
      * come from the save (LoadItems), so the original skips this: after
@@ -1873,7 +1873,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
      * extra alloc/free churn that desynced the fixed heap globally (all objects
      * ended up at different addresses between builds), and downstream a roach's
      * sight scan then iterated in a different order and diverged. */
-    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+    if (g_loadPending == 0)
         for (i = 0; i < objCount; i++) {
             uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
             int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
@@ -1925,14 +1925,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 uint8_t *aaiRec;
 
                 if (code >= 0x64) {
-                    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 2) {
+                    if (g_gameOverFlags & 2) {
                         int32_t sub = 0;
 
                         code = RandomRespawnKind(&sub);
                         aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
                         flags |= 0x10000;
-                        key = *(const int32_t *)((*(uint8_t ***)(uintptr_t)
-                                                  ADDR_AAI_RECORDS)[aai] + 8);
+                        key = *(const int32_t *)((*(uint8_t ** *)&g_aaiRecords)[aai] + 8);
                         goto haveRecord;
                     }
                     if (code == 0x64)
@@ -1954,7 +1953,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
                 }
 
-                aaiRec = (*(uint8_t ***)(uintptr_t)ADDR_AAI_RECORDS)[aai];
+                aaiRec = (*(uint8_t ** *)&g_aaiRecords)[aai];
                 flags |= *(const int32_t *)(aaiRec + 4);
 
                 /* BOTH POINTS ARE PASSED: the one before SettlePointInRegion and
@@ -1994,7 +1993,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
              * record's elevation byte, applied to whichever object was made. */
             if (obj != 0) {
                 const uint8_t *attrs =
-                    *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
+                    g_tileAttrs;
                 int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
 
                 ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
@@ -2011,14 +2010,14 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     am2_free(objs);
 
     orig_map_fclose(f);
-    SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
+    SetGameDir((g_mapBlock));
     return 1;
 
 #undef MISMATCH
 bad:
     am2_log("Error in loadmap()\n");
     orig_map_fclose(f);
-    SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
+    SetGameDir((g_mapBlock));
     return 0;
 #undef DEFAULT_LAYER
 #undef MAP_PLANE

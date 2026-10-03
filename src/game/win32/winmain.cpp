@@ -90,18 +90,7 @@ static_assert(sizeof(MSG) == 28, "the 7 dwords WinMain zeroes on entry");
 
 /* ---- the globals this layer owns -------------------------------------- */
 
-#define g_hInstance    (*(HINSTANCE *)(uintptr_t)ADDR_HINSTANCE)
-#define g_fastMachine  (*(int32_t *)(uintptr_t)ADDR_FAST_MACHINE)
-#define g_slowMachine  (*(int32_t *)(uintptr_t)ADDR_SLOW_MACHINE)
-#define g_hWnd         (*(HWND *)(uintptr_t)ADDR_HWND)
-#define g_appMutex     (*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX)
-#define g_lastMessage  (*(uint32_t *)(uintptr_t)ADDR_LAST_MESSAGE)
-#define g_screenW      (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W)
-#define g_screenH      (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H)
-#define g_screenRect   (*(AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)
-#define g_windowed     (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
-#define g_mapName      ((char *)(uintptr_t)ADDR_OPT_MAP_NAME)
-#define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define g_hWnd         (*(HWND *)&g_enumContext)
 
 /* An option global, written as int32_t whatever it is declared as elsewhere. */
 #define opt(addr) (*(int32_t *)(uintptr_t)(addr))
@@ -174,7 +163,7 @@ void __cdecl CheckBasePath(void)
     }
 #endif
 
-    if (!am2_getcwd((char *)(uintptr_t)ADDR_GAME_DIR, 0xFF))
+    if (!am2_getcwd(g_gameDir, 0xFF))
         FatalError("The base path is longer than 255 characters!\n");
 }
 
@@ -188,23 +177,23 @@ void __cdecl CheckBasePath(void)
  * on the call. */
 void __cdecl InitTimer(void)
 {
-    int64_t *freq = (int64_t *)(uintptr_t)ADDR_PERF_FREQ;
+    int64_t *freq = g_perfFreq;
 
-    *(int16_t *)(uintptr_t)ADDR_AIM_X = 0;
-    *(int16_t *)(uintptr_t)ADDR_AIM_Y = 0;
-    *(int16_t *)(uintptr_t)ADDR_AIM_Z = 0;
+    *(int16_t *)&g_aimX = 0;
+    g_aimY = 0;
+    *(int16_t *)&g_aimZ = 0;
 
     if (QueryPerformanceFrequency((LARGE_INTEGER *)freq)) {
-        QueryPerformanceCounter((LARGE_INTEGER *)(uintptr_t)ADDR_PERF_START);
+        QueryPerformanceCounter((LARGE_INTEGER *)&g_perfStart);
 
         /* Both constants come out of the image rather than being written as
          * literals: same bits, and nothing to mistype. */
-        double period = *(const double *)(uintptr_t)ADDR_DBL_MS_PER_SEC
+        double period = g_dblMsPerSec
                         / (double)*freq;
 
-        *(double *)(uintptr_t)ADDR_PERF_PERIOD = period;
+        g_perfPeriod = period;
 
-        if (period > *(const double *)(uintptr_t)ADDR_DBL_MAX_PERIOD) {
+        if (period > g_dblMaxPeriod) {
             *freq = 0;
             return;
         }
@@ -230,7 +219,7 @@ void __cdecl InitTimer(void)
  * the selection list. */
 void __cdecl ShutdownSubsystems(void)
 {
-    ClearPtrList((void *)(uintptr_t)ADDR_SELECTED_UIDS);
+    ClearPtrList(g_selectedUids);
 
     FreeExplosionAnims();
     FreeMissileAnims();
@@ -245,7 +234,7 @@ void __cdecl ShutdownSubsystems(void)
     ShutdownDirectDraw();
     ShutdownInput();
 
-    ReleaseMutex(*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX);
+    ReleaseMutex(g_appMutex);
 }
 
 /* 0x00409920. A `jmp` and nothing else, to the sprite-list teardown that
@@ -268,19 +257,19 @@ int32_t __cdecl InitAudio(void)
 {
     if (InitDirectSound()) {
         if (InitWaveSounds()) {
-            *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 1;
+            g_audioEnabled = 1;
             return 1;
         }
         ReleaseSoundObjects();
     }
-    *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 0;
+    g_audioEnabled = 0;
     return 1;
 }
 
 /* 0x0042E580. Clears the word 0x0042E5A0 sets, and answers 0 doing it. */
 int32_t __cdecl ClearGameOver(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE = 0;
+    g_endState = 0;
     return 0;
 }
 
@@ -296,32 +285,32 @@ void __cdecl ResetToTitle(void)
 {
     /* Two different globals, and it matters which way round: the command-line
      * option is the SOURCE and the level's own copy is the destination. */
-    strcpy((char *)(uintptr_t)ADDR_MAP_NAME, (const char *)(uintptr_t)ADDR_OPT_MAP_NAME);
-    if (!((const char *)(uintptr_t)ADDR_MAP_NAME)[0])
-        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
-               *(const char *const *)(uintptr_t)ADDR_MAP_NAME_DEFAULT);
-    strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
-           *(const char *const *)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT);
+    strcpy(&g_mapName_, g_mapName);
+    if (!(&g_mapName_)[0])
+        strcpy(&g_mapName_,
+               g_mapNameDefault);
+    strcpy(&g_mpScriptName,
+           g_mpScriptDefault);
 
     /* The palette pointer is re-read for each call. */
-    BuildRgb332Palette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
-    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+    BuildRgb332Palette(*(uint8_t * *)&g_activePalette);
+    SetGamePalette(*(uint8_t * *)&g_activePalette);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {
+    if (g_optDf) {
         SpriteSetLoad("title");
         SpriteSetLoad("shared");
     }
 
     /* The game-over snapshot is int32[3], cleared element by element. */
-    *(int32_t *)(uintptr_t)ADDR_MP_SESSION                    = 0;
-    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[0]          = 0;
-    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[1]          = 0;
-    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[2]          = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ                   = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL                   = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV              = 0;
-    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV              = 0;
-    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS                = 0;
+    g_mpSession                    = 0;
+    (g_gameOverSource)[0]          = 0;
+    (g_gameOverSource)[1]          = 0;
+    (g_gameOverSource)[2]          = 0;
+    *(int32_t *)&g_objCtxObj                   = 0;
+    g_objCtxVal                   = 0;
+    *(int32_t *)&g_objCtxObjPrev              = 0;
+    g_objCtxValPrev              = 0;
+    g_inputSuppress                = 0;
 
     ResetHostState();
     LoadOptions();
@@ -350,7 +339,7 @@ void __cdecl StartIntro(void)
         RequestState(1);
         return;
     }
-    if (*(const int32_t *)(uintptr_t)ADDR_OPT_NO_INTRO) {
+    if (g_optNoIntro) {
         RequestState(1);
         return;
     }
@@ -368,7 +357,7 @@ void __cdecl StartIntro(void)
  * an error, it just runs no handler. */
 void __cdecl RunFrame(void)
 {
-    if (!*(const int32_t *)(uintptr_t)ADDR_APP_ACTIVE)
+    if (!g_appActive)
         return;
 
     RestoreLostSurfaces();
@@ -378,7 +367,7 @@ void __cdecl RunFrame(void)
     /* A switch, not a table of function pointers: the original is a jump
      * table over five arms that each CALL their state's frame, in order. An
      * indexed `call [table]` does the same thing in a different shape. */
-    switch (*(const uint32_t *)(uintptr_t)ADDR_GAME_STATE) {
+    switch (*(const uint32_t *)&g_gameState) {
     case 0: State0Frame(); break;
     case 1: State1Frame(); break;
     case 2: State2Frame(); break;
@@ -393,12 +382,12 @@ void __cdecl RunFrame(void)
  * were loaded -- the same flag ResetToTitle tests before loading two of them. */
 void __cdecl FreeSpriteSets(void)
 {
-    if (!*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
+    if (!g_optDf)
         return;
 
-    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE);
-    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_SHARED);
-    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_THIRD);
+    SpriteSetFree(g_spriteSetTitle);
+    SpriteSetFree(g_spriteSetShared);
+    SpriteSetFree(g_spriteSetThird);
 }
 
 /* 0x0041E690. What the debug allocator has left over.
@@ -414,14 +403,14 @@ void __cdecl ReportLeaks(void)
     int32_t total;
     int32_t shown;
 
-    total = *(const int32_t *)(uintptr_t)ADDR_LEAK_COUNT;
+    total = g_leakCount;
     name[4] = 0;
     shown = total < 50 ? total : 50;
     orig_log("Unreleased memory (%d) blocks:\n", total);
 
 
     /* The record array is read again after the copy. */
-#define REC (*(const uint8_t *const *)(uintptr_t)ADDR_LEAK_RECORDS \
+#define REC (*(const uint8_t *const *)&g_leakRecords \
              + (size_t)i * 16)
     for (int32_t i = 0; i < shown; i++) {
         orig_strncpy(name, (const char *)(REC + 4), 4);
@@ -435,12 +424,12 @@ void __cdecl ReportLeaks(void)
 /* 0x0041E710. Drop the record array and the two counters with it. */
 void __cdecl FreeMemTracker(void)
 {
-    void *recs = *(void **)(uintptr_t)ADDR_LEAK_RECORDS;
+    void *recs = g_leakRecords;
 
-    *(int32_t *)(uintptr_t)ADDR_LEAK_COUNT = 0;
-    *(int32_t *)(uintptr_t)ADDR_LEAK_TOTAL = 0;
+    g_leakCount = 0;
+    g_leakTotal = 0;
     orig_free(recs);
-    *(void **)(uintptr_t)ADDR_LEAK_RECORDS = 0;
+    g_leakRecords = 0;
 }
 
 /* ---- the game CD ------------------------------------------------------- */
@@ -462,9 +451,6 @@ void __cdecl FreeMemTracker(void)
  * why it is called twice. */
 #define VOLUME_NAME_MAX 0x104
 
-#define g_cdPresent   (*(int32_t *)(uintptr_t)ADDR_CD_PRESENT)
-#define g_cdFoundFlag (*(int32_t *)(uintptr_t)ADDR_CD_FOUND_FLAG)
-#define g_cdPath      ((char *)(uintptr_t)ADDR_CD_PATH)
 #define g_cdLabel     ("ARMYMEN2")
 
 typedef int32_t (__cdecl *am2_stricmp_fn)(const char *, const char *);
@@ -536,8 +522,6 @@ int32_t __cdecl FindGameCD(void)
 typedef int32_t (__cdecl *am2_wincpuid_fn)(void);
 typedef int32_t (__cdecl *am2_cpuspeed_fn)(int32_t);
 
-#define g_wincpuid     (*(am2_wincpuid_fn *)(uintptr_t)ADDR_WINCPUID_FN)
-#define g_cpunormspeed (*(am2_cpuspeed_fn *)(uintptr_t)ADDR_CPUNORMSPEED_FN)
 
 #define MIN_CPU_FAMILY 5      /* Pentium */
 #define MIN_CPU_MHZ    0x85   /* 133 */
@@ -587,10 +571,10 @@ static inline void ParseCommandLine(char *cmdLine)
 {
     char *p;
 
-    if (strstr(cmdLine, "-nointro"))   opt(ADDR_OPT_NO_INTRO) = 1;
-    if (strstr(cmdLine, "-w"))         opt(ADDR_OPT_WINDOWED) = 1;
-    if (strstr(cmdLine, "-tracePF"))   opt(ADDR_OPT_TRACE_PF) = 1;
-    if (strstr(cmdLine, "-traceVEH"))  opt(ADDR_OPT_TRACE_VEH) = 1;
+    if (strstr(cmdLine, "-nointro"))   opt(((uintptr_t)&g_optNoIntro)) = 1;
+    if (strstr(cmdLine, "-w"))         opt(((uintptr_t)&g_windowed)) = 1;
+    if (strstr(cmdLine, "-tracePF"))   opt(((uintptr_t)&g_optTracePf)) = 1;
+    if (strstr(cmdLine, "-traceVEH"))  opt(((uintptr_t)&g_traceVeh)) = 1;
 
     if (strstr(cmdLine, "-debugComm"))
         *(int32_t *)(g_commObject + COMM_OFF_VERBOSE) = 1;
@@ -599,15 +583,15 @@ static inline void ParseCommandLine(char *cmdLine)
     if (strstr(cmdLine, "-logComm"))
         *(int32_t *)(g_commObject + COMM_OFF_LOG) = 1;
 
-    if (strstr(cmdLine, "-tracewin"))  opt(ADDR_OPT_TRACE_WIN) = 1;
-    if (strstr(cmdLine, "-dbg"))       opt(ADDR_OPT_DBG) = 1;
-    if (strstr(cmdLine, "-rob"))       opt(ADDR_OPT_ROB) = 1;
-    if (strstr(cmdLine, "-peter"))     opt(ADDR_OPT_PETER) = 1;
-    if (strstr(cmdLine, "-dan"))       opt(ADDR_OPT_DAN) = 1;
-    if (strstr(cmdLine, "-df"))        opt(ADDR_OPT_DF) = 0;
-    if (strstr(cmdLine, "-bm"))        opt(ADDR_OPT_BIG_MOVIES) = 1;
-    if (strstr(cmdLine, "-sm"))        opt(ADDR_OPT_BIG_MOVIES) = 0;
-    if (strstr(cmdLine, "-nm"))        opt(ADDR_OPT_NO_MOVIES) = 1;
+    if (strstr(cmdLine, "-tracewin"))  opt(((uintptr_t)g_optTraceWin)) = 1;
+    if (strstr(cmdLine, "-dbg"))       opt(((uintptr_t)&g_optDbg)) = 1;
+    if (strstr(cmdLine, "-rob"))       opt(((uintptr_t)g_optRob)) = 1;
+    if (strstr(cmdLine, "-peter"))     opt(((uintptr_t)g_optPeter)) = 1;
+    if (strstr(cmdLine, "-dan"))       opt(((uintptr_t)g_optDan)) = 1;
+    if (strstr(cmdLine, "-df"))        opt(((uintptr_t)&g_optDf)) = 0;
+    if (strstr(cmdLine, "-bm"))        opt(((uintptr_t)&g_optBigMovies)) = 1;
+    if (strstr(cmdLine, "-sm"))        opt(((uintptr_t)&g_optBigMovies)) = 0;
+    if (strstr(cmdLine, "-nm"))        opt(((uintptr_t)&g_optNoMovies)) = 1;
 
     /* `-map:NAME` -- everything after the colon up to the first character that
      * is not greater than a space. The comparison is signed, so a byte with the
@@ -681,7 +665,7 @@ void __cdecl PositionWindow(void)
         g_screenRect.bottom = r.bottom;
     } else {
         /* Fullscreen: the drawing rectangle is the screen, at the origin. */
-        SetRect((LPRECT)(uintptr_t)ADDR_SCREEN_RECT, 0, 0, g_screenW, g_screenH);
+        SetRect((LPRECT)((uintptr_t)&g_screenRect), 0, 0, g_screenW, g_screenH);
     }
 }
 
@@ -822,16 +806,15 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 uint32_t __cdecl Ticks(void)
 {
-    const int64_t *freq = (const int64_t *)(uintptr_t)ADDR_PERF_FREQ;
+    const int64_t *freq = g_perfFreq;
     LARGE_INTEGER  now;
     int64_t        delta;
 
     if (*freq > 0) {
         QueryPerformanceCounter(&now);
-        delta = now.QuadPart - *(const int64_t *)(uintptr_t)ADDR_PERF_START;
+        delta = now.QuadPart - g_perfStart;
         return (uint32_t)(int64_t)((long double)delta
-                                   * (long double)*(const double *)
-                                         (uintptr_t)ADDR_PERF_PERIOD);
+                                   * (long double)g_perfPeriod);
     }
     return GetTickCount();
 }

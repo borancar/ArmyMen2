@@ -727,8 +727,6 @@ L41c6f8:
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
-#define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
-#define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)
 
 enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
 
@@ -736,7 +734,6 @@ enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
  * Solid and dest-LUT read coverage only, exactly like the font format. */
 #define FILL_HAS_PIXELS(f) ((f) == FILL_COPY || (f) == FILL_REMAP)
 
-#define g_overlayPalette (*(const uint8_t *const *)(uintptr_t)ADDR_OVERLAY_PALETTE)
 
 /* `param` is the colour byte for FILL_SOLID and the lookup table for
  * FILL_REMAP; it is unused for FILL_COPY.
@@ -864,7 +861,7 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
                          * odd x on shadow edges: an overlay is drawn onto
                          * whatever is under it, and a two-pixel shadow run
                          * whose two pixels differ comes out exchanged. */
-                        const uint8_t *lut = g_overlayPalette;
+                        const uint8_t *lut = (*(const uint8_t *const *)&g_overlayPalette);
                         uint32_t k;
                         if (count == 2 && ((uintptr_t)d & 3u) == 1u) {
                             uint8_t first = lut[d[0]], second = lut[d[1]];
@@ -1012,7 +1009,7 @@ int32_t __cdecl BlitBitmapIn(void *dest, int32_t dstStride, const void *src,
         d += dstStride;
     }
 
-    if (*(void *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
+    if (*(void *const *)&g_activePalette)
         *(uint8_t *)keyOut = *(const uint8_t *)dest;
 
     return dstStride * h;

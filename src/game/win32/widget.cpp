@@ -743,7 +743,6 @@ static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
  * g_drawTarget, under the same name, because it is the same global. */
-#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 
 /* 0x00446AB0, cdecl, 11 direct callers: the clipped sibling of DrawText at
  * 0x00446930. Measures the string with `repne scasb`, then walks it a
@@ -779,18 +778,12 @@ static __attribute__((noinline)) uint8_t am2_stale_byte(const uint8_t *p) { retu
 
 /* The 640x480 screen rectangle, spelled exactly as sprite.cpp and text.cpp
  * spell it so it stays one definition rather than a drift. */
-#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
-#define orig_mouse_moved (*(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
+#define orig_mouse_moved (g_mouseMoved)
 /* Spelled as device.cpp spells them, so they stay one definition. */
-#define g_backgroundColour (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
-#define g_hiliteColour     (*(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR)
-#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
 
 
 /* Which edit box has the focus, and the WM_CHAR consumer WndProc dispatches
  * through. Both are ours now: EditCharHandler is below. */
-#define g_focusedEdit (*(AM2_Widget **)(uintptr_t)ADDR_FOCUSED_EDIT)
 /* The game's own logger, spelled as winproc.cpp spells it. */
 typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
 #define orig_log      (*(am2_log_fn)ADDR_LOG)
@@ -798,7 +791,6 @@ typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
  * definition rather than a drift -- checkglobals refused the first attempt,
  * which had it as a bare void *. */
 typedef void (__cdecl *am2_char_fn)(uint32_t ch, uint32_t lo, uint32_t hi);
-#define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
 /* The game's own rand, and it has to be: the LCG state at 0x0048CC1C is the
  * image's, so drawing from ours would leave it untouched. */
 typedef int32_t (__cdecl *am2_rand_fn)(void);
@@ -829,7 +821,7 @@ static inline void EditReleaseFocus(AM2_Widget *w)
 {
     if (g_focusedEdit == w) {
         g_focusedEdit = (AM2_Widget *)0;
-        g_charHandler = (am2_char_fn)0;
+        (*(am2_char_fn *)&g_charHandler) = (am2_char_fn)0;
     }
 }
 
@@ -937,7 +929,6 @@ static inline int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
 
 
 /* The palette index the matcher filled with white. */
-#define g_whiteInk (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE)
 
 
 
@@ -1129,18 +1120,8 @@ void __attribute__((thiscall)) am2_dtor_AM2_Rec(AM2_Rec *r)
  * is why the original reads the bit and the mask choice at +0 and +4 and the
  * widget index at -0x18; written out here from the record base instead. */
 
-#define g_gameOverFlags   (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
-#define g_gameSetting22C  (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
-#define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
-#define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
-#define g_moviePage       (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
-#define g_movieCount      (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
-#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
-#define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+#define g_gameSetting22C  (*(uint32_t *)&g_gameSetting22c)
 typedef void (__cdecl *am2_void_fn)(void);
-#define g_menuRequestSet  (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
-#define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 
 typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
 
@@ -1185,12 +1166,8 @@ static inline AM2_Widget *OptionBox(AM2_Widget *parent, int32_t index)
  * the same address g_paintObject through an AM2_PaintObject *, which is the
  * same object seen through its other three vtable slots; a third spelling
  * would be a third thing for tools/checkglobals.py to report. */
-#define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_mpSession   (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 /* Spelled exactly as surface.cpp and frame.cpp spell them -- checkglobals
  * refused a second name on either address, which is the rule working. */
-#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
-#define g_currentBitmap  (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
 typedef void (__cdecl *AM2_VoidFn)(void);
@@ -1567,11 +1544,11 @@ typedef int32_t (__cdecl *AM2_MkdirFn)(const char *);
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline void CloseCurrentScreen(void)
 {
-    AM2_Widget *cur = (AM2_Widget *)g_paintObject;
+    AM2_Widget *cur = (AM2_Widget *)(*(uint8_t * *)&g_paintObject);
 
     if (cur) {
         WidgetVDelete(cur, 1);
-        g_paintObject = (uint8_t *)0;
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)0;
     }
 }
 
@@ -1636,7 +1613,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
  * in a mission and 1 on the title screen. */
 
 
-#define g_gameState (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
 
 
 
@@ -1880,7 +1856,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
  * again twice before the constructor ends -- and the blinking dot is stored
  * on the LIST at 0x0094, not on the panel that owns it. */
 
-#define g_difficulty      (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)
 
 
 /* 0x00450E10, thiscall. The CONTROLS dialog: twenty-one key-capture rows and
@@ -1956,9 +1931,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
 
 /* The three the AUDIO dialog reads to place its bars and its own handlers
  * write back; see OnVolumeEffects and friends below. */
-#define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
-#define g_streamVolume  (*(int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
-#define g_voiceVolume   (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 
 
 /* onChange by POINTER, for the same reason MakeButton takes one: all three
@@ -1985,8 +1957,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
  * whitelist of letters, digits, space and punctuation rather than a length
  * limit. */
 
-#define g_colourBelowBg (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG)
-#define g_editCharset   (*(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_PTR)
 
 /* One field: the box, then the dot that sits beside it. */
 /* 0x0042E9C0, thiscall. COMM. CHANNEL SELECT -- the connection list.
@@ -2030,7 +2000,7 @@ typedef void (__cdecl *AM2_ReadCampaignFn)(void);
 /* The game's own sprintf -- the CRT inside the image, as crt.h explains. */
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
 #define orig_sprintf    ((AM2_SprintfFn)((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))
-#define g_currentPlayer ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+#define g_currentPlayer (&g_gameprocBlock)
 
 
 
@@ -2312,15 +2282,8 @@ static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
  * copied the name in.
  * ------------------------------------------------------------------ */
 
-#define g_loadPending     (*(int32_t *)(uintptr_t)ADDR_LOAD_PENDING)
-#define g_missionRetry    (*(int32_t *)(uintptr_t)ADDR_MISSION_RETRY)
-#define g_levelId         (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
-#define g_levelIndex      (*(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX)
 /* Named as army.cpp already names it, not `g_ourArmy` -- the address is the
  * same one and a second name for it is what the globals ratchet is for. */
-#define g_rulesChecksum    (*(uint32_t *)(uintptr_t)ADDR_RULES_CHECKSUM_VAL)
-#define g_mpScriptChecksum (*(uint32_t *)(uintptr_t)ADDR_MP_SCRIPT_CHKSUM_VAL)
-#define g_mapChecksum      (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)
 
 typedef void *(__cdecl *am2_find_level_fn)(int32_t id);
 
@@ -2410,7 +2373,6 @@ static inline void EditNotifyAndRepaint(void)
  * from play.
  * ------------------------------------------------------------------ */
 
-#define g_pendingDelete   ((char *)(uintptr_t)ADDR_PENDING_CONFIRM)
 
 
 
@@ -2457,7 +2419,6 @@ void __cdecl OnMpName(AM2_Widget *w);
  * ITSELF. A guest sends SendTeamMsg and, again, does not store -- so a guest
  * clicking either button changes nothing locally until the host says so. */
 
-#define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
 typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
 /* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
@@ -2496,7 +2457,7 @@ static inline void MpComplain(uint8_t *panel, const char *fmt)
     ShowBadMapPreview(*(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW));
     am2_sprintf(line, fmt,
                 (const char *)(g_commObject + COMM_OFF_PLAYERS
-                    + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+                    + (size_t)*(const int32_t *)&g_defaultOwner
                       * AM2_COMM_SLOT_STRIDE + COMM_SLOT_OFF_NAME));
     Announce(line);
 }
@@ -2534,8 +2495,8 @@ typedef char *(__cdecl *AM2_StrstrFn)(const char *, const char *);
 static inline void GameMenuGoto(int32_t mode)
 {
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = mode;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_subState     = mode;
+    g_overlayDirty = 1;
 }
 
 
@@ -2552,9 +2513,6 @@ static inline void GameMenuGoto(int32_t mode)
 
 
 
-#define g_hudWidgetA (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
-#define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
-#define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
 /* The FIFTH private typedef of the ten-argument creator, and the one that made
  * the count worth stating: it is CreateExplosion, reconstructed in item.cpp,
@@ -2615,7 +2573,7 @@ static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
     {
         struct AimPoint { int16_t x, y, z; };
         *(struct AimPoint *)(u + UNIT_OFF_FIRE_X) =
-            *(const struct AimPoint *)(uintptr_t)ADDR_AIM_X;
+            *(const struct AimPoint *)&g_aimX;
     }
 
     *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
@@ -2646,7 +2604,7 @@ static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
 static inline int32_t PointerFriendTail(uint8_t *o)
 {
     if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-            == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+            == *(const int32_t *)&g_defaultOwner
         && o) {
         if (ObjIsType3Inline(o)
             && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
@@ -2655,15 +2613,14 @@ static inline int32_t PointerFriendTail(uint8_t *o)
             int32_t i;
             int32_t none = 1;
 
-            if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            if (!g_mouseButton
                 || GetTickCount()
-                       - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                       - g_mousePressMs
                    < AM2_CLICK_MS) {
-                for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+                for (i = 0; i < g_selectedCount;
                      i++) {
                     const uint8_t *sel = (const uint8_t *)LookupByUID(
-                        (*(const uint32_t *const *)(uintptr_t)
-                             ADDR_SELECTED_ITEMS)[i]);
+                        (g_selectedItems)[i]);
 
                     if (ObjIsType3Inline(sel)
                         && (*(const uint32_t *)(sel + OBJ_OFF_FLAGS)
@@ -2672,7 +2629,7 @@ static inline int32_t PointerFriendTail(uint8_t *o)
                 }
                 if (none) {
                     OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-                    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+                    g_pointerHoverUid =
                         *(const uint32_t *)(o + OBJ_OFF_UID);
                 }
             }
@@ -2714,12 +2671,12 @@ static inline int32_t PointerFriendTail(uint8_t *o)
 static inline void HudShowPoints(void)
 {
     /* The panel is read from its global at each use, as the image does. */
-#define PANEL (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_B)
+#define PANEL (*(uint8_t *const *)&g_hudWidgetB)
     AM2_Widget *field;
 
     am2_sprintf((char *)PANEL + HUDPANEL_OFF_POINTS_TEXT,
                 "%i",
-                *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
+                g_ourPoints);
 
     field = *(AM2_Widget **)(PANEL + HUDPANEL_OFF_POINTS_FIELD);
 
@@ -2792,13 +2749,13 @@ static inline void SpinRepaint(AM2_Widget *edit)
  * function pointer, and it defaults to -1. */
 static inline void PointerIdleOverlay(int32_t ours)
 {
-    int32_t row = *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2;
+    int32_t row = *(const int32_t *)&g_weaponFnSlot2;
 
     if (ours && row >= 0) {
         OverlayPrepare(row, 0);
         return;
     }
-    OverlayPrepare(*(const int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY, 0);
+    OverlayPrepare(g_pointerOverlay, 0);
 }
 
 
@@ -3917,11 +3874,11 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
         (field) = 0
 #define SQUAD_INK(field, o)                                                   \
     if (SQUAD_HP(o) <= (int16_t)(SQUAD_MAXHP(o) >> 2))                        \
-        (field) = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;       \
+        (field) = g_hudColour;       \
     else if (SQUAD_HP(o) <= (int16_t)(SQUAD_MAXHP(o) >> 1))                   \
-        (field) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;           \
+        (field) = g_colourLagMid;           \
     else                                                                      \
-        (field) = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR
+        (field) = g_hiliteColour
 /* min(rank + 1, 5) -- the same count HudSquadDetail draws as pips. */
 #define SQUAD_PIPS(o)                                                         \
     (*(const int32_t *)((o) + OBJ_OFF_RANK) + 1 >= AM2_HUD_SQUAD_PIPS_MAX     \
@@ -4182,24 +4139,24 @@ void __cdecl AimInit(void)
     uint32_t i;
 
     for (i = 0; i < AM2_AIM_SPRITES_A; i++)
-        ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A)[i] =
+        (g_aimSpritesA)[i] =
             PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_A, (int32_t)i,
                           AM2_AIM_PRELOAD_FLAGS, 1);
 
     for (i = 0; i < AM2_AIM_ARMIES; i++) {
-        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[i]  = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[i] = 0;
+        (g_aimLiveA)[i]  = 0;
+        (g_aimStampA)[i] = 0;
     }
 
     for (i = 0; i < AM2_AIM_SPRITES_B; i++)
-        ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B)[i] =
+        (g_aimSpritesB)[i] =
             PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_B, (int32_t)i,
                           AM2_AIM_PRELOAD_FLAGS, 1);
 
     for (i = 0; i < AM2_AIM_ARMIES; i++) {
-        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[i]  = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[i] = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[i] = 0;
+        (g_aimLiveB)[i]  = 0;
+        (g_aimFrameB)[i] = 0;
+        (g_aimStampB)[i] = 0;
     }
 }
 
@@ -4227,23 +4184,23 @@ void __cdecl FreeAimSprites(void)
     int32_t      i;
 
     /* signed address compares, as the original walked them (`jl`, not `jb`) */
-    for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A;
-         (int32_t)(uintptr_t)spr < (int32_t)ADDR_AIM_LIVE_A; spr++)
+    for (spr = g_aimSpritesA;
+         (int32_t)(uintptr_t)spr < (int32_t)((uintptr_t)g_aimLiveA); spr++)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
-        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[i]  = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[i] = 0;
+        (g_aimLiveA)[i]  = 0;
+        (g_aimStampA)[i] = 0;
     }
 
-    for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B;
-         (int32_t)(uintptr_t)spr < (int32_t)ADDR_AIM_LIVE_B; spr++)
+    for (spr = g_aimSpritesB;
+         (int32_t)(uintptr_t)spr < (int32_t)((uintptr_t)g_aimLiveB); spr++)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
-        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[i]  = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[i] = 0;
-        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[i] = 0;
+        (g_aimLiveB)[i]  = 0;
+        (g_aimFrameB)[i] = 0;
+        (g_aimStampB)[i] = 0;
     }
 }
 
@@ -4285,12 +4242,12 @@ void __cdecl FreeAimSprites(void)
 void __cdecl AimMarkerAge(void)
 {
     /* Indexed, not a walked pointer: the image's loop test is a signed jl. */
-#define LIVE(off)  (((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army + (off) / 4])
-#define XY(off)    (((int16_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army * 2 + (off) / 2])
-#define cursorX (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
-#define cursorY (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
-    int32_t  owner   = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-    uint32_t now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+#define LIVE(off)  ((g_aimLiveA)[army + (off) / 4])
+#define XY(off)    (((int16_t *)g_aimLiveA)[army * 2 + (off) / 2])
+#define cursorX (g_cursorX)
+#define cursorY (g_cursorY)
+    int32_t  owner   = *(const int32_t *)&g_defaultOwner;
+    uint32_t now     = g_gameClockMs;
     int32_t  army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
@@ -4368,37 +4325,37 @@ void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at)
 
     /* Four parallel per-army tables, indexed through one scaled offset. */
 #define AIM(addr) (*(int32_t *)((uint8_t *)((void *)(uintptr_t)(addr)) + off))
-#define PT        ((int16_t *)((uint8_t *)((void *)(uintptr_t)(ADDR_AIM_POINT_A)) + off))
-    AIM(ADDR_AIM_LIVE_A) = 1;
-    AIM(ADDR_AIM_POINT_A) = (int32_t)at;
+#define PT        ((int16_t *)(g_aimPointA + off))
+    AIM(((uintptr_t)g_aimLiveA)) = 1;
+    AIM(((uintptr_t)g_aimPointA)) = (int32_t)at;
 
-    if (!AIM(ADDR_AIM_STAMP_A))
-        AIM(ADDR_AIM_STAMP_A) = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    if (!AIM(((uintptr_t)g_aimStampA)))
+        AIM(((uintptr_t)g_aimStampA)) = *(const int32_t *)&g_gameClockMs;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army)) {
-        AIM(ADDR_AIM_DEADLINE_A) =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        AIM(((uintptr_t)g_aimDeadlineA)) =
+            *(const int32_t *)&g_gameClockMs
             + AM2_AIM_LIFE_REMOTE_MS;
         return;
     }
 
-    AIM(ADDR_AIM_DEADLINE_A) =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-        + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_A * 2 - 1;
+    AIM(((uintptr_t)g_aimDeadlineA)) =
+        *(const int32_t *)&g_gameClockMs
+        + g_aimLifeHalfA * 2 - 1;
 
     ((int16_t *)&hit)[0] =
-        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X + PT[0]);
+        (int16_t)(*(const int16_t *)&g_viewX + PT[0]);
     ((int16_t *)&hit)[1] =
-        (int16_t)(PT[1] + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+        (int16_t)(PT[1] + *(const int16_t *)&g_viewY);
 #undef AIM
 #undef PT
 
     o = (uint8_t *)ObjectsHitByPoint(&hit,
-                                     (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                                     g_objMapDesc);
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT))
-        DamageObject(o, *(const int32_t *)(uintptr_t)ADDR_AIM_DAMAGE, 1,
+        DamageObject(o, g_aimDamage, 1,
                      uid, 0, 0);
 }
 
@@ -4430,32 +4387,32 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
 {
     /* x through the element pointer, y through the array: the image keeps
      * the pointer live in edi across the broadcast test for the one read. */
-#define POINTS ((AM2_Point *)(uintptr_t)ADDR_AIM_POINT_B)
+#define POINTS ((AM2_Point *)g_aimPointB)
     int32_t    i  = army;
     AM2_Point *pt = &POINTS[i];
 
-    ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_LIVE_B)))[i] = 1;
+    (g_aimLiveB)[i] = 1;
     *(uint32_t *)pt = at;
 
-    if (!((int32_t *)((void *)(uintptr_t)(ADDR_AIM_STAMP_B)))[i])
-        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_STAMP_B)))[i] =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    if (!(g_aimStampB)[i])
+        (g_aimStampB)[i] =
+            *(const int32_t *)&g_gameClockMs;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+    if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
-        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        (g_aimDeadlineB)[i] =
+            *(const int32_t *)&g_gameClockMs
             + AM2_AIM_LIFE_REMOTE_MS;
     else
-        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-            + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_B * 2 - 1;
+        (g_aimDeadlineB)[i] =
+            *(const int32_t *)&g_gameClockMs
+            + g_aimLifeHalfB * 2 - 1;
 
-    orig_spawn_at_aim(pt->x + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
-                      POINTS[i].y + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,
+    orig_spawn_at_aim(pt->x + g_viewX,
+                      POINTS[i].y + g_viewY,
                       AM2_AIM_SPAWN_KIND, i, uid,
-                      *(const int32_t *)(uintptr_t)ADDR_AIM_SPAWN_ARG,
+                      g_aimSpawnArg,
                       0, 0, 0, 0);
 #undef POINTS
 }
@@ -4466,8 +4423,8 @@ void __cdecl BuildHudWidgets(void)
     AM2_Widget *box;
     int32_t     ticked;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME
-        && (a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A) != 0
+    if (!g_netGame
+        && (a = g_hudWidgetA) != 0
         && (box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX)) != 0
         && *((uint8_t *)box + CHECKBOX_OFF_CHECKED))
         ticked = 1;
@@ -4476,27 +4433,27 @@ void __cdecl BuildHudWidgets(void)
 
     FreeHudWidgets();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
-        int32_t slot = *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT;
+    if (g_netGame) {
+        int32_t slot = g_ourSlot;
 
-        *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY = 0;
-        *(int32_t *)(uintptr_t)ADDR_OUR_POINTS =
-            ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[slot];
+        g_hudDirty = 0;
+        g_ourPoints =
+            (g_armyPoints)[slot];
         orig_log_noargs();
     }
 
-    *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A =
+    g_hudWidgetA =
         new AM2_HudTop;
-    *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B =
+    g_hudWidgetB =
         new AM2_HudPanel;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME)
-        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C =
+    if (!g_netGame)
+        g_hudWidgetC =
             new AM2_HudEdge;
 
     if (ticked) {
         /* No null test on A -- the original's. */
-        a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+        a = g_hudWidgetA;
         box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
         if (box)
             *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = 1;
@@ -4524,22 +4481,22 @@ void __cdecl FreeHudWidgets(void)
 {
     AM2_Widget *w;
 
-    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+    w = g_hudWidgetA;
     if (w) {
         WidgetVDelete(w, 1);
-        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A = (AM2_Widget *)0;
+        g_hudWidgetA = (AM2_Widget *)0;
     }
 
-    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B;
+    w = g_hudWidgetB;
     if (w) {
         WidgetVDelete(w, 1);
-        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B = (AM2_Widget *)0;
+        g_hudWidgetB = (AM2_Widget *)0;
     }
 
-    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C;
+    w = g_hudWidgetC;
     if (w) {
         WidgetVDelete(w, 1);
-        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C = (AM2_Widget *)0;
+        g_hudWidgetC = (AM2_Widget *)0;
     }
 }
 
@@ -4565,13 +4522,13 @@ void __cdecl HudRepaintOne(void)
 {
     AM2_Widget *w;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY == 0)
+    if (g_hudDirty == 0)
         return;
 
-    *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY = 0;
+    g_hudDirty = 0;
 
-    w = ((AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE)
-            [*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX];
+    w = (g_hudWidgetTable)
+            [g_hudIndex];
 
     *((uint8_t *)w + HUDWIDGET_OFF_FLAG70) = 0;
 
@@ -4634,103 +4591,99 @@ void __cdecl PlacementScreenClick(uint32_t at)
     int32_t ok;
 
     /* The selected type, read from the build table at each use. */
-#define TYPE (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU)) \
+#define TYPE (*(const int32_t *)(g_buildMenu \
                                  + (uintptr_t)AM2_BUILD_MENU_STRIDE                    \
                                        * (uintptr_t)*(const int32_t *)(uintptr_t)      \
-                                             ADDR_HUD_INDEX                            \
+                                             ((uintptr_t)&g_hudIndex)                            \
                                  + BUILD_MENU_OFF_ID))
 
     /* The argument's own slot becomes the point -- see above. */
     ((int16_t *)&at)[0] =
-        (int16_t)((int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT
-                  + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
+        (int16_t)((int32_t)*(const uint32_t *)&g_cursorPoint
+                  + g_viewX);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
-                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+        (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
+                  + *(const int16_t *)&g_viewY);
 
-    obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    obj = ObjectsHitByPoint(&at, g_objMapDesc);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY) {
+    if (g_hudDirty) {
         /* ---- buying ---- */
         if (ActionKeyDown(AM2_ACTION_LEFT))
-            *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING += AM2_PLACE_FACING_STEP;
+            g_placeFacing += AM2_PLACE_FACING_STEP;
         else if (ActionKeyDown(AM2_ACTION_RIGHT))
-            *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING -= AM2_PLACE_FACING_STEP;
+            g_placeFacing -= AM2_PLACE_FACING_STEP;
 
         TakeNumberKey();
 
         army = AM2_THE_COMM->CommArmyOfSlot(
-                              (int32_t)*(const uint32_t *)(uintptr_t)
-                                  ADDR_DEFAULT_OWNER);
+                              (int32_t)g_defaultOwner);
 
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
-            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1) {
+        if (!g_mouseButton1
+            && g_mouseChanged1) {
             HudRepaintOne();
             return;
         }
 
         ok = PlacementAllowed(at, TYPE,
-                              (int32_t)*(const uint32_t *)(uintptr_t)
-                                  ADDR_DEFAULT_OWNER,
-                              *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS,
-                              *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING);
+                              (int32_t)g_defaultOwner,
+                              g_ourPoints,
+                              g_placeFacing);
 
         /* Two calls that differ in one argument; VC6 pushes the shared army
          * once, above the branch. */
         if (!ok) {
-            PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+            PlaceCursorPrepare(g_hudIndex
                                   + AM2_PLACE_CURSOR_ROW_BASE,
-                              0, *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
+                              0, g_placeFacing,
                               army);
             return;
         }
-        PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+        PlaceCursorPrepare(g_hudIndex
                               + AM2_PLACE_CURSOR_ROW_BASE,
-                          1, *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
+                          1, g_placeFacing,
                           army);
 
         /* Down here the button must be UP -- see the note above. */
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+        if (g_mouseButton)
             return;
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        if (!g_mouseChanged)
             return;
 
         orig_make_placed(at, TYPE,
-                         (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                         (int32_t *)(uintptr_t)ADDR_OUR_POINTS,
-                         *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
-                         *(const int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT,
-                         (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+                         (int32_t)g_defaultOwner,
+                         &g_ourPoints,
+                         g_placeFacing,
+                         g_numberKeySlot,
+                         g_dirScratch);
 
         HudShowPoints();
 
-        if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
+        if (g_ourPoints
             < (int32_t)UnitTypeCost(TYPE))
             HudRepaintOne();
 
-        if (!*(const int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88)
+        if (!g_placeFlag4fcf88)
             HudRepaintOne();
     } else {
         /* ---- selling ---- */
         if (!obj
             || !IsPlacedUnit(obj,
-                             (int32_t)*(const uint32_t *)(uintptr_t)
-                                 ADDR_DEFAULT_OWNER)) {
+                             (int32_t)g_defaultOwner)) {
             OverlayPrepare(0, 0);
             return;
         }
 
         OverlayPrepare(AM2_OVERLAY_ROW_SELL, 0);
 
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+        if (!g_mouseButton)
             return;
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        if (!g_mouseChanged)
             return;
 
         RefundPlacedUnit(obj,
-                         (int32_t)*(const uint32_t *)(uintptr_t)
-                             ADDR_DEFAULT_OWNER,
-                         (int32_t *)(uintptr_t)ADDR_OUR_POINTS);
+                         (int32_t)g_defaultOwner,
+                         &g_ourPoints);
 
         HudShowPoints();
     }
@@ -4779,12 +4732,12 @@ void __cdecl HudPostUpdate(void)
     int32_t  repeat = 0;   /* the held weapon keeps acting while held */
     AM2_PointerPickFn   pick;
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
+    if (g_charHandler)
         return;
-    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_inputSuppress)
         return;
 
-    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID = 0;
+    g_pointerHoverUid = 0;
     SelectionClick();
 
     /* Cursor to world, exactly as PlacementScreenClick builds it. The x add is
@@ -4792,88 +4745,88 @@ void __cdecl HudPostUpdate(void)
      * a carry out of x is discarded; written as int16 arithmetic, which is
      * what that amounts to. */
     ((int16_t *)&at)[0] =
-        (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
-                  + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+        (int16_t)(g_viewX
+                  + (int32_t)*(const uint32_t *)&g_cursorPoint);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
-                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+        (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
+                  + *(const int16_t *)&g_viewY);
 
     /* The test is on the CURSOR against the view rectangle, not on the world
      * point just built -- ADDR_BLIT_RECT is in screen space. */
-    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
-                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+    if (!PointInRect(g_blitRect,
+                     (const AM2_Point *)&g_cursorPoint)) {
+        if (g_mouseButton)
             return;
         OverlayPrepare(0, 0);
         return;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (g_netGame) {
         PlacementScreenClick(at);
         return;
     }
 
     /* Take the grab the first frame the button moves, and only while nothing
      * else holds it. -1 rather than a widget: this layer is not a widget. */
-    if (!*(void *const *)(uintptr_t)ADDR_MOUSE_GRAB
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = -1;
+    if (!*(void *const *)&g_mouseGrab
+        && g_mouseChanged)
+        g_mouseGrab = -1;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OPT_4FD748
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1
-        && orig_get_tick_count() - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS2_MS
+    if (g_opt4fd748
+        && g_mouseButton1
+        && g_mouseChanged1
+        && orig_get_tick_count() - g_mousePress2Ms
                < AM2_DOUBLE_CLICK_MS)
         CreateExplosion(((const int16_t *)&at)[0], ((const int16_t *)&at)[1],
-                        *(const int32_t *)(uintptr_t)ADDR_DEBUG_BLAST_KIND,
-                        (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID,
+                        g_debugBlastKind,
+                        (int32_t)g_defaultOwner,
+                        g_ourLeaderUid,
                         0xF, 0, 0, 0, 0);
 
     /* ---- the drag rectangle ------------------------------------------- */
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1)
-            *(uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR = at;
+    if (g_mouseButton1) {
+        if (g_mouseChanged1)
+            g_dragAnchor = at;
 
         /* Six is the dead zone: a drag shorter than that is a click, and the
          * rectangle is not published until it is crossed. Once ON it is not
          * recomputed here -- the test is on the flag, so the corners are the
          * ones the crossing frame wrote. */
-        if (!*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON
+        if (!g_viewRectOn
             && ApproxDist((const AM2_Point *)&at,
-                          (const AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR)
+                          (const AM2_Point *)&g_dragAnchor)
                    > AM2_DRAG_DEAD_ZONE) {
-            int16_t ax = ((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[0];
-#define ay (((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[1])
+            int16_t ax = ((const int16_t *)&g_dragAnchor)[0];
+#define ay (((const int16_t *)&g_dragAnchor)[1])
             int16_t px = ((const int16_t *)&at)[0];
             int16_t py = ((const int16_t *)&at)[1];
 
-            *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 1;
+            g_viewRectOn = 1;
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
-            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[0] = ax < px ? ax : px;
+            (g_viewRect_)[0] = ax < px ? ax : px;
             if (ax > px)
-                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = ax;
+                (g_viewRect_)[2] = ax;
             else
-                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = px;
+                (g_viewRect_)[2] = px;
             if (ay < py)
-                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = ay;
+                (g_viewRect_)[1] = ay;
             else
-                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = py;
-            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[3] = ay > py ? ay : py;
+                (g_viewRect_)[1] = py;
+            (g_viewRect_)[3] = ay > py ? ay : py;
         }
     }
 
     /* ---- the two key arms --------------------------------------------- */
     aiming = 0;
     if (ActionKeyDown(AM2_ACTION_0A) || ActionKeyDown(AM2_ACTION_06)) {
-        void *ctx = *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+        void *ctx = g_objCtxObjA;
 
         /* Everything AIMS except a kind-3 vehicle, which has its own gunner
          * handling. Note the refusal needs BOTH tests: a non-vehicle reaches
          * the arm through the first `je`, not past it. */
         if (!ObjIsType3((const AM2_Object *)ctx)
             || *(const int32_t *)((const uint8_t *)
-                   *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
+                   g_objCtxObjA
                    + VEHICLE_OFF_KIND) != 3) {
             OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
             aiming = 1;
@@ -4883,7 +4836,7 @@ void __cdecl HudPostUpdate(void)
         VehicleDismountAll((void *)0, (void *)(uintptr_t)at);
 
     /* ---- what the leader is holding ----------------------------------- */
-    leader = LookupOwnerObj(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    leader = LookupOwnerObj(g_defaultOwner);
     if (leader) {
         int32_t sel = *(const int32_t *)((const uint8_t *)leader
                                          + UNIT_OFF_INVENTORY_SEL);
@@ -4899,8 +4852,7 @@ void __cdecl HudPostUpdate(void)
                                           + OBJ_OFF_FIELD_C0);
             int32_t kind = *(const int32_t *)(type + ITEMTYPE_OFF_KIND);
 
-            repeat = *(const int32_t *)((const uint8_t *)(uintptr_t)
-                                            ADDR_MISSILE_DEFS
+            repeat = *(const int32_t *)(g_missileDefs
                                         + (uint32_t)kind * AM2_MISSILE_DEF_BYTES
                                         + MISSILEDEF_OFF_FIELD_24);
         }
@@ -4910,8 +4862,8 @@ void __cdecl HudPostUpdate(void)
      * vehicle our leader is riding. Two separate tests, both writing the one
      * flag, and the second needs the leader lookup above. */
     {
-        uint32_t ctx = *(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A;
-        uint32_t us  = *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID;
+        uint32_t ctx = *(const uint32_t *)&g_objCtxValA;
+        uint32_t us  = g_ourLeaderUid;
 
         ours = 0;
         if (us && ctx == us)
@@ -4926,35 +4878,35 @@ void __cdecl HudPostUpdate(void)
     /* The world point is built AGAIN here, the same two adds as at the top,
      * straight into the same slot. */
     ((int16_t *)&at)[0] =
-        (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
-                  + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+        (int16_t)(g_viewX
+                  + (int32_t)*(const uint32_t *)&g_cursorPoint);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
-                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
-    obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
+                  + *(const int16_t *)&g_viewY);
+    obj = ObjectsHitByPoint(&at, g_objMapDesc);
     for (; obj; obj = *(void *const *)((const uint8_t *)obj
                                        + OBJ_OFF_QUERY_NEXT)) {
         if (ours) {
-            pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT0;
+            pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;
             if (pick && pick(obj))
                 goto hit_ours;
             /* A FLAG, not a function: SLOT3 set means this node is spoken for
              * and the generic pick must not see it. */
-            if (*(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3)
+            if (g_weaponFnSlot3)
                 continue;
         }
-        pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK;
+        pick = *(AM2_PointerPickFn *)&g_pointerPick;
         if (pick && !aiming && pick(obj))
             goto hit_generic;
     }
 
     /* Nothing under the pointer: the same arms again, written out for
      * themselves and handing the actions a null object. */
-#define SLOT1   (*(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1)
-#define ACTION  (*(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION)
-#define CHANGED (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-#define BUTTON  (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-    if (ours && *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3) {
+#define SLOT1   (*(AM2_PointerActionFn *)&g_weaponFnSlot1)
+#define ACTION  (*(AM2_PointerActionFn *)&g_pointerAction)
+#define CHANGED (g_mouseChanged)
+#define BUTTON  (g_mouseButton)
+    if (ours && g_weaponFnSlot3) {
         if (CHANGED) {
             if (BUTTON || !SLOT1)
                 goto claim;
@@ -4969,7 +4921,7 @@ void __cdecl HudPostUpdate(void)
             SLOT1((void *)0, at);
         goto tail;
     }
-    if (*(void *const *)(uintptr_t)ADDR_POINTER_F14 && !aiming && CHANGED) {
+    if (*(void *const *)&g_pointerF14 && !aiming && CHANGED) {
         if (BUTTON || !ACTION)
             goto claim;
         ACTION(obj, at);
@@ -5002,7 +4954,7 @@ hit_generic:
     goto tail;
 
 claim:
-    *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
+    g_mouseClaimed = 1;
 
 tail:
     if (!BUTTON && !CHANGED) {
@@ -5075,7 +5027,7 @@ void __cdecl HudUpdate(void)
  * stats, and the command bar all present. */
 void __cdecl HudPaint(void)
 {
-    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
+    SetDrawTarget(g_backBuffer);
 
     WidgetVPaint(g_hudWidgetA, g_hudWidgetA->rect);
     WidgetVPaint(g_hudWidgetB, g_hudWidgetB->rect);
@@ -5131,24 +5083,24 @@ void __cdecl HudPaint(void)
  */
 void __cdecl SetPointerMode(int32_t mode)
 {
-#define REC ((const uint8_t *)((void *)(uintptr_t)(ADDR_POINTER_MODES)) \
+#define REC (g_pointerModes \
              + (size_t)mode * AM2_POINTER_MODE_SIZE)
-#define PICK (*(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK)
-#define ACT  (*(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION)
-#define F14  (*(int32_t *)(uintptr_t)ADDR_POINTER_F14)
-    *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = mode;
+#define PICK (*(AM2_PointerPickFn *)&g_pointerPick)
+#define ACT  (*(AM2_PointerActionFn *)&g_pointerAction)
+#define F14  (g_pointerF14)
+    g_pointerMode = mode;
 
     /* Straight from the record into the globals, then tested from them --
      * in the statement order that schedules into the image's stores. */
     PICK = *(AM2_PointerPickFn const *)(REC + MODE_OFF_PICK);
     ACT  = *(AM2_PointerActionFn const *)(REC + MODE_OFF_ACTION);
-    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 = *(const int32_t *)(REC + MODE_OFF_F10);
+    g_pointerF10 = *(const int32_t *)(REC + MODE_OFF_F10);
     F14  = *(const int32_t *)(REC + MODE_OFF_F14);
-    *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
+    g_pointerOverlay = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
 
     if (!PICK && !F14 && ACT) {
-        ACT((void *)0, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-        *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = 0;
+        ACT((void *)0, g_zeroPoint);
+        g_pointerMode = 0;
     }
 #undef REC
 #undef PICK
@@ -5203,7 +5155,7 @@ void __cdecl HudMessage(const char *text, uint8_t colour)
 {
     /* The HUD widget and its row count are read afresh at every use, as
      * the original does. */
-#define HM_HUD    (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_A)
+#define HM_HUD    (*(uint8_t *const *)&g_hudWidgetA)
 #define HM_COUNT  (*(int32_t *)(HM_HUD + HUDLOG_OFF_COUNT))
 #define HM_ROW(n) (HM_HUD + HUDLOG_OFF_ROWS + (n) * AM2_HUD_MSG_SIZE)
     char    *dst;
@@ -5278,16 +5230,16 @@ void __cdecl HudMessage(const char *text, uint8_t colour)
  */
 void __cdecl DrawTooltip(const char *text, uint8_t colour)
 {
-    const int16_t *cur = (const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+    const int16_t *cur = (const int16_t *)&g_cursorPoint;
     int32_t        w   = TextExtent(text, 0, (int32_t *)0);
     int32_t        x   = cur[0] - w / 2;
     int32_t        y;
     RECT           box;
 
-    if (x + w + AM2_TIP_PAD > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
-        x = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w - AM2_TIP_PAD;
+    if (x + w + AM2_TIP_PAD > g_bitmapAreaW)
+        x = g_bitmapAreaW - w - AM2_TIP_PAD;
 
-    if (cur[1] > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+    if (cur[1] > g_bitmapAreaH
                  - AM2_TIP_BOTTOM_MARGIN)
         y = cur[1] - AM2_TIP_ABOVE;
     else
@@ -5298,9 +5250,9 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
 
     /* Outside the lock, and that is not a style choice -- see above. */
     ClearRegion(&box,
-                *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID);
+                g_colourLagMid);
 
-    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;
 
     DrawText(x + AM2_TIP_TEXT_DX, y - AM2_TIP_TEXT_DY, text, 0, 0, colour);
@@ -5331,13 +5283,13 @@ AM2_HudRadar::AM2_HudRadar()
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
-    uint8_t    *dst  = (uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
+    uint8_t    *dst  = g_radarColours;
     AM2_Sprite *bmp;
     char        name[AM2_RADAR_NAME_BYTES];
     AM2_CTOR_VTABLE(w, VTABLE_HUD_RADAR);
 
-    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-    am2_sprintf(name, "%s.bmp", (const char *)(uintptr_t)ADDR_MAP_NAME);
+    SetGameDir(g_tilesetPath);
+    am2_sprintf(name, "%s.bmp", &g_mapName_);
 
     bmp = (AM2_Sprite *)LoadBitmap(name, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = bmp;
@@ -5351,16 +5303,16 @@ AM2_HudRadar::AM2_HudRadar()
     /* The blip palette: five light/dark pairs indexed by RadarBlipColour's
      * answer, ten separate byte copies -- the original's compiler interleaves
      * them, so no two adjacent stores belong to the same pair. */
-    dst[0] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_GREEN;
-    dst[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
-    dst[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_CREAM;
-    dst[3] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_OLIVE;
-    dst[4] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_BLUE;
-    dst[5] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STEEL_BLUE;
-    dst[6] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_GREY;
-    dst[7] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREY;
-    dst[8] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE_B;
-    dst[9] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BLACK;
+    dst[0] = g_colourLightGreen;
+    dst[1] = g_colourDarkGreen;
+    dst[2] = g_colourCream;
+    dst[3] = g_colourOlive;
+    dst[4] = g_colourLightBlue;
+    dst[5] = g_colourSteelBlue;
+    dst[6] = g_colourLightGrey;
+    dst[7] = g_colourDarkGrey;
+    dst[8] = g_colourWhiteB;
+    dst[9] = g_colourBlack;
 
 }
 
@@ -5396,34 +5348,33 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
     AM2_Widget *w = this;
 
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
-        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_charHandler
+        || g_inputSuppress)
         return;
 
     ::WidgetUpdate(w);
 
-    if (!*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
-                                (uintptr_t)ADDR_HUD_WIDGET_B
+    if (!*(const int32_t *)((const uint8_t *)g_hudWidgetB
                             + HUDPANEL_OFF_OPEN))
         return;
 
-    if (!PointInRect((const AM2_Rect *)&w->rect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+    if (!PointInRect((const AM2_Rect *)&w->rect, (const AM2_Point *)&g_cursorPoint))
         return;
 
-    if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+    if (!*(AM2_Widget * *)&g_mouseGrab
+        && g_mouseChanged)
+        *(AM2_Widget * *)&g_mouseGrab = w;
 
-    if ((*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-         || *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w
-        && !*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS) {
-        const int16_t *cur = (const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
-        int32_t       *tgt = (int32_t *)(uintptr_t)ADDR_VIEW_TARGET;
+    if ((g_mouseButton
+         || g_mouseChanged)
+        && *(AM2_Widget * *)&g_mouseGrab == w
+        && !g_inputSuppress) {
+        const int16_t *cur = (const int16_t *)&g_cursorPoint;
+        int32_t       *tgt = (int32_t *)&g_viewTarget;
 
         ((int16_t *)tgt)[0] = (int16_t)
             ((cur[0] - w->rect.left)
-             * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X / w->w);
+             * g_mapExtentX / w->w);
         /* FROM THE RECTANGLE'S TOP, +0x18, as the x arm takes its left from
          * +0x14: `mov ecx,[esi+0x18]` at 0x0041492B. This read w->y, the
          * widget's own offset at +0x8, so a click on the radar scaled from
@@ -5431,16 +5382,15 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
          * Found by tools/sidebyside.py on a hand-played radar click. */
         ((int16_t *)tgt)[1] = (int16_t)
             ((cur[1] - w->rect.top)
-             * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y / w->h);
+             * g_mapExtentY / w->h);
 
-        *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD    = 1;
-        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET  = 0;
+        g_viewHold    = 1;
+        g_objCtxSet  = 0;
     }
 
-    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-        - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY > AM2_MOUSE_IDLE_MS)
-        strcpy((char *)((uint8_t *)*(AM2_Widget **)
-                            (uintptr_t)ADDR_HUD_WIDGET_B
+    if (g_gameClockMs
+        - g_mouseActivity > AM2_MOUSE_IDLE_MS)
+        strcpy((char *)((uint8_t *)g_hudWidgetB
                             + HUDPANEL_OFF_CAPTION),
                    "Stratmap");
 }
@@ -5473,11 +5423,11 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 {
     AM2_Widget *w = this;
 
-    const AM2_Rect *view  = (const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT;
+    const AM2_Rect *view  = (const AM2_Rect *)g_secondRect;
     /* The map's extent is read at every use. */
-#define mapW (*(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
-#define mapH (*(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
-    const uint8_t  *pal   = (const uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
+#define mapW (g_mapExtentX)
+#define mapH (g_mapExtentY)
+    const uint8_t  *pal   = g_radarColours;
     AM2_Rect        box;
     uint8_t        *obj;
 
@@ -5488,24 +5438,24 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
     box.right  = box.left + (view->right  - view->left) * w->w / mapW;
     box.bottom = box.top  + (view->bottom - view->top)  * w->h / mapH;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (!g_netGame) {
         AM2_Rect lim;
         int32_t  edge;
 
         lim.left   = w->rect.left;
         lim.top    = w->rect.top;
         lim.bottom = w->rect.bottom;
-        edge       = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+        edge       = g_bitmapAreaW
                      - AM2_RADAR_RIGHT_MARGIN;
         lim.right  = w->rect.right < edge ? w->rect.right : edge;
 
         IntersectRect((RECT *)&box, (const RECT *)&box, (const RECT *)&lim);
     }
 
-    DrawRectFast(&box, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+    DrawRectFast(&box, g_hiliteColour);
 
     /* The pulse phase is worked out afresh at each blip. */
-#define phase ((int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS \
+#define phase ((int32_t)((g_gameClockMs \
                           >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES))
 
     for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
@@ -5570,7 +5520,7 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
             /* Per-OBJECT blink, seeded from OBJ_OFF_OWNER -- which is a
              * POINTER, not a uid, so distinct objects land on distinct phases
              * and the blips do not all flash together. */
-            uint32_t t = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            uint32_t t = g_gameClockMs
                          + *(const uint32_t *)(obj + OBJ_OFF_OWNER) * 8;
 
             DrawBlip3(x, y, pal[((~t) >> AM2_RADAR_BLINK_SHIFT & 1)
@@ -5693,14 +5643,14 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
     PlaySoundAt(0, 0, 0, 0, 0);
 
     if (*(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL) == slot) {
-        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+        g_viewSnap = 1;
 
         kind = **(const int32_t **)(w + OBJ_OFF_FIELD_C0);
         switch (kind) {
         case 0x17: {
             int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
             if (hp > 0 && hp < *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
-                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
         }
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
@@ -5708,24 +5658,24 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
          * own and jumps into 0x26's. */
         case 0x23:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
-                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
 
         case 0x1A:
-            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
 
         case 0x24:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
-                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
         case 0x25:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 2)
-                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
         case 0x26:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 3)
-                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)&g_zeroPoint);
             break;
         case 0x29: {
             uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
@@ -5733,7 +5683,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
                 void *veh = LookupType3ByUID(riding);
                 if (veh)
                     SetWeaponTarget(veh,
-                        *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+                        *(const AM2_Point *)&g_zeroPoint);
                 else
                     *(uint32_t *)(u + OBJ_OFF_RIDING) = 0;
             }
@@ -5758,7 +5708,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
         else
             SelectUnit(u);
     }
-    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+    g_viewSnap = 1;
 }
 
 /* 0x004150F0, vtable slot 2 of the sarge panel. It fills every record
@@ -5790,13 +5740,13 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     uint8_t        *obj;
     int32_t         i;
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
-        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_charHandler
+        || g_inputSuppress)
         return;
 
     ::WidgetUpdate(w);
 
-    obj = (uint8_t *)LookupOwnerObj(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    obj = (uint8_t *)LookupOwnerObj(g_defaultOwner);
     if (!obj)
         return;
 
@@ -5815,8 +5765,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
         SelectWeapon(obj, 4);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 5))
         SelectWeapon(obj, 5);
-    else if (*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
-                                    (uintptr_t)ADDR_HUD_WIDGET_B
+    else if (*(const int32_t *)((const uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_OPEN)) {
 /* The row's record, indexed afresh at each use: a local pointer moves the
  * loop's induction bias off the record base. */
@@ -5833,32 +5782,32 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (!SARGE_SPR)
                 continue;
 
-            cell.left   = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2]
+            cell.left   = (g_hudSargeOffsets)[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2 + 1];
+                          + (g_hudSargeOffsets)[i * 2 + 1];
             cell.right  = SARGE_SPR->bounds.right  + cell.left;
             cell.bottom = SARGE_SPR->bounds.bottom + cell.top;
 #undef SARGE_SPR
 
-            if (!PointInRect(&cell, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+            if (!PointInRect(&cell, (const AM2_Point *)&g_cursorPoint))
                 continue;
 
-            if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
-                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-                *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+            if (!*(AM2_Widget * *)&g_mouseGrab
+                && g_mouseChanged)
+                *(AM2_Widget * *)&g_mouseGrab = w;
 
-            if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
-                && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w)
+            if (!g_mouseButton
+                && g_mouseChanged
+                && *(AM2_Widget * *)&g_mouseGrab == w)
                 SelectWeapon(obj, i);
 
             /* The tooltip, and it is gated on STILLNESS rather than on the
              * click. ADDR_MOUSE_ACTIVITY is stamped from the clock on any
              * movement or button change, so this fires while the pointer
              * rests on a cell. */
-            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY
+            if (g_gameClockMs
+                - g_mouseActivity
                 > AM2_HUD_TOOLTIP_DWELL) {
                 const uint8_t *item;
 
@@ -5870,8 +5819,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
                 if (!item)
                     continue;
 
-                strcpy((char *)((uint8_t *)*(AM2_Widget *const *)
-                                    (uintptr_t)ADDR_HUD_WIDGET_B
+                strcpy((char *)((uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_CAPTION),
                        ItemTypeName(
                            **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
@@ -5955,7 +5903,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
     int32_t        i;
 
     /* Clipped in place: the visible part is written over `clip` itself. */
-    if (!IntersectRect(&clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)), &clip))
+    if (!IntersectRect(&clip, (const RECT *)g_screenClip, &clip))
         return;
 
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
@@ -5974,9 +5922,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
         if (!SARGE_SPRITE)
             continue;
 
-        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2]
+        x = box.left = (g_hudSargeOffsets)[i * 2]
                        + w->rect.left;
-        y = box.top  = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2 + 1]
+        y = box.top  = (g_hudSargeOffsets)[i * 2 + 1]
                        + w->rect.top;
         box.right  = SARGE_SPRITE->bounds.right + box.left;
         box.bottom = SARGE_SPRITE->bounds.bottom + box.top;
@@ -6003,7 +5951,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
          * UnlockSurface ignores that, so it is harmless, and it is the
          * original's shape. */
         if (*(const int32_t *)(rec + HUDSARGE_REC_COUNT) >= 0) {
-            if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+            if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
 
             ((int32_t (__cdecl *)(char *, const char *, ...))
@@ -6159,15 +6107,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
     uint8_t    *obj;
     int32_t     i, slot;
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
-        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_charHandler
+        || g_inputSuppress)
         return;
 
     ::WidgetUpdate(w);
 
 /* The panel is read from its global at every use, the records indexed at
  * every store. */
-#define PANEL   (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_B)
+#define PANEL   (*(uint8_t *const *)&g_hudWidgetB)
 #define REC(n, f) (*(int32_t *)(self + HUD_SQUAD_RECS                          \
                                  + (n) * HUD_SQUAD_REC_SIZE + (f)))
 #define INKOF(n) (*(uint8_t *)(self + HUD_SQUAD_RECS                          \
@@ -6176,12 +6124,12 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 /* Who holds the mouse, then whether this is a release over us. Each click
  * arm runs it for itself; the weapon arm's misses fall into the generic
  * arm's copy, which answers the same way. */
-#define MOUSE_GRAB (*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB)
-#define CHANGED    (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+#define MOUSE_GRAB (*(AM2_Widget * *)&g_mouseGrab)
+#define CHANGED    (g_mouseChanged)
 #define GRAB()                                                                \
         if (!MOUSE_GRAB && CHANGED)                                           \
             MOUSE_GRAB = w;
-#define CLICKED (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON              \
+#define CLICKED (!g_mouseButton              \
                  && CHANGED && MOUSE_GRAB == w)
 
     /* Pass one: the mouse, but only while the panel is open. */
@@ -6203,17 +6151,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 spr = *(const AM2_Sprite *const *)(self + HUD_SQUAD_PAIR_LO
                           + REC(i, SQUAD_REC_INDEX) * 4);
 
-            cell.left   = ((const int16_t *)((void *)(uintptr_t)
-                              (ADDR_HUD_SQUAD_SLOT_XY)))[i * 2]
+            cell.left   = (g_hudSquadSlotXy)[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + ((const int16_t *)((void *)(uintptr_t)
-                              (ADDR_HUD_SQUAD_SLOT_XY)))[i * 2 + 1];
+                          + (g_hudSquadSlotXy)[i * 2 + 1];
             cell.right  = spr->bounds.right  + cell.left;
             cell.bottom = spr->bounds.bottom + cell.top;
 
             if (!PointInRect(&cell,
-                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                             (const AM2_Point *)&g_cursorPoint))
                 continue;
 
             obj = (uint8_t *)LookupByUID(
@@ -6221,7 +6167,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (!obj || SQUAD_HP(obj) == 0)
                 continue;
 
-            pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT0;
+            pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;
 
             if (pick && pick(obj)) {
                 /* The slot answers to the weapon hook, so a click hands the
@@ -6233,8 +6179,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                     AM2_PointerActionFn act;
 
                     PlaySoundAt(0, 0, 0, 0, 0);
-                    act = *(AM2_PointerActionFn *)
-                              (uintptr_t)ADDR_WEAPON_FN_SLOT1;
+                    act = *(AM2_PointerActionFn *)&g_weaponFnSlot1;
                     if (act)
                         act(obj, *(const uint32_t *)(obj + OBJ_OFF_POS));
                     break;
@@ -6271,15 +6216,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (CLICKED && ObjIsTypeIn238((const AM2_Object *)obj)) {
                 PlaySoundAt(0, 0, 0, 0, 0);
                 ToggleSelect(obj);
-                *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+                g_viewSnap = 1;
             }
 
         tooltip:
             /* The tooltip, gated on STILLNESS rather than on the click, and
              * written into the PANEL's caption, which empties every frame.
              * The interval is compared UNSIGNED. */
-            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                    - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY
+            if (g_gameClockMs
+                    - g_mouseActivity
                 <= AM2_HUD_TOOLTIP_DWELL)
                 continue;
 
@@ -6289,8 +6234,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0)
                     strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION),
                            *(const char *const *)(
-                               (const uint8_t *)*(void *const *)
-                                   (uintptr_t)ADDR_SCRIPT_NAMES
+                               (const uint8_t *)g_scriptNames
                                + (uint32_t)*(const int32_t *)
                                      (obj + ITEM_OFF_NAME_INDEX)
                                  * AM2_NAME_TABLE_STRIDE));
@@ -6317,14 +6261,14 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
     /* Pass three: refill from the selection, at most twelve. */
     i = 0;
     slot = 0;
-    while (i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT) {
+    while (i < g_selectedCount) {
         if (slot >= AM2_HUD_SQUAD_SLOTS)
             break;
 
         obj = (uint8_t *)LookupByUID(
-                  (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+                  (g_selectedItems)[i]);
         if (!obj) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;
         }
 
@@ -6380,7 +6324,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
              * slot 6 whatever the vehicle itself landed on. A rider that no
              * longer resolves is removed AND stepped past, so the one that
              * slid into its place is skipped this frame. */
-            if (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT == 1) {
+            if (g_selectedCount == 1) {
                 slot = AM2_HUD_SQUAD_SLOTS / 2;
                 for (k = 0;
                      k < *(const int32_t *)(obj + VEHICLE_OFF_PTR_LIST + 4);
@@ -6500,14 +6444,14 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
     obj = (uint8_t *)LookupByUID((uint32_t)uid);
     if (!obj)
         return;
-    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;
 
     /* The rectangle and the ink are read afresh for every string. */
 #define SQD_TEXT(dx, dy, s) DrawText(w->rect.left + (dx), w->rect.top + (dy), \
                                      (s), 0, 0,                               \
                                      *(const uint8_t *)(uintptr_t)            \
-                                         ADDR_VIEW_RECT_COLOUR)
+                                         ((uintptr_t)&g_hiliteColour))
 #define SQD_HP()                                                              \
         a = *(const int16_t *)(obj + OBJ_OFF_HEALTH) < AM2_SQUAD_HP_CAP       \
             ? *(const int16_t *)(obj + OBJ_OFF_HEALTH) : AM2_SQUAD_HP_CAP;    \
@@ -6534,7 +6478,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
          * The sense was once inverted here, which hid a custom name like
          * "wildblood" behind a random soldier name. */
 #define SCRIPT_NAME (*(const char *const *)                                   \
-            ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_SCRIPT_NAMES     \
+            ((const uint8_t *)g_scriptNames     \
              + (uint32_t)*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX)        \
                * AM2_NAME_TABLE_STRIDE))
         if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0
@@ -6561,7 +6505,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 
         a = *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME);
         if (a >= AM2_SQUAD_STAT_CAP) a = AM2_SQUAD_STAT_CAP;
-        c = *(const int32_t *)((const uint8_t *)(uintptr_t)ADDR_RANK_EXP_TABLE
+        c = *(const int32_t *)(g_rankExpTable
               + (size_t)*(const int32_t *)(obj + OBJ_OFF_RANK)
                 * AM2_RANK_EXP_STRIDE);
         if (c >= AM2_SQUAD_STAT_CAP) c = AM2_SQUAD_STAT_CAP;
@@ -6591,7 +6535,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
                 out.right  = PIP->bounds.right;
                 out.bottom = PIP->bounds.bottom;
                 if (ClipRect(&PIP->bounds,
-                             (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+                             (const AM2_Rect *)g_screenClip,
                              &px, &py, &out))
                     DrawSpriteClipped(PIP, px, py, &out, 0);
 #undef PIP
@@ -6663,21 +6607,21 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         box.right  = wide + w->rect.left + SQD_BAR_X + 3;
         box.top    = w->rect.top + SQD_BAR_Y;
         box.bottom = w->rect.top + SQD_BAR_Y + 5;
-        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        ClearRegion(&box, g_backgroundColour);
 
         box.left   += 1;
         box.right   = box.left + wide + 1;
         box.top    += 1;
         box.bottom -= 1;
-        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
+        ClearRegion(&box, g_listInkHotSel);
         box.right = box.left + fill;
 
         if (HP <= (int16_t)(MAXHP >> 2))
-            bar = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+            bar = g_hudColour;
         else if (HP <= (int16_t)(MAXHP >> 1))
-            bar = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+            bar = g_colourLagMid;
         else
-            bar = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+            bar = g_hiliteColour;
         ClearRegion(&box, bar);
 #undef MAXHP
 #undef HP
@@ -6722,7 +6666,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
     int32_t         slot;
 
     /* Clipped in place: the visible part is written over `clip` itself. */
-    if (!IntersectRect(&clip, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
+    if (!IntersectRect(&clip, (const RECT *)g_screenClip, &clip))
         return;
 
 #define REC (self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE)
@@ -6753,10 +6697,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
 
         /* The origin is copied as it is computed: x and y go to ClipRect,
          * which adjusts them; the box keeps the unadjusted pair. */
-        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[slot * 2]
+        x = box.left = (g_hudSquadSlotXy)[slot * 2]
                        + w->rect.left;
         y = box.top  = w->rect.top
-                       + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[slot * 2 + 1];
+                       + (g_hudSquadSlotXy)[slot * 2 + 1];
         box.right  = box.left + spr->bounds.right;
         box.bottom = spr->bounds.bottom + box.top;
 
@@ -6777,7 +6721,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
 
             if (IntersectRect(&hit, &back, &clip))
                 ClearRegion(&hit,
-                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+                            g_backgroundColour);
         }
 
         /* TWO NEARLY IDENTICAL EXITS, and they are not the same. This
@@ -6887,9 +6831,9 @@ AM2_HudCmd::AM2_HudCmd()
     /* Seven records, indexed; the signed `jl` against the next object is the
      * index loop strength-reduced -- the build-menu rectangles start where
      * an eighth record would. */
-    for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_RECTS - ADDR_HUD_CMD_SPEC)
+    for (i = 0; i < (int32_t)((((uintptr_t)g_buildMenuRects) - ((uintptr_t)g_hudCmdSpec))
                               / AM2_HUD_CMD_SPR_STRIDE); i++) {
-        uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
+        uint8_t *rec = g_hudCmdSpec
                        + i * AM2_HUD_CMD_SPR_STRIDE;
 
         *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = PreloadArmySprite(
@@ -6943,8 +6887,8 @@ AM2_HudCmd::~AM2_HudCmd()
     AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
 
     /* signed address compare, as the original (`jl`) */
-    for (spr = (AM2_Sprite **)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES));
-         (int32_t)(uintptr_t)spr < (int32_t)(uintptr_t)ADDR_HUD_CMD_SPRITES_END;
+    for (spr = g_hudCmdSprites;
+         (int32_t)(uintptr_t)spr < (int32_t)((uintptr_t)g_hudCmdSpritesEnd);
          spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
         ReleaseSprite(*spr);
 }
@@ -6979,7 +6923,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdInvoke(int32_t mode)
 
         SetPointerMode(mode);
         {
-            const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
+            const uint8_t *rec = g_hudCmdSpec
                                + (size_t)mode * AM2_HUD_CMD_SPR_STRIDE;
             void (*handler)(void) =
                 *(void (**)(void))(rec + HUDCMDSPR_OFF_HANDLER);
@@ -7026,8 +6970,8 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 #define slots ((int32_t *)(self + HUDCMD_OFF_SLOTS))
     int32_t  i;
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
-        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_charHandler
+        || g_inputSuppress)
         return;
 
     ::WidgetUpdate(w);
@@ -7047,38 +6991,37 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
     else if (ActionKeyPressed(0x0F))
         ::HudCmdInvoke(w, 2);
     /* Pass two: the mouse, but only while the panel is open. */
-    else if (*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
-                                    (uintptr_t)ADDR_HUD_WIDGET_B
+    else if (*(const int32_t *)((const uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_OPEN)) {
         for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
             AM2_Rect cell;
 
 /* The slot's sprite spec, looked up again at each use. */
-#define CMD_SPEC(s) ((const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC)) \
+#define CMD_SPEC(s) (g_hudCmdSpec \
                      + (uint32_t)(s) * AM2_HUD_CMD_SPR_STRIDE)
             if (slots[i] < 0)
                 continue;
 
-            cell.left   = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[i * 2]
+            cell.left   = (g_hudSquadSlotXy)[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[i * 2 + 1];
+                          + (g_hudSquadSlotXy)[i * 2 + 1];
             cell.right  = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
                               ->bounds.right + cell.left;
             cell.bottom = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
                               ->bounds.bottom + cell.top;
 
             if (!PointInRect(&cell,
-                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                             (const AM2_Point *)&g_cursorPoint))
                 continue;
 
-            if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
-                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-                *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+            if (!*(AM2_Widget * *)&g_mouseGrab
+                && g_mouseChanged)
+                *(AM2_Widget * *)&g_mouseGrab = w;
 
-            if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-                || !*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
-                || *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB != w)
+            if (g_mouseButton
+                || !g_mouseChanged
+                || *(AM2_Widget * *)&g_mouseGrab != w)
                 continue;
 
             PlaySoundAt(0, 0, 0, 0, 0);
@@ -7096,7 +7039,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 
     /* Pass three: which three commands the current object offers. The
      * context object is read afresh at each use. */
-#define CTX ((uint8_t *)*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A)
+#define CTX ((uint8_t *)g_objCtxObjA)
     memset(slots, 0xFF, AM2_HUD_CMD_SLOTS * sizeof(int32_t));
 
     if (ObjType2Field548((const AM2_Object *)CTX)) {
@@ -7128,7 +7071,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
     /* Whichever slot matches the live pointer mode is the highlighted one. */
     *(int32_t *)(self + HUDCMD_OFF_SELECTED) = -1;
     for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
-        if (slots[i] == *(const int32_t *)(uintptr_t)ADDR_POINTER_MODE)
+        if (slots[i] == g_pointerMode)
             *(int32_t *)(self + HUDCMD_OFF_SELECTED) = i;
     }
 #undef slots
@@ -7142,7 +7085,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
     int32_t        i;
 
     /* Clipped in place: the visible part is written over `clip` itself. */
-    if (!IntersectRect(&clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)), &clip))
+    if (!IntersectRect(&clip, (const RECT *)g_screenClip, &clip))
         return;
 
     for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
@@ -7152,7 +7095,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
         int32_t        x, y;
 
 /* The slot's sprite, looked up again at each use as the original does. */
-#define HUDCMD_SPRITE(s) (*(AM2_Sprite **)((uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES)) \
+#define HUDCMD_SPRITE(s) (*(AM2_Sprite **)((uint8_t *)g_hudCmdSprites \
                                            + (s) * AM2_POINTER_MODE_SIZE))
         if (*slot < 0)
             continue;
@@ -7165,8 +7108,8 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
          * and the draw uses its ADJUSTED pair. This drew at the unadjusted
          * box origin until the byte match read the frame slots: a partly
          * clipped icon was placed as though nothing had been cut. */
-        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS)))[i * 2] + w->rect.left;
-        y = box.top  = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS)))[i * 2 + 1] + w->rect.top;
+        x = box.left = (g_hudCmdOffsets)[i * 2] + w->rect.left;
+        y = box.top  = (g_hudCmdOffsets)[i * 2 + 1] + w->rect.top;
         box.right  = HUDCMD_SPRITE(*slot)->bounds.right + box.left;
         box.bottom = HUDCMD_SPRITE(*slot)->bounds.bottom + box.top;
 
@@ -7227,7 +7170,7 @@ AM2_HudTop::AM2_HudTop()
     int32_t     i;
     AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0) {
+    if (g_mpSession == 0) {
         frame = 0;
         *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 2;
     } else {
@@ -7277,8 +7220,8 @@ AM2_HudTop::AM2_HudTop()
     if (!spr)
         return;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
-        const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    if (g_mpSession != 0) {
+        const uint8_t *comm = g_commObject;
         uint32_t       me   = g_defaultOwner;
 
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
@@ -7356,7 +7299,7 @@ AM2_HudTop::~AM2_HudTop()
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
 
-    *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
+    g_charHandler = (void *)0;
 }
 
 void __attribute__((thiscall)) AM2_Widget::HudChatSend()
@@ -7373,12 +7316,12 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 
     *(int32_t *)(b + HUDLOG_OFF_TYPING)    = 0;
     *(int32_t *)(b + HUDLOG_OFF_JUST_SENT) = 1;
-    *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
+    g_charHandler = (void *)0;
     PlaySoundAt(0, 0, 0, 0, 0);
 
     line = (char *)(b + HUDLOG_OFF_TYPED);
     HudMessage(line,
-        *(const uint8_t *)((const uint8_t *)(uintptr_t)ADDR_CHAT_COLOUR_TABLE
+        *(const uint8_t *)(g_chatColourTable
             + ((size_t)AM2_THE_COMM->CommArmyOfSlot(
                                       (int32_t)g_defaultOwner) << 8)));
 
@@ -7391,7 +7334,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
         for (i = 0; i < AM2_COMM_SLOTS; i++) {
             if ((uint32_t)i == g_defaultOwner)
                 continue;
-            id = *(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+            id = *(const int32_t *)(g_commObject
                                     + COMM_OFF_PLAYERS
                                     + (size_t)i * AM2_COMM_SLOT_STRIDE
                                     + COMM_SLOT_OFF_ID);
@@ -7410,11 +7353,11 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
     /* A line beginning `!` is a cheat -- outside a session only. */
     if (line[0] == '!' && strlen(line) > 1) {
         strcpy(cheat, (char *)(b + HUDLOG_OFF_TYPED + 1));
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        if (g_mpSession == 0)
             CheatLine(cheat);
     }
 
-    *(char *)(*(uint8_t **)(uintptr_t)ADDR_HUD_WIDGET_A + HUDLOG_OFF_TYPED) = 0;
+    *(char *)(*(uint8_t * *)&g_hudWidgetA + HUDLOG_OFF_TYPED) = 0;
 }
 
 /* 0x004185C0. The WM_CHAR handler the HUD chat line installs into
@@ -7454,7 +7397,7 @@ void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
     (void)hi;
 /* The chat widget, read from its global at each use: with a local the
  * stores' address operands come out the other way round. */
-#define CHAT_W (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
+#define CHAT_W (g_hudWidgetA)
     if (!CHAT_W) {
         orig_log("Error: Key handler not freed\n");
         return;
@@ -7535,7 +7478,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
 
     uint8_t    *self    = (uint8_t *)w;
     AM2_Widget *button  = (AM2_Widget *)(self + HUDLOG_OFF_BUTTON_SPRITE);
-    AM2_Widget *grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+    AM2_Widget *grab    = *(AM2_Widget * *)&g_mouseGrab;
     float      *scroll  = (float *)(self + HUDLOG_OFF_SCROLL);
     RECT        hot;
     int32_t     i;
@@ -7545,7 +7488,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     if (grab == button) {
         *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
             Ticks() + AM2_HUD_REWIND_HOLD_MS;
-        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = NULL;
+        *(AM2_Widget * *)&g_mouseGrab = NULL;
     }
 
     ::WidgetUpdate(w);
@@ -7556,7 +7499,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
             *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
         } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
             PlaySoundAt(0, 0, 0, 0, 0);
-            g_charHandler = HudChatChar;   /* ours now, not the image */
+            (*(am2_char_fn *)&g_charHandler) = HudChatChar;   /* ours now, not the image */
             *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
         } else {
             acc = 0.0f;
@@ -7574,7 +7517,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
             }
 
             /* The step and the row count are recomputed at every use. */
-#define STEP (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * AM2_HUD_SCROLL_PPS)
+#define STEP (g_frameDeltaSec * AM2_HUD_SCROLL_PPS)
 #define COUNT (*(const int32_t *)(self + HUDLOG_OFF_COUNT))
             for (i = 0; i < COUNT; i++) {
                 uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
@@ -7634,7 +7577,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) = NULL;
 
         if (!PointInRect((const AM2_Rect *)&w->rect,
-                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+                         (const AM2_Point *)&g_cursorPoint)) {
             w->focusedChild = NULL;
         return;
     }
@@ -7648,18 +7591,18 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                                      top + AM2_HUD_BUTTON_H);
     }
 
-    grab = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+    grab = *(AM2_Widget * *)&g_mouseGrab;
 
     if (!PointInRect((const AM2_Rect *)&hot,
-                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+                     (const AM2_Point *)&g_cursorPoint)) {
         /* On the strip but not on the button: swallow the press anyway, so
          * the map underneath does not also see it. */
-        if (!grab && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+        if (!grab && g_mouseChanged)
+            *(AM2_Widget * *)&g_mouseGrab = w;
         return;
     }
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON) {
+    if (!g_mouseButton) {
         if (grab == button)
             *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
                 Ticks() + AM2_HUD_REWIND_HOLD_MS;
@@ -7669,9 +7612,9 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
         return;
     }
 
-    if (!grab && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+    if (!grab && g_mouseChanged) {
         grab = button;
-        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = button;
+        *(AM2_Widget * *)&g_mouseGrab = button;
     }
     if (grab != button)
         return;
@@ -7683,15 +7626,15 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     }
 
     if (PointInRect((const AM2_Rect *)&w->rect,
-                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+                    (const AM2_Point *)&g_cursorPoint))
+        *(AM2_Widget * *)&g_mouseGrab = w;
     else
         w->focusedChild = NULL;
 
     /* A RELEASE anywhere sends the line. The typing test below is the
      * original's and is already known true. */
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+    if (!g_mouseButton
+        && g_mouseChanged
         && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
         ::HudChatSend(w);
 }
@@ -7786,11 +7729,11 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
     RECT     hit;
     int32_t  x, y;
 
-    ClearRegion(&clip, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+    ClearRegion(&clip, g_backgroundColour);
 
     /* A failed lock returns from the whole paint -- the widget's own
      * sprite and the button row below are not drawn either. */
-    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;
 
     if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
@@ -7808,7 +7751,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
                  *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
                      + w->rect.top,
                  line, 1, 0,
-                 *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+                 g_whiteInk);
     } else {
         int32_t i;
 
@@ -7824,7 +7767,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
             y = *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
                 + w->rect.top;
             DrawText(x, y, (const char *)row, 1, 0,
-                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE);
+                     g_colourStale);
         }
     }
 
@@ -7998,7 +7941,7 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
-    uint8_t  ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    uint8_t  ink  = g_hiliteColour;
     uint8_t  fill = 0;
     int32_t  do_fill = 0;
     RECT     vis;
@@ -8007,7 +7950,7 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
 
     if (w->disabled) {
         w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR_OFF);
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG;
+        ink = g_colourBelowBg;
     } else {
         w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR);
 
@@ -8015,7 +7958,7 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
          * null-tested: a painted button always has one. */
         if (*(const uint8_t *)(self + COUNTBTN_OFF_LIT)) {
             do_fill = 1;
-            ink     = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+            ink     = g_backgroundColour;
             fill    = (w->parent->focusedChild == w) ? AM2_COUNT_FILL_LIT + 1
                                                          : AM2_COUNT_FILL_LIT;
         } else if (w->parent->focusedChild == w) {
@@ -8036,7 +7979,7 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
                 *(const int32_t *)(self + COUNTBTN_OFF_COUNT));
     width = TextExtent(text, 0, NULL);
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     DrawTextClipped(w->rect.left + AM2_COUNT_CELL_W - width,
@@ -8067,25 +8010,25 @@ void __cdecl BuildOnToggle(AM2_Widget *w)
     uint8_t *self = (uint8_t *)w;
     int32_t  row;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY) {
+    if (g_hudDirty) {
         HudRepaintOne();
-        if (*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+        if (g_hudIndex
                 == *(const int32_t *)(self + COUNTBTN_OFF_MENU_ROW))
             return;
     }
 
-    (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)->focusedChild = w;
+    (g_hudWidgetB)->focusedChild = w;
 
     row = *(const int32_t *)(self + COUNTBTN_OFF_MENU_ROW);
-    *(int32_t *)(uintptr_t)ADDR_HUD_INDEX = row;
+    g_hudIndex = row;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
+    if (g_ourPoints
             >= (int32_t)UnitTypeCost(
-                   *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
+                   *(const int32_t *)(g_buildMenu
                                       + row * AM2_BUILD_MENU_STRIDE
                                       + BUILD_MENU_OFF_ID))) {
-        *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY         = 1;
-        *(int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88 = 1;
+        g_hudDirty         = 1;
+        g_placeFlag4fcf88 = 1;
     }
 }
 
@@ -8142,7 +8085,7 @@ AM2_HudPanel::AM2_HudPanel()
     AM2_CTOR_VTABLE(w, VTABLE_HUD_PANEL);
 
     /* The net-game flag is re-read at each use, as the original does. */
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0)
+    if (g_netGame == 0)
         spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 0, 1);
     else
         spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 1, 1);
@@ -8151,19 +8094,19 @@ AM2_HudPanel::AM2_HudPanel()
         return;
     w->sprite = spr;
 
-    w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0)
+    w->x = g_screenW - spr->bounds.right;
+    if (g_netGame == 0)
         w->x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
     w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
     w->h = spr->bounds.bottom;
     *(int32_t *)(self + HUDPANEL_OFF_STOP) = w->x;
     *(int32_t *)(self + HUDPANEL_OFF_OPEN) = 1;
-    *(int32_t *)(uintptr_t)ADDR_HUD_PANEL_X = w->x;
+    g_hudPanelX = w->x;
 
     ::WidgetAddChild(w, new AM2_HudRadar);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
+    if (g_netGame == 0) {
         ::WidgetAddChild(w, new AM2_HudSarge);
         ::WidgetAddChild(w, new AM2_HudSquad);
         ::WidgetAddChild(w, new AM2_HudCmd);
@@ -8188,8 +8131,8 @@ AM2_HudPanel::AM2_HudPanel()
      * found by reading ADDR_BUILD_ON_TOGGLE, which indexes an 18-row table
      * with +0x78 -- coherent only if that field is the row. */
     {
-        const uint8_t *menu = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
-        AM2_Widget   **slot = (AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
+        const uint8_t *menu = g_buildMenu;
+        AM2_Widget   **slot = g_hudWidgetTable;
         int32_t        army = AM2_THE_COMM->CommArmyOfSlot(
                                   (int32_t)g_defaultOwner);
         AM2_Widget    *btn;
@@ -8206,7 +8149,7 @@ AM2_HudPanel::AM2_HudPanel()
                                    + BUILD_MENU_OFF_KIND),
                 army,
                 *(const AM2_Rect *)(menu + i * AM2_BUILD_MENU_STRIDE
-                                    - (ADDR_BUILD_MENU - ADDR_BUILD_MENU_RECTS)),
+                                    - (((uintptr_t)g_buildMenu) - ((uintptr_t)g_buildMenuRects))),
                 i,
                 (int32_t)UnitTypeCost(*(const int32_t *)
                     (menu + i * AM2_BUILD_MENU_STRIDE + BUILD_MENU_OFF_ID)),
@@ -8217,13 +8160,13 @@ AM2_HudPanel::AM2_HudPanel()
             /* Writes through btn even when it is null -- the original's. */
             if (!CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
                                                   + BUILD_MENU_OFF_ID),
-                               *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
+                               g_ourPoints))
                 *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
         }
 
         /* The points readout, formatted into the panel's own buffer. */
         points = (char *)(self + HUDPANEL_OFF_POINTS_TEXT);
-        am2_sprintf(points, "%d", *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
+        am2_sprintf(points, "%d", g_ourPoints);
 
         /* The edit takes its rectangle as FOUR ints, not a struct. The
          * original still routes them through RectSet and copies the
@@ -8233,9 +8176,9 @@ AM2_HudPanel::AM2_HudPanel()
          * and the background's. Reused rather than given a third and
          * fourth spelling; checkpatches refused the aliases. */
         btn = new AM2_Edit(points, 0x0C, *RectSet(AM2_TEMP(AM2_Rect), 0x5A, 0x98, 0x26, 0x0E), 1,
-                           *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                           *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                           *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                           g_hiliteColour,
+                           g_hiliteColour,
+                           g_backgroundColour,
                            (void (__cdecl *)(AM2_Widget *))0, 0, 0);
         *(void **)(self + HUDPANEL_OFF_POINTS_FIELD) = btn;
         *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
@@ -8322,37 +8265,37 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
      * with only this line in view. */
     self[HUDPANEL_OFF_CAPTION] = 0;
 
-    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
-        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+    if (g_charHandler
+        || g_inputSuppress)
         return;
 
     if (*(const int32_t *)(self + HUDPANEL_OFF_OPEN)) {
         if (w->x > *(const int32_t *)(self + HUDPANEL_OFF_STOP)) {
-            w->x -= (int32_t)(*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * 320.0f);
+            w->x -= (int32_t)(g_frameDeltaSec * 320.0f);
             if (w->x < *(const int32_t *)(self + HUDPANEL_OFF_STOP))
                 w->x = *(const int32_t *)(self + HUDPANEL_OFF_STOP);
-            *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
+            *(int32_t *)(uintptr_t)(((uintptr_t)g_blitRect) + 8) = w->x;
         }
-    } else if (w->x < *(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+    } else if (w->x < g_screenW
                        - HudPanelWidth()) {
-        w->x -= (int32_t)(*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * -320.0f);
-        if (w->x > *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth())
-            w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth();
-        *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
+        w->x -= (int32_t)(g_frameDeltaSec * -320.0f);
+        if (w->x > g_screenW - HudPanelWidth())
+            w->x = g_screenW - HudPanelWidth();
+        *(int32_t *)(uintptr_t)(((uintptr_t)g_blitRect) + 8) = w->x;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (g_netGame) {
         AM2_Widget *const *slot =
-            (AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
-        const uint8_t     *menu = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
+            g_hudWidgetTable;
+        const uint8_t     *menu = g_buildMenu;
         int32_t            i;
 
         /* Indexed, with an if/else: the signed `jl` and the two stores. */
-        for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_END - ADDR_BUILD_MENU)
+        for (i = 0; i < (int32_t)((((uintptr_t)g_buildMenuEnd) - ((uintptr_t)g_buildMenu))
                                   / AM2_BUILD_MENU_STRIDE); i++) {
             if (CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
                                                  + BUILD_MENU_OFF_ID),
-                              *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
+                              g_ourPoints))
                 slot[i]->disabled = 0;
             else
                 slot[i]->disabled = 1;
@@ -8372,7 +8315,7 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelPaint(RECT clip)
 
     ::WidgetPaint(w, clip);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+    if (g_netGame) {
         int32_t i;
 
         /* All eighteen buttons, each record's name against the rectangle its
@@ -8381,29 +8324,28 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelPaint(RECT clip)
          * button's, and stopped one short, so every tooltip answered for the
          * button to the right of the pointer; the byte match found it. The
          * rectangle is filled in place, right and bottom from left and top. */
-        for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_END - ADDR_BUILD_MENU)
+        for (i = 0; i < (int32_t)((((uintptr_t)g_buildMenuEnd) - ((uintptr_t)g_buildMenu))
                                   / AM2_BUILD_MENU_STRIDE); i++) {
             AM2_Rect box;
 
-            box.left   = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[0] + w->rect.left;
-            box.top    = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[1] + w->rect.top;
-            box.right  = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[2] + box.left;
-            box.bottom = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[3] + box.top;
+            box.left   = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[0] + w->rect.left;
+            box.top    = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[1] + w->rect.top;
+            box.right  = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[2] + box.left;
+            box.bottom = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[3] + box.top;
 
             if (PointInRect(&box,
-                            (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-                DrawTooltip((const char *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
+                            (const AM2_Point *)&g_cursorPoint))
+                DrawTooltip((const char *)(g_buildMenu
                                            + i * AM2_BUILD_MENU_STRIDE
                                            + BUILD_MENU_OFF_NAME),
-                            *(const uint8_t *)(uintptr_t)
-                                ADDR_BACKGROUND_COLOUR);
+                            g_backgroundColour);
         }
     }
 
     cap = (char *)(self + HUDPANEL_OFF_CAPTION);
     if (*cap) {
         TitleCaseName(cap);
-        DrawTooltip(cap, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        DrawTooltip(cap, g_backgroundColour);
     }
 }
 
@@ -8444,7 +8386,7 @@ AM2_HudEdge::AM2_HudEdge()
         return;
 
     w->sprite = spr;              /* its own backdrop, not a fourth slot */
-    w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
+    w->x = g_screenW - spr->bounds.right;
     w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
     w->h = spr->bounds.bottom;
@@ -8521,25 +8463,24 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     ::WidgetScreenRect(w);
 
     if (PointInRect((const AM2_Rect *)&w->rect,
-                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
-        if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
-            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+                    (const AM2_Point *)&g_cursorPoint)) {
+        if (!*(AM2_Widget * *)&g_mouseGrab
+            && g_mouseChanged)
+            *(AM2_Widget * *)&g_mouseGrab = w;
 
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
-            && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w) {
+        if (!g_mouseButton
+            && g_mouseChanged
+            && *(AM2_Widget * *)&g_mouseGrab == w) {
             PlaySoundAt(0, 0, 0, 0, 0);
-            *(int32_t *)((uint8_t *)*(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B
+            *(int32_t *)((uint8_t *)g_hudWidgetB
                          + HUDPANEL_OFF_OPEN) =
-                *(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
-                                       (uintptr_t)ADDR_HUD_WIDGET_B
+                *(const int32_t *)((const uint8_t *)g_hudWidgetB
                                    + HUDPANEL_OFF_OPEN) == 0;
         }
     }
 
     obj = (const uint8_t *)LookupOwnerObj(
-              *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+              g_defaultOwner);
 
     *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) = 0;
     *(char *)(self + EDGE_OFF_CAPTION_A)     = '\0';
@@ -8689,10 +8630,10 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,                  \
                                  w->rect.right, w->rect.bottom);             \
     if (IntersectRect(&vis, &box, &clip)) {                                  \
-        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) \
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget)) \
             return;                                                          \
         DrawTextVertical(x, y, (s), 1, vis,                                  \
-                         *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);    \
+                         g_whiteInk);    \
         UnlockSurface();                                                     \
     }
 /* A sprite at the pen, clipped twice. */
@@ -8711,11 +8652,11 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
             pen + AM2_HUD_BAR_BASE - (pct),                                  \
             w->rect.left + AM2_HUD_BAR_X + AM2_HUD_BAR_W,                    \
             pen + AM2_HUD_BAR_BASE);                                         \
-    ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+    ClearRegion(&box, g_hiliteColour);
 #define spr (*(AM2_Sprite **)(self + EDGE_OFF_SPRITE))
 
     /* Clipped in place: the by-value clip is the intersection from here. */
-    if (!IntersectRect(&clip, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
+    if (!IntersectRect(&clip, (const RECT *)g_screenClip, &clip))
         return;
 
     ::WidgetPaint(w, clip);
@@ -8783,10 +8724,10 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
         am2_sprintf(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_FMT)),
                     *(const int32_t *)(self + EDGE_OFF_AMMO));
 
-    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;
     DrawTextVertical(x, y, text, 1, vis,
-                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+                     g_whiteInk);
     UnlockSurface();
 #undef spr
 #undef EDGE_BAR
@@ -8810,7 +8751,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
 int32_t __cdecl HudPanelWidth(void)
 {
     const AM2_Widget *w =
-        *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_C;
+        g_hudWidgetC;
 
     if (!w)
         return 0;
@@ -8848,27 +8789,27 @@ void __cdecl OnAppActivated(void)
 {
     /* A full redraw is requested, not activity: ADDR_APP_ACTIVE, which this
      * set until the relink compared addresses, is WndProc's to raise. */
-    *(int32_t *)(uintptr_t)ADDR_FULL_REDRAW = 1;
+    g_fullRedraw = 1;
     RestoreLostSurfaces();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
+    if (g_gameState == 2)
         RefreshScreen();
 
-    if (g_paintObject) {
-        SetDrawTarget(g_primarySurface);
-        WidgetVPaint((AM2_Widget *)g_paintObject,
-                     ((AM2_Widget *)g_paintObject)->rect);
-        WidgetVPaint((AM2_Widget *)g_paintObject,
-                     ((AM2_Widget *)g_paintObject)->rect);
+    if ((*(uint8_t * *)&g_paintObject)) {
+        SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
+        WidgetVPaint((AM2_Widget *)(*(uint8_t * *)&g_paintObject),
+                     ((AM2_Widget *)(*(uint8_t * *)&g_paintObject))->rect);
+        WidgetVPaint((AM2_Widget *)(*(uint8_t * *)&g_paintObject),
+                     ((AM2_Widget *)(*(uint8_t * *)&g_paintObject))->rect);
     }
 
     if (g_currentBitmap) {
         int32_t x, y;
 
-        SetDrawTarget(g_primarySurface);
-        x = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+        SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
+        x = (g_bitmapAreaW
              - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_W)) >> 1;
-        y = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+        y = (g_bitmapAreaH
              - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_H)) >> 1;
         DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
         DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
@@ -8884,7 +8825,7 @@ AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
     AM2_Widget *list;
     AM2_Widget *bar;
     AM2_CTOR_VTABLE(w, VTABLE_COMM_PANEL);
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = new AM2_Rec(1);
     CommEnumConnections(g_commObject, *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS));
@@ -8933,7 +8874,7 @@ void __cdecl OpenCommPanel(void)
 {
     CloseCurrentScreen();
     CommCreateDirectPlay(g_commObject, (void *)0);
-    g_paintObject = (uint8_t *)new AM2_CommPanelScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_CommPanelScreen("01_000_00_screen.bmp");
 }
 
 /* WarMenuConstruct -- original 0x0042EED0, thiscall, `ret 4`. START A WAR,
@@ -8984,7 +8925,7 @@ AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
     /* Every dialog constructor in this family opens with this, and
      * ADDR_DIR_SCRATCH is uninitialised at load -- so unless something has
      * written it the call is SetGameDir(""), back to the base. Ours. */
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     panel = new AM2_Panel("00_999_99_blank.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xBD, 0x48, 0x106, 0x35));
     ::WidgetAddChild(w, panel);
@@ -9005,7 +8946,7 @@ AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
 void __cdecl OpenWarMenu(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_WarMenuScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_WarMenuScreen("01_000_00_screen.bmp");
 }
 
 /* DlgBattleJoinConstruct -- original 0x0042F4C0, 944 bytes, thiscall
@@ -9041,9 +8982,9 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
     AM2_Widget *kid;
     AM2_Widget *edit;
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_JOIN);
-    SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    SetGameDir(g_dirScratch);
     strcpy((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME),
-           (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
+           &g_savedPlayerName);
     /* No row chosen yet. BattleJoinOk reads -1 as "take the first"; ours
      * never set it, so a join with no row clicked used allocator garbage
      * as the session index (0x0042F52C). */
@@ -9054,11 +8995,11 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
     this->focusedChild = panel;
     panel->flag44 = 1;            /* faults on a failed alloc -- original's */
 
-    kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x42, 0xCE, 0x6E), *(void **)(uintptr_t)ADDR_SESSION_OBJECT, (int32_t)(uintptr_t)BattleJoinSelect, (int32_t)(uintptr_t)BattleJoinPoll, 0);
+    kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x42, 0xCE, 0x6E), g_sessionObject, (int32_t)(uintptr_t)BattleJoinSelect, (int32_t)(uintptr_t)BattleJoinPoll, 0);
     ::WidgetAddChild(panel, kid);
     WidgetVFocus(kid, 0);
 
-    edit = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
+    edit = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
     ::WidgetAddChild(panel, edit);
     /* Letters and digits only, as ENTER NAME's field -- the original sets
      * it (0x0042F6B5); ours left the permissive default. */
@@ -9086,7 +9027,7 @@ AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen()
 void __cdecl OpenBattleJoin(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
@@ -9102,7 +9043,7 @@ void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     }
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT
+    *(int32_t *)(*(uint8_t * *)&g_paintObject
                  + BATTLEJOIN_OFF_CHOSEN) = row;
 }
 
@@ -9124,12 +9065,12 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
 
 void __cdecl BattleJoinOk(void)
 {
-    uint8_t      *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    uint8_t      *dlg = *(uint8_t * *)&g_paintObject;
     uint8_t      *comm;
     int32_t       row;
 
     /* The session list is re-read at each use, as the image does. */
-#define rows (*(AM2_ListRows **)(uintptr_t)ADDR_SESSION_OBJECT)
+#define rows (*(AM2_ListRows * *)&g_sessionObject)
     if (*(const int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) == -1
             && rows->count == 1)
         *(int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) = 0;
@@ -9157,7 +9098,7 @@ void __cdecl BattleJoinOk(void)
             PlaySoundAt(2, 0, 0, 0, 0);
             g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_VIEW;
             g_menuRequestSet = 1;
-            strcpy((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, name);
+            strcpy(&g_savedPlayerName, name);
             SaveOptions();
             return;
         }
@@ -9177,10 +9118,10 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_NAME_DLG);
 
     strcpy((char *)this + 0x64,
-               (const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
+               &g_savedBattleName);
     strcpy((char *)this + 0x84,
-               (const char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)));
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+               &g_savedPlayerName);
+    SetGameDir(g_dirScratch);
 
     panel = new AM2_Panel("02_002_00_host.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0x8F, 0x1A7, 0xC1));
     ::WidgetAddChild(this, panel);
@@ -9240,7 +9181,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpDialogDelete(int32_t flags)
 void __cdecl OpenBattleName(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_BattleNameScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_BattleNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00430140 -- fill a list box from a text file in `rules/`, one row per
@@ -9314,21 +9255,21 @@ void __cdecl RefreshMapSelection(void)
     char        path[0x100];
     char        prev[0x100];
 
-    if (g_paintObject != (uint8_t *)0
+    if ((*(uint8_t * *)&g_paintObject) != (uint8_t *)0
         && g_gameState == AM2_STATE_MENU
         && g_subState == AM2_MENU_MP_HOST)
-        preview = ((AM2_Widget **)(g_paintObject + MP_PANEL_OFF_PREVIEW))[0];
+        preview = ((AM2_Widget **)((*(uint8_t * *)&g_paintObject) + MP_PANEL_OFF_PREVIEW))[0];
 
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+    SetGameDir(g_tilesetPath);
     orig_sprintf(path, "%s.amm",
-                 (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+                 &g_mapName_);
 
     if (FileExists(path)) {
-        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+        SetGameDir(g_tilesetPath);
 
         if (preview) {
             orig_sprintf(prev, "%s_prev.bmp",
-                         (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+                         &g_mapName_);
             MpPreviewSetBitmap(preview, prev);
             WidgetVPaint(preview, preview->rect);
         }
@@ -9391,12 +9332,12 @@ AM2_MpPanelScreen::~AM2_MpPanelScreen()
     AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
 
     /* signed address compares, as the original (`jl`) */
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
-         (int32_t)(uintptr_t)p < (int32_t)(uintptr_t)ADDR_MENU_MSG_LIST; p++)
+    for (p = g_mpPanelSpritesA;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)&g_menuMsgList); p++)
         ReleaseSprite(*p);
 
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B;
-         (int32_t)(uintptr_t)p < (int32_t)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END; p++)
+    for (p = g_mpPanelSpritesB;
+         (int32_t)(uintptr_t)p < (int32_t)((uintptr_t)g_mpPanelSpritesBEnd); p++)
         ReleaseSprite(*p);
 }
 
@@ -9439,10 +9380,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* The four player-colour swatches.  The loop's bound is the address of
      * the NEXT global, so the array's length is written nowhere. */
     {
-        AM2_Sprite **slot = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
+        AM2_Sprite **slot = g_mpPanelSpritesA;
         char         name[0x20];
 
-        for (i = 0; slot < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST;
+        for (i = 0; slot < (AM2_Sprite * *)&g_menuMsgList;
              slot++, i++) {
             am2_sprintf(name, "03_013_0%i_color.bmp", i);
             *slot = PreloadSpriteName(name, 1, 1);
@@ -9451,9 +9392,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
     /* And the thirteen panel sprites, by set and index rather than by name. */
     {
-        AM2_Sprite **slot = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B;
+        AM2_Sprite **slot = g_mpPanelSpritesB;
 
-        for (i = 0; slot < (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END;
+        for (i = 0; slot < g_mpPanelSpritesBEnd;
              slot++, i++)
             *slot = PreloadSprite(3, 0x17, i, 1, 1);
     }
@@ -9488,7 +9429,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         /* The row's own name: the comm slot's player, or `-- Open --`. */
         {
-            const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            const uint8_t *comm = g_commObject;
 
             if (*(const int32_t *)(comm + COMM_OFF_PLAYER_SLOTS
                                    + (size_t)i * AM2_COMM_SLOT_STRIDE) != 0)
@@ -9502,8 +9443,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         names[i] = new AM2_MpName(name,
                                   *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12),
                                   1,
-                                  *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR,
-                                  *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                                  g_hudColour,
+                                  g_backgroundColour,
                                   i);
         ::WidgetAddChild(w, names[i]);
 
@@ -9550,15 +9491,11 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         child = (AM2_Widget *)orig_operator_new(0x84);
         rows[i] = child
                 ? ::new (child) AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + (i == 3)),
-                                  ((const int32_t *)(uintptr_t)
-                                       ADDR_ARMY_POINTS)[i],
+                                  (g_armyPoints)[i],
                                   0, 0x1388, 0x64, w, MpCommitPoints,
-                                  *(const uint8_t *)(uintptr_t)
-                                       ADDR_VIEW_RECT_COLOUR,
-                                  *(const uint8_t *)(uintptr_t)
-                                       ADDR_COLOUR_BELOW_BG,
-                                  *(const uint8_t *)(uintptr_t)
-                                       ADDR_BACKGROUND_COLOUR,
+                                  g_hiliteColour,
+                                  g_colourBelowBg,
+                                  g_backgroundColour,
                                   i)
                 : 0;
         ::WidgetAddChild(w, rows[i]);
@@ -9683,16 +9620,16 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
     /* The chat line: its buffer is a FIELD of the panel, seeded from the
      * directory scratch, and the edit writes into it in place. */
-    strcpy((char *)(p + 0xE4), (const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    strcpy((char *)(p + 0xE4), g_dirScratch);
     {
         AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
 
         if (child)
             ::new (child) AM2_Edit((char *)(p + 0xE4), 0x3C,
                           *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
-                          *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                          *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                          *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                          g_hiliteColour,
+                          g_colourBelowBg,
+                          g_backgroundColour,
                           OnChatEnter,
                           0, 0);
         ::WidgetAddChild(w, child);
@@ -9705,10 +9642,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* THE MESSAGE LIST'S ROWS ARE A GLOBAL SINGLETON, made once and kept.
      * Every panel after the first reuses it, which is why the log survives
      * closing and reopening the lobby. */
-    if (*(void **)(uintptr_t)ADDR_MENU_MSG_LIST == 0) {
+    if (g_menuMsgList == 0) {
         void *rows = orig_operator_new(0x0C);
 
-        *(void **)(uintptr_t)ADDR_MENU_MSG_LIST = rows ? RecordCtor(rows, 0)
+        g_menuMsgList = rows ? RecordCtor(rows, 0)
                                                        : 0;
     }
     {
@@ -9718,8 +9655,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
         *slot = child ? ::new (child) AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
-                                          *(void **)(uintptr_t)
-                                              ADDR_MENU_MSG_LIST,
+                                          g_menuMsgList,
                                           (int32_t)ADDR_LOG, 0)
                       : (AM2_Widget *)0;
 
@@ -9833,23 +9769,23 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         rows = rows ? RecordCtor(rows, 0) : (void *)0;
 
         for (i = 0;
-             i < *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)); i++) {
-            uint8_t *rec = *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE))
+             i < g_nameTableCount; i++) {
+            uint8_t *rec = g_nameTableBase
                          + (uint32_t)i * AM2_NAME_RECORD_SIZE;
 
             if (!rec)
                 continue;
             ((AM2_Rec *)rows)->ListAdd((const char *)(rec + NAMEREC_OFF_NAME3), rec);
             if (strcmp((const char *)(rec + NAMEREC_OFF_NAME),
-                       (const char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME))) == 0)
+                       &g_mpScriptName) == 0)
                 sel = i;
         }
 
-        if (*(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)) != 0) {
-            uint8_t *rec = *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE))
+        if (g_nameTableCount != 0) {
+            uint8_t *rec = g_nameTableBase
                          + (uint32_t)sel * AM2_NAME_RECORD_SIZE;
 
-            strcpy((char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)),
+            strcpy(&g_mpScriptName,
                    (const char *)(rec + NAMEREC_OFF_NAME));
             am2_sprintf(path, "%s.txt",
                         (const char *)(rec + NAMEREC_OFF_NAME2));
@@ -9891,24 +9827,24 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget *child;
 
-        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+        if (*(const int32_t *)(g_commObject
                                + COMM_OFF_IS_HOST))
             child = new AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
-                                   *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
+                                   g_scoreLimit,
                                    0x64, 0x2706, 0x64, w,
                                    MpCommitScore,
-                                   *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                                   *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                                   *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                                   g_hiliteColour,
+                                   g_colourBelowBg,
+                                   g_backgroundColour,
                                    0);
         else {
             am2_sprintf((char *)(p + MP_PANEL_OFF_SCORE_TEXT),
                         "%i",
-                        *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+                        g_scoreLimit);
             child = new AM2_Label((const char *)(p + MP_PANEL_OFF_SCORE_TEXT),
                                   *RectSet(&r, 0x22B, 0x35, 0x21, 0x0E), 2,
-                                  *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                                  *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+                                  g_colourBelowBg,
+                                  g_backgroundColour);
         }
         ::WidgetAddChild(w, child);
         *(int32_t *)((uint8_t *)child + 0x50) = 0;
@@ -9937,7 +9873,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         {
             const uint8_t *maps = (const uint8_t *)ScriptListFind(
-                (char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)));
+                &g_mpScriptName);
 
             if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
                 const char *names = *(const char *const *)
@@ -9953,7 +9889,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                         continue;
                     ((AM2_Rec *)rows)->ListAdd((const char *)(lvl + LEVEL_OFF_NAME), lvl);
                     if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
-                               (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
+                               &g_mapName_) == 0)
                         sel = i;
                 }
 
@@ -10000,9 +9936,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         char        path[0x104];
         AM2_Widget *child;
 
-        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+        SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s_prev.bmp",
-                    (const char *)(uintptr_t)ADDR_MAP_NAME);
+                    &g_mapName_);
         if (!FileExists(path)) {
             SetGameDir("bitmaps");
             strcpy(path, "bad_mp_prev.bmp");
@@ -10025,7 +9961,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child;
 
         /* Two allocations, one per arm, as the image has them. */
-        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+        if (*(const int32_t *)(g_commObject
                                + COMM_OFF_IS_HOST))
             child = new AM2_Button("03_016_00_start.bmp",
                                    "03_016_01_start.bmp",
@@ -10100,7 +10036,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
 #define colours ((AM2_Widget **)(self + MP_PANEL_OFF_COLOURS))
 #define teams   ((AM2_Widget **)(self + MP_PANEL_OFF_TEAMS))
 #define rows    ((AM2_Widget **)(self + MP_PANEL_OFF_ARMY_ROWS))
-#define setting ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
+#define setting (g_armyPoints)
     int32_t      i;
 
     ::WidgetUpdateCancel(w);
@@ -10127,7 +10063,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
 
     orig_sprintf((char *)(self + MP_PANEL_OFF_SCORE_TEXT),
                  "%i",
-                 *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+                 g_scoreLimit);
 
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
         uint8_t *inner = *(uint8_t **)((uint8_t *)rows[i] + AM2_MP_ROW_INNER);
@@ -10151,7 +10087,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelPaint(RECT clip)
 void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_MpPanelScreen("01_001_00_mphost.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_MpPanelScreen("01_001_00_mphost.bmp");
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
 }
@@ -10211,7 +10147,7 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
     }
 
     *(int32_t *)(COMM + COMM_OFF_PLAYERS
-                 + *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+                 + *(const int32_t *)&g_defaultOwner
                    * AM2_COMM_SLOT_STRIDE
                  + COMM_SLOT_OFF_READY_TO_LOAD) = 1;
 
@@ -10225,12 +10161,12 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
     SendGameStartMsg();
 
-    *(int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8 =
-        *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT;
-    *(int32_t *)(uintptr_t)ADDR_HOST_MASK_A =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS;
-    *(int32_t *)(uintptr_t)ADDR_HOST_MASK_B =
-        *(const int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C;
+    g_hostValue3e8 =
+        g_scoreLimit;
+    *(int32_t *)&g_hostMaskA =
+        *(const int32_t *)&g_gameOverFlags;
+    *(int32_t *)&g_hostMaskB =
+        g_gameSetting22c;
 
     SaveOptions();
 #undef COMM
@@ -10347,7 +10283,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
      * after it survives the null test. Reproduced. */
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    strcpy((char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)), (const char *)rec);
+    strcpy(&g_mpScriptName, (const char *)rec);
     am2_sprintf(path, "%s.txt", (const char *)(rec + MP_GAMETYPE_OFF_RULES));
     FillListFromRules(path, panel);
 
@@ -10379,7 +10315,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         ((AM2_Rec *)*(void **)(maps + LIST_OFF_ROWS))->ListAdd(
                 (const char *)(lvl + LEVEL_OFF_NAME), lvl);
 
-        if (strcmp(nm, (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
+        if (strcmp(nm, &g_mapName_) == 0)
             row = i;
     }
 
@@ -10431,7 +10367,7 @@ void __cdecl OnChatEnter(AM2_Widget *w)
 
     MenuMessage(CHAT_TEXT, army, 0);
     SendChatMsg(CHAT_TEXT, 0);
-    strcpy(CHAT_TEXT, (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    strcpy(CHAT_TEXT, g_dirScratch);
 #undef CHAT_TEXT
     WidgetVPaint(w, w->rect);
 }
@@ -10448,7 +10384,7 @@ void __cdecl OnChatEnter(AM2_Widget *w)
  * on any drive here. */
 void __cdecl ClearMenuMsgs(void)
 {
-    void *list = *(void **)(uintptr_t)ADDR_MENU_MSG_LIST;
+    void *list = g_menuMsgList;
 
     if (list)
         RecordReset(list);
@@ -10482,7 +10418,7 @@ void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         return;
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(uintptr_t)ADDR_LEVEL_ID = 0;
+    g_levelId = 0;
 
     lvl = *(const void *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
                                  + AM2_LIST_ROW_VALUE);
@@ -10542,14 +10478,14 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     int32_t        chosen;
     int32_t        i;
 
-    *(int32_t *)(uintptr_t)ADDR_LEVEL_ID    = 0;
-    *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX = 0;
+    g_levelId    = 0;
+    g_levelIndex = 0;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE == AM2_MENU_MODE_MP_PANEL)
-        panel = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (g_subState == AM2_MENU_MODE_MP_PANEL)
+        panel = *(uint8_t * *)&g_paintObject;
 
     rec = (const uint8_t *)ScriptListFind(
-              (char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)));
+              &g_mpScriptName);
     if (!rec) {
         MpComplain(panel, "%s does not have rules.");
         return AM2_MAPCHECK_NO_RULES;
@@ -10604,7 +10540,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
                     (const char *)(lvl + LEVEL_OFF_NAME), lvl);
         }
 
-        if (strcmp(nm, (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
+        if (strcmp(nm, &g_mapName_) == 0)
             chosen = i;
     }
 
@@ -10625,7 +10561,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         return AM2_MAPCHECK_BAD_INSTALL;
     }
 
-    SelectLevel(FindLevelByName((char *)((void *)(uintptr_t)(ADDR_MAP_NAME))));
+    SelectLevel(FindLevelByName(&g_mapName_));
 
     if (MpScriptChecksum() != scriptSum) {
         MpComplain(panel, "%s has a damaged rules file.");
@@ -10642,9 +10578,9 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         /* Its own buffer, not `path` -- the original's frame has one. */
         char amm[AM2_MP_COMPLAINT_BYTES];
 
-        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+        SetGameDir(g_tilesetPath);
         am2_sprintf(amm, "%s.amm",
-                    (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+                    &g_mapName_);
         if (!FileExists(amm)) {
             MpComplain(panel, "%s does not have map.");
             return AM2_MAPCHECK_NO_MAP;
@@ -10655,9 +10591,9 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         AM2_Widget *preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
         char        bmp[AM2_MP_COMPLAINT_BYTES];
 
-        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+        SetGameDir(g_tilesetPath);
         am2_sprintf(bmp, "%s_prev.bmp",
-                    (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+                    &g_mapName_);
         MpPreviewSetBitmap(preview, bmp);
 
         preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
@@ -10694,7 +10630,7 @@ void __cdecl MpCommitScore(AM2_Widget *w)
         return;
 
     edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
-    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
+    g_scoreLimit =
         orig_atoi(*(const char *const *)((const uint8_t *)edit
                                          + EDIT_OFF_TEXT));
     SendPlayerMsg(0);
@@ -10714,7 +10650,7 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
      * original reads it there and nothing between the two touches it. */
     value = orig_atoi(*(const char *const *)((const uint8_t *)edit
                                              + EDIT_OFF_TEXT));
-    ((int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
+    (g_armyPoints)
         [*(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW)] = value;
     SendPlayerMsg(0);
 }
@@ -10729,13 +10665,13 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     /* Whether we host is read from the comm object at each use. */
 #define host (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
     AM2_CTOR_VTABLE(w, VTABLE_OPTIONS_MENU_MP);
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
 
     /* By index, the index doubling as the checkbox's group number: the
      * image's loop test is a signed `jl` against the strength-reduced
      * cursor. */
 #define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                   (uintptr_t)ADDR_OPTION_TABLE)[record][(off) / 4])
+                   ((uintptr_t)g_optionTable))[record][(off) / 4])
     for (record = 0; record < AM2_OPTION_COUNT; record++) {
         AM2_Widget *cb = new AM2_CheckBox(
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
@@ -10765,7 +10701,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     /* Asked twice: once for the group pass, again for the buttons. */
     if (host) {
 #define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                   (uintptr_t)ADDR_OPTION_TABLE)[record][(off) / 4])
+                   ((uintptr_t)g_optionTable))[record][(off) / 4])
         for (record = 0; record < AM2_OPTION_COUNT; record++) {
             AM2_Widget *head;
             int32_t     i;
@@ -10830,7 +10766,7 @@ void __attribute__((thiscall)) AM2_Widget::OptionsUpdate()
 /* Both walk the table by INDEX -- the image's loop test is a signed `jl`
  * against the strength-reduced cursor, which a pointer walk would make `jb`. */
 #define OPT(i, off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                      (uintptr_t)ADDR_OPTION_TABLE)[i][(off) / 4])
+                      ((uintptr_t)g_optionTable))[i][(off) / 4])
 
 void __cdecl OptionsDefaults(AM2_Widget *button)
 {
@@ -10894,7 +10830,7 @@ void __cdecl OptionsRequest(void)
 void __cdecl OptionsSyncGroup(AM2_Widget *header)
 {
     AM2_Widget    *parent = header->parent;
-    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE
+    const uint8_t *rec    = g_optionTable
                             + *(const int32_t *)((uint8_t *)header
                                                  + CHECK_OFF_GROUP)
                               * AM2_OPTION_STRIDE;
@@ -10920,7 +10856,7 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
 void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
 }
 
 /* 0x004329A0, thiscall `ret 0x24` -- nine stack dwords, four of them a
@@ -10982,7 +10918,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * which killed the process the first time this ran. The field's own
      * comment was the evidence and it was read as `char[]` anyway. */
     uint8_t       *self = (uint8_t *)w;
-#define comm (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define comm (g_commObject)
 #define slot (*(const int32_t *)(self + MPBTN_OFF_ROW))
 #define rec (comm + slot * AM2_PLAYER_STRIDE)
     RECT           vis;
@@ -11000,7 +10936,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * here even though AM2_PLAYER_ID's own comment calls 0 and -1 both "none".
      * Reproduced as written rather than as the comment reads. */
     if (*(const uint32_t *)(rec + AM2_PLAYER_ID) > 0) {
-        if (*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS
+        if (g_eventFlags
             & (AM2_MP_PAUSE_BIT0 << slot)) {
             uint32_t now = orig_get_tick_count();
             int32_t  n   = (int32_t)((now * AM2_MP_DOT_NUM
@@ -11014,9 +10950,9 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
 
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)((void *)(uintptr_t)(AM2_STR_NOT_RESPONDING)), dots);
-            w->MpNameSetInk(*(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+            w->MpNameSetInk(g_whiteInk);
             *(uint8_t *)(self + MPNAME_OFF_PAPER) =
-                *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+                g_hudColour;
         } else {
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)((void *)(uintptr_t)(AM2_STR_PCT_S)),
@@ -11031,14 +10967,14 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
         else
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
-        w->MpNameSetInk(*(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+        w->MpNameSetInk(g_hiliteColour);
         *(uint8_t *)(self + MPNAME_OFF_PAPER) =
-            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+            g_backgroundColour;
     }
 
     ClearRegion(&vis, *(const uint8_t *)(self + MPNAME_OFF_PAPER));
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     DrawTextClipped(w->rect.left, w->rect.top,
@@ -11070,7 +11006,7 @@ uint8_t __cdecl MpNameInk(int32_t row)
     int32_t        ms   = PlayerLatency(*(const uint32_t *)(g_commObject
                                           + (uint32_t)row * AM2_PLAYER_STRIDE
                                           + AM2_PLAYER_ID));
-    uint8_t        ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    uint8_t        ink  = g_hiliteColour;
     const uint8_t *player;
 
     /* Re-read, as the original does: it loads the comm object again after
@@ -11083,9 +11019,9 @@ uint8_t __cdecl MpNameInk(int32_t row)
         return ink;
 
     if ((uint32_t)ms > AM2_LATENCY_MID)
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+        ink = g_colourLagMid;
     if ((uint32_t)ms > AM2_LATENCY_BAD)
-        ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+        ink = g_hudColour;
 
     player = (const uint8_t *)FindPlayerById(id);
     if (!player)
@@ -11093,7 +11029,7 @@ uint8_t __cdecl MpNameInk(int32_t row)
 
     if (orig_get_tick_count()
         - *(const uint32_t *)(player + AM2_PLAYER_LAST_SEEN) > AM2_SILENCE_BAD)
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
+        ink = g_colourStale;
 
     return ink;
 }
@@ -11110,11 +11046,11 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define PLAYER(off) (*(const int32_t *)(g_commObject + (uint32_t)row * AM2_PLAYER_STRIDE + (off)))
     if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
         && !PLAYER(COMM_ARMY_OFF_MAP_OK))
-        return *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
+        return g_colourNoMap;
 
     return PLAYER(COMM_ARMY_OFF_READY_TO_LOAD)
-               ? *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG
-               : *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+               ? g_colourBelowBg
+               : g_backgroundColour;
 #undef PLAYER
 }
 
@@ -11198,7 +11134,7 @@ AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
 void __cdecl OnMpColour(AM2_Widget *w)
 {
 #define comm ((uint8_t *)g_commObject)
-    uint8_t *screen = g_paintObject;
+    uint8_t *screen = (*(uint8_t * *)&g_paintObject);
     int32_t  row    = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *sel;
     int32_t  next;
@@ -11258,7 +11194,7 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    uint8_t       *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t       *comm = g_commObject;
     int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
     int32_t        which = 4;
 
@@ -11267,7 +11203,7 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
                            + COMM_SLOT_OFF_INDEX) != 0x63)
         which = ((AM2_Comm *)comm)->CommArmyOfSlot(row);
 
-    w->sprite = ((struct AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A)[which];
+    w->sprite = ((struct AM2_Sprite * *)g_mpPanelSpritesA)[which];
     ::WidgetPaint(w, clip);
 }
 
@@ -11370,13 +11306,13 @@ void __attribute__((thiscall)) AM2_Widget::MpTeamPaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    const uint8_t *comm = g_commObject;
     int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
     int32_t        team = *(const int32_t *)(comm + COMM_OFF_PLAYERS
                                              + row * COMM_PLAYER_STRIDE
                                              + COMM_SLOT_OFF_TEAM);
 
-    w->sprite = ((struct AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B)[team];
+    w->sprite = ((struct AM2_Sprite * *)g_mpPanelSpritesB)[team];
     ::WidgetPaint(w, clip);
 }
 
@@ -11411,11 +11347,11 @@ AM2_TextList::AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t o
 
     AM2_CTOR_VTABLE(w, VTABLE_TEXT_LIST);
 
-    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 0) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
-    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 4) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_OLIVE;
-    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 8) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STEEL_BLUE;
-    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 12) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREY;
-    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 16) = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 0) = g_colourDarkGreen;
+    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 4) = g_colourOlive;
+    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 8) = g_colourSteelBlue;
+    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 12) = g_colourDarkGrey;
+    *(int32_t *)(self + TEXTLIST_OFF_COLOURS + 16) = g_hudColour;
 
     *(int32_t *)(self + LISTBOX_OFF_READ_ONLY) = 1;
     *(int32_t *)(self + LIST_OFF_CHOSEN)  = -1;
@@ -11484,7 +11420,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
      * other three fields are never written: the image's frame has room for
      * the whole rectangle and stores only its first dword. */
     r.left = w->rect.left;
-    ClearRegion(&vis, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+    ClearRegion(&vis, g_backgroundColour);
 
     src = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
 
@@ -11507,7 +11443,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 
         y = w->rect.top + (row - first) * AM2_TEXT_LIST_ROW_H + AM2_TEXT_LIST_PAD;
 
-        if (!LockSurface(g_drawTarget))
+        if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
             return;
 
         DrawTextClipped(r.left + AM2_TEXT_LIST_PAD, y,
@@ -11525,7 +11461,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
 
@@ -11597,17 +11533,17 @@ void __cdecl OpenTitleScreen(void)
     AM2_Widget *btn;
 
     CloseCurrentScreen();
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    SetGameDir(g_dirScratch);
     ((AM2_Comm *)g_commObject)->CommClose();
     CommDropDirectPlay(g_commObject);
     g_mpSession = 0;
-    *(char *)(uintptr_t)ADDR_GAMEPROC_BLOCK = '\0';
-    *(char *)(uintptr_t)ADDR_GAMEPROC_STR_B = '\0';
+    g_gameprocBlock = '\0';
+    g_gameprocStrB = '\0';
 
     /* No local: the screen is reached through g_paintObject throughout,
      * as the original re-reads it. */
-    g_paintObject = (uint8_t *)new AM2_ScreenBase("01_000_00_screen.bmp", 1);
-    ((AM2_Widget *)g_paintObject)->flag44 = 1;
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_ScreenBase("01_000_00_screen.bmp", 1);
+    ((AM2_Widget *)(*(uint8_t * *)&g_paintObject))->flag44 = 1;
 
     /* Seven buttons, written out as the original's seven blocks; the first
      * takes the focus. */
@@ -11616,44 +11552,44 @@ void __cdecl OpenTitleScreen(void)
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0082,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnBootCamp, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
-    ((AM2_Widget *)g_paintObject)->focusedChild = btn;
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
+    ((AM2_Widget *)(*(uint8_t * *)&g_paintObject))->focusedChild = btn;
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_100_00, (const char *)(uintptr_t)AM2_BMP_03_100_01,
                          (const char *)(uintptr_t)AM2_BMP_03_100_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00AA,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnSinglePlayer, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_101_00, (const char *)(uintptr_t)AM2_BMP_03_101_01,
                          (const char *)(uintptr_t)AM2_BMP_03_101_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00D2,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnMultiPlayer, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_103_00, (const char *)(uintptr_t)AM2_BMP_03_103_01,
                          (const char *)(uintptr_t)AM2_BMP_03_103_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00FA,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnOptionsMenu, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_104_00, (const char *)(uintptr_t)AM2_BMP_03_104_01,
                          (const char *)(uintptr_t)AM2_BMP_03_104_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0122,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnMovies, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_105_00, (const char *)(uintptr_t)AM2_BMP_03_105_01,
                          (const char *)(uintptr_t)AM2_BMP_03_105_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x014A,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnCredits, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
     btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_106_00, (const char *)(uintptr_t)AM2_BMP_03_106_01,
                          (const char *)(uintptr_t)AM2_BMP_03_106_02, 0,
                          *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0172,
                                   AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
                          kOnQuit, (void (__cdecl *)(AM2_Widget *))0);
-    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ::WidgetAddChild((AM2_Widget *)(*(uint8_t * *)&g_paintObject), btn);
 }
 
 /* 0x0044DB90, one caller. The image has those same three instructions as a
@@ -11770,7 +11706,7 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_SelectMapScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_SelectMapScreen("01_000_00_screen.bmp");
 }
 
 AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
@@ -11809,9 +11745,9 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
 
     /* Up to four movie buttons, one per unlocked movie on this page, each
      * showing its pair; the first is always there and takes the focus. */
-    btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                         (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                         (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+    btn = new AM2_Button(g_dirScratch,
+                         g_dirScratch,
+                         g_dirScratch, 1,
                          *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0x35, 0x90, 0x90),
                          kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
     idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 0;
@@ -11828,9 +11764,9 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     slots[3] = (AM2_Widget *)0;
 
     if (g_movieCount > 0) {
-        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+        btn = new AM2_Button(g_dirScratch,
+                             g_dirScratch,
+                             g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x35, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 1;
@@ -11843,9 +11779,9 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
         slots[1] = btn;
     }
     if (g_movieCount > 1) {
-        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+        btn = new AM2_Button(g_dirScratch,
+                             g_dirScratch,
+                             g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0xE9, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 2;
@@ -11858,9 +11794,9 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
         slots[2] = btn;
     }
     if (g_movieCount > 2) {
-        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+        btn = new AM2_Button(g_dirScratch,
+                             g_dirScratch,
+                             g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0xE9, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 3;
@@ -11978,15 +11914,14 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
  * afterwards, so state 3 arrives with the film already chosen. */
 void __cdecl OnMoviePlay(AM2_Widget *w)
 {
-    const char *const *names = (const char *const *)
-        ((void *)(uintptr_t)(ADDR_MOVIE_NAMES));
+    const char *const *names = g_movieNames;
     int32_t idx;
 
     PlaySoundAt(2, 0, 0, 0, 0);
     idx = *(const int32_t *)((const uint8_t *)w + MOVIE_BUTTON_OFF_INDEX);
-    strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY, names[idx]);
+    strcpy(&g_movieToPlay, names[idx]);
     RequestState(3);
-    *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
+    g_stateArg = 1;
     g_subState = AM2_MENU_MODE_MOVIE;
 }
 
@@ -12000,7 +11935,7 @@ void __cdecl OnMenuBack(AM2_Widget *w)
 void __cdecl OpenMovies(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_MoviesScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_MoviesScreen("01_000_00_screen.bmp");
 }
 
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
@@ -12073,7 +12008,7 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
 void __cdecl OpenDifficulty(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DifficultyDialog("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DifficultyDialog("01_000_00_screen.bmp");
 }
 
 AM2_QuitDialogScreen::AM2_QuitDialogScreen(const char *bmp)
@@ -12136,7 +12071,7 @@ void __cdecl OnQuitOk(AM2_Widget *w)
 void __cdecl OpenQuitConfirm(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_QuitDialogScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_QuitDialogScreen("01_000_00_screen.bmp");
 }
 
 AM2_ReplayDialogScreen::AM2_ReplayDialogScreen(const char *bmp)
@@ -12198,7 +12133,7 @@ void __cdecl OnReplayOk(AM2_Widget *w)
 {
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
-    if (*(const char *)(uintptr_t)ADDR_GAMEPROC_STR_B) {
+    if (g_gameprocStrB) {
         g_loadPending = 1;
         PlaySoundAt(2, 0, 0, 0, 0);
         RequestState(2);
@@ -12212,7 +12147,7 @@ void __cdecl OnReplayOk(AM2_Widget *w)
 void __cdecl OpenReplayPrompt(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044F2A0: sound effects, demonstrated by playing wave 0x27. */
@@ -12433,9 +12368,9 @@ void __cdecl OpenAudioOptions(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        g_paintObject = (uint8_t *)new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
     } else {
-        g_paintObject = (uint8_t *)new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12512,7 +12447,7 @@ void __cdecl OnAudioButton(AM2_Widget *w)
 void __cdecl OpenOptionsMenu(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044FE50, thiscall. DELETE GAME -- and the ONE screen in the table that
@@ -12631,8 +12566,8 @@ void __cdecl OnDelGameOk(AM2_Widget *w)
         SetGameDir(dir);
     }
 
-    if (FileHasSaveTag((const char *)(uintptr_t)ADDR_PENDING_CONFIRM))
-        orig_remove((const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
+    if (FileHasSaveTag(g_pendingDelete))
+        orig_remove(g_pendingDelete);
 
     OnDelGameCancel(w);
 }
@@ -12643,9 +12578,9 @@ void __cdecl OpenDeleteGame(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12655,9 +12590,9 @@ void __cdecl OpenDeleteGameB(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12696,7 +12631,7 @@ AM2_DlgOverwriteScreen::AM2_DlgOverwriteScreen(const char *bmp, int32_t flag)
     ::WidgetAddChild(w, btn);
 
     am2_sprintf(text, "Are you sure you want to overwrite savefile '%s'?",
-                (const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
+                g_pendingDelete);
 
     typer = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), 0x94, 0xD9, 0xF0, 0x34), text);
     ::WidgetAddChild(w, typer);
@@ -12732,8 +12667,8 @@ void __cdecl DlgOverwriteCancel(AM2_Widget *w)
     (void)w;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
     g_pendingDelete[0] = '\0';
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_SAVE;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_subState     = AM2_MENU_MODE_SAVE;
+    g_overlayDirty = 1;
 }
 
 /* DlgOverwriteOk -- original 0x00450610, 144 bytes, one exit.
@@ -12754,24 +12689,24 @@ void __cdecl DlgOverwriteOk(AM2_Widget *w)
 
     (void)w;
 
-    if (strlen((const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK))) != 0) {
+    if (strlen(&g_gameprocBlock) != 0) {
         am2_sprintf(dir, "Save\\%s",
-                    (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+                    &g_gameprocBlock);
         SetGameDir(dir);
     }
 
-    strcpy((char *)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)), g_pendingDelete);
-    SaveGame((const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)));
+    strcpy(&g_gameprocStrB, g_pendingDelete);
+    SaveGame(&g_gameprocStrB);
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+    g_menuRequestSet = 1;
 }
 
 void __cdecl OpenOverwriteGame(void)
 {
     CloseCurrentScreen();
     RefreshScreen();
-    g_paintObject = (uint8_t *)new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
 }
 
 AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
@@ -12872,9 +12807,9 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    if (strlen((const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK))) != 0) {
+    if (strlen(&g_gameprocBlock) != 0) {
         am2_sprintf(dir, "Save\\%s",
-                    (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
+                    &g_gameprocBlock);
         SetGameDir(dir);
     }
 
@@ -12893,8 +12828,8 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
     }
 
     SetGameDir("save");
-    orig_rmdir((const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
-    *(char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)) = '\0';
+    orig_rmdir(&g_gameprocBlock);
+    g_gameprocBlock = '\0';
 
     OnDelPlayerCancel(w);
 }
@@ -12902,17 +12837,17 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 void __cdecl OpenDeletePlayer(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
 }
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
 {
     int32_t        i   = 0;
-    const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE;
+    const uint8_t *rec = (const uint8_t *)g_keyNameTable;
 
     /* signed pointer compare (`jl`), and `scancode == *rec` (the original's
      * `cmp dl,[ecx]` operand order) -- both are how the shipped code reads */
-    for (; (int32_t)(uintptr_t)rec < (int32_t)ADDR_KEY_NAME_TABLE_END;
+    for (; (int32_t)(uintptr_t)rec < (int32_t)((uintptr_t)g_keyNameTableEnd);
          rec += 8, i++)
         if (scancode == *rec)
             return i;
@@ -12923,7 +12858,7 @@ int32_t __cdecl FindPressedKey(void)
 {
     /* Walked by index (a signed `jl`), the scancode's low byte read from the
      * record again for each query. */
-#define KEY(i) (((const AM2_KeyName *)(uintptr_t)ADDR_KEY_NAME_TABLE)[i])
+#define KEY(i) ((g_keyNameTable)[i])
     int32_t i;
 
     /* 95 records: ADDR_KEY_NAME_TABLE_END - ADDR_KEY_NAME_TABLE is 0x2F8,
@@ -13031,7 +12966,7 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
 
     if (w->parent && orig_mouse_moved && !w->disabled) {
         w->hovered = PointInRect((const AM2_Rect *)&w->rect,
-                                   (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+                                   (const AM2_Point *)&g_cursorPoint);
         if (w->hovered)
             WidgetVFocus(w, 1);
     }
@@ -13046,7 +12981,7 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
 
     {
         const AM2_KeyName *table =
-            (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
+            g_keyNameTable;
 
         *(int32_t *)(self + KEYROW_OFF_KEY)      = key;
         *(const char **)(self + LABEL_OFF_TEXT)  = table[key].name;
@@ -13082,16 +13017,16 @@ AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
 {
     AM2_Widget *w = this;
 
-    const uint8_t *binding = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
-    const int16_t *place   = (const int16_t *)((void *)(uintptr_t)(ADDR_KEYROW_POSITIONS));
-    const uint8_t *names   = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
+    const uint8_t *binding = g_keyBindings;
+    const int16_t *place   = g_keyrowPositions;
+    const uint8_t *names   = (const uint8_t *)g_keyNameTable;
     AM2_Widget   **rows;
     AM2_Widget    *first;
     AM2_Widget    *ok;
     AM2_CTOR_VTABLE(w, VTABLE_CONTROLS_DIALOG);
     rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
-    while (binding < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS))
+    while (binding < g_keyBindings
                      + KEYROW_ROW_COUNT * 2) {
         int32_t     index = KeyNameIndexOf(*binding);
         AM2_Widget *row   = new AM2_KeyRow(index,
@@ -13159,10 +13094,10 @@ void __cdecl OnControlsCancel(AM2_Widget *w)
  * with stride 4. */
 void __cdecl OnControlsOk(AM2_Widget *w)
 {
-    uint8_t *binding = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
+    uint8_t *binding = g_keyBindings;
     AM2_Widget *const *rows =
         (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
-    const AM2_KeyName *keys = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
+    const AM2_KeyName *keys = g_keyNameTable;
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
@@ -13183,9 +13118,9 @@ void __cdecl OnControlsOk(AM2_Widget *w)
  * untouched until OK is pressed. */
 void __cdecl OnControlsDefault(AM2_Widget *w)
 {
-    const uint8_t *defaults = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_DEFAULTS));
+    const uint8_t *defaults = g_keyDefaults;
     const uint8_t *parent = (const uint8_t *)w->parent;
-    const AM2_KeyName *keys = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
+    const AM2_KeyName *keys = g_keyNameTable;
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
@@ -13202,7 +13137,7 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
 void __cdecl OpenControls(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
 }
 
 /* 0x004512A0. SELECT PLAYER's row callback -- what a list box calls when its
@@ -13348,7 +13283,7 @@ AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen()
 void __cdecl OpenSelectPlayer(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451AC0. ENTER NAME's CANCEL, and the screen's escape action. */
@@ -13420,7 +13355,7 @@ AM2_EnterNameScreen::~AM2_EnterNameScreen()
 void __cdecl OpenEnterName(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_EnterNameScreen("01_000_00_screen.bmp");
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_EnterNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451EA0. LOAD GAME's row callback: copy the chosen save's name into the
@@ -13432,9 +13367,9 @@ void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
     (void)list;
     if (!rows || selected < 0 || selected >= rows->count)
         return;
-    if (!g_paintObject)
+    if (!(*(uint8_t * *)&g_paintObject))
         return;
-    strcpy((char *)g_paintObject + LOAD_GAME_OFF_NAME,
+    strcpy((char *)(*(uint8_t * *)&g_paintObject) + LOAD_GAME_OFF_NAME,
            rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
     PlaySoundAt(2, 0, 0, 0, 0);
 }
@@ -13448,9 +13383,9 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w)
     const char *name;
 
     (void)w;
-    if (!g_paintObject)
+    if (!(*(uint8_t * *)&g_paintObject))
         return;
-    name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+    name = (const char *)(*(uint8_t * *)&g_paintObject) + LOAD_GAME_OFF_NAME;
     if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
@@ -13515,14 +13450,14 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     const char *name;
 
     (void)w;
-    if (!g_paintObject)
+    if (!(*(uint8_t * *)&g_paintObject))
         return;
-    name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+    name = (const char *)(*(uint8_t * *)&g_paintObject) + LOAD_GAME_OFF_NAME;
     if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
-    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, name);
+    strcpy(&g_gameprocStrB, name);
     g_loadPending = 1;
     PlaySoundAt(2, 0, 0, 0, 0);
     RequestState(2);
@@ -13647,9 +13582,9 @@ void __cdecl OpenLoadGame(void)
         uint8_t *screen = (uint8_t *)new AM2_LoadGameScreen("02_007_00_loadgame.bmp", 0);
 
         RefreshScreen();
-        g_paintObject = screen;
+        (*(uint8_t * *)&g_paintObject) = screen;
     } else {
-        g_paintObject = (uint8_t *)new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
+        (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -13691,16 +13626,16 @@ AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
     w->flag44 = 1;
 
     back = *(const AM2_Sprite *const *)((uint8_t *)w + HUD_OFF_SPRITE0);
-    ox = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+    ox = (g_bitmapAreaW
           - back->bounds.right) / 2;
-    oy = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+    oy = (g_bitmapAreaH
           - back->bounds.bottom) / 2;
 
     btn = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), ox + 0x149, oy + 0x38, 0x51, 0x20), DlgClose, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, btn);
     w->focusedChild = btn;
 
-    typer = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), ox + 0x28, oy + 0x41, 0xF0, 0x34), (const char *)(uintptr_t)ADDR_MESSAGE_TEXT);
+    typer = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), ox + 0x28, oy + 0x41, 0xF0, 0x34), g_messageText);
     ::WidgetAddChild(w, typer);
 
     icon = new AM2_Blinker("03_029_00_red.bmp", "03_029_01_red.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), ox + 0x23, oy + 0x95, 0x11, 0x10));
@@ -13719,8 +13654,8 @@ AM2_DlgMessageScreen::~AM2_DlgMessageScreen()
 void __cdecl OpenMessage(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DlgMessageScreen(
-        (const char *)((void *)(uintptr_t)(ADDR_MESSAGE_BMP_NAME)), 0);
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DlgMessageScreen(
+        g_messageBmpName, 0);
 }
 
 /* GameMenuUpdate -- original 0x00452A20, 128 bytes, thiscall, two exits.
@@ -13754,12 +13689,12 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
     else
         RequestState(AM2_STATE_MENU);
 
-    dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = *(AM2_Widget * *)&g_paintObject;
     if (dlg)
         WidgetVDelete(dlg, 1);
-    *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+    g_paintObject = (void *)0;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+    if (!g_mpSession)
         return;
 
     CommDropSession(g_commObject);
@@ -13815,8 +13750,8 @@ AM2_DlgGameMenuScreen::AM2_DlgGameMenuScreen(const char *bmp, int32_t flag)
     ::WidgetAddChild(w, btn);
     WidgetVFocus(btn, 0);
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
+    if (!g_mpSession
+        && !g_winEnabled) {
         y += 0x28;
         ::WidgetAddChild(w, new AM2_Button("03_125_00_save.bmp", "03_125_01_save.bmp",
                                       "03_125_02_save.bmp", 0,
@@ -13893,7 +13828,7 @@ void __cdecl DlgClose(AM2_Widget *w)
 {
     (void)w;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+    g_menuRequestSet = 1;
 }
 
 /* 0x00452F00 -- AUDIO. */
@@ -13920,14 +13855,14 @@ void __cdecl GameMenuAbort(AM2_Widget *w)
 {
     (void)w;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT
+    *(int32_t *)(*(uint8_t * *)&g_paintObject
                  + GAMEMENU_OFF_ABORT) = 1;
 }
 
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
     RefreshScreen();
 }
 
@@ -13948,7 +13883,7 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     if (!rows || row < 0 || row >= rows->count)
         return;
 
-    dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    dlg = *(uint8_t * *)&g_paintObject;
     if (!dlg)
         return;
 
@@ -13984,7 +13919,7 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
  * reads it back and does the same save. */
 void __cdecl SaveListOnSave(AM2_Widget *w)
 {
-    uint8_t *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    uint8_t *dlg = *(uint8_t * *)&g_paintObject;
     char    *name;
     uint8_t  find[AM2_FINDDATA_BYTES];
     int32_t  h;
@@ -14009,9 +13944,9 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
         /* Nothing of that name: save it and leave. */
         /* Copied to the global, but SaveGame is handed the dialog's own
          * buffer: the same text either way. */
-        strcpy((char *)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)), name);
+        strcpy(&g_gameprocStrB, name);
         SaveGame(name);
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+        g_menuRequestSet = 1;
         return;
     }
 
@@ -14024,8 +13959,8 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
      * this file's standing position is that the original's defects are the
      * original's. It was nearly written the other way here. */
     strcpy(g_pendingDelete, name);
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_OVERWRITE;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_subState     = AM2_MENU_MODE_OVERWRITE;
+    g_overlayDirty = 1;
 }
 
 /* 0x004531A0 -- the SAVE dialog's CANCEL, which is also its DLG_OFF_ESCAPE.
@@ -14061,7 +13996,7 @@ void __cdecl SaveListOnCancel(AM2_Widget *w)
  * is for. */
 void __cdecl SaveListOnDelete(AM2_Widget *w)
 {
-    uint8_t *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    uint8_t *dlg = *(uint8_t * *)&g_paintObject;
 
     (void)w;
 
@@ -14079,8 +14014,8 @@ void __cdecl SaveListOnDelete(AM2_Widget *w)
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_DEL_SAVE;
-    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    g_subState     = AM2_MENU_MODE_DEL_SAVE;
+    g_overlayDirty = 1;
 }
 
 /* DlgSaveListConstruct -- original 0x00453280, 1456 bytes, thiscall `ret 8`.
@@ -14127,7 +14062,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
 
     /* Make the player's folder if it is missing, or if the name is taken by
      * something that is not a directory. */
-    strcpy(dir, (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+    strcpy(dir, &g_gameprocBlock);
     h = orig_findfirst(dir, find);
     if (h == -1) {
         orig_mkdir(dir);
@@ -14138,7 +14073,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     }
 
     am2_sprintf(path, "save\\%s",
-                (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+                &g_gameprocBlock);
     SetGameDir(path);
 
     *(void **)(self + DLG_OFF_LIST) = new AM2_Rec(1);
@@ -14155,13 +14090,13 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
 
     w->flag44 = 1;
     strcpy((char *)(self + SAVELIST_OFF_NAME),
-           (const char *)(uintptr_t)ADDR_GAMEPROC_STR_B);
+           &g_gameprocStrB);
 
-    edit = new AM2_Edit((char *)(self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
+    edit = new AM2_Edit((char *)(self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);
     WidgetVFocus(edit, 0);
     *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
-        *(void **)(uintptr_t)ADDR_EDIT_CHARSET_PTR;
+        *(void * *)&g_editCharset;
     *(void **)(self + SAVELIST_OFF_EDIT) = edit;
 
     kid = new AM2_Blinker("03_028_00_green.bmp", "03_028_01_green.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xFC, 0x57, 0x11, 0x10));
@@ -14257,7 +14192,7 @@ AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen()
 void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
-    g_paintObject = (uint8_t *)new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
+    (*(uint8_t * *)&g_paintObject) = (uint8_t *)new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
     RefreshScreen();
 }
 
@@ -14480,7 +14415,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)
          * of the flat half not being allowed to name RECT. */
         if (!IntersectRect(&visible, &w->rect, &clip))
             return;
-        if (!IntersectRect(&visible, (const RECT *)&g_screenClip, &visible))
+        if (!IntersectRect(&visible, (const RECT *)&(*(const AM2_Rect *)g_screenClip), &visible))
             return;
         if (!ClipRect(&w->sprite->bounds, (const AM2_Rect *)&visible, &x, &y,
                       &part))
@@ -14791,7 +14726,7 @@ void __attribute__((thiscall)) AM2_Widget::ButtonPaint(RECT clip)
 
     if (w->parent) {
         if (w->parent->focusedChild == w) {
-            if ((w->hovered && (g_mouseButton[0] || g_mouseChanged[0]))
+            if ((w->hovered && ((&g_mouseButton)[0] || (&g_mouseChanged)[0]))
                 || IsKeyDown(AM2_DIK_RETURN))
                 w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED);
             else
@@ -14832,7 +14767,7 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
         goto update;
 
     w->hovered = PointInRect((const AM2_Rect *)&w->rect,
-                               (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+                               (const AM2_Point *)&g_cursorPoint);
     if (w->hovered) {
         if (orig_mouse_moved)
             WidgetVFocus(w, 1);
@@ -14847,15 +14782,15 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
              * repaints. */
             if (!orig_mouse_moved)
                 goto update;
-            if (g_mouseChanged[0]) {
-                if (g_mouseButton[0])
+            if ((&g_mouseChanged)[0]) {
+                if ((&g_mouseButton)[0])
                     BUTTON_FINISH();
                 ButtonFire(w, BUTTON_OFF_ON_LEFT);
                 w->hovered = 0;
                 BUTTON_FINISH();
             }
-            if (g_mouseChanged[1]) {
-                if (g_mouseButton[1])
+            if ((&g_mouseChanged)[1]) {
+                if ((&g_mouseButton)[1])
                     BUTTON_FINISH();
                 ButtonFire(w, BUTTON_OFF_ON_RIGHT);
                 w->hovered = 0;
@@ -14867,8 +14802,8 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
         /* Auto-repeat. The left and right buttons do NOT behave the same:
          * left arms the deadline on first press without firing, right
          * fires. Kept. */
-        if (g_mouseButton[0]) {
-            if (g_mouseChanged[0]) {
+        if ((&g_mouseButton)[0]) {
+            if ((&g_mouseChanged)[0]) {
                 BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
                 BUTTON_FINISH();
             }
@@ -14878,13 +14813,13 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
             ButtonFire(w, BUTTON_OFF_ON_LEFT);
             BUTTON_FINISH();
         }
-        if (g_mouseChanged[0]) {
+        if ((&g_mouseChanged)[0]) {
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
             ButtonFire(w, BUTTON_OFF_ON_LEFT);
             BUTTON_FINISH();
         }
-        if (g_mouseButton[1]) {
-            if (g_mouseChanged[1]) {
+        if ((&g_mouseButton)[1]) {
+            if ((&g_mouseChanged)[1]) {
                 BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
                 ButtonFire(w, BUTTON_OFF_ON_RIGHT);
                 BUTTON_FINISH();
@@ -15070,7 +15005,7 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
 
     /* Ink only -- the sprite stays, so a disabled box still reads as ticked. */
     if (w->disabled)
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
+        ink = g_colourStale;
 
     ::WidgetPaint(w, clip);
 
@@ -15081,7 +15016,7 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
     if (!IntersectRect(&vis, &clip, &w->rect))
         return;
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     DrawTextClipped(w->rect.left + AM2_CHECKBOX_TEXT_X, w->rect.top,
@@ -15194,8 +15129,8 @@ void __attribute__((thiscall)) AM2_Widget::MpPreviewSetBitmap(const char *name)
 AM2_ScreenBase::AM2_ScreenBase(const char *bmp, int32_t flag)
     : AM2_Panel(bmp, flag,
                 *RectSet(AM2_TEMP(AM2_Rect), 0, 0,
-                         *(const int32_t *)(uintptr_t)ADDR_SCREEN_W,
-                         *(const int32_t *)(uintptr_t)ADDR_SCREEN_H))
+                         g_screenW,
+                         g_screenH))
 {
     AM2_Widget *w = this;
 
@@ -15272,7 +15207,7 @@ AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, ui
     onEnter = onEnter_;
     arg7C   = b;
     caret   = 0;
-    charset = *(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT;
+    charset = g_editCharsetDefault;
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     dot     = 0;
     ::WidgetScreenRect(w);
@@ -15301,7 +15236,7 @@ void __attribute__((thiscall)) AM2_Widget::EditTakeFocus(int32_t announce)
     AM2_Widget *w = this;
 
     g_focusedEdit = w;
-    g_charHandler = EditCharHandler;
+    (*(am2_char_fn *)&g_charHandler) = EditCharHandler;
     ::WidgetTakeFocus(w, announce);
 }
 
@@ -15342,7 +15277,7 @@ void __attribute__((thiscall)) AM2_Widget::EditDraw(RECT clip)
         ink = *(const uint8_t *)(self + EDIT_OFF_INK);
     }
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     DrawTextClipped(w->rect.left, w->rect.top, buf,
@@ -15362,7 +15297,7 @@ void __attribute__((thiscall)) AM2_Widget::EditUpdate()
      * gives it the caret and the keyboard. */
     if (w->parent && orig_mouse_moved && !w->disabled) {
         w->hovered = PointInRect((const AM2_Rect *)&w->rect,
-                                   (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+                                   (const AM2_Point *)&g_cursorPoint);
         if (w->hovered)
             WidgetVFocus(w, 1);
     }
@@ -15418,7 +15353,7 @@ void __attribute__((thiscall)) AM2_Widget::LabelDraw(RECT clip)
 
     ClearRegion(&paint, *(const uint8_t *)(self + LABEL_OFF_PAPER));
 
-    if (!LockSurface(g_drawTarget))
+    if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
     DrawTextClipped(w->rect.left, w->rect.top,
@@ -15474,7 +15409,7 @@ AM2_ListBox::AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg
     *(int32_t *)(self + LIST_OFF_INK_SEL) = g_backgroundColour;
     *(int32_t *)(self + LIST_OFF_INK_SEL_DOWN) = g_hiliteColour;
     *(int32_t *)(self + LIST_OFF_INK_HOT_SEL) =
-        *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
+        g_listInkHotSel;
     *(int32_t *)(self + LIST_OFF_ARROWBAR)  = 0;
     *(int32_t *)(self + LIST_OFF_BLINKER) = 0;
 
@@ -15583,7 +15518,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
                        && *(const int32_t *)(self + 0x4C) == 0)
         ink = *(const uint8_t *)(self + LIST_OFF_INK);
         if (idx == *(const int32_t *)(self + LIST_OFF_SELECTED) && w->flag44)
-            ink = g_mouseButton[0]
+            ink = (&g_mouseButton)[0]
                   ? *(const uint8_t *)(self + LIST_OFF_INK_SEL_DOWN)
                   : *(const uint8_t *)(self + LIST_OFF_INK_SEL);
         if (idx == *(const int32_t *)(self + LIST_OFF_CHOSEN)) {
@@ -15607,7 +15542,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
             ClearRegion(&paint, g_hiliteColour);
 #undef SELECTED_HERE
 
-        if (!LockSurface(g_drawTarget))
+        if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
             return;
         DrawTextClipped(rowRect.left + LIST_TEXT_INDENT, rowRect.top,
                                rows->text + offset, 1, paint, ink);
@@ -15680,7 +15615,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
     /* ---- the mouse ---------------------------------------------------- */
     if (w->parent
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED
+        && g_mouseMoved
         && !w->disabled) {
 
         /* 0x0040 IS THE HOVER FLAG. The base constructor never writes it --
@@ -15688,7 +15623,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
          * dump deliberately omits for that reason -- because the update
          * computes it before anything reads it. This is that write. */
         w->hovered = PointInRect((const AM2_Rect *)&w->rect,
-                           (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+                           (const AM2_Point *)&g_cursorPoint);
 
         if (w->hovered) {
             int32_t row;
@@ -15696,7 +15631,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
             if (!w->flag44)
                 WidgetVFocus(w, 1);
 
-            row = (*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+            row = (*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                    - w->rect.top - LIST_ROW_TOP_MARGIN) / LIST_ROW_HEIGHT
                   + *(const int32_t *)(self + LIST_OFF_TOP_ROW);
 
@@ -15711,13 +15646,13 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
                     BlinkerStart(blink, TYPER_BLINK_MS, 1);
             }
 
-            if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+            if (g_mouseChanged) {
                 int32_t sel;
 
                 WidgetVPaint(w, w->rect);
 
                 sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
-                if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && sel >= 0) {
+                if (!g_mouseButton && sel >= 0) {
                     if (ListRowIsDead(rows, sel)) {
                         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
                     } else {
@@ -16576,7 +16511,7 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
     for (i = 0; i < *(const int32_t *)(self + TYPER_OFF_SHOWN); i++) {
         if (((const char *)(self + TYPER_OFF_TEXT))[i] == '|') {
             line[count] = 0;
-            if (!LockSurface(g_drawTarget))
+            if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
                 return;
             DrawTextClipped(w->rect.left, w->rect.top + yoff, line, 1, clip,
                             ink);
@@ -16590,7 +16525,7 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
 
     if (count > 0) {
         line[count] = 0;
-        if (!LockSurface(g_drawTarget))
+        if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
             return;
         DrawTextClipped(w->rect.left, w->rect.top + yoff, line, 1, clip, ink);
         UnlockSurface();
@@ -16768,7 +16703,7 @@ void __cdecl ObjFreeze(void *o)
 
     *(int32_t *)(obj + OBJ_OFF_AI_MODE) = AM2_AI_MODE_IGNORE;
     *(int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT));
+        *(const int32_t *)&g_zeroPoint;
 }
 
 void __cdecl PointerInvokeFreezeArmy(void)
@@ -16828,7 +16763,7 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
     (void)at;
 
     SpeakLine(AM2_SPEAK_OVERHERE,
-              *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+              *(const int32_t *)&g_defaultOwner);
 
     leader = OurLeaderUnit();
     if (!leader)
@@ -16845,8 +16780,8 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
 
     for (i = 0; ; ) {
         const uint8_t *list = (const uint8_t *)
-            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
-                [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER];
+            (g_armyObjLists)
+                [*(const int32_t *)&g_defaultOwner];
         uint8_t *o;
 
         if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
@@ -16857,8 +16792,8 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
 
         if (!o) {
             /* Gone: drop it and DO NOT advance. */
-            ((AM2_Rec *)(void *)((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
-                             [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER])->ListRemoveAt(
+            ((AM2_Rec *)(void *)(g_armyObjLists)
+                             [*(const int32_t *)&g_defaultOwner])->ListRemoveAt(
                          i);
             continue;
         }
@@ -16939,7 +16874,7 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
  * Not exercised: no drive here installs a pointer mode above 0. */
 void __cdecl PointerActionMode4(void *target, uint32_t at)
 {
-    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
     uint8_t *tgt = (uint8_t *)target;
     int32_t  type;
     int32_t  i;
@@ -16958,14 +16893,14 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
     if (SelectIfOwn(tgt))
         return;
 
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+    for (i = 0; i < g_selectedCount; ) {
         uint8_t *o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
         uint32_t slot;
         int32_t  ot;
 
         if (!o) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -16984,7 +16919,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
 
         if (tgt
             && !ArmyAlliedWithObjInline(
-                   *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, tgt, 0)) {
+                   *(const int32_t *)&g_defaultOwner, tgt, 0)) {
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
             *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
                 *(const uint32_t *)(tgt + OBJ_OFF_UID);
@@ -16995,7 +16930,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
         if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) =
-                    *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                    g_pointerHoverUid;
                 PointActionA(o, at);
             } else {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
@@ -17036,7 +16971,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
  * Not exercised: no drive here installs a pointer mode above 0. */
 void __cdecl PointerActionMode5(void *target, uint32_t at)
 {
-    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
     uint8_t *tgt = (uint8_t *)target;
     int32_t  type;
     int32_t  i;
@@ -17053,7 +16988,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         return;
 
     if (tgt
-        && !ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                               tgt, 0)) {
         PointerActionMode4(tgt, at);   /* an enemy: mode 4's job */
         return;
@@ -17062,14 +16997,14 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
     if (SelectIfOwn(tgt))
         return;
 
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+    for (i = 0; i < g_selectedCount; ) {
         uint32_t home = at;   /* this pass's point; `at` becomes the slot */
         uint8_t *o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
         int32_t  ot;
 
         if (!o) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -17097,7 +17032,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) =
-                    *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                    g_pointerHoverUid;
                 PointActionA(o, home);
             } else {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
@@ -17140,7 +17075,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
  * Not exercised: no drive here installs a pointer mode above 0. */
 void __cdecl PointerActionMode6(void *target, uint32_t at)
 {
-    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
     int32_t  type;
     int32_t  i;
 
@@ -17158,13 +17093,13 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
     if (SelectIfOwn(target))
         return;
 
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+    for (i = 0; i < g_selectedCount; ) {
         uint8_t *o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+            (g_selectedItems)[i]);
         int32_t  ot;
 
         if (!o) {
-            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -17185,7 +17120,7 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
             if (ObjIsType2Inline(o)) {
                 if (GetMenuRow() == AM2_MENU_ROW_8) {
                     *(uint32_t *)(o + OBJ_OFF_UID_56C) =
-                        *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                        g_pointerHoverUid;
                     PointActionA(o, at);
                 } else {
                     *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
@@ -17239,7 +17174,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
     (void)a;
     (void)b;
 
-    veh = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    veh = *(uint8_t * *)&g_objCtxObjA;
     if (!veh)
         return;
     if (!ObjIsType3Inline(veh))
@@ -17372,7 +17307,7 @@ void __cdecl SetWeaponTargetMedic(void *target, uint32_t at)
     if (!target)
         return;
     u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+            g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
@@ -17380,7 +17315,7 @@ void __cdecl SetWeaponTargetMedic(void *target, uint32_t at)
 
     weapon = (const uint8_t *)WeaponByUid(
         *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+            + (uint32_t)g_weaponSlot * 4));
     if (!weapon)
         return;
     if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
@@ -17398,7 +17333,7 @@ void __cdecl SetWeaponTargetWrench(void *target, uint32_t at)
     if (!target)
         return;
     u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+            g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
@@ -17406,7 +17341,7 @@ void __cdecl SetWeaponTargetWrench(void *target, uint32_t at)
 
     weapon = (const uint8_t *)WeaponByUid(
         *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+            + (uint32_t)g_weaponSlot * 4));
     if (!weapon)
         return;
     if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
@@ -17426,7 +17361,7 @@ void __cdecl SetWeaponTargetKind2A(void *target, uint32_t at)
     if (!target)
         return;
     u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+            g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
@@ -17436,7 +17371,7 @@ void __cdecl SetWeaponTargetKind2A(void *target, uint32_t at)
 
     weapon = (const uint8_t *)WeaponByUid(
         *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+            + (uint32_t)g_weaponSlot * 4));
     if (!weapon)
         return;
     if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
@@ -17485,7 +17420,7 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
         return;
 
     u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+            g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
@@ -17493,7 +17428,7 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
 
     weapon = (const uint8_t *)WeaponByUid(
         *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+            + (uint32_t)g_weaponSlot * 4));
     if (!weapon)
         return;
 
@@ -17521,7 +17456,7 @@ void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at)
     if (!target)
         return;
     u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+            g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
@@ -17529,7 +17464,7 @@ void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at)
 
     weapon = (const uint8_t *)WeaponByUid(
         *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+            + (uint32_t)g_weaponSlot * 4));
     if (!weapon)
         return;
     if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
@@ -17603,10 +17538,10 @@ int32_t __cdecl PointerPickMode4(void *obj)
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;   /* hoisted above the alliance test -- see above */
 
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                            o, 0)) {
         OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+        g_pointerHoverUid =
             *(const uint32_t *)(o + OBJ_OFF_UID);
         return 1;
     }
@@ -17625,10 +17560,10 @@ int32_t __cdecl PointerPickMode5(void *obj)
 
     /* No hoisted refusal: a neutral object reaches the alliance test, which
      * answers ALLIED for army 4. That is the whole difference from mode 4. */
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                            o, 0)) {
         OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+        g_pointerHoverUid =
             *(const uint32_t *)(o + OBJ_OFF_UID);
         return 1;
     }
@@ -17719,14 +17654,14 @@ static inline uint8_t *OurLeaderUnitReread(void)
 {
     int32_t owner;
 
-    if ((int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
-        == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+    if ((int32_t)g_defaultOwner
+        == *(const int32_t *)&g_defaultOwner)
         return (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
-    owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+            g_ourLeaderUid);
+    owner = *(const int32_t *)&g_defaultOwner;
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         const uint8_t *const *slot =
-            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+            &((const uint8_t *const *)g_armyObjLists)[owner];
         int32_t i;
 
         for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
@@ -17756,9 +17691,9 @@ int32_t __cdecl PointerPickMode0(void *obj)
     /* ArmyAlliedWithObj written in place: its own army-4 test is the
      * neutral-owner case. The enemy arm comes first, the friend tail last,
      * as the image lays them out. */
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                                  o, 0)) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && GetMenuRow() != 1)
+        if (g_mouseButton && GetMenuRow() != 1)
             return 0;
 
         leader = OurLeaderUnitReread();
@@ -17776,10 +17711,10 @@ int32_t __cdecl PointerPickMode0(void *obj)
                 > *(const int32_t *)                                        \
                       (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0) \
                        + ITEMTYPE_OFF_RANGE)                                \
-                  * *(const double *)(uintptr_t)ADDR_WEAPON_RANGE_K3)       \
+                  * g_weaponRangeK3)       \
                 return 0;                                                   \
             OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);                        \
-            *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =                \
+            g_pointerHoverUid =                \
                 *(const uint32_t *)(o + OBJ_OFF_UID);                       \
             return 0;   /* a hint, not a yes -- see above */                \
         } while (0)
@@ -17840,14 +17775,14 @@ int32_t __cdecl PointerPickHeal(void *obj)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *leader;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+    if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_HEAL)
         return 0;
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+    if (g_mouseChanged
         && GetMenuRow() != AM2_MENU_ROW_HEAL)
         return 0;
 
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                            o, 0))
         return 0;
 
@@ -17867,7 +17802,7 @@ int32_t __cdecl PointerPickHeal(void *obj)
 
     if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
                    (const AM2_Point *)(o + OBJ_OFF_X))
-        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6624EC)
+        > g_pickReach6624ec)
         return 0;
 
     OverlayPrepare(AM2_MENU_ROW_HEAL, 1);
@@ -17905,16 +17840,16 @@ int32_t __cdecl PointerPickHeal(void *obj)
  * Not exercised: no drive here opens menu row 0xC. */
 static inline uint8_t *OurLeaderUnitUidLocal(void)
 {
-    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    int32_t owner = *(const int32_t *)&g_defaultOwner;
     uint32_t uid;
 
-    if (owner == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        uid = *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID;
+    if (owner == *(const int32_t *)&g_defaultOwner) {
+        uid = g_ourLeaderUid;
         return (uint8_t *)LookupByUID(uid);
     }
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         const uint8_t *const *slot =
-            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+            &((const uint8_t *const *)g_armyObjLists)[owner];
         int32_t i;
 
         for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
@@ -17934,16 +17869,16 @@ int32_t __cdecl PointerPickRepair(void *obj)
     uint8_t *leader;
     uint32_t riding;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+    if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_REPAIR)
         return 0;
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+    if (g_mouseChanged
         && GetMenuRow() != AM2_MENU_ROW_REPAIR)
         return 0;
 
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                            o, 0))
         return 0;
 
@@ -17974,7 +17909,7 @@ int32_t __cdecl PointerPickRepair(void *obj)
 
     if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_X),
                    (const AM2_Point *)(leader + OBJ_OFF_X))
-        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662894)
+        > g_pickReach662894)
         return 0;
 
     if (*(const int32_t *)o == AM2_OBJ_TYPE_ITEM
@@ -18013,7 +17948,7 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *leader;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+    if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_0A)
         return 0;
 
@@ -18022,14 +17957,14 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
     if (o && ObjIsType2Inline(o)
         && !(*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
              && *(const int32_t *)(o + OBJ_OFF_SARGE))
-        && !ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
                                     o, 0)
         && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < 6) {
         leader = OurLeaderUnit();
         if (leader
             && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
                           (const AM2_Point *)(o + OBJ_OFF_X))
-               <= *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6628C8) {
+               <= g_pickReach6628c8) {
             OverlayPrepare(AM2_MENU_ROW_0A, 1);
             return 1;
         }
@@ -18075,7 +18010,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
     if (!o)
         return 0;
     if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-        != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        != *(const int32_t *)&g_defaultOwner)
         return 0;
 
     leader = OurLeaderUnit();
@@ -18086,12 +18021,12 @@ int32_t __cdecl PointerPickBoard(void *obj)
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
         && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
                < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        if (!g_mouseButton
             || GetTickCount()
-                   - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                   - g_mousePressMs
                    < AM2_CLICK_MS) {
             OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 1);
-            *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+            g_pointerHoverUid =
                 *(const uint32_t *)(o + OBJ_OFF_UID);
         }
         return 0;   /* a hint, not a yes -- see above */
@@ -18102,7 +18037,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
 
     if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
                    (const AM2_Point *)(o + OBJ_OFF_X))
-        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_66275C)
+        > g_pickReach66275c)
         return 0;
 
     OverlayPrepare(AM2_OVERLAY_ROW_REACH, 1);
@@ -18144,7 +18079,7 @@ int32_t __cdecl PointerPickWatchedItem(void *obj)
         if (leader
             && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
                           (const AM2_Point *)(o + OBJ_OFF_X))
-               <= *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662450) {
+               <= g_pickReach662450) {
             OverlayPrepare(AM2_OVERLAY_ROW_SELL, 1);
             return 1;
         }
