@@ -714,7 +714,7 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
     const uint8_t *d = (const uint8_t *)cells;
     int32_t        cl, ct, cr, cb;
     int32_t        cols, rows, shift;
-    int32_t        cell, stride, used;
+    int32_t cell, stride;
 
     cl = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  >> AM2_CELL_SHIFT;
     ct = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  >> AM2_CELL_SHIFT;
@@ -740,25 +740,25 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
         cb = cols - 1;
 
     shift  = *(const int32_t *)(d + MAPDESC_OFF_SHIFT);
-    used   = 0;
+    rows   = 0;
     cell   = (ct << shift) + cl;
     stride = cols - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;
 
-        for (x = cl; x <= cr; x++, used++, cell++) {
-            *(int32_t *)(ENTRY(used) + CELL_ENTRY_OFF_INDEX) = cell;
-            ListPushFront(ENTRY(used),
+        for (x = cl; x <= cr; x++, rows++, cell++) {
+            *(int32_t *)(ENTRY(rows) + CELL_ENTRY_OFF_INDEX) = cell;
+            ListPushFront(ENTRY(rows),
                           (void **)(*(uint8_t **)(d + MAPDESC_OFF_CELLS)
                                     + (uint32_t)cell * 4));
         }
     }
 
-    for (; used < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); used++) {
-        *(int32_t *)(ENTRY(used) + CELL_ENTRY_OFF_INDEX) = -1;
-        *(void **)(ENTRY(used) + 8) = (void *)0;   /* next */
-        *(void **)(ENTRY(used) + 4) = (void *)0;   /* prev, as ListPushFront has it */
+    for (; rows < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); rows++) {
+        *(int32_t *)(ENTRY(rows) + CELL_ENTRY_OFF_INDEX) = -1;
+        *(void **)(ENTRY(rows) + 8) = (void *)0;   /* next */
+        *(void **)(ENTRY(rows) + 4) = (void *)0;   /* prev, as ListPushFront has it */
     }
 #undef ENTRY
 #undef o
@@ -10152,7 +10152,6 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     uint8_t       *v       = (uint8_t *)veh;
     const int32_t *counts  = (const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK_COUNT));
     const uint8_t *masks   = (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK));
-    uint32_t       base    = at;    /* argument 3's slot, and the boat's sample */
     uint32_t       pt      = 0;     /* argument 2's, once the facing is copied */
     int32_t        weight  = 0;
     int32_t        sound   = 0;
@@ -10179,14 +10178,14 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         do {
             const int16_t *p = AM2_MASK_PT(rec, i);
 
-            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)base)
-               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(base >> 16))
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)at)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(at >> 16))
                   << 16);
 
             /* &base, and that is the one byte the two loops differ in. */
-            list = ObjectsAtPoint(&base,
+            list = ObjectsAtPoint(&at,
                                   (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-            weight += BlockWeightChain(v, pt, list, base);
+            weight += BlockWeightChain(v, pt, list, at);
 
             if (apply && list) {
                 for (o = (uint8_t *)list; o != (uint8_t *)0;
@@ -10238,13 +10237,13 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         do {
             const int16_t *p = AM2_MASK_PT(rec, i);
 
-            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)base)
-               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(base >> 16))
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)at)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(at >> 16))
                   << 16);
 
             list = ObjectsAtPoint(&pt,
                                   (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-            weight += BlockWeightTroops(v, pt, list, base);
+            weight += BlockWeightTroops(v, pt, list, at);
 
             if (apply && list) {
                 for (o = (uint8_t *)list; o != (uint8_t *)0;
@@ -10308,17 +10307,17 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
     /* One last sample, at the vehicle's own point, and a weight at or above
      * AM2_BLOCK_CLEAR replaces everything the mask accumulated. */
-    pt   = base;
+    pt   = at;
     list = ObjectsAtPoint(&pt, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-    if (BlockWeightTroops(v, pt, list, base) >= AM2_BLOCK_CLEAR)
+    if (BlockWeightTroops(v, pt, list, at) >= AM2_BLOCK_CLEAR)
         answer = weight = AM2_VEHICLE_BLOCKED_WEIGHT;
 
     if (sound) {
         int32_t kind = *(const int32_t *)(v + VEHICLE_OFF_KIND);
-        int32_t sx   = (int32_t)base;
+        int32_t sx   = (int32_t)at;
         /* The DWORD at base+2: the point's y with `apply`'s low word above it.
          * See this function's note. */
-        int32_t sy   = (int32_t)(((uint32_t)base >> 16)
+        int32_t sy   = (int32_t)(((uint32_t)at >> 16)
                                  | (((uint32_t)apply & 0xFFFFu) << 16));
 
         if (kind == AM2_VEHICLE_KIND_TANK)
@@ -13420,7 +13419,6 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
     uint8_t  *u   = (uint8_t *)unit;
     int16_t  *pt  = (int16_t *)&spot.at;
     uint8_t  *spr;
-    AM2_Point b2;
     uint32_t  from;         /* the packed spot.at the shot leaves from */
     int16_t  *fromP = (int16_t *)&from;
     int32_t   dir;
@@ -13593,8 +13591,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
             a.y = (int16_t)AM2_FTOL((double)pt[1]
                                     - (double)(pt[1] - fromP[1]) * AM2_FW_ARC_K
                                     + AM2_FW_ARC_BIAS);
-            b2 = *(const AM2_Point *)pt;
-            d = ApproxDist(&a, &b2);
+            b = *(const AM2_Point *)pt;
+            d = ApproxDist(&a, &b);
         } else
             d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
@@ -13874,21 +13872,20 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
      * step is zero and the damage is zero. See ADDR_SWEEP_DISTANCE. */
     case 43: {
         uint8_t  *o;
-        AM2_Point at;
         uint32_t  attacker;
 
         PlaySoundAt(0x34, 0, 0,
                     *(const int16_t *)(u + OBJ_OFF_POS),
                     *(const int16_t *)(u + OBJ_OFF_POS + 2));
 
-        at.x = (int16_t)AM2_FTOL(
+        ((AM2_Point *)&from)->x = (int16_t)AM2_FTOL(
             Cos8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + *(const int16_t *)(u + OBJ_OFF_POS));
-        at.y = (int16_t)AM2_FTOL(
+        ((AM2_Point *)&from)->y = (int16_t)AM2_FTOL(
             Sin8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + *(const int16_t *)(u + OBJ_OFF_POS + 2));
 
-        o = (uint8_t *)ObjectsHitByPoint((const uint32_t *)&at,
+        o = (uint8_t *)ObjectsHitByPoint((const uint32_t *)&from,
                 (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
         attacker = *(const uint32_t *)(u + OBJ_OFF_UID);

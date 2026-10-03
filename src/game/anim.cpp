@@ -119,7 +119,6 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
         orig_fread(&w, 2, 1, fp);
         if (w == 1) {
             int16_t   cells;
-            int32_t   j;
 
             /* The animation is reached through the entry at every store. */
 #define a (e->anim)
@@ -144,18 +143,18 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             if (cells > 0)
                 a->cells = (AM2_AnimCell *)am2_malloc((size_t)cells * 4);
 
-            for (j = 0; j < cells; j++) {
+            for (k = 0; k < cells; k++) {
                 orig_fread(&w, 2, 1, fp);
-                a->cells[j].hold = w;
+                a->cells[k].hold = w;
                 orig_fread(&w, 2, 1, fp);
                 /* The original reads this scratch back as a DWORD, so the top
                  * half is stale -- it is the file pointer's own argument slot,
                  * which MSVC reused. Only the low half is stored, so the stale
                  * bits cannot reach the result and a 16-bit read is the same
                  * function. */
-                a->cells[j].sprite = (int16_t)((uint16_t)w + (uint16_t)base);
-                if (a->cells[j].sprite >= g_spriteListN)
-                    am2_log("Error!  %d\n", a->cells[j].sprite);
+                a->cells[k].sprite = (int16_t)((uint16_t)w + (uint16_t)base);
+                if (a->cells[k].sprite >= g_spriteListN)
+                    am2_log("Error!  %d\n", a->cells[k].sprite);
             }
 #undef a
         } else {
