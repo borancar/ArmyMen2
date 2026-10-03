@@ -1910,8 +1910,6 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     }
 
     if (flags & 0x80000000u) {
-        int16_t x, z;
-
         /* Clamped IN THE OBJECT, not just on the wire -- the same as the
          * trooper's, and the reason twelve bits is enough below. */
         if (*(const int16_t *)(o + OBJ_OFF_POS) > 0xFFF)
@@ -1919,12 +1917,14 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
         if (*(const int16_t *)(o + OBJ_OFF_POS + 2) > 0xFFF)
             *(int16_t *)(o + OBJ_OFF_POS + 2) = 0xFFF;
 
-        x = *(const int16_t *)(o + OBJ_OFF_POS);
-        z = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+#define x (*(const int16_t *)(o + OBJ_OFF_POS))
+#define z (*(const int16_t *)(o + OBJ_OFF_POS + 2))
         *out++ = (uint8_t)x;
         *out++ = (uint8_t)z;
         *out++ = (uint8_t)(((((uint8_t)(x >> 8)) ^ ((uint8_t)(z >> 4))) & 0x0F)
                            ^ ((uint8_t)(z >> 4)));
+#undef z
+#undef x
 
         *(uint32_t *)(o + VEHICLE_OFF_SENT_POS) =
             *(const uint32_t *)(o + OBJ_OFF_POS);
