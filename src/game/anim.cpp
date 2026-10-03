@@ -162,7 +162,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             if (fallback) {
                 /* No break on a match: the last entry carrying the id wins. */
                 for (k = 0; k < fallback->count; k++)
-                    if (fallback->entries[k].id == e->id)
+                    if (e->id == fallback->entries[k].id)
                         e->anim = fallback->entries[k].anim;
                 /* Reached whether the loop ran or not, so an empty fallback
                  * reads entry 0 of a table that has none. See anim.h. */

@@ -2169,9 +2169,9 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     /* The original stores these in register-scheduling order rather than in
      * index order; the values are what matters and they are written out here
      * in the order the walk reads them. */
-    ring[1]  = -2 * w;
-    ring[0]  = -2 * w - 1;
     ring[2]  = -2 * w + 1;
+    ring[0]  = -2 * w - 1;
+    ring[1]  = -2 * w;
     ring[3]  = -w - 2;
     ring[4]  = -w - 1;
     ring[5]  = -w;
@@ -2187,8 +2187,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     ring[15] = w + 1;
     ring[17] = 2 * w - 1;
     ring[16] = w + 2;
-    ring[18] = 2 * w;
     ring[19] = 2 * w + 1;
+    ring[18] = 2 * w;
 
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */

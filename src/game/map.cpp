@@ -1511,12 +1511,14 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
     char      path[0x40];
+    int32_t v;
+    AM2_Point at;
     am2_FILE *f;
     int32_t   tag;
     uint32_t  size, formSize;
     int32_t   consumed, plane, i;
-    int32_t   objCount = 0, nfields = 0, tlayDone = 0;
     uint8_t  *objs = 0;
+    int32_t   objCount = 0, nfields = 0, tlayDone = 0;
 
     SetGameDir(folder);
     memset(((char *)(uintptr_t)ADDR_MAP_BLOCK), 0, 0x1A0);
@@ -1726,7 +1728,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             orig_map_fread(&nfields, 4, 1, f);
             consumed += 0xC;
             i = 0;
-            while (1) {
+            for (;;) {
                 if (i >= nfields)
                     break;
                 orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag, 4, 1, f);
@@ -1748,7 +1750,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     scri[0] = 0;
 
                     for (i = 0; i < nfields; i++) {
-                        int32_t  v    = 0;
+                        v = 0;
 
                         tag  = (int32_t)((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag;
                         size = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size;
@@ -1878,9 +1880,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
             uint8_t   trig  = r[MAPREC_OFF_TRIG];
             uint8_t   owner = r[MAPREC_OFF_OWNER];
-            int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
             int32_t   flags = 0;
-            AM2_Point at;
+            int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
             void     *obj = 0;
 
             if (trig & 0x20)
