@@ -768,8 +768,8 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     orig_fclose(fp);
 
     height = *(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT);
-    width  = *(const int32_t *)(infoHdr + BMPINFO_OFF_WIDTH);
     stride = (int32_t)((uint32_t)bytes / (uint32_t)height);
+    width  = *(const int32_t *)(infoHdr + BMPINFO_OFF_WIDTH);
 
     *(int16_t *)(stream + 0) = (int16_t)width;
     *(int16_t *)(stream + 2) = (int16_t)height;

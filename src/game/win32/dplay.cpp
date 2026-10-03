@@ -372,8 +372,8 @@ found:
                  COMM_OFF_VERBOSE) != 0)
         orig_log("Creating Flow Queue for Player id %x\n", id);
 
-    own  = 1u << slot;
     want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
+    own  = 1u << slot;
 
     *(uint32_t *)(rec + 0x00) = id;
     *(uint32_t *)(rec + 0x04) = 0;
@@ -415,7 +415,7 @@ found:
         int32_t i;
 
         i = 0;
-        while (1) {
+        for (;;) {
             if (i >= AM2_PLAYER_RING_LEN)
                 break;
             ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;

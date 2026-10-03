@@ -824,7 +824,9 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
     }
 
     if (cmp < 0) {
-        while (g_depthCursor->prev) {
+        for (;;) {
+            if (!g_depthCursor->prev)
+                break;
             g_depthCursor = g_depthCursor->prev;
             if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
                 at = g_depthCursor;
@@ -838,7 +840,9 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
         AT_FRONT(at);               /* off the front */
     }
 
-    while (g_depthCursor->next) {
+    while (1) {
+        if (!g_depthCursor->next)
+            break;
         g_depthCursor = g_depthCursor->next;
         if (DepthCompare(obj, g_depthCursor->obj) <= 0)
             goto before;
@@ -912,8 +916,8 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
     g_depthDC    = 0;
 
     l = world->left   >> AM2_CELL_SHIFT;
-    r = world->right  >> AM2_CELL_SHIFT;
     t = world->top    >> AM2_CELL_SHIFT;
+    r = world->right  >> AM2_CELL_SHIFT;
     b = world->bottom >> AM2_CELL_SHIFT;
 
     if (b < 0)

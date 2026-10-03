@@ -2122,7 +2122,6 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     int32_t         phase;
     int32_t         splitOdd;
     int32_t         k;
-    int32_t         tilew;
     int32_t         y;
     int32_t         marked = 0;
 
@@ -2182,8 +2181,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     ring[5]  = -w;
     ring[6]  = -w + 1;
     ring[7]  = -w + 2;
-    ring[8]  = -2;
     ring[9]  = -1;
+    ring[8]  = -2;
     ring[10] = 1;
     ring[11] = 2;
     ring[12] = w - 2;
@@ -2204,14 +2203,14 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 
     phase = lw % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
-        splitOdd = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
+        splitOdd = 0;
     } else {
         splitOdd = 1;
         k        = 8 - phase;
     }
 
-    tilew = (box[2] - AM2_TILEMASK_MARGIN)
+    lw = (box[2] - AM2_TILEMASK_MARGIN)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
     for (y = tw; y < bw; y += 8) {
@@ -2239,7 +2238,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 
             col++;
             idx++;
-            if (col == tilew + AM2_TILEMASK_MARGIN)
+            if (col == lw + AM2_TILEMASK_MARGIN)
                 break;
 
             if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
@@ -2749,7 +2748,6 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     int32_t         w;
     int32_t         rowbits;
     int32_t         phase;
-    int32_t         splitOdd;
     int32_t         k;
     int32_t         tilew;
     int32_t         y;
@@ -2815,8 +2813,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[5]  = -w;
     ring[6]  = -w + 1;
     ring[7]  = -w + 2;
-    ring[8]  = -2;
     ring[9]  = -1;
+    ring[8]  = -2;
     ring[10] = 1;
     ring[11] = 2;
     ring[12] = w - 2;
@@ -2835,10 +2833,10 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
 
     phase = lw % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
-        splitOdd = 0;
+        rowbits = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
     } else {
-        splitOdd = 1;
+        rowbits = 1;
         k        = 8 - phase;
     }
 
@@ -2853,7 +2851,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
                       + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
-            if (splitOdd != off % 2) {
+            if (rowbits != off % 2) {
                 if (bits[off]) {
                     cells[idx] |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
@@ -5250,11 +5248,7 @@ score:
                 if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != AI_SIGHT_GEN)
                     AiSightTrace(o, it, rec, rank, viewerAttr, AI_SIGHT_GEN);
 
-                if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != AI_SIGHT_GEN) {
-                    if (candRange
-                        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
-                        continue;
-                } else {
+                if (!(*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != AI_SIGHT_GEN)) {
                     int32_t mine = ObjHeight(o);
                     int32_t his  = ObjHeight(it);
 
@@ -5270,6 +5264,10 @@ score:
                                > *(const int16_t *)(rec + SIGHTDIR_OFF_MID)) {
                         continue;
                     }
+                } else {
+                    if (candRange
+                        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+                        continue;
                 }
             }
         }
@@ -8355,7 +8353,9 @@ sweep:
                     veh = at;
                 else
                     veh = (uint8_t *)0;
-                while (veh) {
+                while (1) {
+                    if (!veh)
+                        break;
                     if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
                         goto board;
                     veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
@@ -9864,7 +9864,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
      * is throttled so that holding the button does not re-order every frame. */
     if (moved != 0)
         goto tail;
-    if (g_gameClockMs <= g_throttleDeadline)
+    if (g_throttleDeadline >= g_gameClockMs)
         goto tail;
 
     if (g_mouseButton[0] == 0) {

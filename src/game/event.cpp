@@ -3809,6 +3809,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         SetObjScriptState(act->target, act->subject, act->n0);
         return;
 
+    case 0x28:                                  /* setbriefvo */
+        strcpy((char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, act->text);
+        return;
+
     case 0x24: {                                /* setobjbitmap */
         /* THE VARIABLE IS READ AND THROWN AWAY. Both branches call with
          * act->n0; the only difference is that a positive xvar gets a
@@ -3834,10 +3838,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     /* Three level strings, three destinations, one shape. */
     case 0x27:                                  /* setbriefing */
         strcpy((char *)(uintptr_t)ADDR_LEVEL_STR_C, act->text);
-        return;
-
-    case 0x28:                                  /* setbriefvo */
-        strcpy((char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, act->text);
         return;
 
     case 0x29:                                  /* setstratmap */

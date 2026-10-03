@@ -102,9 +102,13 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
         uint8_t *dst = g_frameBuf;
         int32_t  i;
 
-        for (i = 0; i < SCRATCH_SIDE; i++) {
+        i = 0;
+        while (1) {
+            if (!(i < SCRATCH_SIDE))
+                break;
             memset(dst, key, SCRATCH_SIDE);
             dst += g_pitch;
+            i++;
         }
     }
 

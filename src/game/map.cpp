@@ -780,8 +780,8 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
         took  = n * 4 + 8;
     }
 
-    a     = *(const int32_t *)cur;
     b     = *(const int32_t *)(cur + 4);
+    a     = *(const int32_t *)cur;
     cur  += 8;
     took += 8;
     if (a > 0) {

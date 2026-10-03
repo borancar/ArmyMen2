@@ -7657,7 +7657,10 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
             any = 1;
     }
 
-    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid; ) {
+    uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID);
+    while (1) {
+        if (!uid)
+            break;
         uint8_t *link = (uint8_t *)LookupByUID(uid);
         int32_t  type;
 
@@ -11113,16 +11116,16 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
                 (dz + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Z)
                  - (long double)iz);
 
-            if (*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) < 0) {
-                *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = 0;
-                *(int32_t *)(o + OBJ_OFF_VEL_Z) = 0;
-            } else {
+            if (!(*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) < 0)) {
                 *(float *)(o + OBJ_OFF_VEL_Z) = (float)
                     ((long double)*(const float *)(o + OBJ_OFF_VEL_Z)
                      - (long double)*(const float *)(uintptr_t)ADDR_GRAVITY
                        * (long double)scale);
                 if (*(const float *)(o + OBJ_OFF_VEL_Z) == 0.0f)
                     *(uint32_t *)(o + OBJ_OFF_VEL_Z) = AM2_VEL_Z_MIN;
+            } else {
+                *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = 0;
+                *(int32_t *)(o + OBJ_OFF_VEL_Z) = 0;
             }
         }
     }
@@ -12922,7 +12925,9 @@ void __cdecl StepType5(void *obj)
         }
     }
 
-    while (travel > 0.0) {
+    while (1) {
+        if (!(travel > 0.0))
+            break;
         float   d = travel < AM2_MISSILE_SUBSTEP ? travel
                                                  : AM2_MISSILE_SUBSTEP;
         int32_t nx, ny;

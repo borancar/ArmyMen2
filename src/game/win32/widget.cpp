@@ -7626,7 +7626,10 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                                         + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
                 if (*scroll > *first) {
                     float v = *scroll - STEP;
-                    *scroll = *first > v ? *first : v;
+                    if (*first > v)
+                        *scroll = *first;
+                    else
+                        *scroll = v;
                 } else if (*scroll < *first) {
                     float v = *scroll + STEP;
                     *scroll = *first < v ? *first : v;
@@ -10334,7 +10337,6 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     uint8_t       *maps;
     char           path[AM2_MP_GAMETYPE_PATH];
     int32_t        i;
-    int32_t        chosen;
 
     if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
         return;
@@ -10372,7 +10374,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
                  + LIST_OFF_TOP_ROW) = 0;
 
-    chosen = 0;
+    row = 0;
     for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
         const char *nm = *(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
                          + (size_t)i * AM2_MP_MAP_NAME_BYTES;
@@ -10386,22 +10388,22 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
                 (const char *)(lvl + LEVEL_OFF_NAME), lvl);
 
         if (strcmp(nm, (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
-            chosen = i;
+            row = i;
     }
 
     maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
     {
         uint8_t *lvl = (uint8_t *)FindLevelByName(
             (char *)(*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
-                     + (size_t)chosen * AM2_MP_MAP_NAME_BYTES));
+                     + (size_t)row * AM2_MP_MAP_NAME_BYTES));
 
         /* The INDEX goes in the list, not the level -- espmap puts the
-         * stored value in the same frame slot the loop wrote `chosen` to,
+         * stored value in the same frame slot the loop wrote `row` to,
          * where reading the instruction alone suggests the FindLevelByName
          * result that was computed two lines earlier. That result is kept in
          * esi and handed to SelectLevel instead. */
-        *(int32_t *)(maps + LIST_OFF_CHOSEN) = chosen;
-        ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), chosen);
+        *(int32_t *)(maps + LIST_OFF_CHOSEN) = row;
+        ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), row);
         SelectLevel(lvl);
         RefreshMapSelection();
         SendPlayerMsg(1);
@@ -15570,7 +15572,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
     ClearRegion(&paint, g_backgroundColour);
 
     idx = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
-    if (idx >= rows->count)
+    if (rows->count <= idx)
         return;
 
     offset = idx * LIST_ROW_STRIDE;
