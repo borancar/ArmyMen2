@@ -1625,8 +1625,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_SHOWMESSAGE:
         STEP();
         WANT(AM2_TOKEN_STRING)
-        act->code = 1;
         act->text = (char *)TOK.value;
+        act->code = 1;
         (*at)++;
         return 1;
 
@@ -2091,6 +2091,29 @@ eos:
         }
         return 0;
 
+    case AM2_TOK_SETGUNFACING:
+        STEP();
+        act->code = 0x21;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
+            (*at)++;
+            return 1;
+        }
+        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
+            (*at)++;
+            return 1;
+        }
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        VARNAME("Line [%4d]:  expected variable name but variable %s not "
+                "declared\n")
+        return 1;
+
     case AM2_TOK_SETFACING:
         STEP();
         act->code = 0x20;
@@ -2117,29 +2140,6 @@ eos:
                 "declared\n")
         return 1;
 
-    case AM2_TOK_SETGUNFACING:
-        STEP();
-        act->code = 0x21;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count)
-            goto eos;
-        if (TOK.kind == AM2_TOKEN_INTEGER) {
-            act->n0 = TOKVAL;
-            act->n0 = (uint8_t)act->n0;
-            (*at)++;
-            return 1;
-        }
-        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
-            (*at)++;
-            return 1;
-        }
-        STEP();
-        WANT(AM2_TOKEN_STRING)
-        VARNAME("Line [%4d]:  expected variable name but variable %s not "
-                "declared\n")
-        return 1;
-
     case AM2_TOK_SETVAR:
         STEP();
         act->code = 0x23;
@@ -2152,6 +2152,15 @@ eos:
         }
         VARNAME_EQ("Line [%4d]:  expected variable name in SetVar but "
                    "variable %s not declared\n")
+        return 1;
+
+    case AM2_TOK_ACTIVATEREGION:
+        STEP();
+        act->code = 0x26;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = 1;
+        act->subject = TOKVAL;
+        (*at)++;
         return 1;
 
     case AM2_TOK_ADDVAR:
@@ -2167,15 +2176,6 @@ eos:
         WANT(AM2_TOKEN_STRING)
         VARNAME_EQ("Line [%4d]:  expected variable name in AddVar but "
                    "variable %s not declared\n")
-        return 1;
-
-    case AM2_TOK_ACTIVATEREGION:
-        STEP();
-        act->code = 0x26;
-        WANT(AM2_TOKEN_INTEGER)
-        act->n0 = 1;
-        act->subject = TOKVAL;
-        (*at)++;
         return 1;
 
     case AM2_TOK_INACTIVATEREGION:

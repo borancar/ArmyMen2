@@ -1247,8 +1247,8 @@ void __cdecl ScrollMapCache(void)
      * always zero, which is what makes this one expression for both
      * directions. */
     {
-        int32_t  sy = (dy > 0) ? dy : 0;
         int32_t  sx = (dx > 0) ? dx : 0;
+        int32_t  sy = (dy > 0) ? dy : 0;
         AM2_Rect tiles;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
@@ -2499,8 +2499,8 @@ void __cdecl DrawEffectLayer(void)
         x = ptA[0];
         y = ptA[1];
 
-        box.left   = x + AM2_AIM_BOX_LEFT;
         box.top    = y + AM2_AIM_BOX_TOP;
+        box.left   = x + AM2_AIM_BOX_LEFT;
         box.right  = x + AM2_AIM_BOX_RIGHT;
         box.bottom = y + AM2_AIM_BOX_BOTTOM;
 
@@ -2520,15 +2520,14 @@ void __cdecl DrawEffectLayer(void)
                     int32_t  sx = map[at * 2]     + box.left;
                     int32_t  sy = map[at * 2 + 1] + box.top;
                     int32_t  w  = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W;
-                    int32_t  h  = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H;
 
                     if (sx > w - 1)
                         sx = w - 1;
                     else if (sx < 0)
                         sx = 0;
 
-                    if (sy > h - 1)
-                        sy = h - 1;
+                    if (sy > (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H) - 1)
+                        sy = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H) - 1;
                     else if (sy < 0)
                         sy = 0;
 

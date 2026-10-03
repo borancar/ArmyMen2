@@ -4862,7 +4862,10 @@ void __cdecl HudPostUpdate(void)
             *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 1;
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
             ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[0] = ax < px ? ax : px;
-            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = ax > px ? ax : px;
+            if (ax > px)
+                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = ax;
+            else
+                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = px;
             if (ay < py)
                 ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = ay;
             else

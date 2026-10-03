@@ -10445,7 +10445,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
             else
                 target = *(const uint32_t *)(o + 0xC0u);
 
-            noTarget = ((uint16_t)target == 0);
+            noTarget = ((uint16_t)target <= 0);
 
             if (!noTarget
                 && ApproxDist((const AM2_Point *)(o + 0x12u),
