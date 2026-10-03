@@ -71,6 +71,12 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1478:
+  - **More frame-size fixes** (2026-10-03): RunScriptAction gives every
+    variable read its own function-scope slot (frame 0x60 as the image; 347
+    -> 189); UpdateTrooperAction reuses its settled flag as the found flag
+    (frame matches, 451 -> 442); HudTopUpdate's `acc` is set before a call so
+    it lives in memory like the image's (158 -> 85); ListMaskAction and
+    VehicleBlockWeight read their packed point argument as two words.
   - **TrooperFire handed SetFieldInAll a zero** (2026-10-03): it moves the
     table record from TABLE_REC_SLOT to TABLE_REC_KIND, zeroes the slot, then
     passed the slot (via a macro that re-reads it) -- always 0. The image
