@@ -2735,8 +2735,6 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     const uint8_t  *spr;
     int32_t         ox;
     int32_t         oy;
-    int32_t         mx;
-    int32_t         my;
     int32_t         lw;
     int32_t         rw;
     int32_t         tw;
@@ -2761,25 +2759,23 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
               (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
                + LISTREC_OFF_SPRITE);
 
-    ox = (int32_t)(int16_t)(at & 0xFFFFu)
+    ox = ((const AM2_Point *)&at)->x
          - *(const int16_t *)(spr + SPR_OFF_HOTX);
-    oy = (int32_t)(int16_t)(at >> 16)
+    oy = ((const AM2_Point *)&at)->y
          - *(const int16_t *)(spr + SPR_OFF_HOTY);
 
-    mx = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X);
-    my = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y);
 
-    lw = Clamp(ox + mx, 1 << AM2_TILE_SHIFT,
+    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox, 1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
                    - (1 << AM2_TILE_SHIFT));
-    rw = Clamp(ox + mx + *(const int16_t *)(m + OBJMASK_OFF_WIDTH) - 1,
+    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox - 1,
                1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
                    - (1 << AM2_TILE_SHIFT));
-    tw = Clamp(oy + my, 1 << AM2_TILE_SHIFT,
+    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy, 1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
                    - (1 << AM2_TILE_SHIFT));
-    bw = Clamp(oy + my + *(const int16_t *)(m + OBJMASK_OFF_HEIGHT) - 1,
+    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy - 1,
                1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
                    - (1 << AM2_TILE_SHIFT));
@@ -2819,8 +2815,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[15] = w + 1;
     ring[17] = 2 * w - 1;
     ring[16] = w + 2;
-    ring[18] = 2 * w;
     ring[19] = 2 * w + 1;
+    ring[18] = 2 * w;
 
     rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
     rw = rowbits >> 3;
@@ -2840,7 +2836,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
     for (y = tw; y < bw; y += 8) {
-        int32_t off = (y - my - oy) * rw;
+        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rw;
         int32_t end = off + rw;
         int32_t col = AM2_TILEMASK_MARGIN;
         int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w

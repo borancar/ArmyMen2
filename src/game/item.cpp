@@ -10178,8 +10178,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         do {
             const int16_t *p = AM2_MASK_PT(rec, i);
 
-            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)at)
-               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(at >> 16))
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + ((const AM2_Point *)&at)->x)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + ((const AM2_Point *)&at)->y)
                   << 16);
 
             /* &base, and that is the one byte the two loops differ in. */
@@ -10237,8 +10237,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         do {
             const int16_t *p = AM2_MASK_PT(rec, i);
 
-            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)at)
-               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(at >> 16))
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + ((const AM2_Point *)&at)->x)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + ((const AM2_Point *)&at)->y)
                   << 16);
 
             list = ObjectsAtPoint(&pt,

@@ -3401,15 +3401,28 @@ extern "C" void __cdecl StopAudioStream(void);
  * deferral: it is the one action that means "do nothing here". */
 void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 {
+    /* The variable reads each have their own frame slot in the image (a
+     * 0x60 frame), not one shared block-local packed into a dead argument
+     * slot: function-scope locals, one per use, the coordinate arms sharing
+     * a point. */
+    int32_t v1;
+    int32_t v2;
+    int32_t v3;
+    AM2_Point p1;
+    int32_t v4;
+    AM2_Point p3;
+    int32_t v6;
+    int32_t v7;
+    int32_t v8;
+    int32_t v9;
     AM2_Point at;
 
     if (act->uid != -2 && act->code != 0x1A) {
         if (act->xvar > 0) {
-            int32_t v;
 
-            GetVarValue(act->xvar, &v);
+            GetVarValue(act->xvar, &v1);
             EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
-                        0, 0, 0, 0, v, 0, 0);
+                        0, 0, 0, 0, v1, 0, 0);
             return;
         }
         EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
@@ -3484,12 +3497,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x09: {                                /* showvar */
-        int32_t v;
         char    text[0x40];
 
-        if (GetVarValue(act->xvar, &v) == 0)
+        if (GetVarValue(act->xvar, &v2) == 0)
             return;
-        am2_sprintf(text, "%d", v);
+        am2_sprintf(text, "%d", v2);
         HudMessage(text, 0);
         return;
     }
@@ -3503,14 +3515,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* The subject is resolved afresh at each call, as the image does. */
 #define UID ResolveUid(act->subject, (uint32_t)(uintptr_t)owner)
         if (act->xvar > 0) {
-            int32_t v;
-            AM2_Point p;
 
-            GetVarValue(act->xvar, &v);
-            p.x = (int16_t)v;
-            GetVarValue(act->yvar, &v);
-            p.y = (int16_t)v;
-            EvtAtPointC(UID, *(const uint32_t *)&p, act->relative);
+            GetVarValue(act->xvar, &v3);
+            p1.x = (int16_t)v3;
+            GetVarValue(act->yvar, &v3);
+            p1.y = (int16_t)v3;
+            EvtAtPointC(UID, *(const uint32_t *)&p1, act->relative);
             return;
         }
         if (act->relative == 0 && act->u.pos.x == 0) {
@@ -3675,15 +3685,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                              act->n0);
             /* The same three paths as `moveto`, in the A variants. */
             if (act->xvar > 0) {
-                int32_t v;
-                AM2_Point p;
 
-                GetVarValue(act->xvar, &v);
-                p.x = (int16_t)v;
-                GetVarValue(act->yvar, &v);
-                p.y = (int16_t)v;
+                GetVarValue(act->xvar, &v4);
+                p1.x = (int16_t)v4;
+                GetVarValue(act->yvar, &v4);
+                p1.y = (int16_t)v4;
                 EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                            *(const uint32_t *)&p, act->relative);
+                            *(const uint32_t *)&p1, act->relative);
                 return;
             }
             if (act->relative == 0 && act->u.pos.x == 0) {
@@ -3700,14 +3708,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->n0 >= 0)
             EvtArmySetField(act->army, act->subject, act->n0);
         if (act->xvar != 0) {
-            int32_t v;
-            AM2_Point p;
 
-            GetVarValue(act->xvar, &v);
-            p.x = (int16_t)v;
-            GetVarValue(act->yvar, &v);
-            p.y = (int16_t)v;
-            EvtArmyAtPoint(act->army, act->subject, *(const uint32_t *)&p,
+            GetVarValue(act->xvar, &v4);
+            p3.x = (int16_t)v4;
+            GetVarValue(act->yvar, &v4);
+            p3.y = (int16_t)v4;
+            EvtArmyAtPoint(act->army, act->subject, *(const uint32_t *)&p3,
                            act->relative);
             return;
         }
@@ -3728,12 +3734,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
      * initialised, so a failed variable read passes stack garbage, as the
      * original does. */
     case 0x20: {
-        int32_t v;
 
         if (act->xvar > 0) {
-            GetVarValue(act->xvar, &v);
+            GetVarValue(act->xvar, &v6);
             EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                         (int8_t)v);
+                         (int8_t)v6);
             return;
         }
         EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3742,12 +3747,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     }
 
     case 0x21: {
-        int32_t v;
 
         if (act->xvar > 0) {
-            GetVarValue(act->xvar, &v);
+            GetVarValue(act->xvar, &v7);
             EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                          (int8_t)v);
+                          (int8_t)v7);
             return;
         }
         EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3759,12 +3763,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* NOT the 0x20/0x21 shape: this one tests xvar for NON-ZERO where its
          * neighbours test for positive, and it REFUSES outright when the
          * read fails rather than falling back to n0. */
-        int32_t v;
 
         if (act->xvar != 0) {
-            if (GetVarValue(act->xvar, &v) == 0)
+            if (GetVarValue(act->xvar, &v8) == 0)
                 return;
-            SetVarValue(act->subject, v);
+            SetVarValue(act->subject, v8);
             return;
         }
         SetVarValue(act->subject, act->n0);
@@ -3774,11 +3777,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x22: {                                /* addtovar */
         /* Not the 0x20/0x21 shape: the value starts as n0 and the variable read
          * writes over it, so a failed read leaves n0 rather than 0. */
-        int32_t v = act->n0;
+        v9 = act->n0;
 
         if (act->xvar > 0)
-            GetVarValue(act->xvar, &v);
-        AddToVar(act->subject, v);
+            GetVarValue(act->xvar, &v9);
+        AddToVar(act->subject, v9);
         return;
     }
 
