@@ -14426,17 +14426,13 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     switch (kb) {
     case 1:  case 8:  case 9:  case 10: case 13: case 14: case 15: case 16:
     case 17: case 18: case 19: case 20: case 21: case 27: case 29:
-        ammo = -1;
-        break;
-    default:
-        ammo = quantity;
+        quantity = -1;
         break;
     }
 
     if (*(const int32_t *)(def + 0x18u) < 0)
-        ammo = -1;
-    else if (ammo == 0)
-        ammo = 3;
+        quantity = -1;
+    ammo = quantity ? quantity : 3;
     *(int32_t *)(o + 0xCCu) = ammo;
 
 #if !defined(AM2_RELINK)   /* harness trace, not the original's */
