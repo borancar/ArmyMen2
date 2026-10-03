@@ -66,11 +66,23 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1473 of
-  1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1474 of
+  1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1473:
+  the near-miss sweep, 758 before the row pools. From 758 to 1474:
+  - **BuildRegionGraph, AddSightBlocker, ReceivePlayerMsg, LoadMap**
+    (2026-10-03): the image re-reads globals at every use where the
+    reconstruction cached them in locals -- the weights and region tables,
+    the map width, the stride after a realloc, the comm object, the map's
+    H*W per chunk -- and `$T/rereads.py`-style global-load counts find
+    them. BuildRegionGraph matches (also a uint16 cell index and tile
+    stepping before x); AddSightBlocker 176 -> 38 (generation in a
+    register, do-while sweep over a0, per-arm tails; checked equal to the
+    original over 6,000 Unicorn cases); ReceivePlayerMsg 161 -> 4, and
+    it now STOPS AFTER THE FOURTH RECORD -- the reconstruction ran a fifth
+    through the log and CommSetSlotRemote, which the original's `jl` never
+    does; LoadMap's path buffer is the original's 0x40 bytes.
   - **DrawText** (2026-10-02): the glyph width and height are uint16_t
     locals (the image's `mov bx,[..]; and ebx,0xFFFF`), the pen and the
     index are set before the length test, and the loop steps i then j.
