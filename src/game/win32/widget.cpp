@@ -7601,9 +7601,11 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                 if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
                     *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
 
-                *scroll -= STEP;
-                if (*scroll < 0.0f)
-                    *scroll = 0.0f;
+                {
+                    float v = *scroll - STEP;
+
+                    *scroll = 0.0f > v ? 0.0f : v;
+                }
             } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
                 float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
                 float first;
