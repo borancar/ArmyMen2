@@ -1454,41 +1454,10 @@ typedef int32_t (__cdecl *am2_load_atl_fn)(const char *path);
 
 
 /* w*h bytes straight into one global.  Seven of the arms are exactly this. */
-static inline uint8_t *ReadPlane(am2_FILE *f, uint32_t size, int32_t *consumed)
-{
-    uint8_t *p = (uint8_t *)am2_malloc(size);
-
-    orig_map_fread(p, size, 1, f);
-    *consumed += (int32_t)size;
-    return p;
-}
 
 /* MHDR's tail.  Three rectangles, the listener, both map descriptors and the
  * tile deltas, all derived from w and h.  ADDR_CAMERA_Y is field +4 of
  * ADDR_VISIBLE_TILES and is written by the same RectSet as the rest of it. */
-static inline void DeriveMapGeometry(void)
-{
-    AM2_Rect r;
-
-    (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)    = *RectSet(&r, 0, 0, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
-    /* The inset rect already has four field names in this tree rather than
-     * one rect name, so it is written a field at a time -- adding a second
-     * base over storage that is already named is the mistake orig.h opens
-     * with. */
-    RectSet(&r, 0x40, 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X) - 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y) - 0x40);
-    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT   = r.left;
-    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP    = r.top;
-    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT  = r.right;
-    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM = r.bottom;
-    (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  = MakePoint(0x10, 0x10);
-    (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV) = (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS);
-    (*(AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES) = *RectSet(&r, 1, 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W) + 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H) + 1);
-
-    MapDescInit((void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
-    MapDescInit((void *)(uintptr_t)ADDR_MAP_DESC, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
-    BuildTileDeltas();
-}
 
 /* One OLAY batch's records.  Each is described by the field table the FILE
  * just supplied, so the widths come from there and a field with no arm is
@@ -1498,77 +1467,6 @@ static inline void DeriveMapGeometry(void)
  * elevation from ELOW's high nibble and its owner from the low one, and the
  * two single-byte fields are not used at all.  Three fields, two
  * destinations, and a precedence that is invisible from any one arm. */
-static inline void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
-                           int32_t nfields, int32_t count, int32_t *consumed)
-{
-    int32_t rec;
-
-    for (rec = 0; rec < count; rec++) {
-        int32_t index = -1;
-        int32_t move = 0, numb = 0, trig = 0, ownr = 0, elev = 0, elow = 0;
-        char    scri[0x80];
-        int32_t i;
-
-        scri[0] = 0;
-
-        for (i = 0; i < nfields; i++) {
-            uint32_t tag  = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag;
-            uint32_t size = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size;
-            int32_t  v    = 0;
-
-            orig_map_fread(&v, size, 1, f);
-            *consumed += (int32_t)size;
-
-            switch (tag) {
-            case AM2_IFF_MOVE: move = (int8_t)v; break;
-            case AM2_IFF_NUMB: numb = (int8_t)v; break;
-            case AM2_IFF_TRIG: trig = (int8_t)v; break;
-            case AM2_IFF_OWNR: ownr = (int8_t)v; break;
-            case AM2_IFF_ELEV: elev = (int8_t)v; break;
-            case AM2_IFF_ELOW: elow = (int8_t)v; break;
-            case AM2_IFF_INDX: index = v + first; break;
-            case AM2_IFF_SCRI:
-                if (v > 0) {
-                    orig_map_fread(scri, (size_t)v, 1, f);
-                    *consumed += v;
-                }
-                break;
-            default:
-                break;          /* read for its declared width and dropped */
-            }
-        }
-
-        if (index < 0) {
-            am2_log("Missing index attribute for item #%d!\n", rec);
-            continue;
-        }
-
-        {
-            uint8_t *r = objs + (size_t)index * 0x1C;
-            uint8_t  owner;
-
-            r[0x14] = (uint8_t)move;
-            if (elow != 0) {
-                r[0x12] = (uint8_t)((elow >> 4) & 0xF);
-                owner   = (uint8_t)(elow & 0xF);
-            } else {
-                r[0x12] = (uint8_t)elev;
-                owner   = (uint8_t)ownr;
-            }
-            r[0x13] = owner;
-            r[0x10] = (uint8_t)trig;
-            r[0x11] = 0;
-            r[0x15] = (uint8_t)numb;
-
-            if (scri[0] != 0) {
-                size_t n = strlen(scri) + 1;
-
-                *(char **)(r + 0x18) = (char *)am2_malloc(n);
-                memcpy(*(char **)(r + 0x18), scri, n);
-            }
-        }
-    }
-}
 
 typedef int32_t (__cdecl *am2_kind_allowed_fn)(int32_t kind);
 typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
@@ -1585,138 +1483,6 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
  * one packs a sprite key, may have its kind SUBSTITUTED from the weighted
  * respawn pool, preloads its sprite and takes that sprite's own offset into
  * its position before anything is created. */
-static inline void BuildMapObjects(uint8_t *objs, int32_t count)
-{
-    int32_t i;
-
-    for (i = 0; i < count; i++) {
-        uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
-        int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
-        int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
-        uint8_t   trig  = r[MAPREC_OFF_TRIG];
-        uint8_t   owner = r[MAPREC_OFF_OWNER];
-        int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
-        int32_t   flags = 0;
-        AM2_Point at;
-        void     *obj = 0;
-
-        if (trig & 0x20)
-            flags = 4;
-        if (trig & 0x08)
-            flags |= 0x810;
-
-        at.x = *(const int16_t *)(r + MAPREC_OFF_X);
-        at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
-
-        if (type != 0x19) {
-            /* An ITEM. */
-            void *spr = PreloadSpriteByKey(PackKey(type + 0x14, kind, 0),
-                                           0x1000, 1);
-
-            if (spr != 0) {
-                at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
-                at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
-            }
-            obj = CreateItem(*(char **)(r + MAPREC_OFF_SCRIPT), army,
-                             PackKey(type + 0x14, kind, 0),
-                             at, flags, 1, 0);
-            if (obj != 0 && ObjIsWatchedKind(obj)
-                && (int32_t)g_defaultOwner != army)
-                ObjConceal(obj, 1);
-            /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL
-             * below, exactly as the original does (0x0042D1C3 jmps to the
-             * ApplyHeightItem at 0x0042D30B that the weapon arm reaches by
-             * falling through). Skipping it left every map item's height at 0
-             * instead of the terrain's, which halved its depth layer and drew
-             * overlapping ground sprites in the wrong order -- the bottom-edge
-             * divergence AM2_TRACE_HEIGHT traced to this call. */
-        } else {
-
-        /* A WEAPON, and the branch where a kind of 0x64 or more is either
-         * substituted from the respawn pool or reduced by 0x64. */
-            int32_t  aai = -1, key = PackKey(type + 0x14, kind, 0);
-            uint32_t settled;
-            int32_t  code = kind;
-            void    *spr;
-            uint8_t *aaiRec;
-
-            if (code >= 0x64) {
-                if (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 2) {
-                    int32_t sub = 0;
-
-                    code = RandomRespawnKind(&sub);
-                    aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
-                    flags |= 0x10000;
-                    key = *(const int32_t *)((*(uint8_t ***)(uintptr_t)
-                                              ADDR_AAI_RECORDS)[aai] + 8);
-                    goto haveRecord;
-                }
-                if (code == 0x64)
-                    continue;
-                code -= 0x64;
-                key = PackKey(type + 0x14, code, 0);
-            }
-            if (RespawnKindAllowed(code) == 0)
-                continue;
-            aai = EnsureSpriteAaiRecord(type + 0x14, code, 0);
-
-        haveRecord:
-            if (aai < 0)
-                continue;
-
-            spr = PreloadSpriteByKey(key, 0x1000, 1);
-            if (spr != 0) {
-                at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
-                at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
-            }
-
-            aaiRec = (*(uint8_t ***)(uintptr_t)ADDR_AAI_RECORDS)[aai];
-            flags |= *(const int32_t *)(aaiRec + 4);
-
-            /* BOTH POINTS ARE PASSED: the one before SettlePointInRegion and
-             * the one it may have moved.  The original keeps the first in a
-             * register and hands the slot Settle writes as a separate
-             * argument. The weapon is placed at the point BEFORE Settle
-             * (the original's ARG4 is the un-settled point in ebp); Settle
-             * runs but its written-back point is not what the weapon uses,
-             * and it is certainly NOT the weapon's quantity. */
-            settled = *(const uint32_t *)&at;
-            SettlePointInRegion(TileOfPoint(settled), (uint32_t *)&at);
-
-            /* QUANTITY IS THE RECORD'S NUMB FIELD, NOT ZERO AND NOT THE
-             * SETTLED POINT. The original reads its quantity from frame slot
-             * +0x2c at 0x0042D2D1 (with SettlePointInRegion's push still
-             * outstanding, so the raw `[esp+0x30]` is one slot off -- espmap
-             * confirms +0x2c). That slot is NOT a zero local: it is set at
-             * 0x0042CBF1 from `movsx byte [numb]`, the record's NUMB field.
-             * A prior reconstruction misread the slot as zero, so every map
-             * weapon was created with quantity 0 -> CreateWeapon's default
-             * ammo of 3, and a weapon crate specifying NUMB=30 came out with
-             * 3 rounds; the port's under-stocked crate was then consumed and
-             * removed while the original's survived, so the port was missing
-             * a whole weapon object a few thousand pumps later. (Passing the
-             * SETTLED POINT instead makes ammo a packed point -- a grenade
-             * count of 99 -- which is a different wrong slot.)
-             *
-             * AND THE ARMY IS THE LITERAL 4, not the record's owner: the
-             * register that carried the owner has been reused twice by here. */
-            obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
-                                  aai, settled, flags,
-                                  *(const int8_t *)(r + MAPREC_OFF_NUMB), 1, 0);
-        }
-
-        /* THE SHARED HEIGHT TAIL (0x0042D2ED), reached by both arms: the map
-         * record's own height is the tile's terrain attribute plus the
-         * record's elevation byte, applied to whichever object was made. */
-        if (obj != 0) {
-            const uint8_t *attrs =
-                *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
-            int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
-
-            ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
-        }
-    }
-}
 
 /* 0x0042C440. Load one map: its tileset, its layers and its objects.
  *
@@ -1746,7 +1512,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
     char      path[0x40];
     am2_FILE *f;
-    uint32_t  tag, size, formSize;
+    int32_t   tag;
+    uint32_t  size, formSize;
     int32_t   consumed, plane, i;
     int32_t   objCount = 0, nfields = 0, tlayDone = 0;
     uint8_t  *objs = 0;
@@ -1814,7 +1581,28 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 FreeMapLayers();
                 goto bad;
             }
-            DeriveMapGeometry();
+            {
+                AM2_Rect r;
+
+                (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)    = *RectSet(&r, 0, 0, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+                /* The inset rect already has four field names in this tree rather than
+                 * one rect name, so it is written a field at a time -- adding a second
+                 * base over storage that is already named is the mistake orig.h opens
+                 * with. */
+                RectSet(&r, 0x40, 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X) - 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y) - 0x40);
+                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT   = r.left;
+                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP    = r.top;
+                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT  = r.right;
+                *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM = r.bottom;
+                (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  = MakePoint(0x10, 0x10);
+                (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV) = (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS);
+                (*(AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES) = *RectSet(&r, 1, 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W) + 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H) + 1);
+
+                MapDescInit((void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+                MapDescInit((void *)(uintptr_t)ADDR_MAP_DESC, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+                BuildTileDeltas();
+            }
             break;
         }
 
@@ -1907,7 +1695,9 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 am2_log("mismatched chunk and target size\n");
                 goto bad;
             }
-            *(uint8_t **)(uintptr_t)ADDR_MAP_TILES = ReadPlane(f, (uint32_t)bytes, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_MAP_TILES = (uint8_t *)am2_malloc((uint32_t)bytes);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_TILES, (uint32_t)bytes, 1, f);
+            consumed += bytes;
             tlayDone++;
             break;
         }
@@ -1948,7 +1738,74 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             orig_map_fread(&recCount, 4, 1, f);
             consumed += 4;
             if (recCount > 0)
-                LoadMapRecords(f, objs, first, nfields, recCount, &consumed);
+                {
+                    int32_t rec;
+                for (rec = 0; rec < recCount; rec++) {
+                    int32_t index = -1;
+                    int32_t move = 0, numb = 0, trig = 0, ownr = 0, elev = 0, elow = 0;
+                    char    scri[0x80];
+
+                    scri[0] = 0;
+
+                    for (i = 0; i < nfields; i++) {
+                        int32_t  v    = 0;
+
+                        tag  = (int32_t)((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag;
+                        size = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size;
+
+                        orig_map_fread(&v, size, 1, f);
+                        consumed += (int32_t)size;
+
+                        switch (tag) {
+                        case AM2_IFF_MOVE: move = (int8_t)v; break;
+                        case AM2_IFF_NUMB: numb = (int8_t)v; break;
+                        case AM2_IFF_TRIG: trig = (int8_t)v; break;
+                        case AM2_IFF_OWNR: ownr = (int8_t)v; break;
+                        case AM2_IFF_ELEV: elev = (int8_t)v; break;
+                        case AM2_IFF_ELOW: elow = (int8_t)v; break;
+                        case AM2_IFF_INDX: index = v + first; break;
+                        case AM2_IFF_SCRI:
+                            if (v > 0) {
+                                orig_map_fread(scri, (size_t)v, 1, f);
+                                consumed += v;
+                            }
+                            break;
+                        default:
+                            break;          /* read for its declared width and dropped */
+                        }
+                    }
+
+                    if (index < 0) {
+                        am2_log("Missing index attribute for item #%d!\n", rec);
+                        continue;
+                    }
+
+                    {
+                        uint8_t *r = objs + (size_t)index * 0x1C;
+                        uint8_t  owner;
+
+                        r[0x14] = (uint8_t)move;
+                        if (elow != 0) {
+                            r[0x12] = (uint8_t)((elow >> 4) & 0xF);
+                            owner   = (uint8_t)(elow & 0xF);
+                        } else {
+                            r[0x12] = (uint8_t)elev;
+                            owner   = (uint8_t)ownr;
+                        }
+                        r[0x13] = owner;
+                        r[0x10] = (uint8_t)trig;
+                        r[0x11] = 0;
+                        r[0x15] = (uint8_t)numb;
+
+                        if (scri[0] != 0) {
+                            size_t n = strlen(scri) + 1;
+
+                            *(char **)(r + 0x18) = (char *)am2_malloc(n);
+                            memcpy(*(char **)(r + 0x18), scri, n);
+                        }
+                    }
+                }
+                }
             break;
         }
 
@@ -2015,7 +1872,133 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
      * ended up at different addresses between builds), and downstream a roach's
      * sight scan then iterated in a different order and diverged. */
     if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
-        BuildMapObjects(objs, objCount);
+        for (i = 0; i < objCount; i++) {
+            uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
+            int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
+            int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
+            uint8_t   trig  = r[MAPREC_OFF_TRIG];
+            uint8_t   owner = r[MAPREC_OFF_OWNER];
+            int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
+            int32_t   flags = 0;
+            AM2_Point at;
+            void     *obj = 0;
+
+            if (trig & 0x20)
+                flags = 4;
+            if (trig & 0x08)
+                flags |= 0x810;
+
+            at.x = *(const int16_t *)(r + MAPREC_OFF_X);
+            at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
+
+            if (type != 0x19) {
+                /* An ITEM. */
+                void *spr = PreloadSpriteByKey(PackKey(type + 0x14, kind, 0),
+                                               0x1000, 1);
+
+                if (spr != 0) {
+                    at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
+                    at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+                }
+                obj = CreateItem(*(char **)(r + MAPREC_OFF_SCRIPT), army,
+                                 PackKey(type + 0x14, kind, 0),
+                                 at, flags, 1, 0);
+                if (obj != 0 && ObjIsWatchedKind(obj)
+                    && (int32_t)g_defaultOwner != army)
+                    ObjConceal(obj, 1);
+                /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL
+                 * below, exactly as the original does (0x0042D1C3 jmps to the
+                 * ApplyHeightItem at 0x0042D30B that the weapon arm reaches by
+                 * falling through). Skipping it left every map item's height at 0
+                 * instead of the terrain's, which halved its depth layer and drew
+                 * overlapping ground sprites in the wrong order -- the bottom-edge
+                 * divergence AM2_TRACE_HEIGHT traced to this call. */
+            } else {
+
+            /* A WEAPON, and the branch where a kind of 0x64 or more is either
+             * substituted from the respawn pool or reduced by 0x64. */
+                int32_t  aai = -1, key = PackKey(type + 0x14, kind, 0);
+                uint32_t settled;
+                int32_t  code = kind;
+                void    *spr;
+                uint8_t *aaiRec;
+
+                if (code >= 0x64) {
+                    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 2) {
+                        int32_t sub = 0;
+
+                        code = RandomRespawnKind(&sub);
+                        aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
+                        flags |= 0x10000;
+                        key = *(const int32_t *)((*(uint8_t ***)(uintptr_t)
+                                                  ADDR_AAI_RECORDS)[aai] + 8);
+                        goto haveRecord;
+                    }
+                    if (code == 0x64)
+                        continue;
+                    code -= 0x64;
+                    key = PackKey(type + 0x14, code, 0);
+                }
+                if (RespawnKindAllowed(code) == 0)
+                    continue;
+                aai = EnsureSpriteAaiRecord(type + 0x14, code, 0);
+
+            haveRecord:
+                if (aai < 0)
+                    continue;
+
+                spr = PreloadSpriteByKey(key, 0x1000, 1);
+                if (spr != 0) {
+                    at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
+                    at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+                }
+
+                aaiRec = (*(uint8_t ***)(uintptr_t)ADDR_AAI_RECORDS)[aai];
+                flags |= *(const int32_t *)(aaiRec + 4);
+
+                /* BOTH POINTS ARE PASSED: the one before SettlePointInRegion and
+                 * the one it may have moved.  The original keeps the first in a
+                 * register and hands the slot Settle writes as a separate
+                 * argument. The weapon is placed at the point BEFORE Settle
+                 * (the original's ARG4 is the un-settled point in ebp); Settle
+                 * runs but its written-back point is not what the weapon uses,
+                 * and it is certainly NOT the weapon's quantity. */
+                settled = *(const uint32_t *)&at;
+                SettlePointInRegion(TileOfPoint(settled), (uint32_t *)&at);
+
+                /* QUANTITY IS THE RECORD'S NUMB FIELD, NOT ZERO AND NOT THE
+                 * SETTLED POINT. The original reads its quantity from frame slot
+                 * +0x2c at 0x0042D2D1 (with SettlePointInRegion's push still
+                 * outstanding, so the raw `[esp+0x30]` is one slot off -- espmap
+                 * confirms +0x2c). That slot is NOT a zero local: it is set at
+                 * 0x0042CBF1 from `movsx byte [numb]`, the record's NUMB field.
+                 * A prior reconstruction misread the slot as zero, so every map
+                 * weapon was created with quantity 0 -> CreateWeapon's default
+                 * ammo of 3, and a weapon crate specifying NUMB=30 came out with
+                 * 3 rounds; the port's under-stocked crate was then consumed and
+                 * removed while the original's survived, so the port was missing
+                 * a whole weapon object a few thousand pumps later. (Passing the
+                 * SETTLED POINT instead makes ammo a packed point -- a grenade
+                 * count of 99 -- which is a different wrong slot.)
+                 *
+                 * AND THE ARMY IS THE LITERAL 4, not the record's owner: the
+                 * register that carried the owner has been reused twice by here. */
+                obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
+                                      aai, settled, flags,
+                                      *(const int8_t *)(r + MAPREC_OFF_NUMB), 1, 0);
+            }
+
+            /* THE SHARED HEIGHT TAIL (0x0042D2ED), reached by both arms: the map
+             * record's own height is the tile's terrain attribute plus the
+             * record's elevation byte, applied to whichever object was made. */
+            if (obj != 0) {
+                const uint8_t *attrs =
+                    *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
+                int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
+
+                ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
+            }
+        }
 
     am2_log("freeing temporary map load data...\n");
     for (i = 0; i < objCount; i++) {
