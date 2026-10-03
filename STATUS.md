@@ -83,8 +83,12 @@ main result so far (details in `src/vc6/README.md`):
     none; uncache, for-header and case-order passes found nothing more.
     What is left is VC6's own choice -- register ties, tail merging of
     identical return blocks, goto-target placement -- that no source
-    spelling tried in the lab moves. Rich @comp.id says 8168, which may only
-    record the front end; a service-pack c2.dll is the open suspect.
+    spelling tried in the lab moves. NOT a different compiler: VS6 SP2 ships
+    no compiler, and SP3 updates only c1/c1xx (12.00.8472) and LINK, never
+    c2.dll -- so the image's 8168 objects were built by exactly our RTM
+    CL/C1XX/C2. The remaining differences are source (or flag) choices not
+    yet found; a sweep of /Oa /Ow /Op /Ob0 /Ob2 /Oi- /Oy- /G5 /G6 /GB /J
+    over the near misses made nothing better.
   - **Unrotated loops are `while (1) { if (!cond) break; ... }`**
     (2026-10-03): VC6 duplicates a loop's test at the bottom for `while
     (cond)`, `for`, `for (;;)` with breaks, and goto loops alike; the image's
