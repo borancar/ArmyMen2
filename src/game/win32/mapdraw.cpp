@@ -1902,7 +1902,8 @@ void __cdecl ViewUpdate(void)
 #define BOUND_R (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT)
 #define BOUND_B (*(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM)
     int32_t dist, step, dx, dy;
-    int32_t vx, vy;
+    int16_t tx, ty;                 /* where the eye goes this frame */
+    int16_t vx, vy;
     void   *obj;
 
     g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
@@ -1915,38 +1916,48 @@ void __cdecl ViewUpdate(void)
     if (obj) {
         const uint8_t *o = (const uint8_t *)obj;
 
+        /* Both copies are a word at a time, as the image makes them. */
         if (*(const int32_t *)(uintptr_t)ADDR_VIEW_SNAP) {
-            g_viewTarget = *(const AM2_Point *)(o + OBJ_OFF_POS);
+            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            tx = g_viewTarget.x;
+            ty = g_viewTarget.y;
             *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 0;
             goto clamp_eye;
         }
-        if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)
-            g_viewTarget = *(const AM2_Point *)(o + OBJ_OFF_POS);
+        if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET) {
+            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+        }
     }
 
     dist = ApproxDist(VIEW_EYE, &g_viewTarget);
-    step = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
-                     * (double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+    step = (int32_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
+                     * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
 
     dx = g_viewTarget.x - VIEW_EYE->x;
     dy = g_viewTarget.y - VIEW_EYE->y;
 
+    /* THE TARGET IS NOT WRITTEN BACK. The step lands in two locals -- x in a
+     * register, y in the word at frame +0x16 -- and only the eye moves, so a
+     * target the glide has not reached is still there next frame. This had
+     * stored the stepped point into ADDR_VIEW_TARGET, which ended every glide
+     * after one step unless something re-aimed it: a diagonal edge scroll,
+     * where ApproxDist exceeds the step and the eye moves less than the target
+     * did, stopped short where the original carries on. HOLD's arm is the same
+     * tail with the deltas unscaled, which lands exactly on the target. */
     if (*(const int32_t *)(uintptr_t)ADDR_VIEW_HOLD) {
         *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD = 0;
-    } else {
-        if (dist > step) {
-            dx = dx * step / dist;
-            dy = dy * step / dist;
-        }
-        dx += VIEW_EYE->x;
-        dy += VIEW_EYE->y;
-        g_viewTarget.x = (int16_t)dx;   /* the original's scratch slot */
-        g_viewTarget.y = (int16_t)dy;
+    } else if (dist > step) {
+        dx = dx * step / dist;
+        dy = dy * step / dist;
     }
+    tx = (int16_t)(dx + VIEW_EYE->x);
+    ty = (int16_t)(dy + VIEW_EYE->y);
 
 clamp_eye:
-    vx = Clamp(g_viewTarget.x, halfW + BOUND_L, BOUND_R - halfW - 1);
-    vy = Clamp(g_viewTarget.y, halfH + BOUND_T, BOUND_B - halfH - 1);
+    vx = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
+    vy = (int16_t)Clamp(ty, halfH + BOUND_T, BOUND_B - halfH - 1);
 
     {
         int32_t *world  = (int32_t *)(uintptr_t)ADDR_SECOND_RECT;
@@ -3059,6 +3070,18 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
  * reach it with no game running. That tool tests THIS one by emulating the
  * original with IntersectRect hooked, so the split costs nothing.
  */
+#define PREV (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV))
+#define NEXT (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT))
+#define UNLINK()                                                          \
+    do {                                                                  \
+        *(uint16_t *)(recs + (uint32_t)PREV * AM2_DIRTY_RECORD_SIZE       \
+                      + DIRTY_OFF_NEXT) = NEXT;                           \
+        if (!NEXT)                                                        \
+            *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = PREV;   \
+        else                                                              \
+            *(uint16_t *)(recs + (uint32_t)NEXT * AM2_DIRTY_RECORD_SIZE   \
+                          + DIRTY_OFF_PREV) = PREV;                       \
+    } while (0)
 void __cdecl DirtyCollect(const AM2_Rect *r)
 {
     uint8_t  *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
@@ -3126,16 +3149,18 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
 
         case 4: case 5: case 7: case 8: case 13: case 14: case 16:
         case 17: case 31: case 32: case 34: case 35: case 43: case 44:
-            goto unlink;
+            UNLINK();
+            break;
 
         case 9:
-            e->top = cur.bottom;
             cur.right = e->right;
+            e->top = cur.bottom;
             break;
 
         case 10:
             cur.right = e->right;
-            goto unlink;
+            UNLINK();
+            break;
 
         case 18:
             AddDirtyRect(e->left, cur.bottom, e->right, e->bottom);
@@ -3168,23 +3193,26 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
 
         case 30:
             cur.bottom = e->bottom;
-            goto unlink;
+            UNLINK();
+            break;
 
         case 36: case 37: case 39: case 40: case 45: case 46: case 48:
         case 49: case 63: case 64: case 66: case 67: case 72: case 73:
         case 75: case 76:
             return;
 
+        case 41:
+            UNLINK();
+            break;
+
         case 38: case 47: case 65: case 68: case 74: case 77:
             cur.top = e->bottom;
             break;
 
-        case 41:
-            goto unlink;
-
         case 50:
             cur.top = e->top;
-            goto unlink;
+            UNLINK();
+            break;
 
         case 56:
             AddDirtyRect(cur.right, e->top, e->right, e->bottom);
@@ -3207,7 +3235,8 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
 
         case 70:
             cur.left = e->left;
-            goto unlink;
+            UNLINK();
+            break;
 
         case 78: case 79:
             cur.left = e->right;
@@ -3222,23 +3251,13 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
             break;   /* unreachable: the code is 0..80 by construction */
         }
         continue;
-
-    unlink:
-#define PREV (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV))
-#define NEXT (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT))
-        *(uint16_t *)(recs + (uint32_t)PREV * AM2_DIRTY_RECORD_SIZE
-                      + DIRTY_OFF_NEXT) = NEXT;
-        if (!NEXT)
-            *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = PREV;
-        else
-            *(uint16_t *)(recs + (uint32_t)NEXT * AM2_DIRTY_RECORD_SIZE
-                          + DIRTY_OFF_PREV) = PREV;
-#undef NEXT
-#undef PREV
     }
 
     AddDirtyRect(cur.left, cur.top, cur.right, cur.bottom);
 }
+#undef UNLINK
+#undef NEXT
+#undef PREV
 
 int mapdraw_install(void)
 {

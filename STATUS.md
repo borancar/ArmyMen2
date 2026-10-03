@@ -71,6 +71,36 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1479:
+  - **ViewUpdate wrote the glide back into the target** (2026-10-03): the
+    stepped point went into ADDR_VIEW_TARGET every frame, so a glide ended
+    after one step unless something re-aimed it. The image keeps it in two
+    locals and moves only the eye; a target it has not reached is still
+    there next frame. Visible on a diagonal edge scroll, where ApproxDist
+    exceeds the step and the eye moves less than the target did: the original
+    carries on, the reconstruction stopped short. Found by the byte-match
+    (the image has no store to the target after the glide), 132 -> 100.
+  - **Per-file prototypes** (2026-10-03): the original's TUs did not all see
+    the same declarations. Type2PlayerInput's AngleBetween returns int (the
+    byte result is used unmasked), TrooperFire's FireWeapon takes a byte
+    heading (pushed from a byte slot unmasked); both are reproduced with a
+    cast at the call, and every use downstream reads only the low byte.
+    With them, and the jitter / face-to / fire calls laid out as the image
+    has them, TrooperFire 123 -> 37 and Type2PlayerInput 197 -> 95 (its
+    cursor filter was a switch with a byte index table, not a table lookup).
+  - **Written-out copies, not shared labels** (2026-10-03): DirtyCollect's
+    unlink is a macro expanded in every case that needs it -- VC6 merges the
+    copies that come out identical and keeps three -- where the
+    reconstruction had one `goto unlink` target (89 -> 5); ScriptIf's late
+    "Unexpected end of script" steps are inline the same way (156 -> 138).
+    VehicleBlockWeight builds its offset points a word at a time in a
+    block-scoped AM2_Point, which VC6 packs into the dead `facing` slot,
+    and computes `facing & 0xFF` per branch: frame 8 as the image (221 ->
+    167). ObjMoveAlongFacing's and TrooperFire's floats are plain float
+    arithmetic: the `long double` casts changed VC6's instruction choice,
+    not the value. GCC (-m32, x87) emits the same code for TrooperFire's
+    either way; for ObjMoveAlongFacing the one change is that vel_z's zero
+    test now reads the unrounded register, which is what the image's
+    `fst` / `fcomp qword` does (80 -> 56).
   - **SeqStepKind0 matches; a range check that is a switch** (2026-10-03):
     the life clamp is `abs(life >> 1) - 2 >= 7 ? 7 : ...` with the
     expression written twice. Type2PlayerInput's `add eax,-0x18` filter is

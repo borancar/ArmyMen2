@@ -7915,6 +7915,17 @@ static inline void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
     *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)f;
 }
 
+/* FireWeapon AS THIS FILE'S ORIGINAL DECLARED IT: the heading a byte. The
+ * definition takes a full int and event.cpp's four callers mask one, but
+ * TrooperFire pushes the byte's dword slot raw -- 0x0044A2D5
+ * `mov ebp,[esp+0x24]` straight after a `mov byte ptr [esp+0x24],al` -- which
+ * only a char parameter in scope produces. Harmless in both games: everything
+ * below FireWeapon (SeqStartDirEffect, CreateMissile, TimedDirFrame) uses
+ * the low byte alone. */
+#define FireWeaponB ((int32_t (__cdecl *)(void *, void *, int16_t, uint8_t, \
+                                          AM2_FireSpot, void *))           \
+                     (void (*)(void))FireWeapon)
+
 /* TrooperFire -- original 0x00449FD0, 976 bytes, two callers, both of them
  * StepType2's AI arms. It names itself in its own log line:
  * "FIRE  trooper: %x  weapon: %x  ammo: %d". Given a trooper, the weapon it
@@ -8082,8 +8093,8 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
     if (target != (uint8_t *)0) {
         int16_t z;
 
-        spot.at.y = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
         spot.at.x = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
+        spot.at.y = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
         z = (int16_t)(int8_t)((uint8_t)ObjHeight(target) - AM2_FIRE_HEIGHT_DROP);
 
         *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at.x;
@@ -8092,14 +8103,13 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         spot.ground = z;
 
         def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
-        /* The jitter is written in both arms, as the image has it. */
+        /* One jitter after the optional turn: both kind tests branch to the
+         * same JitterFacing at 0x0044A1C2. */
         if (*(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI
-            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN) {
+            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
             TrooperFaceTo(o, (const AM2_Point *)(target + OBJ_OFF_POS));
-            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
-        } else
-            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
-        fired = FireWeapon(w, o, ObjHeight(o), heading, spot, target);
+        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+        fired = FireWeaponB(w, o, ObjHeight(o), heading, spot, target);
     } else {
         const uint8_t *at = out + SIGHTCOUT_OFF_X;
 
@@ -8107,33 +8117,41 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
             && ObjCodeUnmapped(w)
             && PointsDiffer(*(const uint32_t *)(o + OBJ_OFF_POS),
                             *(const uint32_t *)at))
+        {
+            /* Turned to face it: a call of its own, which the original
+             * writes out in full and the compiler cross-jumps into the
+             * other arm's tail. */
             TrooperFaceTo(o, (const AM2_Point *)at);
+            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            fired = FireWeaponB(w, o, ObjHeight(o), heading,
+                                *(const AM2_FireSpot *)at, 0);
+        } else {
+            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
 
-        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            /* No point at all: put the impact one weapon-range away along
+             * the heading. Plain float arithmetic, as the original wrote it
+             * -- `fimul` on the integer range, `fiadd` on the signed
+             * position, then _ftol, which TRUNCATES toward zero. Both builds
+             * are x87 and keep the intermediate in a register, so there is
+             * no rounding to float between the two. Only the low sixteen
+             * bits are stored, as the `mov word` says.
+             *
+             * The definition pointer is re-read between the two, which is
+             * the original's spelling and not a second value. */
+            if (*(const int16_t *)at == 0) {
+                *(int16_t *)(o + UNIT_OFF_FIRE_X) = (int16_t)(int32_t)
+                    (Cos8(heading)
+                     * *(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
+                     + *(const int16_t *)(o + OBJ_OFF_X));
 
-        /* No point at all: put the impact one weapon-range away along the
-         * heading. `long double` because the original is x87 and keeps 80 bits
-         * across the whole expression -- `fimul` on the integer range, then
-         * `fiadd` on the signed position, then _ftol, which TRUNCATES toward
-         * zero. The same reasoning as SetMaxHealth's. Only the low sixteen
-         * bits are stored, as the `mov word` says.
-         *
-         * The definition pointer is re-read between the two, which is the
-         * original's spelling and not a second value. */
-        if (*(const int16_t *)at == 0) {
-            *(int16_t *)(o + UNIT_OFF_FIRE_X) = (int16_t)(int32_t)
-                ((long double)Cos8(heading)
-                 * (long double)*(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
-                 + (long double)*(const int16_t *)(o + OBJ_OFF_X));
-
-            *(int16_t *)(o + UNIT_OFF_FIRE_Y) = (int16_t)(int32_t)
-                ((long double)Sin8(heading)
-                 * (long double)*(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
-                 + (long double)*(const int16_t *)(o + OBJ_OFF_Y));
+                *(int16_t *)(o + UNIT_OFF_FIRE_Y) = (int16_t)(int32_t)
+                    (Sin8(heading)
+                     * *(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
+                     + *(const int16_t *)(o + OBJ_OFF_Y));
+            }
+            fired = FireWeaponB(w, o, ObjHeight(o), heading,
+                                *(const AM2_FireSpot *)at, 0);
         }
-
-        fired = FireWeapon(w, o, ObjHeight(o), heading,
-                           *(const AM2_FireSpot *)at, 0);
     }
 
     orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n",
@@ -9500,6 +9518,16 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define AM2_CLICK_THROTTLE_MS   0x12C
 #define AM2_CLICK_TAP_MS        0x1F4
 
+/* AngleBetween AS TYPE2PLAYERINPUT'S ORIGINAL SAW IT: returning int. The
+ * definition returns a byte and leaves eax's upper bits as they fall, and
+ * every other caller stores the byte or masks it; this one does neither --
+ * 0x0044A8DF stores al and hands eax to AngleDelta unmasked -- which is an
+ * int-returning prototype in scope. Every use here truncates to a byte or
+ * masks it, so the upper bits reach nothing. */
+#define AngleBetweenInt ((int32_t (__cdecl *)(const AM2_Point *,     \
+                                              const AM2_Point *))     \
+                         (void (*)(void))AngleBetween)
+
 /* Type2PlayerInput -- original 0x0044A420, one caller: StepType2's player arm,
  * immediately before Type2PlayerStep and passing it the same record. So this
  * is the INPUT half of what the trooper you command does each frame -- keys
@@ -9614,10 +9642,10 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
 
     /* FIRE. One weapon code answers a different action from all the others. */
     if (ActionKeyDown(0)) {
-        if (code == 0x14)
-            *(int32_t *)(w + 8) = 0x26;
-        else
+        if (code != 0x14)
             *(int32_t *)(w + 8) = 2;
+        else
+            *(int32_t *)(w + 8) = 0x26;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
         moved = 1;
         OverlayPrepare(1, 1);
@@ -9702,12 +9730,14 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
         *(int32_t *)(w + 0x10) = 1;
         *(uint16_t *)(w + 0x14) = 0;
         k = **(int32_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0);
-        if (k == 0xB) {
+        if (k != 0xB) {
+            if (k > 0x17 && k <= 0x1A) {
+                *(uint16_t *)(w + 0x14) = (uint16_t)(g_viewRect->left + g_cursorX);
+                *(uint16_t *)(w + 0x16) = (uint16_t)(g_viewRect->top + g_cursorY);
+            }
+        } else {
             *(uint16_t *)(w + 0x14) = *(const uint16_t *)(o + OBJ_OFF_POS);
             *(uint16_t *)(w + 0x16) = *(const uint16_t *)(o + OBJ_OFF_POS + 2);
-        } else if (k > 0x17 && k <= 0x1A) {
-            *(uint16_t *)(w + 0x14) = (uint16_t)(g_viewRect->left + g_cursorX);
-            *(uint16_t *)(w + 0x16) = (uint16_t)(g_viewRect->top + g_cursorY);
         }
     }
 
@@ -9733,13 +9763,13 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
          * off the original's -- invisible to every replay, found by
          * tools/sidebyside.py on a hand-played click, and settled by logging
          * AngleBetween's arguments in both games (AM2_TRACE_ANGLE). */
-        bearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &aim);
-        dist    = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        int32_t reach = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        bearing = AngleBetweenInt((const AM2_Point *)(o + OBJ_OFF_POS), &aim);
         w[4]    = (uint8_t)bearing;
 
         /* Close in, or already facing far enough away, keep the old facing. */
-        if (dist < 6
-            || (dist < 0x18
+        if (reach < 6
+            || (reach < 0x18
                 && AngleDelta(bearing, *(const uint8_t *)(o + OBJ_OFF_FACING))
                      < 0x40))
             w[4] = *(const uint8_t *)(o + OBJ_OFF_FACING);
@@ -9763,23 +9793,23 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
                 *(uint16_t *)(w + 0x14) = 0;
                 *(uint16_t *)(w + 0x16) = 0;
             } else {
-                int32_t b = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                int32_t b = AngleBetweenInt((const AM2_Point *)(o + OBJ_OFF_POS),
                                          &aim);
 #define face (*(const uint8_t *)(o + OBJ_OFF_FACING))
 
                 w[4] = (uint8_t)b;
                 if (AM2_CHEAT_ABS((b & 0xFF) - face) < 0x10) {
-                    uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
-                    int32_t  dirs = *(const uint8_t *)(*(uint8_t **)(row + 0x44)
-                                                       + 8);
 
                     /* Both roundings use the SAME directions count; only the
                      * angle differs, so a difference means the click would
                      * change the drawn facing. */
+                    /* The directions count is read afresh for each call,
+                     * as the image has it. */
+#define dirs (*(const uint8_t *)(*(uint8_t **)(*(uint8_t **)(o + OBJ_OFF_ROWS) \
+                                               + 0x44) + 8))
                     if (RoundTo8(w[4], dirs) != RoundTo8(face, dirs)) {
-                        int32_t d = AngleDelta(face, w[4]);
-
-                        w[4] = (uint8_t)(face + ((d - (d >> 31)) >> 1));
+#undef dirs
+                        w[4] = (uint8_t)(face + AngleDelta(face, w[4]) / 2);
                         *(uint16_t *)(w + 0x14) = 0;
                         *(uint16_t *)(w + 0x16) = 0;
                     }
@@ -9853,7 +9883,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
      * is throttled so that holding the button does not re-order every frame. */
     if (moved != 0)
         goto tail;
-    if (g_throttleDeadline >= g_gameClockMs)
+    if (g_gameClockMs <= g_throttleDeadline)
         goto tail;
 
     if (g_mouseButton[0] == 0) {
