@@ -7593,8 +7593,8 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                     if (*x < acc)
                         *x = acc;
                 }
-                acc += (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
-                               + AM2_HUD_MSG_GAP);
+                acc = (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
+                              + AM2_HUD_MSG_GAP) + acc;
             }
 
             if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT) > 0) {
@@ -7608,7 +7608,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                 }
             } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
                 float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
-                float first;
+                const float *first;
 
                 for (i = COUNT - 1; i >= 0; i--) {
                     int32_t width = *(const int32_t *)
@@ -7622,14 +7622,14 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                 if (++i < 0)
                     i = 0;
 
-                first = *(const float *)(self + HUDLOG_OFF_ROWS
-                                         + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
-                if (*scroll > first) {
+                first = (const float *)(self + HUDLOG_OFF_ROWS
+                                        + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
+                if (*scroll > *first) {
                     float v = *scroll - STEP;
-                    *scroll = first > v ? first : v;
-                } else if (*scroll < first) {
+                    *scroll = *first > v ? *first : v;
+                } else if (*scroll < *first) {
                     float v = *scroll + STEP;
-                    *scroll = first < v ? first : v;
+                    *scroll = *first < v ? *first : v;
                 }
             }
         }
