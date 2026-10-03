@@ -3126,9 +3126,9 @@ void *from, uint32_t at, void *chain,
                     goto ask;
                 goto skip;
             } else if (f && ObjIsTypeIn238((const AM2_Object *)o)
-                       && ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                       && ApproxDist((const AM2_Point *)&ap,
                                      (const AM2_Point *)(o + OBJ_OFF_POS))
-                          < ApproxDist((const AM2_Point *)&ap,
+                          > ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
                                        (const AM2_Point *)(o + OBJ_OFF_POS))) {
                 w = 0;
                 goto add;
