@@ -1570,15 +1570,6 @@ static inline void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
     }
 }
 
-/* Allocate and zero a layer the file did not supply. */
-static inline void DefaultLayerPtr(void **slot, int32_t bytes)
-{
-    if (*slot == 0) {
-        *slot = am2_malloc(bytes);
-        memset(*slot, 0, bytes);
-    }
-}
-
 typedef int32_t (__cdecl *am2_kind_allowed_fn)(int32_t kind);
 typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
 /* BuildRespawnPool is reconstructed; maprow.h declares it. */
@@ -1742,9 +1733,18 @@ static inline void BuildMapObjects(uint8_t *objs, int32_t count)
  * after the walk if the file did not supply them, so every consumer
  * downstream may assume its layer exists. Two of the nine have no chunk arm
  * at all and are created only here. */
+#define MAP_PLANE ((*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H) \
+                   * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W))
+/* Allocate and zero a layer the file did not supply; the size is re-read
+ * for each of the two uses, as the original does. */
+#define DEFAULT_LAYER(slot)                     \
+    if (*(slot) == 0) {                         \
+        *(slot) = am2_malloc(MAP_PLANE);        \
+        memset(*(slot), 0, MAP_PLANE);          \
+    }
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
-    char      path[0x104];
+    char      path[0x40];
     am2_FILE *f;
     uint32_t  tag, size, formSize;
     int32_t   consumed, plane, i;
@@ -1787,7 +1787,6 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         orig_map_fread(&tag, 4, 1, f);
         orig_map_fread(&size, 4, 1, f);
         consumed += 8;
-        plane = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H);
 
         switch (tag) {
         case AM2_IFF_MHDR: {
@@ -1812,32 +1811,53 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
         /* Seven planes, one shape.  Only the global differs. */
         case AM2_IFF_NPAD:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_BPAD:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_MOVE:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_OWNR:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_KIND = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_TILE_KIND = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_KIND, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_TRIG:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_REGN:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL, plane, 1, f);
+            consumed += plane;
             break;
         case AM2_IFF_ELEV:
+            plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS = ReadPlane(f, size, &consumed);
+            *(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS, plane, 1, f);
+            consumed += plane;
             break;
 
         /* Owns nothing: a scratch buffer the parser consumes and we free. */
@@ -1939,14 +1959,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     } while (consumed < (int32_t)formSize);
 
     /* Nine layers every consumer may assume exists. */
-    plane = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_CELL_WEIGHTS, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_ATTRS, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_REGION_OF_CELL, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_MAP_PADBIT_LAYER, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_KIND, plane);
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_FLAGS, plane);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_CELL_WEIGHTS);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_ATTRS);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_REGION_OF_CELL);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_MAP_PADBIT_LAYER);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_MAP_PAD_LAYER);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_KIND);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_FLAGS);
     /* AND A LOOP, WHICH IS WHY ENUMERATING THE EXPLICIT BLOCKS MISSED THESE.
      * The original walks every pointer from ADDR_TILE_REVEAL_GRIDS up to
      * ADDR_TILE_COVER four bytes at a time -- the four per-army reveal grids
@@ -1956,11 +1975,11 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         void **slot = (void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS;
 
         while (slot < (void **)(uintptr_t)ADDR_TILE_COVER) {
-            DefaultLayerPtr(slot, plane);
+            DEFAULT_LAYER(slot);
             slot++;
         }
     }
-    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_COVER, plane);
+    DEFAULT_LAYER((void **)(uintptr_t)ADDR_TILE_COVER);
 
     /* FOUR THINGS THE DEFAULTING IS FOLLOWED BY, and leaving them out is what
      * cost this function four attempts.  ADDR_LOAD_PENDING is a FLAG tested
@@ -2012,6 +2031,8 @@ bad:
     orig_map_fclose(f);
     SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
     return 0;
+#undef DEFAULT_LAYER
+#undef MAP_PLANE
 }
 
 void map_install(void)
