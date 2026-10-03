@@ -1050,16 +1050,15 @@ found:
             default: want = 0; break;
             }
 
+            /* The record is re-read through the table at each use. */
             for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-                const uint8_t *rec = kUnitType(i);
-
-                if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
-                    || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+                if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER)
+                    || *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_VEHICLE))
                     continue;
-                if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND) != want)
+                if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND) != want)
                     continue;
 
-                cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+                cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
                 break;
             }
 

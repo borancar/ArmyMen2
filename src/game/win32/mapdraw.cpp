@@ -1191,11 +1191,10 @@ void __cdecl RepaintDirtyList(const AM2_Rect *region)
 
 void __cdecl ScrollMapCache(void)
 {
-    LPDIRECTDRAWSURFACE cache = g_mapCacheS;
     int32_t  dx = 0, dy = 0, adx, ady;
     AM2_Rect wide, tall, src;
 
-    if (!cache)
+    if (!g_mapCacheS)
         return;
 
     if (g_viewRect->left < (g_camera->left << TILE_SHIFT)
@@ -1254,11 +1253,11 @@ void __cdecl ScrollMapCache(void)
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
 
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
-        IDirectDrawSurface_BltFast(cache,
+        IDirectDrawSurface_BltFast(g_mapCacheS,
 
                                    (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),
                                    (DWORD)(((dy > 0) ? 0 : -dy) << TILE_SHIFT),
-                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
+                                   g_mapCacheS, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
     wide.left  = g_camera->left;

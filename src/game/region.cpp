@@ -10554,19 +10554,18 @@ void __cdecl Step3Drive(void *obj, void *rec)
                               *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
 
             if (first != second) {
-                uint32_t now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
                 uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
 
-                if (*(const uint32_t *)(g + 0x58u) == now) {
-                    *(uint32_t *)(turret + 0x58u) = now;
+                if (*(const uint32_t *)(g + 0x58u) == *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS) {
+                    *(uint32_t *)(turret + 0x58u) = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
                 } else {
-                    uint32_t age = now - *(const uint32_t *)(turret + 0x58u);
+                    uint32_t age = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS - *(const uint32_t *)(turret + 0x58u);
 
                     if ((age <= 0x3Cu || *(const int32_t *)(o + 0x52Cu) == 1)
                         && age <= 0x96u)
                         swing = 0;
                     else
-                        *(uint32_t *)(turret + 0x58u) = now;
+                        *(uint32_t *)(turret + 0x58u) = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
                 }
             }
 
