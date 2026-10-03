@@ -774,7 +774,10 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
         rows = (n > 0) ? *(uint8_t **)(made + OBJ_OFF_ROWS) : (uint8_t *)0;
 
-        for (i = 1; i < n; i++) {
+        i = 1;
+        while (1) {
+            if (i >= n)
+                break;
             uint8_t       *row = *(uint8_t **)(made + OBJ_OFF_ROWS)
                                  + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
             const uint8_t *spr = *(const uint8_t *const *)(rows + 4);
@@ -788,6 +791,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
             RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
             n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
+            i++;
         }
 
         ObjSetFieldA(made, (uint32_t)group);

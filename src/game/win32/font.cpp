@@ -60,7 +60,10 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
 
     key = p[g_pitch * KEY_ROW];
 
-    for (row = 0; row < height; row++) {
+    row = 0;
+    while (1) {
+        if (row >= height)
+            break;
         const uint8_t *start = p;
         const uint8_t *end   = p + width;
 
@@ -89,6 +92,7 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
         } while (p != end);
 
         p = start + g_pitch;
+        row++;
     }
 
     /* Wipe the scratch square back to the background colour so the next

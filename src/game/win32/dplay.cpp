@@ -414,9 +414,13 @@ found:
     {
         int32_t i;
 
-        for (i = 0; i < AM2_PLAYER_RING_LEN; i++) {
+        i = 0;
+        while (1) {
+            if (i >= AM2_PLAYER_RING_LEN)
+                break;
             ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
             ((uint32_t *)(rec + PLAYER_REC_OFF_RING_B))[i] = 0;
+            i++;
         }
     }
 #undef rec

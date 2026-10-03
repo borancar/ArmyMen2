@@ -1935,10 +1935,14 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             orig_map_fread(&junk, 4, 1, f);
             orig_map_fread(&nfields, 4, 1, f);
             consumed += 0xC;
-            for (i = 0; i < nfields; i++) {
+            i = 0;
+            while (1) {
+                if (i >= nfields)
+                    break;
                 orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag, 4, 1, f);
                 orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size, 4, 1, f);
                 consumed += 8;
+                i++;
             }
 
             orig_map_fread(&recCount, 4, 1, f);

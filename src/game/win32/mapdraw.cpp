@@ -753,8 +753,9 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
     }
 
     /* The four ways a fresh node goes in, each written through the cursor
-     * global and the count re-read, as the original has them -- VC6 shares
-     * each between its two callers. */
+     * global and the count re-read, as the original has them. Each exists
+     * ONCE in the image: the flag paths jump into the compare paths' copies
+     * past their loads, so they are labels here that both reach. */
 #define FRESH (&g_depthNodes[g_depthCount])
 #define LINK_AFTER(at)                                                      \
     do {                                                                    \
@@ -796,20 +797,17 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
         for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
             if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_BACK) {
                 g_depthCursor = at;
-                if (at->next)
-                    LINK_AFTER(at);
-                else
-                    APPEND(at);
-                goto done;
+                if (!at->next)
+                    goto append;
+                goto link_after;
             }
     } else if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_BACK) {
         head = &g_depthNodes[g_depthHead];
         for (at = head; at; at = at->next)
             if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_FRONT) {
                 if (at == head)
-                    AT_FRONT(at);   /* at the front, and the head moves */
-                LINK_BEFORE(at);
-                goto done;
+                    goto at_front;  /* at the front, and the head moves */
+                goto link_before;
             }
     }
 
@@ -830,27 +828,30 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
             g_depthCursor = g_depthCursor->prev;
             if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
                 at = g_depthCursor;
+            link_after:
                 LINK_AFTER(at);
                 goto done;
             }
         }
         at = g_depthCursor;
+    at_front:
         AT_FRONT(at);               /* off the front */
     }
 
-    while (1) {
-        if (!g_depthCursor->next)
-            break;
+    while (g_depthCursor->next) {
         g_depthCursor = g_depthCursor->next;
-        if (DepthCompare(obj, g_depthCursor->obj) <= 0) {
-            at = g_depthCursor;
-            LINK_BEFORE(at);
-            goto done;
-        }
+        if (DepthCompare(obj, g_depthCursor->obj) <= 0)
+            goto before;
     }
     at = g_depthCursor;
+append:
     APPEND(at);
+    goto done;
 
+before:
+    at = g_depthCursor;
+link_before:
+    LINK_BEFORE(at);
 done:
     g_depthCount++;
     return 1;
@@ -940,7 +941,10 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
     stride = cols - r + l0 - 1;
 
     for (row = t0; row <= b; row++) {
-        for (col = l0; col <= r; col++) {
+        col = l0;
+        while (1) {
+            if (col > r)
+                break;
             const uint8_t *node = *cell++;
 
             while (node) {
@@ -968,6 +972,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
             nextNode:
                 node = *(const uint8_t *const *)(node + CELL_NODE_OFF_NEXT);
             }
+            col++;
         }
         cell += stride;
     }
