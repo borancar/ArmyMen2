@@ -3495,11 +3495,10 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
     uint8_t   b0, b1, b2;
 
     /* Four bytes, big-endian, exactly as VehicleUpdateAppend wrote them. */
-    head  = (uint32_t)at[0] << 24;
-    head |= (uint32_t)at[1] << 16;
-    head |= (uint32_t)at[2] << 8;
-    head |= (uint32_t)at[3];
-    at += 4;
+    head  = (uint32_t)*at++ << 24;
+    head |= (uint32_t)*at++ << 16;
+    head |= (uint32_t)*at++ << 8;
+    head |= (uint32_t)*at++;
 
     o = (uint8_t *)ObjByUidAlias((head & 0x1FFFFFFFu)
                                  | ((uint32_t)army << 29));
@@ -3517,13 +3516,13 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
             (uint16_t)(((uint16_t)(b2 & 0xF0u) << 4) | b1);
 
         {
-            uint32_t action = *at++;
+            uint8_t action = *at++;
 
             *(int32_t *)(o + 0x59Cu) = 1;
             *(int32_t *)(o + 0x580u) = (int32_t)(action & 7u);
-            *(int32_t *)(o + 0x584u) = (int32_t)(action >> 7);
-            *(int32_t *)(o + 0x588u) = (int32_t)((action >> 6) & 1u);
-            *(int32_t *)(o + 0x58Cu) = (int32_t)((action >> 5) & 1u);
+            *(int32_t *)(o + 0x584u) = (int32_t)((uint32_t)action >> 7);
+            *(int32_t *)(o + 0x588u) = (int32_t)(((uint32_t)action >> 6) & 1u);
+            *(int32_t *)(o + 0x58Cu) = (int32_t)(((uint32_t)action >> 5) & 1u);
         }
     }
 
