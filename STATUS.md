@@ -66,11 +66,20 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1477 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1478 of
   1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1477:
+  the near-miss sweep, 758 before the row pools. From 758 to 1478:
+  - **Frame size is evidence** (2026-10-03): 21 unmatched functions had a
+    different `sub esp` from the image. A bigger frame in ours meant the
+    original reused a dead variable (ItemLinkCells counts its entries in
+    `rows` -> exact match; FireWeapon keeps one point for both arcs and the
+    sweep point in `from`, 215 -> 2) or wrote helpers in place (LoadMap,
+    whose chunk tag is also signed: 713 -> 616); a smaller one meant the
+    original cached a value (ScrollMapCache's surface, 189 -> 179). An
+    automatic merge pass proposes many merges the scorer rewards that are
+    wrong (overlapping lifetimes); each must be checked by hand.
   - **An exact scorer, and what it found** (2026-10-03): every per-function
     scorer masked absolute operands, so WHICH global an instruction reads was
     invisible -- LoadMap's plane size was H*W where the image has W*H (57
