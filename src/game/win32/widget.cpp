@@ -17708,6 +17708,38 @@ int32_t __cdecl PointerPickMode6(void *obj)
  * weapon-reach arm is the interesting one. A five-figure counter is not
  * evidence that the branch you care about ran, which this project has recorded
  * before for ShotStrike. */
+/* OurLeaderUnit (item.h) as two of the pick functions spell it. The shared
+ * inline matches the image at the sites that already match; these two do
+ * not, and each matches only with its own spelling -- PointerPickMode0
+ * re-reads ADDR_DEFAULT_OWNER for the dead branch instead of keeping the copy
+ * it compared (297 -> 149), PointerPickRepair takes the leader uid into a
+ * local before the lookup (29 -> 10). Same behaviour in all three: the
+ * comparison is the owner against itself, so only the first arm runs. */
+static inline uint8_t *OurLeaderUnitReread(void)
+{
+    int32_t owner;
+
+    if ((int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+        == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+    owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    if (owner >= 0 && owner < AM2_COMM_SLOTS) {
+        const uint8_t *const *slot =
+            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        int32_t i;
+
+        for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(*slot + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+        }
+    }
+    return (uint8_t *)0;
+}
 int32_t __cdecl PointerPickMode0(void *obj)
 {
     uint8_t       *o = (uint8_t *)obj;
@@ -17729,7 +17761,7 @@ int32_t __cdecl PointerPickMode0(void *obj)
         if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && GetMenuRow() != 1)
             return 0;
 
-        leader = OurLeaderUnit();
+        leader = OurLeaderUnitReread();
         if (!leader)
             return 0;
 
@@ -17871,6 +17903,31 @@ int32_t __cdecl PointerPickHeal(void *obj)
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table.
  *
  * Not exercised: no drive here opens menu row 0xC. */
+static inline uint8_t *OurLeaderUnitUidLocal(void)
+{
+    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    uint32_t uid;
+
+    if (owner == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        uid = *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID;
+        return (uint8_t *)LookupByUID(uid);
+    }
+    if (owner >= 0 && owner < AM2_COMM_SLOTS) {
+        const uint8_t *const *slot =
+            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        int32_t i;
+
+        for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(*slot + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+        }
+    }
+    return (uint8_t *)0;
+}
 int32_t __cdecl PointerPickRepair(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -17907,7 +17964,7 @@ int32_t __cdecl PointerPickRepair(void *obj)
     /* Neither an item nor a vehicle: no health test at all -- see above. */
 
 
-    leader = OurLeaderUnit();
+    leader = OurLeaderUnitUidLocal();
     if (!leader)
         return 0;
 
