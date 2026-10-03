@@ -2110,8 +2110,6 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     const AM2_Rect *hit;
     const uint8_t  *m;
     const uint8_t  *bits;
-    int32_t         mx;
-    int32_t         my;
     int32_t         lw;
     int32_t         rw;
     int32_t         tw;
@@ -2133,21 +2131,19 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
         return 0;
 
     hit = (const AM2_Rect *)(o + OBJ_OFF_HIT_RECT);
-    mx  = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X);
-    my  = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y);
 
     /* The world clamp, x pair then y pair, with a margin of one tile. */
-    lw = Clamp(hit->left + mx, 1 << AM2_TILE_SHIFT,
+    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left, 1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
                    - (1 << AM2_TILE_SHIFT));
-    rw = Clamp(hit->left + mx + *(const int16_t *)(m + OBJMASK_OFF_WIDTH) - 1,
+    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left - 1,
                1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
                    - (1 << AM2_TILE_SHIFT));
-    tw = Clamp(hit->top + my, 1 << AM2_TILE_SHIFT,
+    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top, 1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
                    - (1 << AM2_TILE_SHIFT));
-    bw = Clamp(hit->top + my + *(const int16_t *)(m + OBJMASK_OFF_HEIGHT) - 1,
+    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top - 1,
                1 << AM2_TILE_SHIFT,
                *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
                    - (1 << AM2_TILE_SHIFT));
@@ -2214,7 +2210,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
     for (y = tw; y < bw; y += 8) {
-        int32_t off = (y - my - hit->top) * rowbytes;
+        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - hit->top) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
         int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
