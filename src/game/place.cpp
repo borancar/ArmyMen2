@@ -975,14 +975,12 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
             return;
 
         for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-            const uint8_t *rec = kUnitType(i);
-
-            if (!*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER))
+            if (!*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER))
                 continue;
-            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND)
+            if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND)
                 != **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
                 continue;
-            cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+            cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
         }
         break;
     }
