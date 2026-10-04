@@ -798,7 +798,7 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
     took += 4;
     *(uint16_t *)(p + SCENARIO_PART_OFF_COUNT) = (uint16_t)count;
     if (count == 0)
-        return took;
+        goto done;      /* the one return, as the image has it */
 
     rows = (uint8_t *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
     *(uint8_t **)(p + SCENARIO_PART_OFF_ROWS) = rows;
@@ -843,6 +843,7 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
         took += 0x10;
     }
 
+done:
     return took;
 }
 
