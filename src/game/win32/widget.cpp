@@ -17655,7 +17655,7 @@ int32_t __cdecl PointerPickMode6(void *obj)
  * (99 against 303 here) by dropping that scan, which the image has, so it
  * could not reach a match; what remains is `o` in ebp where the image keeps
  * it in ebx. Same behaviour either way: only the first arm runs. */
-static inline uint8_t *OurLeaderUnitReread(const int32_t &owner)
+static inline uint8_t *OurLeaderUnitReread(int32_t owner)
 {
     if (owner == *(const int32_t *)&g_defaultOwner)
         return (uint8_t *)LookupByUID(
