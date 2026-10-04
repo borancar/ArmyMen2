@@ -3764,8 +3764,8 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
     uint8_t *o = (uint8_t *)obj;
 
     /* Every "no" falls to the one return at the end, as the image has it. */
-    if (abs((int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET)
-            - (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET))
+    if (abs((int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+            - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
         <= AM2_BLOCK_HEIGHT_STEP) {
         if ((*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT24)
             && (*(const int32_t *)(f + VEHICLE_OFF_KIND) == 1
@@ -3774,8 +3774,8 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
 
         if (ObjIsTypeIn238((const AM2_Object *)o)) {
             if (!ObjIsType3((const AM2_Object *)o)
-                || *(const int8_t *)(f + OBJ_OFF_ARMY)
-                       != *(const int8_t *)(o + OBJ_OFF_ARMY)) {
+                || *(const int8_t *)(o + OBJ_OFF_ARMY)
+                       != *(const int8_t *)(f + OBJ_OFF_ARMY)) {
                 if (!ObjsAreAllied(f, o, 0)
                     || (*(const uint32_t *)((const uint8_t *)LookupOwnerObj(
                             g_defaultOwner)
@@ -3784,8 +3784,8 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
                     return 1;
             }
         } else if (ObjIsWatchedKind(o)) {
-            if (*(const int8_t *)(f + OBJ_OFF_ARMY)
-                    != *(const int8_t *)(o + OBJ_OFF_ARMY)
+            if (*(const int8_t *)(o + OBJ_OFF_ARMY)
+                    != *(const int8_t *)(f + OBJ_OFF_ARMY)
                 || g_gameClockMs
                        - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
                    > AM2_COLLIDE_OWN_DELAY)
