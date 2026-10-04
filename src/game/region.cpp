@@ -3444,8 +3444,8 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
      * clear it replanned a 15-waypoint path into a 2-waypoint straight move,
      * one step off from the original. Only the radar showed it -- an off-screen
      * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
-                    *(const uint32_t *)&pt)
+    if (PointsEqual(*(const uint32_t *)&pt,
+                    *(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL))
         && *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
         && (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
            < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
@@ -3502,8 +3502,8 @@ after_region:
     /* Keep the route we have when it still aims at this point AND either has
      * waypoints left or has run past its cooldown. Both arms of that second
      * test skip the re-plan; see the header. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
-                    *(const uint32_t *)&pt)) {
+    if (PointsEqual(*(const uint32_t *)&pt,
+                    *(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL))) {
         if (*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
             && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
                    < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT))
@@ -7528,8 +7528,8 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
             *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
         else
             *(int32_t *)(c + SIGHTC_OFF_VEHICLE_DIST) =
-                ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)(V + OBJ_OFF_POS));
+                ApproxDist((const AM2_Point *)(V + OBJ_OFF_POS),
+                           (const AM2_Point *)(o + OBJ_OFF_POS));
     }
 
     if (g_gameClockMs
@@ -10187,8 +10187,8 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
             *r = a;
             *(int32_t *)(r + 0x08u) = 4;
             d = abs(AngleDelta(a, *(const uint8_t *)(o + OBJ_OFF_FACING)));
-            dist = ApproxDist((const AM2_Point *)(o + 0x12u),
-                              (const AM2_Point *)(o + 0xC0u));
+            dist = ApproxDist((const AM2_Point *)(o + 0xC0u),
+                              (const AM2_Point *)(o + 0x12u));
             if (*(const int32_t *)(o + 0x548u) == 0)
                 r[1] = r[0];
 
@@ -10385,8 +10385,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
             noTarget = ((uint16_t)target <= 0);
 
             if (!noTarget
-                && ApproxDist((const AM2_Point *)(o + 0x12u),
-                              (const AM2_Point *)&target) < 0xC0) {
+                && ApproxDist((const AM2_Point *)&target,
+                              (const AM2_Point *)(o + 0x12u)) < 0xC0) {
                 int32_t d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
                                        *(const uint8_t *)r);
                 d = abs(d);
@@ -10400,8 +10400,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
             if (!noTarget
                 && *(const uint16_t *)(o + 0xC0u) == (uint16_t)target
-                && ApproxDist((const AM2_Point *)(o + 0x12u),
-                              (const AM2_Point *)&target) < 0x60)
+                && ApproxDist((const AM2_Point *)&target,
+                              (const AM2_Point *)(o + 0x12u)) < 0x60)
                 *(int32_t *)(r + 0x10u) = 1;
             else
                 *(int32_t *)(r + 0x10u) = 0;
