@@ -2639,7 +2639,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     PAD.compared = 0;
     PAD.number = number;
 
-    kPadNumbers[number].pads[kPadNumbers[number].count] = (int16_t)kPadCount;
+    kPadNumbers[number].pads[kPadNumbers[number].count] = (int16_t)PAD.id;
     kPadNumbers[number].count++;
 
     if (++(*at) >= ctx->count) {

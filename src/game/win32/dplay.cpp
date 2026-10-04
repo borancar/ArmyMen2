@@ -376,7 +376,7 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
         *(uint32_t *)(rec + 0x0C) = 0;
         *(uint32_t *)(rec + PLAYER_REC_OFF_FLAG_94) = 1;
         *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = own;
-        g_playerSlotMask |= own;
+        g_playerSlotMask |= *(const uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT);
         *(uint32_t *)(rec + PLAYER_REC_OFF_WANT_BIT) = want;
         *(uint32_t *)(rec + 0x10) = 0;
         *(uint32_t *)(rec + 0x1C) = 0;

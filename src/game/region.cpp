@@ -1442,7 +1442,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 /* Cheapest so far: in front of the head. */
                 b.next = from;
                 b.prev = 0;
-                g_pathNodes[from & 0xFFFF].prev = (uint16_t)nb;
+                g_pathNodes[b.next & 0xFFFF].prev = (uint16_t)nb;
                 from = (uint16_t)nb;
             } else {
                 uint16_t after = g_pathNodes[before & 0xFFFF].next;
@@ -5249,27 +5249,25 @@ in_sight:
 
 allied:
         if (ObjIsTypeIn238((const AM2_Object *)it)) {
-            uint8_t *theirs;
 
             ++*nAllied;
             if (!*(const uint32_t *)(it + OBJ_OFF_TARGET_UID))
                 continue;
-            theirs = (uint8_t *)LookupByUID(
+            cand = (uint8_t *)LookupByUID(
                 *(const uint32_t *)(it + OBJ_OFF_TARGET_UID));
-            cand = theirs;
-            if (!theirs) {
+            if (!cand) {
                 *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
                 goto score;                 /* cand is null; score refuses */
             }
-            if (*(const int16_t *)(theirs + OBJ_OFF_HEALTH) <= 0
-                || (*(const int32_t *)(theirs + OBJ_OFF_FLAGS) & 0x204)) {
+            if (*(const int16_t *)(cand + OBJ_OFF_HEALTH) <= 0
+                || (*(const int32_t *)(cand + OBJ_OFF_FLAGS) & 0x204)) {
                 *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
                 continue;
             }
-            if (ObjsAreAllied(o, theirs, 0))
+            if (ObjsAreAllied(o, cand, 0))
                 continue;
             DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                         (const AM2_Point *)(theirs + OBJ_OFF_POS),
+                         (const AM2_Point *)(cand + OBJ_OFF_POS),
                          &candRange, &candBearing);
             /* Only mode 1 adopts an ally's target, and only close by. */
             if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) != 1)
@@ -8403,7 +8401,7 @@ swept:
                       + AM2_TROOPER_TURN_MS);
         *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
             (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                                facing);
+                                *(w + 4));   /* read back, as stored */
         acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
         if (acc > 0x100)
             *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc - 0x100);

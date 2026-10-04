@@ -946,10 +946,11 @@ void __cdecl State2Enter(void)
     ProgressBar(0x64);
 
     if (g_missionRetry != 0) {
-        int32_t n = g_attemptCount + 1;
+        /* Logged from the global, not a local: the image stores the count
+         * and reads it back for the call. */
         g_missionRetry = 0;
-        g_attemptCount = n;
-        orig_log("Attempt# %d\n", n);
+        g_attemptCount = g_attemptCount + 1;
+        orig_log("Attempt# %d\n", g_attemptCount);
     }
     orig_log("calculating region data...\n");
 

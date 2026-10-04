@@ -11335,7 +11335,9 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
             slot = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT);
             *(int32_t *)(o + OBJ_OFF_TABLE_REC_KIND) = slot;
             *(int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
-            SetFieldInAll(o + OBJ_OFF_SUBRECORD, (void *)(uintptr_t)slot);
+            /* The argument is read back from the field just stored. */
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                          (void *)(uintptr_t)*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND));
         }
 
         *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 0;
