@@ -66,14 +66,35 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1480 of
-  1645 byte-identical (2026-10-04), piecewise 399.** 1480 before the globals
-  rename; PlacementScreenClick is lost to the known coin pair with
-  CheatLine (cursor + view origin load order), which tracks the set of new
-  identifiers the headers declare -- settled last, after all header work. Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1485 of
+  1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
+  PlacementScreenClick coin pair both match now: it tracks the set of
+  externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
+  aggregate range's declarations (relinkos.py KEEP_DECLS) settles both
+  sides -- any change to that set can flip it again. Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1480:
+  the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
+  From 758 to 1485:
+  - **Globals that were one object** (2026-10-04): when the image keeps a
+    load before a store that ours hoists past it, the globals were members of
+    one object in the original, which VC6 must assume may alias. relinkos.py
+    AGGREGATE_RANGES now also holds the menu cursor's animation state
+    (OverlayPrepare matches), the sprite list (LoadSpriteSet matches) and the
+    aim markers' tables as a RANGE -- the old `aim_` name prefix swept in
+    far-away lone globals (AimStartB 15 -> 10).
+  - **A local versus re-reading the field** (2026-10-04) changes instruction
+    selection away from the statement itself: SetSoldierKind matches once the
+    kind-7 name index is stored and read back from the object (a local turned
+    an earlier flag set into `or [m], imm`), CreateMissile once its 16-bit row
+    adjust is written from the ground field just stored rather than from the
+    argument.
+  - **Order of independent initialisations** (2026-10-04): ReceivePlayerMsg
+    25 -> 7 by initialising its loop index after the setting pointer in the
+    for-list; an adjacent-statement swap search over all mismatches
+    (semantics-preserving: distinct locals, no calls) found ViewUpdate
+    101 -> 95. Also DrawMenuCursor 155 -> 19, LoadMap 567 -> 548,
+    BlockWeightTroops 65 -> 50, StepType5 189 -> 169, BuildFont 37 -> 32.
   - **Game code names globals, never addresses** (2026-10-04): every data
     `ADDR_` use in src/game (900 globals) goes through a `g_` name bound in
     `src/game/globals.h` (Win32-typed ones in `win32/globals.h`); 405 local

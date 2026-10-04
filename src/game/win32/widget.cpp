@@ -4802,10 +4802,7 @@ void __cdecl HudPostUpdate(void)
             g_viewRectOn = 1;
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
             (g_viewRect_)[0] = ax < px ? ax : px;
-            if (ax > px)
-                (g_viewRect_)[2] = ax;
-            else
-                (g_viewRect_)[2] = px;
+            (g_viewRect_)[2] = ax > px ? ax : px;
             if (ay < py)
                 (g_viewRect_)[1] = ay;
             else
