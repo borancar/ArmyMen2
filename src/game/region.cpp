@@ -4304,7 +4304,7 @@ static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &s
                                 const uint32_t &dir, const int32_t &viewerAttr,
                                 const int32_t &gen)
 {
-    uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
+    uint16_t       buf[AM2_AI_SIGHT_LINE_BUF];   /* SightScan's 0x84C frame holds 1024 */
     const uint8_t *attrs = g_tileAttrs;
     int32_t        highest = AM2_AI_SIGHT_FLOOR;
     int32_t        n = 0, i = 0, reach;
