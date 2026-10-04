@@ -2423,8 +2423,8 @@ no_next:
         }
 
         orig_findclose(h);
-        g_scriptReload = 1;
         strcpy(g_scriptReloadPath, path);
+        g_scriptReload = 1;
         g_levelIndex += 1;
         return;
     }
