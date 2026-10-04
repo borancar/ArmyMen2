@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1485 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1492 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,19 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1485:
+  From 758 to 1492:
+  - **Pointer aliases are second variables** (2026-10-04): `AM2_Widget *w =
+    this;`, `uint8_t *h = (uint8_t *)set;` and `T *x = g_table;` each make VC6
+    reassociate or reorder (`(right - left) - width` where the image keeps
+    `(right - width) - left`; `rows + i*stride` for its `i*stride + rows`).
+    Where the image has no alias the alias is now a macro over the parameter,
+    `this` or the global -- BlitCentred, HudSquadDetail, HudTopPaint,
+    MultiSpritePaint, ScrollBarPaint and BuildRowSet match -- and where the
+    image walks its argument in place the parameter itself is the walked
+    byte pointer (VehicleUpdateApply matches, RefundPlacedUnit 74 -> 48).
+    Matched functions keep their aliases: the change is made only where it
+    scores better. CommRegisterSelf 75 -> 65: an answer that merges at one
+    `return result` stays in a register as the image's does.
   - **Globals that were one object** (2026-10-04): when the image keeps a
     load before a store that ours hoists past it, the globals were members of
     one object in the original, which VC6 must assume may alias. relinkos.py
