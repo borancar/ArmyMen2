@@ -8221,10 +8221,14 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
 
         if (st == 2 || st == 3 || st == 0x26 || st == 0x12) {
             *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
-            if (klass == 1)
+            switch (klass) {        /* `dec; je; dec; jne` in the image */
+            case 1:
                 *(int32_t *)(w + 8) = 8;
-            else if (klass == 2)
+                break;
+            case 2:
                 *(int32_t *)(w + 8) = 9;
+                break;
+            }
         }
     }
 
