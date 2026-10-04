@@ -747,11 +747,19 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
     (void)lpdwTimeOut;
     (void)lpContext;
 
-    if (!g_sessionList || (dwFlags & DPESC_TIMEDOUT) || !lpThisSD)
-        return FALSE;
+    /* Three refusals, each its own test, all jumping to the failed
+     * allocation's return: one block, where the image has it. */
+    if (!g_sessionList)
+        goto refuse;
+    if (dwFlags & DPESC_TIMEDOUT)
+        goto refuse;
+    if (!lpThisSD)
+        goto refuse;
     rec = (uint8_t *)orig_malloc(AM2_SESSION_REC_BYTES);
-    if (!rec)
+    if (!rec) {
+refuse:
         return FALSE;
+    }
 
     *(GUID *)(rec + SESSION_REC_OFF_GUID)   = lpThisSD->guidInstance;
     *(uint32_t *)(rec + SESSION_REC_OFF_CUR) = lpThisSD->dwCurrentPlayers;
