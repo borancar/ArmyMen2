@@ -7589,17 +7589,16 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                                      top + AM2_HUD_BUTTON_H);
     }
 
-    grab = *(AM2_Widget * *)&g_mouseGrab;
-
     if (!PointInRect((const AM2_Rect *)&hot,
                      (const AM2_Point *)&g_cursorPoint)) {
         /* On the strip but not on the button: swallow the press anyway, so
          * the map underneath does not also see it. */
-        if (!grab && g_mouseChanged)
+        if (!*(AM2_Widget * *)&g_mouseGrab && g_mouseChanged)
             *(AM2_Widget * *)&g_mouseGrab = w;
         return;
     }
 
+    grab = *(AM2_Widget * *)&g_mouseGrab;
     if (!g_mouseButton) {
         if (grab == button)
             *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
