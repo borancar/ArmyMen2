@@ -2809,7 +2809,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 #define IS_WORD(w)  (TOK->kind == AM2_TOKEN_RESERVED \
                      && (int32_t)(uintptr_t)TOK->value == (w))
 #define STEP_EOS()  if (++(*at) >= ctx->count) goto end_of_script
-#define STEP_LATE() if (++(*at) >= ctx->count) { am2_log("Unexpected end of script.\n"); return 0; }
+#define STEP_LATE() if (ctx->count <= ++(*at)) { am2_log("Unexpected end of script.\n"); return 0; }
 #define STEP_OWN()  if (!ScriptStep(ctx, at)) return 0
 /* A wrong token kind logs and returns WITHOUT freeing the record -- another
  * of the original's leaks. */
@@ -2872,13 +2872,13 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
     } else if (TOK->kind == AM2_TOKEN_RESERVED) {
         switch ((int32_t)(uintptr_t)TOK->value) {
-        case AM2_TOK_INORDER:
-            cond->kind = AM2_IF_INORDER;
-            STEP_OWN();
-            break;
         case AM2_TOK_ALLOF:
             cond->kind = AM2_IF_ALLOF;
-            STEP_OWN();
+            STEP_LATE();
+            break;
+        case AM2_TOK_INORDER:
+            cond->kind = AM2_IF_INORDER;
+            STEP_LATE();
             break;
         case AM2_TOK_REPEAT:
             cond->kind = AM2_IF_REPEAT;
