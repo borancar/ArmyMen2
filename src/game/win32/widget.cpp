@@ -4386,8 +4386,8 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
     /* x through the element pointer, y through the array: the image keeps
      * the pointer live in edi across the broadcast test for the one read. */
 #define POINTS ((AM2_Point *)g_aimPointB)
-    int32_t    i  = army;
-    AM2_Point *pt = &POINTS[i];
+#define i ((int32_t)army)
+#define pt (&POINTS[i])
 
     (g_aimLiveB)[i] = 1;
     *(uint32_t *)pt = at;
@@ -4413,6 +4413,8 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
                       g_aimSpawnArg,
                       0, 0, 0, 0);
 #undef POINTS
+#undef i
+#undef pt
 }
 
 void __cdecl BuildHudWidgets(void)
