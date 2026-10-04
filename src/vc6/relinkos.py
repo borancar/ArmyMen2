@@ -48,7 +48,13 @@ AGGREGATES = ("aim_",)
 # repeat deadlines, the pressed flags): PollKeyboard re-reads the current
 # buffer pointer every key because its stores may alias it, and walks the
 # two per-key arrays with one pointer.
-AGGREGATE_RANGES = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0))
+# The menu cursor's animation state 0x004FCAA8..0x004FCDF4 (the hovered row,
+# the per-row sprite table, the cursor and overlay sprites, inks, offsets,
+# the frame clock and its stamp): OverlayPrepare loads the row's first sprite
+# BEFORE storing the frame index, the source order, which VC6 keeps only
+# when the indexed table load may alias the store.
+AGGREGATE_RANGES = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
+                    (0x004FCAA8, 0x004FCDF4))
 
 
 def _aggregated(va):
@@ -56,7 +62,7 @@ def _aggregated(va):
 
 
 # Aggregated ranges whose members stay DECLARED (see render()).
-KEEP_DECLS = ((0x005127C8, 0x00512FD0),)
+KEEP_DECLS = ((0x005127C8, 0x00512FD0), (0x004FCAA8, 0x004FCDF4))
 
 
 def _kept(va):

@@ -666,8 +666,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_PADS ((uintptr_t)(const void *)am2_os_pads)
 #undef ADDR_PAD_NUMBERS
 #define ADDR_PAD_NUMBERS ((uintptr_t)(const void *)am2_os_pad_numbers)
-#undef ADDR_MENU_SPRITES
-#define ADDR_MENU_SPRITES ((uintptr_t)(const void *)am2_os_menu_sprites)
 #undef ADDR_ARMY_OBJ_LISTS
 #define ADDR_ARMY_OBJ_LISTS ((uintptr_t)(const void *)am2_os_army_obj_lists)
 #undef ADDR_AIR_SAVE_BLOCK
@@ -1130,36 +1128,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_PALETTE_GLYPHS ((uintptr_t)(const void *)am2_os_palette_glyphs)
 #undef ADDR_MENU_SAVED_RECT
 #define ADDR_MENU_SAVED_RECT ((uintptr_t)(const void *)am2_os_menu_saved_rect)
-#undef ADDR_MENU_ROW
-#define ADDR_MENU_ROW ((uintptr_t)(const void *)am2_os_menu_row)
-#undef ADDR_MENU_SPRITES_END
-#define ADDR_MENU_SPRITES_END ((uintptr_t)(const void *)am2_os_menu_sprites_end)
-#undef ADDR_MENU_OVERLAY_A
-#define ADDR_MENU_OVERLAY_A ((uintptr_t)(const void *)am2_os_menu_overlay_a)
-#undef ADDR_MENU_OVERLAY_B
-#define ADDR_MENU_OVERLAY_B ((uintptr_t)(const void *)am2_os_menu_overlay_b)
-#undef ADDR_MENU_INK
-#define ADDR_MENU_INK ((uintptr_t)(const void *)am2_os_menu_ink)
-#undef ADDR_MENU_OVERLAY_A_INK
-#define ADDR_MENU_OVERLAY_A_INK ((uintptr_t)(const void *)am2_os_menu_overlay_a_ink)
-#undef ADDR_MENU_OVERLAY_B_INK
-#define ADDR_MENU_OVERLAY_B_INK ((uintptr_t)(const void *)am2_os_menu_overlay_b_ink)
-#undef ADDR_MENU_CURSOR_DX
-#define ADDR_MENU_CURSOR_DX ((uintptr_t)(const void *)am2_os_menu_cursor_dx)
-#undef ADDR_MENU_OVERLAY_A_DX
-#define ADDR_MENU_OVERLAY_A_DX ((uintptr_t)(const void *)am2_os_menu_overlay_a_dx)
-#undef ADDR_MENU_OVERLAY_B_DX
-#define ADDR_MENU_OVERLAY_B_DX ((uintptr_t)(const void *)am2_os_menu_overlay_b_dx)
-#undef ADDR_MENU_CURSOR_PREV
-#define ADDR_MENU_CURSOR_PREV ((uintptr_t)(const void *)am2_os_menu_cursor_prev)
-#undef ADDR_MENU_CURSOR_RECT
-#define ADDR_MENU_CURSOR_RECT ((uintptr_t)(const void *)am2_os_menu_cursor_rect)
-#undef ADDR_MENU_ANIM_NEXT
-#define ADDR_MENU_ANIM_NEXT ((uintptr_t)(const void *)am2_os_menu_anim_next)
-#undef ADDR_MENU_ANIM_FRAME
-#define ADDR_MENU_ANIM_FRAME ((uintptr_t)(const void *)am2_os_menu_anim_frame)
-#undef ADDR_MENU_ROW_STAMP
-#define ADDR_MENU_ROW_STAMP ((uintptr_t)(const void *)am2_os_menu_row_stamp)
 #undef ADDR_MENU_SURFACE
 #define ADDR_MENU_SURFACE ((uintptr_t)(const void *)am2_os_menu_surface)
 #undef ADDR_FLAME_RECORD
