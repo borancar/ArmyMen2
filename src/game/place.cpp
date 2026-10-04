@@ -1044,10 +1044,13 @@ found:
             if (!ObjIsType4((const AM2_Object *)w))
                 return;
 
+            /* Kind 9 has its own arm that sets the default again; it is
+             * in the image (`dec eax; jne`) whatever it was for. */
+            want = 0;
             switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
             case 4:  want = 1; break;
             case 8:  want = 2; break;
-            default: want = 0; break;
+            case 9:  want = 0; break;
             }
 
             /* The record is re-read through the table at each use. */
