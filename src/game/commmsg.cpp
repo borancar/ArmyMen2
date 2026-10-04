@@ -3364,7 +3364,7 @@ pool:
  * past.
  *
  * The applier is reached by ADDRESS because it is still the image's. */
-uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
+uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army);
 
 void __cdecl RecvVehicle1B(void *msg, int32_t army)
 {
@@ -3484,9 +3484,8 @@ void __cdecl RecvVehicle24(void *msg)
  * straight into ObjClearFootprint and then into a dozen field writes with no
  * test between. Reproduced; a message naming an object this client does not
  * have would fault the same way in both. */
-uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
+uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
 {
-    uint8_t  *at = (uint8_t *)rec;
     uint8_t  *o;
     uint32_t  head;
     uint8_t   b0, b1, b2;

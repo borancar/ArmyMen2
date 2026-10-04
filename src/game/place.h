@@ -116,7 +116,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army);
 
 /* 0x0043B160, one caller -- the manual placement screen. Take a placed unit
  * back off the map and put its cost back into `points`. */
-void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points);
+void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points);
 
 /* MakePlacedUnit is still original and reached by address. It is shared by
  * this module and by the manual placement screen in win32/widget.cpp, so the

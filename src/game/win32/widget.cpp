@@ -4679,7 +4679,7 @@ void __cdecl PlacementScreenClick(uint32_t at)
         if (!g_mouseChanged)
             return;
 
-        RefundPlacedUnit(obj,
+        RefundPlacedUnit((uint8_t *)obj,
                          (int32_t)g_defaultOwner,
                          &g_ourPoints);
 

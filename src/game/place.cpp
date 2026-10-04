@@ -932,10 +932,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
  * UNIT_TYPE_OFF_ names, which is the same three addresses said legibly, and
  * is why checkoffsetuse reports 0 and 0x20 on one side and 0x18 on the other.
  */
-void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
+void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points)
 {
     int32_t  cost = 0;
-    uint8_t *o    = (uint8_t *)obj;
     int32_t  i = 0;
 
     if (!ObjIsTypeIn238((const AM2_Object *)o)

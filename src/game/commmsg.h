@@ -155,7 +155,7 @@ void __cdecl RecvVehicle24(void *msg);
 
 /* 0x0045DF10. Decode one vehicle delta record and RETURN the cursor past it,
  * which is what lets RecvVehicle1B find the next one. */
-uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
+uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army);
 
 /* 0x0045E630. Kind 0x1D: the host grants or refuses a vehicle's request to
  * pick an item up, and tells the asker. Three of its four arms are a log. */
