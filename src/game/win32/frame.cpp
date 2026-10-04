@@ -1826,10 +1826,10 @@ typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
  * count entirely rather than counting zero. */
 void __cdecl PausedFrameStep(void)
 {
-    static const uint32_t kPauseBitsA[4] = { 0x10u, 0x20u, 0x40u, 0x80u };
-    static const uint32_t kPauseBitsB[4] = { 0x800u, 0x1000u, 0x2000u, 0x4000u };
-    static const uint32_t kPauseBitsC[4] =
-        { 0x20000u, 0x40000u, 0x80000u, 0x100000u };
+    /* The image's three per-slot pause-bit tables, each its own global. */
+#define kPauseBitsA ((const uint32_t *)(uintptr_t)ADDR_MP_PAUSE_BITS_A)
+#define kPauseBitsB ((const uint32_t *)(uintptr_t)ADDR_MP_PAUSE_BITS_B)
+#define kPauseBitsC ((const uint32_t *)(uintptr_t)ADDR_MP_PAUSE_BITS_C)
 
     /* The comm object is read at every use. */
 #define comm (g_commObject)
@@ -1860,7 +1860,7 @@ void __cdecl PausedFrameStep(void)
         int32_t  badge;
         int32_t  army;
         char     scoreText[20];
-        char     teamText[20];
+        char     teamText[32];
         int32_t  width;
 
         if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_25C) == 0)
@@ -1962,14 +1962,16 @@ void __cdecl PausedFrameStep(void)
         if (g_infoOverlayOn) {
             RECT clip;
 
+            /* The rect is built from its own corner, and the text sits two
+             * pixels inside that corner. */
             clip.left   = xy[0];
             clip.top    = xy[1] + 0x14;
-            clip.bottom = xy[1] + 0x14 + 0x14;
-            clip.right  = xy[0] + 0x6E;
+            clip.right  = clip.left + 0x6E;
+            clip.bottom = clip.top + 0x14;
             if (!LockSurface(
                     *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
-            DrawTextClipped(xy[0] + 2, xy[1] + 0x14 + 2,
+            DrawTextClipped(clip.left + 2, clip.top + 2,
                             (const char *)(rec + 0x218u), 1, clip,
                             g_whiteInk);
             UnlockSurface();
@@ -1977,7 +1979,7 @@ void __cdecl PausedFrameStep(void)
     }
 
     if (g_infoOverlayOn) {
-        char buf[284];
+        char buf[292];
         RECT clip;
 
         am2_sprintf(buf, "Game type: %s, Goal: %d",
@@ -1985,17 +1987,20 @@ void __cdecl PausedFrameStep(void)
                         &g_mpScriptName) + 0x80,
                     g_scoreLimit);
 
-        clip.left   = xy[0];
-        clip.bottom = xy[1] + 0x24 + 0x14;
         clip.top    = xy[1] + 0x24;
-        clip.right  = xy[0] + 0x190;
+        clip.left   = xy[0];
+        clip.right  = clip.left + 0x190;
+        clip.bottom = clip.top + 0x14;
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;
-        DrawTextClipped(xy[0] + 2, xy[1] + 0x24 + 2, buf, 1, clip,
+        DrawTextClipped(clip.left + 2, clip.top + 2, buf, 1, clip,
                         g_whiteInk);
         UnlockSurface();
     }
 #undef comm
 #undef rec
 #undef pause
+#undef kPauseBitsA
+#undef kPauseBitsB
+#undef kPauseBitsC
 }

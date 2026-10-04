@@ -1444,7 +1444,9 @@ extern const uint8_t am2_crt_eh_catch_2[12];
 extern const uint8_t am2_crt_eh_catch_3[24];
 extern const uint8_t am2_crt_xcpt_tables[136];
 extern const uint8_t am2_air_bit_masks[40];
-extern const uint8_t am2_mp_pause_bits[48];
+extern const uint32_t am2_mp_pause_bits_a[4];
+extern const uint32_t am2_mp_pause_bits_b[4];
+extern const uint32_t am2_mp_pause_bits_c[4];
 extern const uint8_t am2_map_field_tables[316];
 extern const uint8_t am2_spiral_path_const[64];
 extern const uint8_t am2_rank_thresholds[32];
@@ -1546,7 +1548,11 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #undef ADDR_AIR_BIT_MASKS
 #define ADDR_AIR_BIT_MASKS                 ((uintptr_t)(const void *)am2_air_bit_masks)
 #undef ADDR_MP_PAUSE_BITS_A
-#define ADDR_MP_PAUSE_BITS_A               ((uintptr_t)(const void *)am2_mp_pause_bits)
+#define ADDR_MP_PAUSE_BITS_A               ((uintptr_t)(const void *)am2_mp_pause_bits_a)
+#undef ADDR_MP_PAUSE_BITS_B
+#define ADDR_MP_PAUSE_BITS_B               ((uintptr_t)(const void *)am2_mp_pause_bits_b)
+#undef ADDR_MP_PAUSE_BITS_C
+#define ADDR_MP_PAUSE_BITS_C               ((uintptr_t)(const void *)am2_mp_pause_bits_c)
 #undef ADDR_MAP_FIELD_TABLES
 #define ADDR_MAP_FIELD_TABLES              ((uintptr_t)(const void *)am2_map_field_tables)
 #undef ADDR_SPIRAL_PATH_CONST

@@ -7850,6 +7850,8 @@ typedef struct {
  * and each selecting a different scoreboard badge. Decoded from the image;
  * the branches that read them look identical. */
 #define ADDR_MP_PAUSE_BITS_A      0x0048C7A8u  /* {0x10,0x20,0x40,0x80} */
+#define ADDR_MP_PAUSE_BITS_B      0x0048C7B8u  /* {0x800,0x1000,0x2000,0x4000} */
+#define ADDR_MP_PAUSE_BITS_C      0x0048C7C8u  /* {0x20000,..,0x100000} */
 #define ADDR_MP_MARK_A            0x00664594u  /* AM2_Sprite * */
 #define ADDR_MP_MARK_B            0x00664598u
 #define ADDR_MP_MARK_C            0x0066459Cu
