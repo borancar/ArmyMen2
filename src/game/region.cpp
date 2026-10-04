@@ -9174,7 +9174,10 @@ leader_unseen:
         RoachRouteToward(obj, out, ctx);
         if (*(void **)(c + SIGHT_OFF_FOUND))
             AM2_ROACH_PROMOTE_FOUND(o, c);
-        goto tail;
+        /* Its own call, not `goto tail`: the far arm's identical block is
+         * the one VC6 folds into this, as the image has it. */
+        ConsiderSightingB(obj, out, ctx);
+        return;
     }
 #undef PROMOTE_LEADER
 #undef LEADER
