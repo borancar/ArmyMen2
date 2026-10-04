@@ -10118,8 +10118,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                                    int32_t apply)
 {
     uint8_t       *v       = (uint8_t *)veh;
-    int32_t        weight  = 0;
     int32_t        sound   = 0;
+    int32_t        weight  = 0;
     int32_t        answer  = 0;
     int32_t        i;
     int32_t        rec;

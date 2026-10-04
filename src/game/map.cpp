@@ -1878,10 +1878,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
             int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
             int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
-            uint8_t   trig  = r[MAPREC_OFF_TRIG];
             uint8_t   owner = r[MAPREC_OFF_OWNER];
-            int32_t   flags = 0;
+            uint8_t   trig  = r[MAPREC_OFF_TRIG];
             int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
+            int32_t   flags = 0;
             void     *obj = 0;
 
             if (trig & 0x20)

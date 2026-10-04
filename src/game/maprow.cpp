@@ -139,19 +139,30 @@ static int32_t DepthCompareBody(void *a, void *b)
         if (LA > LB)
             return 1;
         if (LA < LB)
-            return -1;
+            goto minus;
     }
 
     if (SA != 0.0f) {
         if (SB != 0.0f) {
-            int32_t aInFront = DepthProject(BX - AX, SA, AY) > BY ? 1 : 0;
+            /* b's y is read once and kept across both projections (the
+             * image spills it to the frame). */
+            int32_t by = BY;
+            int32_t aInFront = DepthProject(BX - AX, SA, AY) > by ? 1 : 0;
 
-            p = DepthProject(AX - BX, SB, BY);
+            p = DepthProject(AX - BX, SB, by);
             if (AY > p && aInFront)
                 return 1;
             if (AY < p && !aInFront)
+                goto minus;
+            /* They disagree: plain y decides -- written out here as well as
+             * below, as the image has it twice; every arm's `< then -1`
+             * meets at the one `minus` block VC6 places before the pointer
+             * comparison. */
+            if (*(const int16_t *)(pa + ROW_OFF_Y) > *(const int16_t *)(pb + ROW_OFF_Y))
+                return 1;
+            if (*(const int16_t *)(pa + ROW_OFF_Y) < *(const int16_t *)(pb + ROW_OFF_Y))
                 return -1;
-            /* They disagree: plain y decides. */
+            return (pb < pa) ? 1 : -1;
         } else {
             /* Only A has a slope, so only A's projection is available. */
             p = DepthProject(BX - AX, SA, AY);
@@ -173,9 +184,11 @@ static int32_t DepthCompareBody(void *a, void *b)
     if (*(const int16_t *)(pa + ROW_OFF_Y) > *(const int16_t *)(pb + ROW_OFF_Y))
         return 1;
     if (*(const int16_t *)(pa + ROW_OFF_Y) < *(const int16_t *)(pb + ROW_OFF_Y))
-        return -1;
+        goto minus;
 
     return (pb < pa) ? 1 : -1;
+minus:
+    return -1;
 #undef LA
 #undef LB
 #undef SA
