@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1502 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1503 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,7 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1502:
+  From 758 to 1503:
   - **The image's stack frame names its locals** (2026-10-04). Reading each
     slot of the image's frame against our `/FAs` layout showed what the
     source declared. LoadMap went 502 -> 135 and its frame is now exact:
@@ -99,6 +99,8 @@ main result so far (details in `src/vc6/README.md`):
     image emits as a register known to hold zero. EditCharHandler matches
     once the text extent is assigned to a function-scope local: inline, the
     `+ margin` became one lea where the image copies eax and adds later.
+    CreateWeapon matches once the missile definition is read back from
+    the weapon's own +0xC0 at each use instead of being held in a local.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
