@@ -480,8 +480,8 @@ void __cdecl UpdateMouseState(void)
             (&g_mouseButton)[n] = now_;                                          \
         } else {                                                              \
             now_ = 0;                                                         \
-            (&g_mouseClaimed)[n] = 0;                                            \
             (&g_mouseButton)[n] = now_;                                          \
+            (&g_mouseClaimed)[n] = 0;                                            \
         }                                                                     \
         (&g_mouseChanged)[n] = (now_ != was_);                                   \
     } while (0)
