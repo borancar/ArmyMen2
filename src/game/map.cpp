@@ -1799,11 +1799,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                         r[0x11] = 0;
                         r[0x15] = (uint8_t)numb;
 
-                        if (scri[0] != 0) {
-                            size_t n = strlen(scri) + 1;
-
-                            *(char **)(r + 0x18) = (char *)am2_malloc(n);
-                            memcpy(*(char **)(r + 0x18), scri, n);
+                        if (strlen(scri) != 0) {
+                            *(char **)(r + 0x18) =
+                                (char *)am2_malloc(strlen(scri) + 1);
+                            strcpy(*(char **)(r + 0x18), scri);
                         }
                     }
                 }
