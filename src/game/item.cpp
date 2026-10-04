@@ -5078,8 +5078,12 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
             case 1:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GRENADE_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else
+                else {
+                    /* The two raise poses exist once each in the image, and
+                     * the other arms jump into them. */
+raise_k:
                     STATE = AM2_POSE_RAISE_KNEEL;
+                }
                 break;
             case 2:
                 STATE = AM2_POSE_KNEEL;
@@ -5088,7 +5092,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
                 else
-                    STATE = AM2_POSE_RAISE_STAND;
+                    goto raise_s;
                 break;
             }
             break;
@@ -5102,7 +5106,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
                 else
-                    STATE = AM2_POSE_RAISE_KNEEL;
+                    goto raise_k;
                 break;
             case 2:
                 STATE = AM2_POSE_CLASS2_ARMED;
@@ -5111,7 +5115,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
                 else
-                    STATE = AM2_POSE_RAISE_STAND;
+                    goto raise_s;
                 break;
             }
             break;
@@ -5122,7 +5126,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
                 else
-                    STATE = AM2_POSE_RAISE_KNEEL;
+                    goto raise_k;
                 break;
             case 2:
                 STATE = AM2_POSE_KNEEL;
@@ -5130,8 +5134,10 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
             default:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
-                else
+                else {
+raise_s:
                     STATE = AM2_POSE_RAISE_STAND;
+                }
                 break;
             }
             break;
