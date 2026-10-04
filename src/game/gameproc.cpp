@@ -1348,7 +1348,10 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                 g_zeroRect);
 
     *(int32_t *)(o + MISSILE_OFF_GROUND) = a5;
-    *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)a5;
+    /* From the field just stored, not from a5: the image copies the
+     * stored register into a fresh one for the 16-bit store. */
+    *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) =
+        (int16_t)*(const int32_t *)(o + MISSILE_OFF_GROUND);
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
         g_gameClockMs;
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = *(const int32_t *)(b + OBJ_OFF_FIELD_44);
@@ -1399,16 +1402,15 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
 
         *(uint32_t *)(w + MISSILE_OFF_LAST_UID) =
             ((const AM2_Object *)o)->uid;
-        return o;
+    } else {
+        *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+            g_missileAnims;
+        *(int16_t *)(rows + ROW_OFF_FIELD_26) =
+            (int16_t)(ScaleBy32Blocks(*(const int16_t *)
+                          (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
+        *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
+        SetAnimFrame(rows, (int16_t)frame, 1);
     }
-
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
-        g_missileAnims;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) =
-        (int16_t)(ScaleBy32Blocks(*(const int16_t *)
-                      (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
-    *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
-    SetAnimFrame(rows, (int16_t)frame, 1);
     return o;
 #undef rows
 }

@@ -3151,7 +3151,7 @@ add:
         }
     }
 
-    tile = (uint16_t)TileOfPoint(at);
+    tile = ((uint16_t (__cdecl *)(uint32_t))(void (*)(void))TileOfPoint)(at);
     /* The original's guard, on the tile widened to int -- vacuous, exactly as
      * in BlockWeightChain, and kept for the same reason. */
 #pragma GCC diagnostic push
@@ -12950,12 +12950,18 @@ after_flight:
                                                             + OBJ_OFF_FACING)
                                        + 2);
 
-                *(int16_t *)(o + OBJ_OFF_POS) = (int16_t)(int32_t)(
-                    Cos8(spread) * AM2_MISSILE_TRAIL_SPACING
-                    + (float)*(const int16_t *)(ahead + OBJ_OFF_POS));
-                *(int16_t *)(o + OBJ_OFF_POS + 2) = (int16_t)(int32_t)(
-                    Sin8(spread) * AM2_MISSILE_TRAIL_SPACING
-                    + (float)*(const int16_t *)(ahead + OBJ_OFF_POS + 2));
+                {
+                    /* Both coordinates computed before either is stored. */
+                    int16_t px = (int16_t)(int32_t)(
+                        Cos8(spread) * AM2_MISSILE_TRAIL_SPACING
+                        + (float)*(const int16_t *)(ahead + OBJ_OFF_POS));
+                    int16_t py = (int16_t)(int32_t)(
+                        Sin8(spread) * AM2_MISSILE_TRAIL_SPACING
+                        + (float)*(const int16_t *)(ahead + OBJ_OFF_POS + 2));
+
+                    *(int16_t *)(o + OBJ_OFF_POS)     = px;
+                    *(int16_t *)(o + OBJ_OFF_POS + 2) = py;
+                }
                 *(o + OBJ_OFF_FACING) = *(const uint8_t *)(ahead
                                                            + OBJ_OFF_FACING);
             }
