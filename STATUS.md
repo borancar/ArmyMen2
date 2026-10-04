@@ -154,11 +154,20 @@ main result so far (details in `src/vc6/README.md`):
     ends at the ret+pad at 0x00401EFC. FindPath's `img+57` is a differ
     misalignment: its terrain-penalty branch (AM2_TILE_NO_WEIGHT_NEAR /
     AM2_TILE_LITTLE_COVER_NEAR) IS present, the bytes differ only in register
-    choice and block order. So the one genuine reconstruction gap left in the
-    set is PacketThreadProc; everything else is VC6 register allocation and
-    scheduling that no source form steers. Reconstructing PacketThreadProc is
-    the next real step and needs the comm/thread path to verify, not a
-    byte-match-only pass.
+    choice and block order. And the FlowRecvMessage span's extra ~406 bytes
+    are RecvThreadProc (0x00401F00), which turns out to be ALREADY
+    reconstructed in dplay.cpp -- just never installed, so the relink never
+    scored it and FlowRecvMessage's span ran across it. Installing it
+    (patch_replace at ADDR_PACKET_THREAD_PROC + the dllmain guard) scores it
+    at NORM 27, NOT exact: the image keeps one WaitForMultipleObjects at the
+    loop top that every path jmps back to and caches PostMessageA in ebx
+    across the whole function, where VC6 gives us a duplicated bottom wait and
+    a fresh import load -- loop rotation and register caching, the same wall.
+    A receive thread that is not byte-identical cannot be installed without
+    behavioural verification this byte-match pass cannot do, so it stays
+    un-installed. NET: there is NO genuinely-missing function left; all 138
+    are VC6 register-allocation and loop-rotation differences that no source
+    form steers. 1507 is the practical ceiling of piecewise re-spelling.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
