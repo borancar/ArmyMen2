@@ -2487,12 +2487,15 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     int32_t        idx;
     int32_t        row;
     int32_t        x;
+    uint32_t       flags;
 
-    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+    /* The flags are read once for the three tests. */
+    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    if (!(flags & OBJ_FLAG_BIT0))
         return;
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (flags & OBJ_FLAG_DESTROYED)
         return;
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
+    if (flags & OBJ_FLAG_FOOTPRINT_ON)
         return;
 
     switch (*(const int32_t *)o) {

@@ -11004,6 +11004,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     uint8_t *o = (uint8_t *)obj;
     uint8_t *row0;
     uint8_t *anim;
+    int32_t  nrows;
     int32_t  i = 0;
 
     (void)unused;   /* the original never reads its third argument */
@@ -11011,8 +11012,10 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     if (g_frameDeltaMs == 0)
         return;
 
+    /* The row count is read once and bounds the loop below. */
+    nrows = *(const int32_t *)(o + OBJ_OFF_ROW_COUNT);
     row0 = (uint8_t *)0;
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
+    if (nrows > 0)
         row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
     /* Read off a null row0 when there are no rows -- the original's. */
@@ -11104,7 +11107,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
         RowUpdate(row0, 0, g_mapDesc);
     }
 
-    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+    for (i = 1; i < nrows; i++) {
         uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
         const uint8_t *spr;
