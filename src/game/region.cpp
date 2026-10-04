@@ -6312,18 +6312,15 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
  * log, so x and y come out of the tile index by a mask and a shift, written
  * as one expression the way the original computes it, inline, three times
  * in RegionFindPath. */
-static inline int32_t RegionSpan(const uint8_t *const &a, const uint8_t *const &b)
-{
-#define TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
-#define SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift    \
-                 & 0xFFFFu)
-#define WMASK   ((uint32_t)(g_mapTilesW - 1))
-    return ApproxDistXY((int32_t)((TILE(b) & WMASK) - (TILE(a) & WMASK)),
-                        (int32_t)((TILE(b) >> SHIFT) - (TILE(a) >> SHIFT)));
-#undef TILE
-#undef SHIFT
-#undef WMASK
-}
+#define RS_TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
+#define RS_SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu)
+#define RS_WMASK   ((uint32_t)(g_mapTilesW - 1))
+/* A macro, not an inline function: as a function its parameters are two
+ * more variables to VC6 (and as references they crash its non-relink
+ * compile), and the image has none. */
+#define RegionSpan(a, b)                                                     \
+    ApproxDistXY((int32_t)((RS_TILE(b) & RS_WMASK) - (RS_TILE(a) & RS_WMASK)), \
+                 (int32_t)((RS_TILE(b) >> RS_SHIFT) - (RS_TILE(a) >> RS_SHIFT)))
 
 static inline uint8_t *RegionAt(int32_t id)
 {
@@ -6592,6 +6589,11 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 #undef I32
 #undef PTR
 }
+#undef RegionSpan
+#undef RS_TILE
+#undef RS_SHIFT
+#undef RS_WMASK
+
 
 /* RegionSolvePair -- original 0x00438300, four callers. Solve the route from
  * one region to another and record it in the two all-pairs byte matrices, so
