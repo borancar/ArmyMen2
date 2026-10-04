@@ -4921,7 +4921,7 @@ void __cdecl HudPostUpdate(void)
     if (*(void *const *)&g_pointerF14 && !aiming && CHANGED) {
         if (BUTTON || !ACTION)
             goto claim;
-        ACTION(obj, at);
+        ACTION((void *)0, at);      /* the walk ran out: no object */
     }
     goto tail;
 
