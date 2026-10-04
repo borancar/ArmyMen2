@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1493 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1497 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,22 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1493:
+  From 758 to 1497:
+  - **Where VC6 puts a shared exit follows the shape of the source**
+    (2026-10-04). EnumSessionsCb matches once its three refusals are separate
+    `if (x) goto refuse;` statements jumping forward to the failed
+    allocation's inline return. `||` moves that block to the end, and separate
+    `return`s each get their own epilogue. UnitKindMatches matches once kinds
+    0-2 end in `if (E) return 1; break;` with `return 0` after the switch:
+    that sets which arm keeps the sete tail VC6 shares and which jumps into
+    it. Two more cases of shared blocks: MissionEnded 26 -> 2 (a strcpy
+    ordered before an independent flag store stops a cross-jump the image
+    lacks) and SelectFirePose 194 -> 183 (the raise poses are one labelled
+    block each). RoachBehaviour matches once its leader-unseen arm calls the
+    tail itself rather than `goto tail`: VC6 then keeps that copy of the
+    route block and folds the far arm into it, as the image does. The image's "first inline return, later sites jump back"
+    (ShotHitsObj, 58 -> 32 so far) only comes out of VC6 for returns inside
+    a loop; that is not written yet.
   - **Pointer aliases are second variables** (2026-10-04): `AM2_Widget *w =
     this;`, `uint8_t *h = (uint8_t *)set;` and `T *x = g_table;` each make VC6
     reassociate or reorder (`(right - left) - width` where the image keeps
