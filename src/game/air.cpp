@@ -1616,7 +1616,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     int32_t        l, t, r, bo;
     int16_t        vx, vy;
     AM2_Point      close;       /* a struct, so it lives in the frame */
-    int16_t        fx, fy;
+    AM2_Point      farPt;
     int32_t        code;
     int32_t        dist;
     uint8_t        arc;
@@ -1673,14 +1673,14 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
      * cannot happen with l <= r and t <= b; the eighth, code 3, is the
      * viewer standing INSIDE the box. */
     switch (code) {
-    case 0:  close.x = l; close.y = bo; fx = r; fy = t;  break;  /* left,  above  */
-    case 1:  close.x = l; close.y = t;  fx = r; fy = t;  break;  /* inside above  */
-    case 2:  close.x = l; close.y = bo; fx = l; fy = t;  break;  /* left,  level  */
-    case 5:  close.x = l; close.y = t;  fx = r; fy = bo; break;  /* right, above  */
-    case 7:  close.x = r; close.y = t;  fx = r; fy = bo; break;  /* right, level  */
-    case 10: close.x = r; close.y = bo; fx = l; fy = t;  break;  /* left,  below  */
-    case 11: close.x = r; close.y = bo; fx = l; fy = bo; break;  /* inside below  */
-    case 15: close.x = r; close.y = t;  fx = l; fy = bo; break;  /* right, below  */
+    case 0:  close.x = l; close.y = bo; farPt.x = r; farPt.y = t;  break;  /* left,  above  */
+    case 1:  close.x = l; close.y = t;  farPt.x = r; farPt.y = t;  break;  /* inside above  */
+    case 2:  close.x = l; close.y = bo; farPt.x = l; farPt.y = t;  break;  /* left,  level  */
+    case 5:  close.x = l; close.y = t;  farPt.x = r; farPt.y = bo; break;  /* right, above  */
+    case 7:  close.x = r; close.y = t;  farPt.x = r; farPt.y = bo; break;  /* right, level  */
+    case 10: close.x = r; close.y = bo; farPt.x = l; farPt.y = t;  break;  /* left,  below  */
+    case 11: close.x = r; close.y = bo; farPt.x = l; farPt.y = bo; break;  /* inside below  */
+    case 15: close.x = r; close.y = t;  farPt.x = l; farPt.y = bo; break;  /* right, below  */
     default:
         return;
     }
@@ -1692,8 +1692,8 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         int32_t dx1, dy1, d1;
 
         a0 = AngleOfDelta3(dx0, dy0, d0);
-        dx1 = (int16_t)(fx - *(const int16_t *)(v + OBJ_OFF_X));
-        dy1 = (int16_t)(fy - *(const int16_t *)(v + OBJ_OFF_Y));
+        dx1 = (int16_t)(farPt.x - *(const int16_t *)(v + OBJ_OFF_X));
+        dy1 = (int16_t)(farPt.y - *(const int16_t *)(v + OBJ_OFF_Y));
         d1 = ApproxDistXY(dx1, dy1);
         a1 = AngleOfDelta3(dx1, dy1, d1);
         /* The original pads the silhouette distance by one tile once (the
@@ -1717,7 +1717,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
 
     if (AbsAngle(heading, a0) < arc) {
         if (AbsAngle(heading, a1) > arc)
-            a1 = (uint8_t)(arc + heading);      /* clip the far edge */
+            a1 = (uint8_t)(arc + heading);      /* clip the farPt edge */
     } else {
         if (AbsAngle(heading, a1) > arc)
             return;                             /* both outside the arc */

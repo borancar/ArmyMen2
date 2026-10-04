@@ -1861,7 +1861,7 @@ void __cdecl ViewUpdate(void)
 #define BOUND_B (g_mapBoundsBottom)
     int32_t dist, step, dx, dy;
     int16_t tx, ty;                 /* where the eye goes this frame */
-    int16_t vx, vy;
+    AM2_Point vpt;
     void   *obj;
 
     g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
@@ -1914,14 +1914,14 @@ void __cdecl ViewUpdate(void)
     tx = (int16_t)(dx + VIEW_EYE->x);
 
 clamp_eye:
-    vx = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
-    vy = (int16_t)Clamp(ty, halfH + BOUND_T, BOUND_B - halfH - 1);
+    vpt.x = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
+    vpt.y = (int16_t)Clamp(ty, halfH + BOUND_T, BOUND_B - halfH - 1);
 
     {
         int32_t *world  = g_secondRect;
         int32_t *origin = &g_viewX;
-        int32_t  vl = vx - halfW;
-        int32_t  vt = vy - halfH;
+        int32_t  vl = vpt.x - halfW;
+        int32_t  vt = vpt.y - halfH;
 
         world[0] = vl;
         world[1] = vt;
@@ -1933,8 +1933,8 @@ clamp_eye:
         origin[3] = g_screenH + origin[1];
         origin[2] = g_screenW + origin[0];
 
-        VIEW_EYE->y = (int16_t)vy;
-        VIEW_EYE->x = (int16_t)vx;
+        VIEW_EYE->y = (int16_t)vpt.y;
+        VIEW_EYE->x = (int16_t)vpt.x;
 
         IntersectRect(g_viewClipped,
                       (const RECT *)origin,
