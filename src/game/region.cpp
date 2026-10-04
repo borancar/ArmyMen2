@@ -10194,14 +10194,15 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
             }
             /* else: routing but not arrived -- do NOT touch heading/turret. */
         } else {
-            uint8_t a = AngleBetween((const AM2_Point *)(o + 0x12u),
-                                     (const AM2_Point *)(o + 0xC0u));
             int32_t d;
             int32_t dist;
 
-            *r = a;
+            /* No local for the bearing: it goes into the record and is
+             * read back from there. */
+            *r = AngleBetween((const AM2_Point *)(o + 0x12u),
+                              (const AM2_Point *)(o + 0xC0u));
             *(int32_t *)(r + 0x08u) = 4;
-            d = abs(AngleDelta(a, *(const uint8_t *)(o + OBJ_OFF_FACING)));
+            d = abs(AngleDelta(*r, *(const uint8_t *)(o + OBJ_OFF_FACING)));
             dist = ApproxDist((const AM2_Point *)(o + 0xC0u),
                               (const AM2_Point *)(o + 0x12u));
             if (*(const int32_t *)(o + 0x548u) == 0)
