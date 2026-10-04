@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1492 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1493 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,7 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1492:
+  From 758 to 1493:
   - **Pointer aliases are second variables** (2026-10-04): `AM2_Widget *w =
     this;`, `uint8_t *h = (uint8_t *)set;` and `T *x = g_table;` each make VC6
     reassociate or reorder (`(right - left) - width` where the image keeps
@@ -86,7 +86,13 @@ main result so far (details in `src/vc6/README.md`):
     image walks its argument in place the parameter itself is the walked
     byte pointer (VehicleUpdateApply matches, RefundPlacedUnit 74 -> 48).
     Matched functions keep their aliases: the change is made only where it
-    scores better. CommRegisterSelf 75 -> 65: an answer that merges at one
+    scores better. An inlined helper's by-value parameters are the same kind
+    of copy: as references (or a macro) RegionFindPath 96 -> 37 and
+    PointerPickMode0 303 -> 120; AimStartB matched with its index and
+    element pointer as macros. Reference parameters on RegionSpan made VC6
+    exit silently on region.cpp without AM2_RELINK (the relink's baseline
+    compile) -- it is a macro now; base-compile every file after such
+    changes. CommRegisterSelf 75 -> 65: an answer that merges at one
     `return result` stays in a register as the image's does.
   - **Globals that were one object** (2026-10-04): when the image keeps a
     load before a store that ours hoists past it, the globals were members of
