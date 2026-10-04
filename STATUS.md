@@ -87,6 +87,18 @@ main result so far (details in `src/vc6/README.md`):
     g_formationSlots, g_roachMasks, g_vehicleMasks). FormationPoint 47 -> 12,
     BuildVehicleMask 72 -> 67, the roach footprint pair 41/38 -> 36 each.
     AM2_OptionRec likewise (OptionsDefaults 18 -> 13).
+  - **What the remaining 165 are** (2026-10-04): a source-mutation search
+    (operand and comparison swaps, if/else and block flips, increment and
+    not-forms; 200 tries a function) over all of them found one (SetGamePalette),
+    a declaration-order permutation found none, and a per-file sweep of ~18
+    VC6 flags found nothing that does not lose matched functions -- so the
+    flags are right and what is left is register ties, which copy of an
+    identical block VC6 keeps (ScriptParseActionRecon, MissionEnded,
+    CommRegisterSelf), loop rotation (PlaceScenario's form-up), and the
+    CheatLine/PlacementScreenClick coin pair. Progress now comes from reading
+    the image's full disassembly for the original's shape: variable widths
+    (AiTrooperStep's int16 regions), field-wise copies (Step3Drive's spot),
+    case order, exit shape.
   - **Exits shaped as the image lays them out** (2026-10-04):
     VehicleBlockWeight 167 -> 83 (the boat arm returns through the shared
     `return answer`, each damage arm assigns hp, the type-2 test inverted);
