@@ -3738,7 +3738,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             GetVarValue(act->xvar, &v7);
             EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                           (int8_t)v7);
-            return;
+            break;      /* out of the switch, not `return` -- the layout */
         }
         EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                       (int8_t)act->n0);
