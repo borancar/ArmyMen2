@@ -246,7 +246,6 @@ extern "C" const AM2_FontDesc am2_font_descs[3] = {
 int32_t __cdecl BuildFont(int32_t font)
 {
     uint8_t  *scratch, *out, *kept;
-    uint16_t *offsets;
     HFONT     hfont;
     int32_t   ch;
     uint32_t  total;
@@ -269,7 +268,6 @@ int32_t __cdecl BuildFont(int32_t font)
     /* The first 32 characters are never rendered, so their offsets are zeroed
      * rather than written; the loop starts at space. */
     memset(font_offsets(font), 0, 32 * sizeof(uint16_t));
-    offsets = font_offsets(font) + 32;
 
     for (ch = 0x20; ch < 0x100; ch++) {
         uint32_t n;
@@ -277,7 +275,7 @@ int32_t __cdecl BuildFont(int32_t font)
         /* The offset and the room left are two expressions, not one `used`:
          * the image computes `out - scratch` and `scratch - out + size`
          * separately. */
-        *offsets = (uint16_t)(out - scratch);
+        font_offsets(font)[ch] = (uint16_t)(out - scratch);
         n = RenderGlyph(font, (char)ch, hfont, (AM2_Rle16 *)out,
                         (uint32_t)(scratch + GLYPH_SCRATCH - out));
         if (!n) {
@@ -286,7 +284,6 @@ int32_t __cdecl BuildFont(int32_t font)
             return 0;
         }
         out += n;
-        offsets++;
     }
     DeleteObject(hfont);
 
