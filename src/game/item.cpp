@@ -12851,8 +12851,13 @@ void __cdecl StepType5(void *obj)
 
             *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
             *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
-            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0)
+            /* Driven through the floor: the clamp also stops the fall.
+             * The image shares this block with the arm below (0x0043C1E8:
+             * one `jge` past both stores), so the two must be identical. */
+            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0) {
                 *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+                *(float *)(o + MISSILE_OFF_VZ)       = 0.0f;
+            }
         } else {
             /* Flat and on the floor: it stops falling as well as sinking. */
             *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
@@ -12893,9 +12898,7 @@ void __cdecl StepType5(void *obj)
         }
     }
 
-    while (1) {
-        if (!(travel > 0.0))
-            break;
+    while (travel > 0.0) {
         float   d = travel < AM2_MISSILE_SUBSTEP ? travel
                                                  : AM2_MISSILE_SUBSTEP;
         int32_t nx, ny;
