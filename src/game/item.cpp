@@ -14354,7 +14354,6 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                            int32_t remote, int32_t uid)
 {
     uint8_t       *o;
-    const uint8_t *def;
     int32_t        kb;
     int32_t        ammo;
 
@@ -14384,9 +14383,9 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     kb = (int32_t)KeyFieldB(*(const uint32_t *)(
              (const uint8_t *)(g_aaiRecords)[key]
              + 8));
-    def = g_missileDefs
+    *(const uint8_t **)(o + 0xC0u) = g_missileDefs
           + (uint32_t)kb * AM2_MISSILE_DEF_REC_SIZE;
-    *(const uint8_t **)(o + 0xC0u) = def;
+#define def (*(const uint8_t *const *)(o + 0xC0u))
 
     /* The ammo filter is a switch, compiled to a byte-indexed table at
      * 0x0045F270 over keys 1..29: fifteen keys take -1 and every other key
@@ -14432,4 +14431,5 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
 
     ObjMoveAlongFacing(o, 0, 0, 0);
     return o;
+#undef def
 }
