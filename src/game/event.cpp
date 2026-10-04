@@ -3807,11 +3807,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * act->n0; the only difference is that a positive xvar gets a
          * GetVarValue call whose answer nothing uses. Second arm in this
          * function to discard a call's result, after playsoundon. */
-        int32_t ignored = 0;
+        int32_t ignored;                /* never cleared: nothing reads it */
+        int32_t frame = act->n0;
 
         if (act->xvar > 0)
             GetVarValue(act->xvar, &ignored);
-        ScriptSetObjBitmap(act->subject, act->n0);
+        ScriptSetObjBitmap(act->subject, frame);
         return;
     }
 
