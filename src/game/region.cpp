@@ -2180,27 +2180,24 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
                       + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
-            if (splitOdd != off % 2) {
-                if (bits[off]) {
+            if (splitOdd == off % 2) {
+                if (bits[off] & tab[k]) {
                     cells[idx] |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
                     MarkTileRing(cells, ring, idx);
                 }
-                continue;
-            }
 
-            if (bits[off] & tab[k]) {
-                cells[idx] |= AM2_TILEMASK_BOX_CELL;
-                marked = 1;
-                MarkTileRing(cells, ring, idx);
-            }
+                col++;
+                idx++;
+                if (col == lw + AM2_TILEMASK_MARGIN)
+                    break;
 
-            col++;
-            idx++;
-            if (col == lw + AM2_TILEMASK_MARGIN)
-                break;
-
-            if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    marked = 1;
+                    MarkTileRing(cells, ring, idx);
+                }
+            } else if (bits[off]) {
                 cells[idx] |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
                 MarkTileRing(cells, ring, idx);
@@ -2689,7 +2686,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     const uint8_t  *h     = (const uint8_t *)hdr;
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
-    uint8_t        *cells;
+#define cells (rec + TILEMASK_OFF_CELLS)
     int32_t        *ring  = g_tilemaskNeighbours;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
@@ -2757,7 +2754,6 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
     w = box[2] - box[0] + 1;
-    cells = rec + TILEMASK_OFF_CELLS;
     memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
 
     ring[1]  = -2 * w;
@@ -2802,36 +2798,37 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
         int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rw;
         int32_t end = off + rw;
         int32_t col = AM2_TILEMASK_MARGIN;
-        int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
-                      + AM2_TILEMASK_MARGIN;
+        uint8_t *c   = cells + ((y >> AM2_TILE_SHIFT) - box[1]) * w
+                             + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
             if (rowbits == off % 2) {
                 if (bits[off] & tab[k]) {
-                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, idx);
+                    MarkTileRing(cells, ring, (int32_t)(c - cells));
                 }
 
                 col++;
-                idx++;
+                c++;
                 if (col == tilew + AM2_TILEMASK_MARGIN)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
-                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, idx);
+                    MarkTileRing(cells, ring, (int32_t)(c - cells));
                 }
             } else if (bits[off]) {
-                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(cells, ring, idx);
+                MarkTileRing(cells, ring, (int32_t)(c - cells));
             }
         }
     }
 
     return marked;
+#undef cells
 }
 
 /* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
@@ -8162,6 +8159,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *w = (uint8_t *)out;
     uint8_t *at;
+    uint8_t *pos;
     int32_t  klass;
     int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
@@ -8173,8 +8171,9 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint32_t stepPoint;
     int32_t  d;                /* the enforced turn's delta, taken first */
 
-    stepPoint = *(const uint32_t *)(o + OBJ_OFF_POS);
     klass = ClassifyByCode74(o);
+    pos = o + OBJ_OFF_POS;
+    stepPoint = *(const uint32_t *)pos;
     if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
         goto pose;
 
@@ -8202,7 +8201,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
                              + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0) {
         *(int16_t *)(o + OBJ_OFF_FIELD_D6) = 0;
         *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = 0;
-        at = (uint8_t *)ObjectsAtPoint((const uint32_t *)(o + OBJ_OFF_POS),
+        at = (uint8_t *)ObjectsAtPoint((const uint32_t *)pos,
                                        g_objMapDesc);
         goto settle_facing;
     }
@@ -8592,7 +8591,7 @@ pose:
 
             if (held)
                 *(uint32_t *)(held + OBJ_OFF_POS) =
-                    *(const uint32_t *)(o + OBJ_OFF_POS);
+                    *(const uint32_t *)pos;
         }
     }
 
@@ -10538,7 +10537,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 if (aimed != 0) {
                     /* Firing at an OBJECT: the spot is its position and its
                      * ground height, and the heading gets a +/-2 spread. */
-                    *(uint32_t *)&spot.at = *(const uint32_t *)(aimed + 0x12u);
+                    spot.at.x = *(const int16_t *)(aimed + 0x12u);
+                    spot.at.y = *(const int16_t *)(aimed + 0x14u);
                     spot.ground = *(const int16_t *)(aimed + 0x42u);
                     /* Asked and discarded, in both aimed arms. */
                     (void)AngleBetween((const AM2_Point *)(o + 0x12u),
