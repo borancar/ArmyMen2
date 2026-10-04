@@ -2037,7 +2037,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (*at < ctx->count)
-            goto place;
+            return ScriptLocation(ctx, at, act, 0) != 0;
 eos:
         am2_log("Unexpected end of script.\n");
         /* fall through */
@@ -2447,7 +2447,7 @@ eos:
             }
         } else
             act->n0 = -1;
-        goto place;
+        return ScriptLocation(ctx, at, act, 0) != 0;
 
     case AM2_TOK_UNITFIRE:
         STEP();
