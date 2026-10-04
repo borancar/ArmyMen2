@@ -128,6 +128,20 @@ main result so far (details in `src/vc6/README.md`):
     MakeBitmap, ListUpdate, MpPanelScreen, HudEdgeUpdate, CheckMapRules);
     the ones read so far are register-allocation choices -- which value
     gets ebp, which is spilled -- that no spelling tried moved.
+  - **Three more distance reductions that do not flip to exact**
+    (2026-10-04). `$T/cntgap.py SRC FN img|ours` lists the normalised hunks
+    where one side holds more instructions than the other -- the structural
+    (not register) gaps. It found: ObjHitMaskAction's 20-entry neighbour
+    ring wants index-order source (VC6 schedules the scramble itself),
+    218 -> 162; StepType5's floor clamp must share the flat-on-the-floor
+    block that also zeroes MISSILE_OFF_VZ (a real behaviour fix -- an
+    undershooting missile kept a frame of negative velocity), 110 -> 106;
+    HudTopUpdate reads g_mouseGrab fresh in the off-button arm, 74 -> 67.
+    None reaches 0, so the relink stays 1507. DepthResort (31) and the rest
+    of the near-miss band are register-colouring losses: DepthResort's head
+    pointer lands in edx in the image and eax in ours, with the two unlink
+    exits already separate blocks in both -- nothing to fold, nothing a
+    spelling moves.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
