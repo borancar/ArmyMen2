@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1497 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1499 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,19 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1497:
+  From 758 to 1499:
+  - **VC6 saves registers lazily** (2026-10-04). After an early-return
+    region it pushes ebx/edi/ebp at the point they are first needed, but
+    only when the paths after that point converge on one exit. StepType2
+    and PlaceScenario match once their mid-function `return`s jump to the
+    single tail (`goto tail` / `goto done`). SightScan and the two mask
+    builders also lost a redundant early return. Two more VC6 spellings:
+    a single-case `switch` compiles to `sub eax, K; jne` (PlaceScenario),
+    and `while (1)` is the unrotated loop where `for (;;)` rotates
+    (CommRegisterSelf 65 -> 44). Two transcription errors turned up along
+    the way: ReceivePlayerMsg's log line had lost its "for id %x\n" tail,
+    and StepType5 cut a blast's y to sixteen bits where the image passes
+    the whole sum.
   - **Where VC6 puts a shared exit follows the shape of the source**
     (2026-10-04). EnumSessionsCb matches once its three refusals are separate
     `if (x) goto refuse;` statements jumping forward to the failed
