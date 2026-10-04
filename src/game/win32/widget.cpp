@@ -11446,6 +11446,7 @@ void __cdecl OpenMpJoin(void)
 void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 {
     int32_t len;
+    int32_t width;          /* the extent, kept in its own local as the image does */
 
     /* The focused field is read from its global at every use -- VC6 shares
      * the loads between calls and reloads after each, as the image does --
@@ -11472,9 +11473,9 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
         /* The refusal beep is written three times; VC6 folds the copies
          * into one block, the image's -- this layout is what puts it where
          * the image has it. */
-        if (TextExtent(*(const char *const *)(FOCUS + EDIT_OFF_TEXT),
-                       *(const int32_t *)(FOCUS + EDIT_OFF_FONT), 0)
-                + EDIT_TEXT_MARGIN > g_focusedEdit->w) {
+        width = TextExtent(*(const char *const *)(FOCUS + EDIT_OFF_TEXT),
+                           *(const int32_t *)(FOCUS + EDIT_OFF_FONT), 0);
+        if (width + EDIT_TEXT_MARGIN > g_focusedEdit->w) {
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
