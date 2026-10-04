@@ -410,7 +410,7 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
             int32_t i;
 
             i = 0;
-            for (;;) {
+            while (1) {
                 if (i >= AM2_PLAYER_RING_LEN)
                     break;
                 ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
