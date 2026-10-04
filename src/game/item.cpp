@@ -11261,6 +11261,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *row0;
     AM2_Point at;
+    AM2_Point out;   /* NearestClearPoint's answer: its own slot in the image */
     uint8_t   height;
 
     if (*(const int32_t *)(g_commObject
@@ -11272,8 +11273,8 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
     at.x = (int16_t)x;
     at.y = (int16_t)y;
-    NearestClearPoint(*(const uint32_t *)&at, &at);
-    *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&at;
+    NearestClearPoint(*(const uint32_t *)&at, &out);
+    *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&out;
 
     height = HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
     *(o + OBJ_OFF_HEIGHT_SET) = height;
