@@ -1035,7 +1035,7 @@ int32_t __cdecl PlaceScenario(void)
                     g_leaderFacing =
                         amt < 1 ? 1 : amt;
                     g_viewHold = 1;
-                    g_viewTarget =
+                    (*(uint32_t *)&g_viewTarget) =
                         g_leaderPos;
                 }
                 continue;
@@ -1092,7 +1092,7 @@ int32_t __cdecl PlaceScenario(void)
                     DeselectAll();
                     SelectUnit(unit);
                     g_viewHold   = 1;
-                    g_viewTarget =
+                    (*(uint32_t *)&g_viewTarget) =
                         g_leaderPos;
                 }
                 SelectInventorySlot(unit, 0);

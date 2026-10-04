@@ -1864,10 +1864,10 @@ void __cdecl ViewUpdate(void)
     int16_t vx, vy;
     void   *obj;
 
-    (*(AM2_Point *)&g_viewTarget).x = (int16_t)Clamp((*(AM2_Point *)&g_viewTarget).x, halfW + BOUND_L,
+    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
                                     BOUND_R - halfW - 1);
     halfH = h >> 1;
-    (*(AM2_Point *)&g_viewTarget).y = (int16_t)Clamp((*(AM2_Point *)&g_viewTarget).y, halfH + BOUND_T,
+    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, halfH + BOUND_T,
                                     BOUND_B - halfH - 1);
 
     obj = g_objCtxObj;
@@ -1876,25 +1876,25 @@ void __cdecl ViewUpdate(void)
 
         /* Both copies are a word at a time, as the image makes them. */
         if (g_viewSnap) {
-            (*(AM2_Point *)&g_viewTarget).x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            (*(AM2_Point *)&g_viewTarget).y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
-            tx = (*(AM2_Point *)&g_viewTarget).x;
-            ty = (*(AM2_Point *)&g_viewTarget).y;
+            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            tx = g_viewTarget.x;
+            ty = g_viewTarget.y;
             g_viewSnap = 0;
             goto clamp_eye;
         }
         if (g_objCtxSet) {
-            (*(AM2_Point *)&g_viewTarget).x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            (*(AM2_Point *)&g_viewTarget).y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
+            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
         }
     }
 
-    dist = ApproxDist(VIEW_EYE, &(*(AM2_Point *)&g_viewTarget));
+    dist = ApproxDist(VIEW_EYE, &g_viewTarget);
     step = (int32_t)(g_viewSpeed
                      * g_frameDeltaSec);
 
-    dx = (*(AM2_Point *)&g_viewTarget).x - VIEW_EYE->x;
-    dy = (*(AM2_Point *)&g_viewTarget).y - VIEW_EYE->y;
+    dx = g_viewTarget.x - VIEW_EYE->x;
+    dy = g_viewTarget.y - VIEW_EYE->y;
 
     /* THE TARGET IS NOT WRITTEN BACK. The step lands in two locals -- x in a
      * register, y in the word at frame +0x16 -- and only the eye moves, so a

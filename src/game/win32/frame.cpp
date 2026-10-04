@@ -81,7 +81,7 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 /* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
 /* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
-#define VIEW_TARGET ((AM2_Point *)&g_viewTarget)
+#define VIEW_TARGET (&g_viewTarget)
 #define VIEW_EYE2   ((const AM2_Point *)&g_listenerPos)
 
 

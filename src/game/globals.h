@@ -862,7 +862,7 @@
 #define g_viewRectPrev           (*(AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV)  /* 0x00514E24 */
 #define g_viewSnap               (*(int32_t *)(uintptr_t)ADDR_VIEW_SNAP)  /* 0x00511E34 */
 #define g_viewSpeed              (*(int32_t *)(uintptr_t)ADDR_VIEW_SPEED)  /* 0x004852E0 */
-#define g_viewTarget             (*(uint32_t *)(uintptr_t)ADDR_VIEW_TARGET)  /* 0x00514E08 */
+#define g_viewTarget             (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)  /* 0x00514E08 */
 #define g_viewTilesH             (*(int32_t *)(uintptr_t)ADDR_VIEW_TILES_H)  /* 0x00514EA4 */
 #define g_viewTilesW             (*(int32_t *)(uintptr_t)ADDR_VIEW_TILES_W)  /* 0x00514EA0 */
 #define g_viewX                  (*(int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)  /* 0x00514E14 */
