@@ -92,7 +92,11 @@ main result so far (details in `src/vc6/README.md`):
     AM2_LoadGameScreen matches once its panel offsets are assigned just
     before the state test rather than at their declaration: initialised
     locals get frame slots, while the image keeps them in registers. The
-    rest are still short of exact, on register choice.
+    rest are still short of exact, on register choice. AM2_MpPanelScreen's
+    five operator-new-plus-construct calls are plain `new X(...)` in the
+    image: each allocation carries its own unwind state (26 of them).
+    HudPostUpdate's empty-pointer action takes a literal null, which the
+    image emits as a register known to hold zero.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
