@@ -11486,10 +11486,17 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 
     if (ch >= 0x20 && ch < 0x80 && ch != '^'
         && orig_strchr(*(const char *const *)(FOCUS + EDIT_OFF_CHARSET), (int)ch)) {
+        /* The refusal beep is written three times; VC6 folds the copies
+         * into one block, the image's -- this layout is what puts it where
+         * the image has it. */
         if (TextExtent(*(const char *const *)(FOCUS + EDIT_OFF_TEXT),
                        *(const int32_t *)(FOCUS + EDIT_OFF_FONT), 0)
-                + EDIT_TEXT_MARGIN > g_focusedEdit->w
-            || len >= *(const int32_t *)(FOCUS + EDIT_OFF_MAX) - 1) {
+                + EDIT_TEXT_MARGIN > g_focusedEdit->w) {
+            PlaySoundAt(2, 0, 0, 0, 0);
+            return;
+        }
+        if (len >= *(const int32_t *)(FOCUS + EDIT_OFF_MAX) - 1) {
+        full:
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
@@ -11500,13 +11507,12 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
     }
 
     if (ch == 8) {
-        if (len <= 0) {
-            PlaySoundAt(2, 0, 0, 0, 0);
+        if (len > 0) {
+            (*(char **)(FOCUS + EDIT_OFF_TEXT))[len - 1] = '\0';
+            EditNotifyAndRepaint();
             return;
         }
-        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len - 1] = '\0';
-        EditNotifyAndRepaint();
-        return;
+        goto full;      /* nothing to delete: the same refusal beep */
     }
 
     if (ch == 0x0D) {
