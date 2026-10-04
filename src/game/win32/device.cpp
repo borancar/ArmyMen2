@@ -467,23 +467,20 @@ void __cdecl UpdateMouseState(void)
 
 /* One button event. `changed` is against the previous state rather than a
  * simple "went down", so a release marks it too -- and only a release clears
- * the claim the menus set. A macro, and the button stored in each arm: that
- * is what lets VC6 copy the join into both arms for buttons 0 and 1 as the
- * image has it (an inline function or a join-side store keeps one join). */
+ * the claim the menus set. A macro, the button stored in each arm and READ
+ * BACK for the comparison: the image stores the new state from a register it
+ * then compares, where a `now` local let VC6 store the constant itself. */
 #define MouseButton(n, data)                                                  \
     do {                                                                      \
-        int32_t was_ = (&g_mouseButton)[n];                                      \
-        int32_t now_;                                                         \
+        int32_t was_ = (&g_mouseButton)[n];                                   \
                                                                               \
         if ((data) & BUTTON_DOWN) {                                           \
-            now_ = 1;                                                         \
-            (&g_mouseButton)[n] = now_;                                          \
+            (&g_mouseButton)[n] = 1;                                          \
         } else {                                                              \
-            now_ = 0;                                                         \
-            (&g_mouseButton)[n] = now_;                                          \
-            (&g_mouseClaimed)[n] = 0;                                            \
+            (&g_mouseButton)[n] = 0;                                          \
+            (&g_mouseClaimed)[n] = 0;                                         \
         }                                                                     \
-        (&g_mouseChanged)[n] = (now_ != was_);                                   \
+        (&g_mouseChanged)[n] = ((&g_mouseButton)[n] != was_);                 \
     } while (0)
 
 void __cdecl PollMouse(void)
@@ -523,9 +520,11 @@ void __cdecl PollMouse(void)
                 g_mouseAcquired = 0;
                 return;
             }
-        } else if (hr != DI_OK) {
-            return;
         }
+        /* Asked again after a successful retry, as the image does: both
+         * paths meet at one `cmp eax, esi`. */
+        if (hr != DI_OK)
+            return;
 
         if (count == 0) {
 #if defined(AM2_STANDALONE) && !defined(AM2_RELINK)   /* harness input, not the original */
