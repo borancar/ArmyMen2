@@ -3836,11 +3836,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x2A:                                  /* setaimode, army or object */
         /* act->extra chooses the TARGET, not the value: the same act->n0
          * goes to a whole army or to one resolved object. */
-        if (act->extra != 0)
-            EvtArmySetField(act->army, act->subject, act->n0);
-        else
+        if (act->extra == 0)
             EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                          act->n0);
+        else
+            EvtArmySetField(act->army, act->subject, act->n0);
         return;
 
     case 0x2B:

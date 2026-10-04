@@ -2806,27 +2806,24 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
                       + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
-            if (rowbits != off % 2) {
-                if (bits[off]) {
+            if (rowbits == off % 2) {
+                if (bits[off] & tab[k]) {
                     cells[idx] |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
                     MarkTileRing(cells, ring, idx);
                 }
-                continue;
-            }
 
-            if (bits[off] & tab[k]) {
-                cells[idx] |= AM2_TILEMASK_BOX_CELL;
-                marked = 1;
-                MarkTileRing(cells, ring, idx);
-            }
+                col++;
+                idx++;
+                if (col == tilew + AM2_TILEMASK_MARGIN)
+                    break;
 
-            col++;
-            idx++;
-            if (col == tilew + AM2_TILEMASK_MARGIN)
-                break;
-
-            if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    marked = 1;
+                    MarkTileRing(cells, ring, idx);
+                }
+            } else if (bits[off]) {
                 cells[idx] |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
                 MarkTileRing(cells, ring, idx);
@@ -3398,7 +3395,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
     uint8_t  *pos;
     AM2_Point pt;                    /* the original's first argument slot */
     int32_t   fromTile, toTile;
-    int32_t   fromRegion, toRegion;
+    int16_t   fromRegion, toRegion;
     int32_t   d;
 
     /* A zero goal is "nowhere to be", and it leaves `out` alone entirely. */
@@ -3596,10 +3593,10 @@ walk:
 
     /* Indexed by the AI context's class -- SIGHTC_OFF_FIELD_00, which
      * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
-    *(int32_t *)(w + 8) =
-        *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
-            ? (g_aiMoveStateAlt)[*(const int32_t *)ctx]
-            : (g_aiMoveState)[*(const int32_t *)ctx];
+    if (*(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) == 0)
+        *(int32_t *)(w + 8) = g_aiMoveState[*(const int32_t *)ctx];
+    else
+        *(int32_t *)(w + 8) = g_aiMoveStateAlt[*(const int32_t *)ctx];
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
         *(int32_t *)(w + 8) = 3;
 

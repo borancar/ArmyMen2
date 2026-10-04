@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1479 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1480 of
   1645 byte-identical (2026-10-04), piecewise 399.** 1480 before the globals
   rename; PlacementScreenClick is lost to the known coin pair with
   CheatLine (cursor + view origin load order), which tracks the set of new

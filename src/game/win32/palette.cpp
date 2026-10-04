@@ -331,7 +331,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
 
     /* Four 256-byte blocks, back to back. */
     g_remapShades[0] = (uint8_t *)((((uintptr_t)g_remapShadeStore) + 3) & ~3u);
-    for (k = 1; k < 4; k++)
+    for (k = 1; 4 > k; k++)
         g_remapShades[k] = g_remapShades[k - 1] + PALETTE_ENTRIES;
 
     i = 0;
