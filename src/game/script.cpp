@@ -2188,14 +2188,12 @@ eos:
     case AM2_TOK_SETBRIEFING:
         STEP();
         act->code = 0x27;
-        WANT(AM2_TOKEN_STRING)
-        act->text = (char *)TOK.value;
-        (*at)++;
-        return 1;
+        goto string_arg;        /* the image shares SETBRIEFVO's tail */
 
     case AM2_TOK_SETBRIEFVO:
         STEP();
         act->code = 0x28;
+    string_arg:
         WANT(AM2_TOKEN_STRING)
         act->text = (char *)TOK.value;
         (*at)++;
@@ -2270,12 +2268,7 @@ eos:
     case AM2_TOK_SETNPC:
         STEP();
         act->code = 0x2D;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        WANT(AM2_TOKEN_INTEGER)
-        act->n0 = TOKVAL;
-        (*at)++;
-        return 1;
+        goto name_then_int;     /* the image shares ADDEXP's tail */
 
     case AM2_TOK_SETITEMFLAG:
         STEP();
@@ -2423,6 +2416,7 @@ eos:
     case AM2_TOK_ADDEXP:
         STEP();
         act->code = 0x35;
+    name_then_int:
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         WANT(AM2_TOKEN_INTEGER)
