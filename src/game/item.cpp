@@ -13548,6 +13548,10 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
      * rather than over the head. With no target spot.at the distance IS the
      * maximum, so the scale is exactly 1.0 and the shot is flat. */
     case 2: {
+        /* This arm's own copy of the target point: VC6 parks it in a dead
+         * argument slot, where the image has it, rather than sharing `b`. */
+        AM2_Point to;
+
         fromP[1] = (int16_t)(fromP[1] - 0x10);
         PlaySoundAt(0x0C, 0, 0, fromP[0], fromP[1]);
 
@@ -13556,8 +13560,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
             a.y = (int16_t)AM2_FTOL((double)pt[1]
                                     - (double)(pt[1] - fromP[1]) * AM2_FW_ARC_K
                                     + AM2_FW_ARC_BIAS);
-            b = *(const AM2_Point *)pt;
-            d = ApproxDist(&a, &b);
+            to = *(const AM2_Point *)pt;
+            d = ApproxDist(&a, &to);
         } else
             d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
