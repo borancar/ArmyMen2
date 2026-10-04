@@ -2600,17 +2600,13 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
                 sx = 0;
                 total = MAP_TILES_W * MAP_TILES_H;
-                i = 0;
                 sy = 0;
-                while (1) {
-                    if (!(i < total))
-                        break;
+                for (i = 0; i < total; i++) {
                     if ((int32_t)PAD_LAYER[i] == number) {
                         sx += i % MAP_TILES_H;
                         sy += i / MAP_TILES_H;
                         n++;
                     }
-                    i++;
                 }
                 if (n > 0) {
                     /* Sixteenths, rounded. */
