@@ -8723,12 +8723,17 @@ void __cdecl StepType2(void *obj)
             RowFaceSprite(row);
             *(int32_t *)out = 0;
             LeaveRemainsRow(row);
+            DestroyByType(obj);
         } else {
             *(int32_t *)out = 0;
+            DestroyByType(obj);
         }
-        DestroyByType(obj);
-        UpdateTrooperAction(obj, w, out);
-        return;
+        /* DestroyByType is written in each arm, as the image has it (one
+         * stack adjustment covers the arm's calls), and the path then takes
+         * the shared tail rather than returning: an early `return` here made
+         * VC6 save ebx and edi in the prologue, where the image saves them
+         * only after the destroyed branch. */
+        goto tail;
     }
 
     /* EVERY ALIVE PATH CONVERGES ON ADDR_UPDATE_TROOPER_ACTION -- it is a tail, not a set
