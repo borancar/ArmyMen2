@@ -66,12 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1478 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1479 of
   1645 byte-identical (2026-10-04), piecewise 399.** 1480 before the globals
-  rename; the two lost are CheatLine and PlacementScreenClick, the known
-  coin pair (cursor + view origin load order). They track the set of new
-  identifiers the headers declare, so they are settled last, after all
-  header work. Earlier: 384 at start,
+  rename; PlacementScreenClick is lost to the known coin pair with
+  CheatLine (cursor + view origin load order), which tracks the set of new
+  identifiers the headers declare -- settled last, after all header work. Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1480:
@@ -87,6 +86,13 @@ main result so far (details in `src/vc6/README.md`):
     bound as typed arrays (g_rankRecords, g_sightBlockByDir,
     g_formationSlots, g_roachMasks, g_vehicleMasks). FormationPoint 47 -> 12,
     BuildVehicleMask 72 -> 67, the roach footprint pair 41/38 -> 36 each.
+    AM2_OptionRec likewise (OptionsDefaults 18 -> 13).
+  - **Exits shaped as the image lays them out** (2026-10-04):
+    VehicleBlockWeight 167 -> 83 (the boat arm returns through the shared
+    `return answer`, each damage arm assigns hp, the type-2 test inverted);
+    PlaceScenario 127 -> 62 (rows loaded after the army lookup, the form-up
+    list re-read from the table at each use, its counters zeroed before the
+    leader lookup).
   - **Global tables are arrays of structs** (2026-10-03): FindPath's path
     nodes are AM2_PathNode[0x10000] indexed by tile, as the image addresses
     them (`[tile*16 + base + field]`), not through an element pointer

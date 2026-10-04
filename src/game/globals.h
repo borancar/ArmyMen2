@@ -517,7 +517,7 @@
 #define g_optDan                 ((uint8_t *)(uintptr_t)ADDR_OPT_DAN)  /* 0x004FD740 */
 #define g_optDbg                 (*(int32_t *)(uintptr_t)ADDR_OPT_DBG)  /* 0x0050C358 */
 #define g_optDf                  (*(int32_t *)(uintptr_t)ADDR_OPT_DF)  /* 0x0047894C */
-#define g_optionTable            ((uint8_t *)(uintptr_t)ADDR_OPTION_TABLE)  /* 0x004865B8 */
+#define g_optionTable            ((AM2_OptionRec *)(uintptr_t)ADDR_OPTION_TABLE)  /* 0x004865B8 */
 #define g_optNoIntro             (*(int32_t *)(uintptr_t)ADDR_OPT_NO_INTRO)  /* 0x004FA038 */
 #define g_optNoMovies            (*(int32_t *)(uintptr_t)ADDR_OPT_NO_MOVIES)  /* 0x0051259C */
 #define g_optPeter               ((uint8_t *)(uintptr_t)ADDR_OPT_PETER)  /* 0x004FD744 */

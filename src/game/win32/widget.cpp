@@ -1902,8 +1902,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
  * of rectangle, a flag, the caption and the handler. */
 
 
-#define OPT_REC(base, off) (*(const int32_t *)((base) + (off)))
-
 
 /* 0x0044F370, thiscall, `ret 8`. AUDIO CONTROLS -- three volume sliders.
  *
@@ -10670,27 +10668,26 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     /* By index, the index doubling as the checkbox's group number: the
      * image's loop test is a signed `jl` against the strength-reduced
      * cursor. */
-#define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                   ((uintptr_t)g_optionTable))[record][(off) / 4])
+#define REC (g_optionTable[record])
     for (record = 0; record < AM2_OPTION_COUNT; record++) {
         AM2_Widget *cb = new AM2_CheckBox(
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK3)),
-                *RectSet(AM2_TEMP(AM2_Rect), REC(0x04), REC(0x08), 0xC8, 0x0D),
+                *RectSet(AM2_TEMP(AM2_Rect), REC.x, REC.y, 0xC8, 0x0D),
                 record,
-                (const char *)REC(0x20),
+                REC.label,
                 (void (__cdecl *)(AM2_Widget *))kOptionsSyncGroup);
-        boxes[REC(AM2_OPTION_OFF_WIDGET)] = cb;
+        boxes[REC.widget] = cb;
         cb->flag3C = 0;
 
-        if (REC(AM2_OPTION_OFF_WHICH))
+        if (REC.which)
             *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
-                (g_gameOverFlags & (uint32_t)REC(AM2_OPTION_OFF_BIT)) != 0;
+                (g_gameOverFlags & (uint32_t)REC.bit) != 0;
         else
             *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
-                (g_gameSetting22C & (uint32_t)REC(AM2_OPTION_OFF_BIT)) != 0;
+                (g_gameSetting22C & (uint32_t)REC.bit) != 0;
 
         ::WidgetAddChild(w, cb);
         if (!host)
@@ -10700,16 +10697,15 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
 
     /* Asked twice: once for the group pass, again for the buttons. */
     if (host) {
-#define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                   ((uintptr_t)g_optionTable))[record][(off) / 4])
+#define REC (g_optionTable[record])
         for (record = 0; record < AM2_OPTION_COUNT; record++) {
             AM2_Widget *head;
             int32_t     i;
 
-            if (!REC(AM2_OPTION_OFF_GROUP))
+            if (!REC.group)
                 continue;
-            head = boxes[REC(AM2_OPTION_OFF_WIDGET)];
-            for (i = REC(AM2_OPTION_OFF_FIRST); i <= REC(AM2_OPTION_OFF_LAST);
+            head = boxes[REC.widget];
+            for (i = REC.first; i <= REC.last;
                  i++)
                 boxes[i]->disabled =
                     (*((const uint8_t *)head + CHECKBOX_OFF_CHECKED) == 0);
@@ -10765,8 +10761,7 @@ void __attribute__((thiscall)) AM2_Widget::OptionsUpdate()
 
 /* Both walk the table by INDEX -- the image's loop test is a signed `jl`
  * against the strength-reduced cursor, which a pointer walk would make `jb`. */
-#define OPT(i, off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
-                      ((uintptr_t)g_optionTable))[i][(off) / 4])
+#define OPT(i) (g_optionTable[i])
 
 void __cdecl OptionsDefaults(AM2_Widget *button)
 {
@@ -10781,10 +10776,11 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
         AM2_Widget *box;
         uint32_t    bit, mask;
 
-        box = OptionBox(parent, OPT(i, AM2_OPTION_OFF_WIDGET));
-        mask = OPT(i, AM2_OPTION_OFF_WHICH) ? flags : other;
+        const AM2_OptionRec *r = &g_optionTable[i];
+        box = OptionBox(parent, r->widget);
+        mask = r->which ? flags : other;
         box->disabled = 0;
-        bit = (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
+        bit = (uint32_t)r->bit;
         *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
         WidgetVPaint(box, box->rect);
     }
@@ -10798,12 +10794,12 @@ void __cdecl OptionsApply(AM2_Widget *button)
     int32_t     i;
 
     for (i = 0; i < AM2_OPTION_COUNT; i++) {
-        if (*((const uint8_t *)OptionBox(parent, OPT(i, AM2_OPTION_OFF_WIDGET))
+        if (*((const uint8_t *)OptionBox(parent, OPT(i).widget)
               + CHECKBOX_OFF_CHECKED)) {
-            if (OPT(i, AM2_OPTION_OFF_WHICH))
-                flags |= (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
+            if (OPT(i).which)
+                flags |= (uint32_t)OPT(i).bit;
             else
-                other |= (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
+                other |= (uint32_t)OPT(i).bit;
         }
     }
 
@@ -10830,17 +10826,15 @@ void __cdecl OptionsRequest(void)
 void __cdecl OptionsSyncGroup(AM2_Widget *header)
 {
     AM2_Widget    *parent = header->parent;
-    const uint8_t *rec    = g_optionTable
-                            + *(const int32_t *)((uint8_t *)header
-                                                 + CHECK_OFF_GROUP)
-                              * AM2_OPTION_STRIDE;
+    const AM2_OptionRec *rec =
+        &g_optionTable[*(const int32_t *)((uint8_t *)header + CHECK_OFF_GROUP)];
     int32_t        i;
 
-    if (!*(const int32_t *)(rec + AM2_OPTION_OFF_GROUP))
+    if (!rec->group)
         return;
 
-    for (i = *(const int32_t *)(rec + AM2_OPTION_OFF_FIRST);
-         i <= *(const int32_t *)(rec + AM2_OPTION_OFF_LAST);
+    for (i = rec->first;
+         i <= rec->last;
          i++) {
         AM2_Widget *box = OptionBox(parent, i);
 

@@ -981,7 +981,7 @@ int32_t __cdecl PlaceScenario(void)
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
         uint8_t *part = scen + SCENARIO_OFF_PARTS
                       + (size_t)slot * SCENARIO_PART_BYTES;
-        uint8_t *row  = *(uint8_t **)(part + SCENARIO_PART_OFF_ROWS);
+        uint8_t *row;
 #define n (*(const int16_t *)(part + SCENARIO_PART_OFF_COUNT))
         int32_t  army;
         int32_t  i;
@@ -992,6 +992,7 @@ int32_t __cdecl PlaceScenario(void)
 
         army = ((AM2_Comm *)comm)->CommSlotForArmy(slot);
 
+        row = *(uint8_t **)(part + SCENARIO_PART_OFF_ROWS);
         for (i = 0; i < n; row += SCEN_ROW_BYTES, i++) {
             uint8_t *unit;
 #define kind (*(const int32_t *)(row + SCEN_ROW_OFF_KIND))
@@ -1115,9 +1116,11 @@ int32_t __cdecl PlaceScenario(void)
 
     /* The .cof pass: put the leader where the save says, then form up on it. */
     {
-        uint8_t *lead = (uint8_t *)LookupOwnerObj(g_defaultOwner);
+        uint8_t *lead;
+        int32_t  i      = 0;
         int32_t  formed = 0;
-        int32_t  i;
+
+        lead = (uint8_t *)LookupOwnerObj(g_defaultOwner);
 
         if (!lead)
             return 1;
@@ -1131,9 +1134,9 @@ int32_t __cdecl PlaceScenario(void)
         DeselectAll();
         SelectUnit(lead);
 
-        for (i = 0; ; ) {
-            uint8_t **list = ((uint8_t ** *)g_armyObjLists)
-                                 [g_defaultOwner];
+        /* Our army's list, re-read from the table at every use. */
+#define list (((uint8_t ** *)g_armyObjLists)[g_defaultOwner])
+        for (;;) {
             uint8_t  *obj;
 
             if (i >= *(const int32_t *)((const uint8_t *)list + 4))
@@ -1171,6 +1174,7 @@ int32_t __cdecl PlaceScenario(void)
             }
             i++;
         }
+#undef list
     }
     return 1;
 #undef n

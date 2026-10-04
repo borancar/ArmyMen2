@@ -68,4 +68,17 @@ typedef struct AM2_MaskRec {
     struct { int16_t x, y; } pts[40];
 } AM2_MaskRec;
 
+/* One checkbox of the OPTIONS dialog, ADDR_OPTION_TABLE[AM2_OPTION_COUNT],
+ * 0x24 bytes. The dialog is declared by this table; see ADDR_OPTION_TABLE. */
+typedef struct AM2_OptionRec {
+    int32_t     widget;     /* +0x00 index in the parent's widget array */
+    int32_t     x, y;       /* +0x04 */
+    int32_t     group;      /* +0x0C non-zero: heads a group */
+    int32_t     first;      /* +0x10 the group's first widget */
+    int32_t     last;       /* +0x14 and last, inclusive */
+    int32_t     bit;        /* +0x18 the bit this checkbox owns */
+    int32_t     which;      /* +0x1C non-zero: ADDR_GAME_OVER_FLAGS */
+    const char *label;      /* +0x20 */
+} AM2_OptionRec;
+
 #endif /* AM2_GLOBALTYPES_H */

@@ -10121,7 +10121,6 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     uint8_t       *v       = (uint8_t *)veh;
     int32_t        weight  = 0;
     int32_t        sound   = 0;
-    int32_t        facing8;
     int32_t        answer  = 0;
     int32_t        i;
     int32_t        rec;
@@ -10132,11 +10131,9 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 #define AM2_MASK_REC(n) (g_vehicleMasks[n].count)
 
     if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT) {
-        facing8 = facing & 0xFF;
+        int32_t facing8 = facing & 0xFF;
         rec = AM2_VEHICLE_KIND_BOAT * AM2_VEHICLE_MASK_DIRS + facing8;
-        if (AM2_MASK_REC(rec) <= 0)
-            return answer;
-
+        if (AM2_MASK_REC(rec) > 0) {
         i = 0;
         do {
             pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + ((const AM2_Point *)&at)->x);
@@ -10164,13 +10161,14 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                         g_gameClockMs
                         + AM2_VEHICLE_HIT_COOLDOWN;
 
-                    if (ObjIsType2((const AM2_Object *)o))
+                    if (!ObjIsType2((const AM2_Object *)o)) {
+                        if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44))
+                            > AM2_BOAT_CRUSH_SPEED)
+                            hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 3;
+                        else
+                            hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 6;
+                    } else
                         hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
-                    else if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44))
-                             > AM2_BOAT_CRUSH_SPEED)
-                        hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 3;
-                    else
-                        hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 6;
 
                     DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                  *(const uint32_t *)(v + OBJ_OFF_UID), 0, 0);
@@ -10183,9 +10181,10 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         } while (i < AM2_MASK_REC(rec));
 
         return weight;
-    }
+        }
+    } else {
 
-    facing8 = facing & 0xFF;
+    int32_t facing8 = facing & 0xFF;
     rec = (*(const int32_t *)(v + VEHICLE_OFF_KIND) * AM2_VEHICLE_MASK_DIRS)
         + facing8;
 
@@ -10210,19 +10209,20 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                     if (ObjCollidesWith(v, o)
                         && g_gameClockMs
                            > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
-                        int32_t hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
+                        int32_t hp;
 
 
                         *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
                             g_gameClockMs
                             + AM2_VEHICLE_HIT_COOLDOWN;
 
-                        if (ObjIsType2((const AM2_Object *)o))
-                            ;
-                        else if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44)) > AM2_VEHICLE_CRUSH_SPEED)
-                            hp /= 3;
-                        else
-                            hp /= 6;
+                        if (!ObjIsType2((const AM2_Object *)o)) {
+                            if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44)) > AM2_VEHICLE_CRUSH_SPEED)
+                                hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 3;
+                            else
+                                hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568) / 6;
+                        } else
+                            hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
 
                         DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                      *(const uint32_t *)(v + OBJ_OFF_UID),
@@ -10283,6 +10283,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
             PlaySoundAt(AM2_SND_CRUSH_JEEP, 2, 0, sx, sy);
         else
             PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, sx, sy);
+    }
+
     }
 
     return answer;
