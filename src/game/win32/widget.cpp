@@ -13490,8 +13490,8 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     char        pattern[256];
     uint8_t     found[0x118];     /* a _finddata_t */
     int32_t     handle;
-    int32_t     dx = 0x7D;
-    int32_t     dy = 0x62;
+    int32_t     dx;
+    int32_t     dy;
     AM2_CTOR_VTABLE(w, VTABLE_LOAD_GAME);
     *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
 
@@ -13511,6 +13511,8 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
         orig_findclose(handle);
     }
 
+    dx = 0x7D;
+    dy = 0x62;
     if (g_gameState == 2) {
         w->flag44 = 1;
         parent = w;
