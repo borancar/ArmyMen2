@@ -47,9 +47,6 @@ extern uint8_t am2_os_air_leg1_x0[];  /* 0x004F96AC */
 extern uint8_t am2_os_air_leg1_dx[];  /* 0x004F96B0 */
 extern uint8_t am2_os_air_leg3_x1[];  /* 0x004F96B4 */
 extern uint8_t am2_os_dir_scratch[];  /* 0x004F96B8 */
-extern uint8_t am2_os_sprite_list_cap[];  /* 0x004F96C0 */
-extern uint8_t am2_os_sprite_list_count[];  /* 0x004F96C4 */
-extern uint8_t am2_os_sprite_list[];  /* 0x004F96C8 */
 extern uint8_t am2_os_army_ramp_tables[];  /* 0x004F96CC */
 extern uint8_t am2_os_obj_table_records[];  /* 0x004F9ACC */
 extern uint8_t am2_os_chat_colour_table[];  /* 0x004F9AD0 */
@@ -331,6 +328,9 @@ extern uint8_t am2_os_game_dir[];  /* 0x0051235C */
 extern uint8_t am2_os_hwnd[];  /* 0x0051245C */
 extern uint8_t am2_os_full_redraw[];  /* 0x00512460 */
 extern uint8_t am2_os_cd_path[];  /* 0x00512464 */
+extern uint8_t am2_os_aim_x[];  /* 0x00512568 */
+extern uint8_t am2_os_aim_y[];  /* 0x0051256A */
+extern uint8_t am2_os_aim_z[];  /* 0x0051256C */
 extern uint8_t am2_os_perf_period[];  /* 0x00512570 */
 extern uint8_t am2_os_perf_start[];  /* 0x00512578 */
 extern uint8_t am2_os_hinstance[];  /* 0x00512580 */
@@ -563,6 +563,10 @@ extern uint8_t am2_os_pick_reach_662450[];  /* 0x00662450 */
 extern uint8_t am2_os_pick_reach_6624ec[];  /* 0x006624EC */
 extern uint8_t am2_os_medic_heal_pct[];  /* 0x006624F8 */
 extern uint8_t am2_os_pick_reach_66275c[];  /* 0x0066275C */
+extern uint8_t am2_os_aim_life_half_a[];  /* 0x00662820 */
+extern uint8_t am2_os_aim_damage[];  /* 0x00662838 */
+extern uint8_t am2_os_aim_life_half_b[];  /* 0x00662854 */
+extern uint8_t am2_os_aim_spawn_arg[];  /* 0x0066286C */
 extern uint8_t am2_os_pick_reach_662894[];  /* 0x00662894 */
 extern uint8_t am2_os_repair_heal_pct[];  /* 0x006628A0 */
 extern uint8_t am2_os_pick_reach_6628c8[];  /* 0x006628C8 */
@@ -1010,12 +1014,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_AIR_LEG1_DX ((uintptr_t)(const void *)am2_os_air_leg1_dx)
 #undef ADDR_AIR_LEG3_X1
 #define ADDR_AIR_LEG3_X1 ((uintptr_t)(const void *)am2_os_air_leg3_x1)
-#undef ADDR_SPRITE_LIST_CAP
-#define ADDR_SPRITE_LIST_CAP ((uintptr_t)(const void *)am2_os_sprite_list_cap)
-#undef ADDR_SPRITE_LIST_COUNT
-#define ADDR_SPRITE_LIST_COUNT ((uintptr_t)(const void *)am2_os_sprite_list_count)
-#undef ADDR_SPRITE_LIST
-#define ADDR_SPRITE_LIST ((uintptr_t)(const void *)am2_os_sprite_list)
 #undef ADDR_ARMY_RAMP_TABLES
 #define ADDR_ARMY_RAMP_TABLES ((uintptr_t)(const void *)am2_os_army_ramp_tables)
 #undef ADDR_CHAT_COLOUR_TABLE
@@ -1434,6 +1432,12 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_PERF_FREQ ((uintptr_t)(const void *)am2_os_perf_freq)
 #undef ADDR_CHEAT_INVULNERABLE
 #define ADDR_CHEAT_INVULNERABLE ((uintptr_t)(const void *)am2_os_cheat_invulnerable)
+#undef ADDR_AIM_X
+#define ADDR_AIM_X ((uintptr_t)(const void *)am2_os_aim_x)
+#undef ADDR_AIM_Y
+#define ADDR_AIM_Y ((uintptr_t)(const void *)am2_os_aim_y)
+#undef ADDR_AIM_Z
+#define ADDR_AIM_Z ((uintptr_t)(const void *)am2_os_aim_z)
 #undef ADDR_PERF_PERIOD
 #define ADDR_PERF_PERIOD ((uintptr_t)(const void *)am2_os_perf_period)
 #undef ADDR_PERF_START
@@ -1724,6 +1728,14 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_MEDIC_HEAL_PCT ((uintptr_t)(const void *)am2_os_medic_heal_pct)
 #undef ADDR_PICK_REACH_66275C
 #define ADDR_PICK_REACH_66275C ((uintptr_t)(const void *)am2_os_pick_reach_66275c)
+#undef ADDR_AIM_LIFE_HALF_A
+#define ADDR_AIM_LIFE_HALF_A ((uintptr_t)(const void *)am2_os_aim_life_half_a)
+#undef ADDR_AIM_DAMAGE
+#define ADDR_AIM_DAMAGE ((uintptr_t)(const void *)am2_os_aim_damage)
+#undef ADDR_AIM_LIFE_HALF_B
+#define ADDR_AIM_LIFE_HALF_B ((uintptr_t)(const void *)am2_os_aim_life_half_b)
+#undef ADDR_AIM_SPAWN_ARG
+#define ADDR_AIM_SPAWN_ARG ((uintptr_t)(const void *)am2_os_aim_spawn_arg)
 #undef ADDR_PICK_REACH_662894
 #define ADDR_PICK_REACH_662894 ((uintptr_t)(const void *)am2_os_pick_reach_662894)
 #undef ADDR_REPAIR_HEAL_PCT

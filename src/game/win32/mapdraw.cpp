@@ -1910,8 +1910,8 @@ void __cdecl ViewUpdate(void)
         dx = dx * step / dist;
         dy = dy * step / dist;
     }
-    tx = (int16_t)(dx + VIEW_EYE->x);
     ty = (int16_t)(dy + VIEW_EYE->y);
+    tx = (int16_t)(dx + VIEW_EYE->x);
 
 clamp_eye:
     vx = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);

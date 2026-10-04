@@ -27,11 +27,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 OUT = os.path.join(REPO, "src", "vc6", "include", "am2_relink_os.h")
 ORIGSTATE_BASE = 0x0048E000
 
-# Members that were ONE object in the original, walked by address across
-# their boundaries (FreeAimSprites runs a pointer from the sprites up to the
-# live flags, AimInit likewise), stay on am2_origstate: split into separate
-# symbols, VC6 can no longer share one base between them.
-AGGREGATES = ("aim_",)
+# Members that were ONE object in the original, by name prefix. None now:
+# the aim markers' tables are a range below, and the other aim_ globals (the
+# aim point, the lifetimes, the damage and spawn argument, far from the
+# tables) are lone globals.
+AGGREGATES = ()
 
 # The same, by address: [lo, hi) ranges that were one object. The live game
 # settings 0x00515FD8..0x00516078 (game-over flags, the setting at +0x22C,
@@ -48,12 +48,20 @@ AGGREGATES = ("aim_",)
 # repeat deadlines, the pressed flags): PollKeyboard re-reads the current
 # buffer pointer every key because its stores may alias it, and walks the
 # two per-key arrays with one pointer.
+# The aim markers' tables 0x004FC8C8..0x004FC994, both sets (sprites, live
+# flags, points, stamps, deadlines): FreeAimSprites runs a pointer from the
+# sprites up to the live flags and AimInit likewise, so VC6 must be able to
+# share one base between them. The aim_ globals outside it were swept in by
+# a name prefix once; as lone globals AimStartB keeps its element pointer and
+# PlacementScreenClick matches.
+# The sprite list 0x004F96C0..0x004F96CC (capacity, count, the array
+# pointer): LoadSpriteSet's growth path matches only as one object.
 # The menu cursor's animation state 0x004FCAA8..0x004FCDF4 (the hovered row,
 # the per-row sprite table, the cursor and overlay sprites, inks, offsets,
 # the frame clock and its stamp): OverlayPrepare loads the row's first sprite
 # BEFORE storing the frame index, the source order, which VC6 keeps only
 # when the indexed table load may alias the store.
-AGGREGATE_RANGES = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
+AGGREGATE_RANGES = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994), (0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
                     (0x004FCAA8, 0x004FCDF4))
 
 

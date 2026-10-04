@@ -1374,18 +1374,17 @@ static inline void TickMenuAnimation(void)
 
 /* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
  * point and the overlay's. The original writes this out twice. */
-static inline void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t fld)
+static inline void DrawMenuOverlaySprite(uint8_t *const &spr, uint32_t dxAddr, int32_t fld)
 {
-    const uint8_t *cursor = g_cursorSprite;
     int32_t x, y;
 
     if (!spr)
         return;
-    swr32(spr, SPR_OFF_MODE) = fld;
-    x = g_cursorX + sfld16(cursor, SPR_OFF_OVX)
+    x = g_cursorX + sfld16(g_cursorSprite, SPR_OFF_OVX)
       + *(const int16_t *)(uintptr_t)dxAddr;
-    y = g_cursorY + sfld16(cursor, SPR_OFF_OVY)
+    y = g_cursorY + sfld16(g_cursorSprite, SPR_OFF_OVY)
       + *(const int16_t *)(uintptr_t)(dxAddr + 2);
+    swr32(spr, SPR_OFF_MODE) = fld;
     DrawSprite((AM2_Sprite *)spr, x, y, g_cursorInk != 0);
 }
 
@@ -1470,13 +1469,11 @@ void __cdecl DrawMenuCursor(void)
             if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
                 return;
             if (g_cursorSprite) {
-                uint8_t *spr = g_cursorSprite;
+                int32_t x = g_cursorX + *(const int16_t *)&g_menuCursorDx;
+                int32_t y = g_cursorY + *(const int16_t *)(uintptr_t)(((uintptr_t)&g_menuCursorDx) + 2);
 
-                swr32(spr, SPR_OFF_MODE) = g_cursorInk;
-                DrawSprite((AM2_Sprite *)spr,
-                           g_cursorX + *(const int16_t *)&g_menuCursorDx,
-                           g_cursorY + *(const int16_t *)(uintptr_t)(((uintptr_t)&g_menuCursorDx) + 2),
-                           g_cursorInk != 0);
+                swr32(g_cursorSprite, SPR_OFF_MODE) = g_cursorInk;
+                DrawSprite((AM2_Sprite *)g_cursorSprite, x, y, g_cursorInk != 0);
                 DrawMenuOverlaySprite(g_overlayA, ((uintptr_t)&g_menuOverlayADx),
                                       g_overlayAInk);
                 DrawMenuOverlaySprite(g_overlayB, ((uintptr_t)&g_menuOverlayBDx),
@@ -1494,8 +1491,8 @@ void __cdecl DrawMenuCursor(void)
     if (g_cursorSprite) {
         const uint8_t *spr = g_cursorSprite;
         AM2_Rect       r;
-        int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
         int32_t        hy = sfld16(spr, SPR_OFF_HOTY);
+        int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
 
         r = RectMake(g_cursorX - hx, g_cursorY - hy,
                      g_cursorX + sfld32(spr, SPR_OFF_W) - hx,

@@ -280,12 +280,14 @@ int32_t __cdecl BuildFont(int32_t font)
     offsets = font_offsets(font) + 32;
 
     for (ch = 0x20; ch < 0x100; ch++) {
-        uint32_t used = (uint32_t)(out - scratch);
         uint32_t n;
 
-        *offsets = (uint16_t)used;
+        /* The offset and the room left are two expressions, not one `used`:
+         * the image computes `out - scratch` and `scratch - out + size`
+         * separately. */
+        *offsets = (uint16_t)(out - scratch);
         n = RenderGlyph(font, (char)ch, hfont, (AM2_Rle16 *)out,
-                        GLYPH_SCRATCH - used);
+                        (uint32_t)(scratch + GLYPH_SCRATCH - out));
         if (!n) {
             orig_free(scratch);
             DeleteObject(hfont);

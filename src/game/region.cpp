@@ -5151,8 +5151,8 @@ score:
                 continue;
             best        = cand;
             bestRange   = candRange;
-            bestBearing = candBearing;
             slack       = 0;
+            bestBearing = candBearing;
             continue;
         }
 

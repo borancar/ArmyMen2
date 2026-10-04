@@ -1894,9 +1894,9 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
      * break can never fire; it is in the image all the same. (This was once
      * written as an unbounded loop with only the break, which ran a fifth
      * record through the log and CommSetSlotRemote.) */
-    for (i = 0,
-         rec = m + MSG_PLAYER_RECORDS + REC_PLAYER_COLOUR,
-         slotSetting = g_armyPoints;
+    for (rec = m + MSG_PLAYER_RECORDS + REC_PLAYER_COLOUR,
+         slotSetting = g_armyPoints,
+         i = 0;
          (int32_t)(uintptr_t)slotSetting < SETTING_END;
          i++, rec += MSG_PLAYER_STRIDE, slotSetting++) {
         if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))

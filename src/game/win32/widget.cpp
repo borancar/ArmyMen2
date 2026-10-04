@@ -17637,22 +17637,20 @@ int32_t __cdecl PointerPickMode6(void *obj)
  * weapon-reach arm is the interesting one. A five-figure counter is not
  * evidence that the branch you care about ran, which this project has recorded
  * before for ShotStrike. */
-/* OurLeaderUnit (item.h) as two of the pick functions spell it. The shared
- * inline matches the image at the sites that already match; these two do
- * not, and each matches only with its own spelling -- PointerPickMode0
- * re-reads ADDR_DEFAULT_OWNER for the dead branch instead of keeping the copy
- * it compared (297 -> 149), PointerPickRepair takes the leader uid into a
- * local before the lookup (29 -> 10). Same behaviour in all three: the
- * comparison is the owner against itself, so only the first arm runs. */
-static inline uint8_t *OurLeaderUnitReread(void)
+/* OurLeaderUnit (item.h) as PointerPickMode0 spells it: the army is a
+ * PARAMETER, called with ADDR_DEFAULT_OWNER. The image keeps the comparison
+ * (`mov eax, [owner]; cmp eax, eax; jne`) and the whole army-list scan behind
+ * it at 0x004595E1 -- VC6 merged the two loads but never folded the compare,
+ * which it does when both reads are written in one expression (item.h's
+ * spelling, whose scan disappears). A re-reading spelling scored lower
+ * (99 against 303 here) by dropping that scan, which the image has, so it
+ * could not reach a match; what remains is `o` in ebp where the image keeps
+ * it in ebx. Same behaviour either way: only the first arm runs. */
+static inline uint8_t *OurLeaderUnitReread(int32_t owner)
 {
-    int32_t owner;
-
-    if ((int32_t)g_defaultOwner
-        == *(const int32_t *)&g_defaultOwner)
+    if (owner == *(const int32_t *)&g_defaultOwner)
         return (uint8_t *)LookupByUID(
             g_ourLeaderUid);
-    owner = *(const int32_t *)&g_defaultOwner;
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         const uint8_t *const *slot =
             &((const uint8_t *const *)g_armyObjLists)[owner];
@@ -17690,7 +17688,7 @@ int32_t __cdecl PointerPickMode0(void *obj)
         if (g_mouseButton && GetMenuRow() != 1)
             return 0;
 
-        leader = OurLeaderUnitReread();
+        leader = OurLeaderUnitReread(*(const int32_t *)&g_defaultOwner);
         if (!leader)
             return 0;
 

@@ -1889,14 +1889,15 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (trig & 0x08)
                 flags |= 0x810;
 
-            at.x = *(const int16_t *)(r + MAPREC_OFF_X);
-            at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
-
+            /* The point is read from the record after each arm's sprite
+             * lookup, not before it. */
             if (type != 0x19) {
                 /* An ITEM. */
                 void *spr = PreloadSpriteByKey(PackKey(type + 0x14, kind, 0),
                                                0x1000, 1);
 
+                at.x = *(const int16_t *)(r + MAPREC_OFF_X);
+                at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
                 if (spr != 0) {
                     at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
                     at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
@@ -1948,6 +1949,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     continue;
 
                 spr = PreloadSpriteByKey(key, 0x1000, 1);
+                at.x = *(const int16_t *)(r + MAPREC_OFF_X);
+                at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
                 if (spr != 0) {
                     at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
                     at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));

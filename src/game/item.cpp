@@ -3855,10 +3855,11 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
 static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
                                        uint32_t ref)
 {
-    int32_t w = AM2_BLOCK_FULL;
+    int32_t w;
 
     if (o == f)
         return 0;
+    w = AM2_BLOCK_FULL;
     if (ObjIsItem((const AM2_Object *)o)) {
         w = *(const int8_t *)(o + OBJ_OFF_RANK);
     } else if (ObjIsType2((const AM2_Object *)o)) {
@@ -7504,17 +7505,17 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
     if (kind == 7) {
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
 
-        {
-            int32_t n = orig_rand() % AM2_KIND7_NAME_COUNT + 1;
+        /* The name index is read back from the object, not kept in a local:
+         * with a local, VC6 sets the flag above with a read-modify-write
+         * `or [esi+8]` instead of the image's load, `or dh`, store. */
+        *(int32_t *)(o + OBJ_OFF_FIELD_5A8) =
+            orig_rand() % AM2_KIND7_NAME_COUNT + 1;
+        *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const int32_t *)&g_zeroPoint;
 
-            *(int32_t *)(o + OBJ_OFF_FIELD_5A8) = n;
-            *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-                *(const int32_t *)&g_zeroPoint;
-
-            if (n > 0)
-                SetFieldInAll(o + OBJ_OFF_SUBRECORD,
-                                      (g_kind7Names)[n]);
-        }
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A8) > 0)
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                          (g_kind7Names)[*(const int32_t *)(o + OBJ_OFF_FIELD_5A8)]);
 
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
             ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
@@ -7633,9 +7634,7 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
     }
 
     uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID);
-    while (1) {
-        if (!uid)
-            break;
+    while (uid) {
         uint8_t *link = (uint8_t *)LookupByUID(uid);
         int32_t  type;
 
