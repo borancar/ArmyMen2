@@ -1597,27 +1597,29 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_SUSPENDAI:
         STEP();
         act->code = 0x1B;
-        if (TOK.kind == AM2_TOKEN_STRING)
-            return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
-        /* No name means everyone. */
-        act->subject = g_svarId15;
-        return 1;
+        if (TOK.kind != AM2_TOKEN_STRING) {
+            /* No name means everyone. */
+            act->subject = g_svarId15;
+            return 1;
+        }
+        return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_REVIVEAI:
         STEP();
         act->code = 0x1C;
-        if (TOK.kind == AM2_TOKEN_STRING)
-            return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
-        act->subject = g_svarId15;
-        return 1;
+        if (TOK.kind != AM2_TOKEN_STRING) {
+            act->subject = g_svarId15;
+            return 1;
+        }
+        return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     /* The record keeps the token's own string. Nothing copies it and nothing
      * frees it here. */
     case AM2_TOK_SHOWMESSAGE:
         STEP();
         WANT(AM2_TOKEN_STRING)
-        act->text = (char *)TOK.value;
         act->code = 1;
+        act->text = (char *)TOK.value;
         (*at)++;
         return 1;
 
@@ -1734,7 +1736,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             STEP();
             VARNAME("Line [%4d]:  expected variable name but variable %s not "
                     "declared\n")
-        } else if (TOK.kind == AM2_TOKEN_INTEGER) {
+        } else if (TOK.kind != AM2_TOKEN_INTEGER)
+            TYPEERR(AM2_TOKEN_INTEGER)
+        else {
             act->delay = TOKVAL;
             if (act->delay < 0) {
                 am2_log("Line[%4d]:  Negative time set for a TRIGGERDELAY.\n",
@@ -1742,8 +1746,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                 return 0;
             }
             (*at)++;
-        } else
-            TYPEERR(AM2_TOKEN_INTEGER)
+        }
         if (*at >= ctx->count) {
             am2_log("Unexpected end of script.\n");
             return 0;
@@ -1902,10 +1905,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ScriptResolveName(ctx, at, &act->target, 0))
             return 0;
         WANT(AM2_TOKEN_STRING)
-        act->subject = ScriptFindName((const char *)TOK.value);
-        if (act->subject < 0)
-            act->subject = AddNameTableName((const char *)TOK.value,
-                                            AM2_NAME_TYPE_REF, 0);
+        {
+            int32_t v = ScriptFindName((const char *)TOK.value);
+
+            if (v < 0)
+                v = AddNameTableName((const char *)TOK.value,
+                                     AM2_NAME_TYPE_REF, 0);
+            act->subject = v;
+        }
         (*at)++;
         /* No bounds check before this read. */
         if (TOK.kind != AM2_TOKEN_INTEGER)
@@ -2082,29 +2089,6 @@ eos:
         }
         return 0;
 
-    case AM2_TOK_SETGUNFACING:
-        STEP();
-        act->code = 0x21;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count)
-            goto eos;
-        if (TOK.kind == AM2_TOKEN_INTEGER) {
-            act->n0 = TOKVAL;
-            act->n0 = (uint8_t)act->n0;
-            (*at)++;
-            return 1;
-        }
-        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
-            (*at)++;
-            return 1;
-        }
-        STEP();
-        WANT(AM2_TOKEN_STRING)
-        VARNAME("Line [%4d]:  expected variable name but variable %s not "
-                "declared\n")
-        return 1;
-
     case AM2_TOK_SETFACING:
         STEP();
         act->code = 0x20;
@@ -2131,6 +2115,29 @@ eos:
                 "declared\n")
         return 1;
 
+    case AM2_TOK_SETGUNFACING:
+        STEP();
+        act->code = 0x21;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
+            (*at)++;
+            return 1;
+        }
+        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
+            (*at)++;
+            return 1;
+        }
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        VARNAME("Line [%4d]:  expected variable name but variable %s not "
+                "declared\n")
+        return 1;
+
     case AM2_TOK_SETVAR:
         STEP();
         act->code = 0x23;
@@ -2143,15 +2150,6 @@ eos:
         }
         VARNAME_EQ("Line [%4d]:  expected variable name in SetVar but "
                    "variable %s not declared\n")
-        return 1;
-
-    case AM2_TOK_ACTIVATEREGION:
-        STEP();
-        act->code = 0x26;
-        WANT(AM2_TOKEN_INTEGER)
-        act->n0 = 1;
-        act->subject = TOKVAL;
-        (*at)++;
         return 1;
 
     case AM2_TOK_ADDVAR:
@@ -2167,6 +2165,15 @@ eos:
         WANT(AM2_TOKEN_STRING)
         VARNAME_EQ("Line [%4d]:  expected variable name in AddVar but "
                    "variable %s not declared\n")
+        return 1;
+
+    case AM2_TOK_ACTIVATEREGION:
+        STEP();
+        act->code = 0x26;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = 1;
+        act->subject = TOKVAL;
+        (*at)++;
         return 1;
 
     case AM2_TOK_INACTIVATEREGION:
@@ -2297,23 +2304,6 @@ eos:
         (*at)++;
         return 1;
 
-    case AM2_TOK_SETITEMOWNER:
-        STEP();
-        act->code = 0x34;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count)
-            goto eos;
-        if (TOK.kind == AM2_TOKEN_INTEGER) {
-            act->n0 = 4;
-            (*at)++;
-            return 1;
-        }
-        act->n0 = ScriptArmyColour(ctx, at);
-        if (act->n0 < 0)
-            return 0;
-        return 1;
-
     case AM2_TOK_SETDAMAGEPAD:
         STEP();
         act->code = 0x3A;
@@ -2352,6 +2342,23 @@ eos:
         case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
         case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
         }
+        return 1;
+
+    case AM2_TOK_SETITEMOWNER:
+        STEP();
+        act->code = 0x34;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = 4;
+            (*at)++;
+            return 1;
+        }
+        act->n0 = ScriptArmyColour(ctx, at);
+        if (act->n0 < 0)
+            return 0;
         return 1;
 
     case AM2_TOK_SETM80:

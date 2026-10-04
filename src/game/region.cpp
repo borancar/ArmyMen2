@@ -7628,8 +7628,16 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
  * commmsg.cpp use: an import of our own would resolve through our IAT, and
  * this file is flat. */
 typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
+#if defined(_MSC_VER) && !defined(__GNUC__)
+/* The import itself under VC6: a function that calls it more than once loads
+ * the IAT slot into a register (`call ebp`), which a read through our pointer
+ * cannot reproduce. armymsg.cpp does the same. */
+extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
+#define orig_get_tick_count GetTickCount
+#else
 #define orig_get_tick_count \
     (*(AM2_RegionTickFn *)g_iatGetTickCount)
+#endif
 
 /* Type2PlayerStep -- original 0x0044AD40, one caller: StepType2's player arm,
  * which runs when the object is Sarge AND belongs to the default owner. So
