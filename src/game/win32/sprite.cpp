@@ -1858,9 +1858,9 @@ void __cdecl BuildRoachMask(void)
     a = t->entries[i].anim;
 
     g_roachMaskDirs = a->directions;
-    if (a->directions <= 0)
-        return;
 
+    /* No early return for zero directions: the loop's own test is the only
+     * one, as the image has it. */
     out = (uint8_t *)g_roachMasks[0].pts;
     for (facing = 0; facing < a->directions; facing++) {
         AM2_Sprite *spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing]
@@ -1937,8 +1937,6 @@ void __cdecl BuildVehicleMask(int32_t kind)
     a = t->entries[i].anim;
 
     g_vehicleMaskDirs[kind] = a->directions;
-    if (a->directions <= 0)
-        return;
 
     for (dir = 0; dir < a->directions; dir++) {
         AM2_Sprite *spr;
