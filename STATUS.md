@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1499 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1500 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,16 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1499:
+  From 758 to 1500:
+  - **Which copy of a shared exit survives, and where locals go**
+    (2026-10-04). VC6 folds identical return blocks, and the site carrying
+    the label decides which copy is kept and where it sits. `if (c) goto L;`
+    pulls L's block inline, while `if (!c) { ...; return; } goto L;` does
+    not. That took EditCharHandler 26 -> 2, ShotHitsObj 32 -> 7 and
+    ScriptParseActionRecon 865 -> 823. FireWeapon matches
+    once its grenade arm has a case-scoped copy of the target point: VC6
+    parks block-scoped address-taken locals in dead argument slots, as the
+    image does.
   - **VC6 saves registers lazily** (2026-10-04). After an early-return
     region it pushes ebx/edi/ebp at the point they are first needed, but
     only when the paths after that point converge on one exit. StepType2
