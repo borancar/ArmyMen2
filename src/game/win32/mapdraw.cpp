@@ -1241,7 +1241,8 @@ void __cdecl ScrollMapCache(void)
         tall.left  = g_camera->right - dx;
         tall.right = g_camera->right;
         wide.right = tall.left;
-    } else if (dx < 0) {
+    }
+    if (dx < 0) {
         tall.left  = g_camera->left;
         tall.right = g_camera->left - dx;
         wide.left  = tall.right;
