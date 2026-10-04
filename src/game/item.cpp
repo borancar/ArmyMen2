@@ -13023,7 +13023,7 @@ after_flight:
         if ((flags[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)] & AM2_TILE_OPEN)
             && !(flags[*(const uint16_t *)(o + OBJ_OFF_TILE)]
                  & AM2_TILE_OPEN)) {
-            int32_t want = (int8_t)HeightAtPoint(
+            int16_t want = (int8_t)HeightAtPoint(
                                *(const uint32_t *)(o + OBJ_OFF_POS))
                            + AM2_SIGHT_OVERHEAD;
 
@@ -13089,8 +13089,9 @@ expire:
                                   + 0x80));
         break;
     case 5:
+        /* The y is the full sum, not cut back to sixteen bits. */
         CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
+                        (*(const int16_t *)(o + OBJ_OFF_POS + 2)
                                   - *(const int16_t *)(o
                                                        + MISSILE_OFF_HEIGHT)
                                   + *(const int32_t *)(o
