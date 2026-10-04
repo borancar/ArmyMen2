@@ -8173,6 +8173,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
     int32_t  tries;
+    int32_t  i;                /* 0 for the plain step, else the sweep's try */
     int32_t  found;            /* the facing is settled, then: anything is here */
     int32_t  pose;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
@@ -8255,17 +8256,15 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
 have_facing:
     at   = (uint8_t *)0;
     pose = ObjNextKind538(o, *(const int32_t *)(w + 8));
+    i    = 0;
     AnimStepPoint(o, facing, pose, &stepPoint, 0);
     at = (uint8_t *)ObjectsAtPoint(&stepPoint,
                                    g_objMapDesc);
-    if (BlockWeightRoute(o, stepPoint, at, &inside) < AM2_STEP_ROUTE_OK) {
-        /* Walkable: take this heading and step, with no sweep at all.
-         * 0x0044B14B jumps straight to the tail that writes the facing
-         * back and falls into the settle, so none of the stop arms below
-         * runs on a clear step. */
-        *(w + 4) = facing;
-        goto settle_facing;
-    }
+    /* Walkable: take this heading and step, with no sweep at all -- the
+     * `i == 0` arm of the dispatch below (0x0044B14B jumps straight to it),
+     * so none of the stop arms runs on a clear step. */
+    if (BlockWeightRoute(o, stepPoint, at, &inside) < AM2_STEP_ROUTE_OK)
+        goto swept;
 
     /* Blocked. A claimed vehicle standing in the way is boarded rather than
      * swept around; with nothing claimed there is nothing to board and
@@ -8276,91 +8275,94 @@ have_facing:
      * in the list leaves `at` null. That is what an exhausted sweep then
      * hands the item walk below: nothing, where a separate cursor had left
      * the last swept cell's objects to be picked over. */
-    {
-        uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+    if (*(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
+        /* Something is claimed: search the blocked cell for it, then sweep.
+         * The stop arms are this test's ELSE, laid out after the sweep and
+         * jumping back into it (0x0044B159 -> 0x0044B299). */
+        {
+            uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
-        if (!claimed)
-            goto no_route;
-        while (1) {
-            if (!at)
-                break;
-            if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
-                goto board;
-            at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+            while (at) {
+                if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
+                    goto board;
+                at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+            }
         }
-    }
 
 sweep:
-    /* Sweep alternate headings. The player's trooper gives up sooner. */
-    /* 0x0044B17C..0x0044B1A6: the limit is the player's when Field548 is
-     * set AND the object's ARMY byte is ADDR_DEFAULT_OWNER (`movsx eax,
-     * [esi+0x10]; cmp eax, [0x4F9FDC]` -- the army-equals-owner idiom
-     * CLAUDE.md records) AND OBJ_OFF_FIELD_10C is clear. This compared
-     * Field548's VALUE against the owner, which matched only sometimes, so
-     * Sarge alternately swept three headings and six. */
-    tries = AM2_STEP_SWEEP_OTHER;
-    if (ObjType2Field548((const AM2_Object *)o)
-        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-               == (int32_t)g_defaultOwner
-        && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
-        tries = AM2_STEP_SWEEP_PLAYER;
-    {
-        const int32_t *step = g_stepFacingSweep;
-        /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
-         * 0x0044B174 -- and stops when the count reaches the limit, so the
-         * limit is one more than the headings tried: three for the player's
-         * trooper and six for everyone else's. And every try steps with the
-         * SAVED pose from ObjNextKind538 (slot +0x2c), not the state. */
-        int32_t i = 1;
+        /* Sweep alternate headings. The player's trooper gives up sooner. */
+        /* 0x0044B17C..0x0044B1A6: the limit is the player's when Field548 is
+         * set AND the object's ARMY byte is ADDR_DEFAULT_OWNER (`movsx eax,
+         * [esi+0x10]; cmp eax, [0x4F9FDC]` -- the army-equals-owner idiom
+         * CLAUDE.md records) AND OBJ_OFF_FIELD_10C is clear. This compared
+         * Field548's VALUE against the owner, which matched only sometimes, so
+         * Sarge alternately swept three headings and six. */
+        tries = AM2_STEP_SWEEP_OTHER;
+        if (ObjType2Field548((const AM2_Object *)o)
+            && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+                   == (int32_t)g_defaultOwner
+            && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
+            tries = AM2_STEP_SWEEP_PLAYER;
+        {
+            const int32_t *step = g_stepFacingSweep;
+            /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
+             * 0x0044B174 -- and stops when the count reaches the limit, so the
+             * limit is one more than the headings tried: three for the player's
+             * trooper and six for everyone else's. And every try steps with the
+             * SAVED pose from ObjNextKind538 (slot +0x2c), not the state. */
+            i = 1;
 
-        while (1) {
-            facing = (uint8_t)(facing + (uint8_t)step[i - 1]);
-            AnimStepPoint(o, facing, pose, &stepPoint, 0);
-            at = (uint8_t *)ObjectsAtPoint(&stepPoint,
-                                           g_objMapDesc);
-            if (BlockWeightRoute(o, stepPoint, at, &inside)
-                < AM2_STEP_ROUTE_OK)
-                break;
-            {
-                uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+            while (facing = (uint8_t)(facing + (uint8_t)*step),
+                   AnimStepPoint(o, facing, pose, &stepPoint, 0),
+                   (at = (uint8_t *)ObjectsAtPoint(&stepPoint, g_objMapDesc)),
+                   BlockWeightRoute(o, stepPoint, at, &inside)
+                       >= AM2_STEP_ROUTE_OK) {
+                {
+                    uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
-                if (claimed)
-                    while (1) {
-                        if (!at)
-                            break;
-                        if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
-                            goto board;
-                        at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
-                    }
+                    if (claimed)
+                        while (1) {
+                            if (!at)
+                                break;
+                            if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
+                                goto board;
+                            at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+                        }
+                }
+                i++;
+                step++;
+                if (i >= tries)
+                    break;
             }
-            if (++i >= tries)
-                break;
+            goto swept;
         }
-        if (i < tries) {
-            /* A heading was found: turn toward it and STOP this frame
-             * (0x0044B3A2), stamp the turn deadline and charge the sweep to
-             * the accumulator, which wraps at +/-0x100 in two steps. */
-            int16_t acc;
-
+    } else {
+        /* Nothing walkable ahead and nothing claimed. Four reasons to stop where
+         * the trooper stands -- and when NONE applies, the original goes back to
+         * the sweep: 0x0044B311, 0x0044B331 and 0x0044B342 all jump to
+         * 0x0044B173 when their test fails. This chain used to fall through to
+         * the settle with `turned` still clear, which is a trooper walking
+         * through the hut at full speed; the injected A/B could not see it,
+         * both sides being driven the same, and it was found by bisecting
+         * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
+        if (ObjKind538In10To17(o)) {
+            turned = 1;
             speed  = 0;
             *(w + 4) = facing;
-            *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) =
-                (int32_t)(g_gameClockMs
-                          + AM2_TROOPER_TURN_MS);
-            *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
-                (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                                    facing);
-            acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
-            if (acc > 0x100)
-                *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc - 0x100);
-            acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
-            if (acc < (int16_t)0xFF00)
-                *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc + 0x100);
-            goto settle_facing;
+        } else if (*(const int32_t *)(w + 0x0C)
+                   || !found
+                   || (g_mpSession
+                       && !AM2_THE_COMM->CommMustBroadcast(
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
+                       && ObjType2Field548((const AM2_Object *)o))) {
+            /* One block; VC6 copies it into each of the three tests. */
+            *(int32_t *)(w + 8) = 1;
+            turned = 1;
+            *(w + 4) = facing;
+            speed  = 0;
+        } else {
+            goto sweep;
         }
-        /* Exhausted: nothing to walk toward. */
-        PickFireMode(o);
-        turned = 1;
         goto settle_facing;
     }
 
@@ -8369,33 +8371,39 @@ board:
     EnterVehicle(o, at);
     return;
 
-no_route:
-    /* Nothing walkable ahead and nothing claimed. Four reasons to stop where
-     * the trooper stands -- and when NONE applies, the original goes back to
-     * the sweep: 0x0044B311, 0x0044B331 and 0x0044B342 all jump to
-     * 0x0044B173 when their test fails. This chain used to fall through to
-     * the settle with `turned` still clear, which is a trooper walking
-     * through the hut at full speed; the injected A/B could not see it,
-     * both sides being driven the same, and it was found by bisecting
-     * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
-    if (ObjKind538In10To17(o)) {
-        turned = 1;
-        speed  = 0;
+swept:
+    /* One dispatch for every way out of the step and the sweep. */
+    if (i == 0) {
+        speed = 0;
         *(w + 4) = facing;
-    } else if (*(const int32_t *)(w + 0x0C)
-               || !found
-               || (g_mpSession
-                   && !AM2_THE_COMM->CommMustBroadcast(
-                          (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
-                   && ObjType2Field548((const AM2_Object *)o))) {
-        /* One block; VC6 copies it into each of the three tests. */
-        *(int32_t *)(w + 8) = 1;
-        turned = 1;
-        *(w + 4) = facing;
-        speed  = 0;
-    } else {
-        goto sweep;
+        goto settle_facing;
     }
+    if (i < tries) {
+        /* A heading was found: turn toward it and STOP this frame
+         * (0x0044B3A2), stamp the turn deadline and charge the sweep to
+         * the accumulator, which wraps at +/-0x100 in two steps. */
+        int16_t acc;
+
+        speed  = 0;
+        *(w + 4) = facing;
+        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) =
+            (int32_t)(g_gameClockMs
+                      + AM2_TROOPER_TURN_MS);
+        *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
+            (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                                facing);
+        acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+        if (acc > 0x100)
+            *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc - 0x100);
+        acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+        if (acc < (int16_t)0xFF00)
+            *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc + 0x100);
+        goto settle_facing;
+    }
+    /* Exhausted: nothing to walk toward. */
+    PickFireMode(o);
+    turned = 1;
+    goto settle_facing;
 
 settle_facing:
     /* A facing that actually changed stamps the settle clock. */
