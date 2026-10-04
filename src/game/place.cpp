@@ -383,8 +383,9 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
             return 1;
         if (code == (int32_t)PackKey(0x26, (uint32_t)(n * 10 + 11), 0))
             return 1;
-        return code == (int32_t)PackKey(0x26, (uint32_t)(n * 10 + 12), 0)
-               ? 1 : 0;
+        if (code == (int32_t)PackKey(0x26, (uint32_t)(n * 10 + 12), 0))
+            return 1;
+        break;
 
     case 3:
         if (code == (int32_t)PackKey(0x20, (uint32_t)(n + 1), 0))
@@ -424,6 +425,7 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
     default:
         return 0;
     }
+    return 0;
 }
 
 
