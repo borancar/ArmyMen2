@@ -5304,15 +5304,18 @@ finish:
         /* Overwrites the store above, and measures from the ANCHOR. */
         *outBearing = AngleBetween((const AM2_Point *)&anchor,
                                    (const AM2_Point *)(best + OBJ_OFF_POS));
-        return best;
+        goto out;
     }
-    /* One return for the fallback and for nothing at all: `alt` is null
-     * when there is neither. */
+    /* The fallback, or nothing at all: `alt` is null when there is
+     * neither. ONE return for every path past the throttle -- with two,
+     * VC6 saves ebx/esi/edi in the prologue instead of after it. */
     if (alt) {
         *outRange   = bestRange;
         *outBearing = bestBearing;
     }
-    return alt;
+    best = alt;
+out:
+    return best;
 }
 
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
