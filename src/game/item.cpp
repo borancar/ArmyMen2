@@ -3447,9 +3447,9 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
     /* The army test is asked twice, once for each rule it guards. */
     if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army
         && (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & OBJ_FLAG_SHOT_PROOF)) {
-        /* The refusals after the height test come back here, as the image
-         * shares this one block with them. */
-    refuse:
+        /* The image sends every later refusal back to this block. Ours
+         * still gives them their own copy (at the `refuse` label below)
+         * at the end of the function. */
         return 0;
     }
 
@@ -3490,8 +3490,10 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
 
         if (code == AM2_SHOT_CODE_RANDOM
             && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
-            if (objH >= height + AM2_SHOT_OVER_UNDER)
+            if (objH >= height + AM2_SHOT_OVER_UNDER) {
+            refuse:
                 return 0;
+            }
             if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
                 goto refuse;
             return 1;
