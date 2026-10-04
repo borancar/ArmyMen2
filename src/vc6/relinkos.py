@@ -70,7 +70,8 @@ def _aggregated(va):
 
 
 # Aggregated ranges whose members stay DECLARED (see render()).
-KEEP_DECLS = ((0x005127C8, 0x00512FD0), (0x004FCAA8, 0x004FCDF4))
+KEEP_DECLS = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
+              (0x004FCAA8, 0x004FCDF4), (0x004F96C0, 0x004F96CC))
 
 
 def _kept(va):
@@ -124,7 +125,11 @@ def render():
     # functions that never name them: dropping the keyboard block's four
     # turned CheatLine's cursor sum around. Ranges in KEEP_DECLS lose their
     # redirects but keep their declarations. Which set is right is empirical
-    # (keeping the other two ranges' declarations costs CheatLine instead).
+    # and moves with every other change to the set: with the aim globals
+    # split and the sprite list aggregated, keeping ALL five ranges'
+    # declarations is what matches both CheatLine and PlacementScreenClick
+    # (2026-10-04); keeping the keyboard block's alone once did, and keeping
+    # the settings and level blocks once cost CheatLine.
     members = sorted({m for _, m in redirects() if m in vas
                       and (not _aggregated(vas[m]) or _kept(vas[m]))},
                      key=lambda m: vas[m])
