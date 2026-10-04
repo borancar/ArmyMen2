@@ -762,8 +762,8 @@ typedef int32_t (__cdecl *AM2_PalRandFn)(void);
  */
 void __cdecl BuildRemapTables(void)
 {
-    const uint8_t  *base = g_armyPalBase;
-    const uint8_t  *pal  = (const uint8_t *)g_paletteCopy;
+#define base (g_armyPalBase)
+#define pal ((const uint8_t *)g_paletteCopy)
     uint8_t        *obj  = g_objTableRecords;
     uint8_t        *ramp = g_armyRampTables;
     uint8_t       **table;
@@ -822,6 +822,8 @@ void __cdecl BuildRemapTables(void)
 
     for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
         ((uint8_t *)g_rowLutDoubles)[i] = (uint8_t)i;
+#undef base
+#undef pal
 }
 
 int palette_install(void)

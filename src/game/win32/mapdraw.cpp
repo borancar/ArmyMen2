@@ -1919,7 +1919,7 @@ clamp_eye:
 
     {
         int32_t *world  = g_secondRect;
-        int32_t *origin = &g_viewX;
+#define origin (&g_viewX)
         int32_t  vl = vpt.x - halfW;
         int32_t  vt = vpt.y - halfH;
 
@@ -1944,6 +1944,7 @@ clamp_eye:
 #undef BOUND_R
 #undef BOUND_T
 #undef BOUND_L
+#undef origin
 }
 
 /* 0x00413610. Outline a rectangle held in view space.
