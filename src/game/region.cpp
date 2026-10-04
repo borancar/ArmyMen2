@@ -3440,9 +3440,9 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
             *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         *(uint32_t *)&pt                      = *(const uint32_t *)dest;
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
         *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)dest;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
         *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
         goto two_waypoints;
     }
