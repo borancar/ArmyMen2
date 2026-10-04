@@ -6416,7 +6416,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
  * the uid or the lock fails. */
 void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 {
-    AM2_Widget *w = this;
+#define w this
 
     /* All three tables are LOCALS, built on the stack a dword at a time
      * before anything is looked up -- the reason for the aligned frame. The
@@ -6625,6 +6625,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 #undef SQD_BAR_X
 #undef SQD_BAR_Y
 #undef SQD_BAR_MAX_W
+#undef w
 }
 
 /* 0x00416DA0, vtable slot 1 of the squad panel. Twelve portraits in a 3x4
@@ -7718,7 +7719,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
  */
 void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
 {
-    AM2_Widget *w = this;
+#define w this
 
     uint8_t *self = (uint8_t *)w;
     RECT     hit;
@@ -7795,6 +7796,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
         DrawSpriteClipped(TOP_SPR, x, y, &part, 0);
 #undef TOP_SPR
     }
+#undef w
 }
 
 /* The COUNT BUTTON's own three functions -- constructor, deleting destructor
@@ -15937,7 +15939,7 @@ void __attribute__((thiscall)) AM2_Widget::RepaintAncestor(RECT clip)
 
 void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
 {
-    AM2_Widget *w = this;
+#define w this
 
     const uint8_t *self = (const uint8_t *)w;
     AM2_Sprite    *spr;
@@ -15969,6 +15971,7 @@ void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
         return;
 
     DrawSpriteClipped(spr, x, y, &part, 0);
+#undef w
 }
 
 void __attribute__((thiscall)) AM2_Widget::MultiUpdateThunk()
@@ -16184,7 +16187,7 @@ AM2_ScrollBar::~AM2_ScrollBar()
 
 void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
 {
-    AM2_Widget *w = this;
+#define w this
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *bar;
@@ -16220,6 +16223,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
     if (IntersectRect(&visible, &box, &clip)
         && ClipRect(&bar->bounds, (const AM2_Rect *)&visible, &x, &y, &part))
         DrawSpriteClipped(bar, x, y, &part, 0);
+#undef w
 }
 
 /* MpSpinConstruct -- original 0x00456300, 1008 bytes, thiscall `ret 0x38`.

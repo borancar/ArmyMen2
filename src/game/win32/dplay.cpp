@@ -354,75 +354,76 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
 
     for (slot = 0; slot < NRECS; slot++)
         if (*(const uint32_t *)RECAT(slot) == 0)
-            goto found;
-    orig_log("Create FlowQ failed for ID %x \n", id);
-    return result;
+            break;
 
-found:
-    /* Every store indexes the array afresh rather than holding a record
-     * pointer: the image addresses each field as table + slot*stride. */
-#define rec RECAT(slot)
+    /* The answer merges here, so VC6 returns it from a register on
+     * both paths rather than folding the failure to a constant. */
+    if (slot < NRECS) {
+        /* Every store indexes the array afresh rather than holding a record
+         * pointer: the image addresses each field as table + slot*stride. */
+    #define rec RECAT(slot)
 
-    if (comm_u32(g_commObject,
-                 COMM_OFF_VERBOSE) != 0)
-        orig_log("Creating Flow Queue for Player id %x\n", id);
+        if (comm_u32(g_commObject,
+                     COMM_OFF_VERBOSE) != 0)
+            orig_log("Creating Flow Queue for Player id %x\n", id);
 
-    want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
-    own  = 1u << slot;
+        want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
+        own  = 1u << slot;
 
-    *(uint32_t *)(rec + 0x00) = id;
-    *(uint32_t *)(rec + 0x04) = 0;
-    *(uint32_t *)(rec + 0x08) = 0;
-    *(uint32_t *)(rec + 0x0C) = 0;
-    *(uint32_t *)(rec + PLAYER_REC_OFF_FLAG_94) = 1;
-    *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = own;
-    g_playerSlotMask |= own;
-    *(uint32_t *)(rec + PLAYER_REC_OFF_WANT_BIT) = want;
-    *(uint32_t *)(rec + 0x10) = 0;
-    *(uint32_t *)(rec + 0x1C) = 0;
-    *(uint32_t *)(rec + 0x20) = 0;
-    *(uint32_t *)(rec + 0x28) = 0;
-    *(uint32_t *)(rec + 0x30) = 0;
-    *(uint32_t *)(rec + 0x34) = 0;
-    *(uint32_t *)(rec + 0x38) = 0;
-    *(uint32_t *)(rec + 0x40) = 0;
-    *(uint32_t *)(rec + 0x44) = 0;
-    *(uint32_t *)(rec + 0x48) = 0;
-    *(uint32_t *)(rec + 0x4C) = 0;
-    g_msgWantedFlags |= want;
-    *(uint32_t *)(rec + PLAYER_REC_OFF_MADE_AT) = GetTickCount();
-    *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) = 1;
-    *(uint32_t *)(rec + 0x0C) = 0;
-    *(uint32_t *)(rec + 0x8C) = 0;
-    *(uint32_t *)(rec + 0x9C) = 0;
-    *(uint32_t *)(rec + 0xA0) = 0;
-    *(uint32_t *)(rec + 0xA4) = 0;
-    *(uint32_t *)(rec + 0xA8) = 0;
-    *(uint32_t *)(rec + 0xAC) = 0;
-    *(uint32_t *)(rec + 0xB0) = 0;
-    *(uint32_t *)(rec + 0xB4) = 0;
+        *(uint32_t *)(rec + 0x00) = id;
+        *(uint32_t *)(rec + 0x04) = 0;
+        *(uint32_t *)(rec + 0x08) = 0;
+        *(uint32_t *)(rec + 0x0C) = 0;
+        *(uint32_t *)(rec + PLAYER_REC_OFF_FLAG_94) = 1;
+        *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = own;
+        g_playerSlotMask |= own;
+        *(uint32_t *)(rec + PLAYER_REC_OFF_WANT_BIT) = want;
+        *(uint32_t *)(rec + 0x10) = 0;
+        *(uint32_t *)(rec + 0x1C) = 0;
+        *(uint32_t *)(rec + 0x20) = 0;
+        *(uint32_t *)(rec + 0x28) = 0;
+        *(uint32_t *)(rec + 0x30) = 0;
+        *(uint32_t *)(rec + 0x34) = 0;
+        *(uint32_t *)(rec + 0x38) = 0;
+        *(uint32_t *)(rec + 0x40) = 0;
+        *(uint32_t *)(rec + 0x44) = 0;
+        *(uint32_t *)(rec + 0x48) = 0;
+        *(uint32_t *)(rec + 0x4C) = 0;
+        g_msgWantedFlags |= want;
+        *(uint32_t *)(rec + PLAYER_REC_OFF_MADE_AT) = GetTickCount();
+        *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) = 1;
+        *(uint32_t *)(rec + 0x0C) = 0;
+        *(uint32_t *)(rec + 0x8C) = 0;
+        *(uint32_t *)(rec + 0x9C) = 0;
+        *(uint32_t *)(rec + 0xA0) = 0;
+        *(uint32_t *)(rec + 0xA4) = 0;
+        *(uint32_t *)(rec + 0xA8) = 0;
+        *(uint32_t *)(rec + 0xAC) = 0;
+        *(uint32_t *)(rec + 0xB0) = 0;
+        *(uint32_t *)(rec + 0xB4) = 0;
 
-    *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) =
-        comm_u32(g_commObject,
-                 COMM_OFF_IS_HOST);
+        *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) =
+            comm_u32(g_commObject,
+                     COMM_OFF_IS_HOST);
 
-    {
-        int32_t i;
+        {
+            int32_t i;
 
-        i = 0;
-        for (;;) {
-            if (i >= AM2_PLAYER_RING_LEN)
-                break;
-            ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
-            ((uint32_t *)(rec + PLAYER_REC_OFF_RING_B))[i] = 0;
-            i++;
+            i = 0;
+            for (;;) {
+                if (i >= AM2_PLAYER_RING_LEN)
+                    break;
+                ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
+                ((uint32_t *)(rec + PLAYER_REC_OFF_RING_B))[i] = 0;
+                i++;
+            }
         }
-    }
+        result = 1;
+    } else
+        orig_log("Create FlowQ failed for ID %x \n", id);
 #undef rec
 #undef NRECS
 #undef RECAT
-
-    result = 1;
     return result;
 }
 

@@ -661,7 +661,7 @@ static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
 
 void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 {
-    void *self = this;
+#define self this
     RECT  to, from;
 
     /* The descriptor's width and height are read afresh at every use, and
@@ -700,6 +700,7 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 #undef DESC
 #undef WIDTH
 #undef HEIGHT
+#undef self
 }
 
 /* Turn a loaded bitmap into something drawable -- 0x0041BE80.
