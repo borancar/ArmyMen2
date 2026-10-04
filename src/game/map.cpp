@@ -1876,7 +1876,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (g_loadPending == 0)
         for (i = 0; i < objCount; i++) {
             uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
-            int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
+#define type ((int32_t)*(const int32_t *)(r + MAPREC_OFF_TYPE))
             int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
             uint8_t   owner = r[MAPREC_OFF_OWNER];
             uint8_t   trig  = r[MAPREC_OFF_TRIG];
@@ -2024,6 +2024,7 @@ bad:
     return 0;
 #undef DEFAULT_LAYER
 #undef MAP_PLANE
+#undef type
 }
 
 void map_install(void)
