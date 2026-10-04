@@ -1112,7 +1112,7 @@ int32_t __cdecl PlaceScenario(void)
     }
 
     if (g_haveDefaultCof == 0)
-        return 1;
+        goto done;
 
     /* The .cof pass: put the leader where the save says, then form up on it. */
     {
@@ -1123,7 +1123,7 @@ int32_t __cdecl PlaceScenario(void)
         lead = (uint8_t *)LookupOwnerObj(g_defaultOwner);
 
         if (!lead)
-            return 1;
+            goto done;
 
         *(uint32_t *)(lead + OBJ_OFF_POS) =
             g_leaderPos;
@@ -1176,6 +1176,7 @@ int32_t __cdecl PlaceScenario(void)
         }
 #undef list
     }
+done:
     return 1;
 #undef n
 #undef comm
