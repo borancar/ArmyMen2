@@ -13047,7 +13047,8 @@ after_flight:
         CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
                         *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x90, 4,
                         0, 0, 0, 0, 0, 0);
-        /* Its own copy of the tail, not `goto gone`. */
+        /* Its own copy of the function's tail (the flag store), not a jump
+         * to the one at the end. */
         *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
         return;
     }
@@ -13111,7 +13112,6 @@ expire:
         break;
     }
 
-gone:
     *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
 #undef o
 }
