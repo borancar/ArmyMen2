@@ -1136,7 +1136,7 @@ int32_t __cdecl PlaceScenario(void)
 
         /* Our army's list, re-read from the table at every use. */
 #define list (((uint8_t ** *)g_armyObjLists)[g_defaultOwner])
-        for (;;) {
+        while (1) {         /* not `for (;;)`, which VC6 rotates */
             uint8_t  *obj;
 
             if (i >= *(const int32_t *)((const uint8_t *)list + 4))
@@ -1158,18 +1158,23 @@ int32_t __cdecl PlaceScenario(void)
                 && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0) {
                 *(uint32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
                     g_zeroPoint;
-                if (*(const int32_t *)obj == 2
-                    && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
-                    AM2_Point p;
+                /* A one-case switch, not `== 2`: the image tests the type
+                 * with `sub eax, 2`. */
+                switch (*(const int32_t *)obj) {
+                case 2:
+                    if (*(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
+                        AM2_Point p;
 
-                    FormationPoint(obj, lead, &p, formed);
-                    /* The point is copied as one dword. */
-                    *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
-                    *(uint8_t *)(obj + OBJ_OFF_FACING) =
-                        g_leaderFacing;
-                    ObjTileChanged(obj, 0, 0);
-                    SetUnitPose(obj, 1);
-                    formed++;
+                        FormationPoint(obj, lead, &p, formed);
+                        /* The point is copied as one dword. */
+                        *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
+                        *(uint8_t *)(obj + OBJ_OFF_FACING) =
+                            g_leaderFacing;
+                        ObjTileChanged(obj, 0, 0);
+                        SetUnitPose(obj, 1);
+                        formed++;
+                    }
+                    break;
                 }
             }
             i++;
