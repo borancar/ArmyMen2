@@ -2063,21 +2063,27 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
  * does on this machine for reasons of its own. */
 int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 {
-    const uint8_t  *o     = (const uint8_t *)obj;
-    uint8_t        *rec   = (uint8_t *)out;
-    int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
-    uint8_t        *cells;
-    int32_t        *ring  = g_tilemaskNeighbours;
-    const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                (g_bitFromN);
-    const AM2_Rect *hit;
+    /* No locals for the record's parts: the box is the record itself, the
+     * cells follow it, the hit rect is re-read from the object and the grid
+     * width from the box at every use -- the original keeps only the record
+     * pointer in a register and these few on the frame. */
+#define o     ((const uint8_t *)obj)
+#define rec   ((uint8_t *)out)
+#define box   ((int32_t *)(rec + TILEMASK_OFF_RECT))
+#define cells (rec + TILEMASK_OFF_CELLS)
+#define HIT   ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))
+#define GRIDW (box[2] - box[0] + 1)
+#define ring  g_tilemaskNeighbours
+#define tab   ((const uint8_t *)(uintptr_t)(g_bitFromN))
     const uint8_t  *m;
     const uint8_t  *bits;
     int32_t         lw;
     int32_t         rw;
     int32_t         tw;
     int32_t         bw;
+    int32_t         tl, tr, tt, tb;
     int32_t         w;
+    int32_t         span;
     int32_t         rowbits;
     int32_t         rowbytes;
     int32_t         phase;
@@ -2093,41 +2099,39 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     if (!bits)
         return 0;
 
-    hit = (const AM2_Rect *)(o + OBJ_OFF_HIT_RECT);
-
     /* The world clamp, x pair then y pair, with a margin of one tile. */
-    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left, 1 << AM2_TILE_SHIFT,
+    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + hit->left - 1,
+    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top, 1 << AM2_TILE_SHIFT,
+    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + hit->top - 1,
+    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
-    /* and the tile clamp over the same four, into the grid. */
-    box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   g_mapTilesH
-                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
-    box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   g_mapTilesW
-                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
-    box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   g_mapTilesH
-                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
-    box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
-                   g_mapTilesW
-                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
+    /* and the tile clamp over the same four, kept raw: the margin goes on
+     * as the box is written, and the row width below is taken from these. */
+    tl = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+               g_mapTilesW - AM2_TILEMASK_MARGIN);
+    tr = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+               g_mapTilesW - AM2_TILEMASK_MARGIN);
+    tt = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+               g_mapTilesH - AM2_TILEMASK_MARGIN);
+    tb = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+               g_mapTilesH - AM2_TILEMASK_MARGIN);
+    box[3] = tb + AM2_TILEMASK_MARGIN;
+    box[2] = tr + AM2_TILEMASK_MARGIN;
+    box[1] = tt - AM2_TILEMASK_MARGIN;
+    box[0] = tl - AM2_TILEMASK_MARGIN;
 
-    w = box[2] - box[0] + 1;
-    cells = rec + TILEMASK_OFF_CELLS;
-    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
+    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
+    w = GRIDW;
 
     /* The original stores these in register-scheduling order rather than in
      * index order; the values are what matters and they are written out here
@@ -2153,6 +2157,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     ring[19] = 2 * w + 1;
     ring[18] = 2 * w;
 
+    span = tr - tl + 1;
+
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
     rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
@@ -2169,43 +2175,49 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
         k        = 8 - phase;
     }
 
-    lw = (box[2] - AM2_TILEMASK_MARGIN)
-            - (box[0] + AM2_TILEMASK_MARGIN) + 1;
-
     for (y = tw; y < bw; y += 8) {
-        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - hit->top) * rowbytes;
+        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - HIT->top) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
-        int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
-                      + AM2_TILEMASK_MARGIN;
+        uint8_t *c  = cells + ((y >> AM2_TILE_SHIFT) - box[1]) * GRIDW
+                            + AM2_TILEMASK_MARGIN;
 
-        for (; off < end; off++) {
+        /* No entry test: a row is never empty once rowbits is not 0. */
+        do {
             if (splitOdd == off % 2) {
                 if (bits[off] & tab[k]) {
-                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, idx);
+                    MarkTileRing(cells, ring, (int32_t)(c - cells));
                 }
 
                 col++;
-                idx++;
-                if (col == lw + AM2_TILEMASK_MARGIN)
+                c++;
+                if (col == span + AM2_TILEMASK_MARGIN)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
-                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, idx);
+                    MarkTileRing(cells, ring, (int32_t)(c - cells));
                 }
             } else if (bits[off]) {
-                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(cells, ring, idx);
+                MarkTileRing(cells, ring, (int32_t)(c - cells));
             }
-        }
+        } while (++off < end);
     }
 
     return marked;
+#undef o
+#undef rec
+#undef box
+#undef cells
+#undef HIT
+#undef GRIDW
+#undef ring
+#undef tab
 }
 
 
