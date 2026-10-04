@@ -142,6 +142,23 @@ main result so far (details in `src/vc6/README.md`):
     pointer lands in edx in the image and eax in ours, with the two unlink
     exits already separate blocks in both -- nothing to fold, nothing a
     spelling moves.
+  - **All 138 remaining differ-functions triaged** (2026-10-04, Opus).
+    `$T/triage.py RL.json` scores each by its largest single image-longer
+    and ours-longer NORM hunk -- the fold / missing-block candidates sort to
+    the top, the register-colouring losses (only small scattered hunks) sink.
+    The outcome: the two biggest apparent gaps are NOT source-spellable.
+    FlowRecvMessage's `img+129` is `PacketThreadProc` (0x00401F00, dplay.h):
+    an original thread proc that is still UNRECONSTRUCTED and sits unlabelled
+    inside FlowRecvMessage's scored span (0x4014C0..0x4020A0), so the relink
+    charges its ~406 bytes to FlowRecvMessage -- the real FlowRecvMessage
+    ends at the ret+pad at 0x00401EFC. FindPath's `img+57` is a differ
+    misalignment: its terrain-penalty branch (AM2_TILE_NO_WEIGHT_NEAR /
+    AM2_TILE_LITTLE_COVER_NEAR) IS present, the bytes differ only in register
+    choice and block order. So the one genuine reconstruction gap left in the
+    set is PacketThreadProc; everything else is VC6 register allocation and
+    scheduling that no source form steers. Reconstructing PacketThreadProc is
+    the next real step and needs the comm/thread path to verify, not a
+    byte-match-only pass.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
