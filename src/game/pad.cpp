@@ -354,7 +354,7 @@ int32_t __cdecl ObjTileHook(void *obj)
             for (i = 0; i < AM2_PAD_BITS; i++, num += AM2_PAD_NUMBER_STRIDE) {
                 if (mask[i] & entered)
                     PadNumberEnter(o, num);
-                else if ((uint8_t)mask[i] & left)
+                else if (mask[i] & left)
                     PadNumberLeave(o, num);
             }
             changed = 1;
