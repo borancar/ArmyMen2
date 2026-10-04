@@ -76,6 +76,20 @@ main result so far (details in `src/vc6/README.md`):
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
   From 758 to 1500:
+  - **The image's stack frame names its locals** (2026-10-04). Reading each
+    slot of the image's frame against our `/FAs` layout showed what the
+    source declared. LoadMap went 502 -> 135 and its frame is now exact:
+    `path` is function-scope and `scri` is 0x40 bytes. The MHDR rects are
+    three by-value RectMake results. `at` and OLAY's `first` share a slot,
+    so both are block-scoped. The record count is read into `v`. Two
+    behaviour fixes came out of it. OLAY's `first` stays 0 when a chunk
+    declares no records. On the respawn path the weapon's quantity is what
+    RandomRespawnKind writes through its pointer; we had passed the record's
+    NUMB. Frames also fixed for SightScan (a 1024-entry line buffer) and
+    PausedFrameStep (buffer sizes; three separate pause-bit tables,
+    `am2_mp_pause_bits_a/_b/_c`). ObjHitMaskAction went 265 -> 218 once its
+    tile clamps are raw locals and the record's parts are not variables.
+    Every one of these is still short of exact, on register choice.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
