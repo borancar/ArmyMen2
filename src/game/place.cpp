@@ -611,7 +611,10 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
  */
 int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
 {
-    /* Nested positively onto one `return found`, the kinds laid out 3, 2, 1,
+    /* Every case sets `found` and breaks to the one `return found`; VC6
+     * copies that return into the constant arms itself, which is how the
+     * image has a `mov eax, 1` epilogue per arm and still returns the
+     * register at the end. Nested positively, the kinds laid out 3, 2, 1,
      * and the type table walked by index (a signed `jl`). */
 #define TYPE(i, off) (((const int32_t (*)[AM2_UNIT_TYPE_STRIDE / 4]) \
                        ((uintptr_t)g_unitTypes))[i][(off) / 4])
@@ -625,12 +628,13 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
         if (*(const int8_t *)(o + OBJ_OFF_ARMY) == army) {
             switch (*(const int32_t *)o) {
             case 3:
-                return 1;
+                found = 1;
+                break;
 
             case 2:
                 if (!*(const int32_t *)(o + OBJ_OFF_SARGE)
                     && !*(const int32_t *)(o + OBJ_OFF_FIELD_94))
-                    return 1;
+                    found = 1;
                 break;
 
             case 1:
@@ -646,7 +650,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
                                TYPE(i, UNIT_TYPE_OFF_KIND), slot))
                         found = 1;
                 }
-                return found;
+                break;
             }
         }
     }
