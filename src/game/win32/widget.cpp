@@ -9761,7 +9761,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_GAME_BOX);
         AM2_Widget  *child;
         void        *rows;
-        char         path[0x100];
+        char         path[0x40];
         int32_t      sel = 0;
 
         rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -9932,7 +9932,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * Neither move is undone; the panel leaves the directory where the
      * fallback put it, unlike LoadMap which restores its own. */
     {
-        char        path[0x104];
+        char        path[0x100];
         AM2_Widget *child;
 
         SetGameDir(g_tilesetPath);
