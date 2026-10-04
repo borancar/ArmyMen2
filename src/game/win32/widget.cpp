@@ -9591,12 +9591,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget *child;
 
-        child = (AM2_Widget *)orig_operator_new(0x80);
-        if (child)
-            ::MultiSpriteConstruct(child,
-                                 (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
-                                 (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)),
-                                 1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
+        child = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)),
+                                1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
         *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0) = child;
         ::WidgetAddChild(w, child);
         *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0)
@@ -9604,13 +9601,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     }
 
     {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
-
-        if (child)
-            ::MultiSpriteConstruct(child,
-                                 (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
-                                 (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)),
-                                 1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
+        AM2_Widget *child = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
+                                            (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)),
+                                            1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
         *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1) = child;
         ::WidgetAddChild(w, child);
         *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1)
@@ -9943,10 +9936,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             strcpy(path, "bad_mp_prev.bmp");
         }
 
-        child = (AM2_Widget *)orig_operator_new(0x60);
-        if (child)
-            ::PanelConstruct(child, path, 1,
-                           *RectSet(&r, 0x152, 0x110, 0xBA, 0xBA));
+        child = new AM2_Panel(path, 1, *RectSet(&r, 0x152, 0x110, 0xBA, 0xBA));
         *(AM2_Widget **)(p + MP_PANEL_OFF_PREVIEW) = child;
         ::WidgetAddChild(w, child);
         *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_PREVIEW)
@@ -9982,26 +9972,19 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * NULL first bitmap where the other three buttons pass one, so it has no
      * released state of its own. */
     {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x78);
-
-        if (child)
-            ::ButtonConstruct(child,
-                            "03_015_00_options.bmp",
-                            "03_015_01_options.bmp",
-                            "03_015_02_options.bmp", 1,
-                            *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
-                            (void (__cdecl *)(AM2_Widget *))MpRequestOptions,
-                            0);
+        AM2_Widget *child = new AM2_Button("03_015_00_options.bmp",
+                                           "03_015_01_options.bmp",
+                                           "03_015_02_options.bmp", 1,
+                                           *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
+                                           (void (__cdecl *)(AM2_Widget *))MpRequestOptions,
+                                           (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
 
-        child = (AM2_Widget *)orig_operator_new(0x78);
-        if (child)
-            ::ButtonConstruct(child, 0,
-                            "03_018_01_cancel.bmp",
-                            "03_018_02_cancel.bmp", 1,
-                            *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
-                            (void (__cdecl *)(AM2_Widget *))MpLeaveSession,
-                            0);
+        child = new AM2_Button(0, "03_018_01_cancel.bmp",
+                               "03_018_02_cancel.bmp", 1,
+                               *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
+                               (void (__cdecl *)(AM2_Widget *))MpLeaveSession,
+                               (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
     }
 
