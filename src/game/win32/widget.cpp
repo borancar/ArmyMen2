@@ -17902,8 +17902,8 @@ int32_t __cdecl PointerPickRepair(void *obj)
     if (riding && *(const uint32_t *)(o + OBJ_OFF_UID) != riding)
         return 0;
 
-    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_X),
-                   (const AM2_Point *)(leader + OBJ_OFF_X))
+    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                   (const AM2_Point *)(o + OBJ_OFF_X))
         > g_pickReach662894)
         return 0;
 
