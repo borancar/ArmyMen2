@@ -2338,12 +2338,12 @@ void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
                  * byte -- and the wrap is one add or one subtract because
                  * the table's values keep the sum inside +/- one turn. */
                 angle += sector;
-                if (!(angle < 0)) {
+                if (angle < 0) {
+                    SpawnParticle(at, rowField2C, i, 7, height, angle + 0x100);
+                } else {
                     if (angle >= 0x100)
                         angle -= 0x100;
                     SpawnParticle(at, rowField2C, i, 7, height, angle);
-                } else {
-                    SpawnParticle(at, rowField2C, i, 7, height, angle + 0x100);
                 }
             } else {
                 /* Unreachable through this caller; see the header. */
