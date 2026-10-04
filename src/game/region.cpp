@@ -2794,7 +2794,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     tilew = (box[2] - AM2_TILEMASK_MARGIN)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
-    for (y = tw; y < bw; y += 8) {
+    for (y = tw; bw > y; y += 8) {
         int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rw;
         int32_t end = off + rw;
         int32_t col = AM2_TILEMASK_MARGIN;
@@ -5183,7 +5183,7 @@ score:
             delta = abs(delta);
 #define rank g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)]
             if (delta > rank.field_04) {
-                if (candRange >= rank.field_08)
+                if (rank.field_08 <= candRange)
                     continue;
                 goto in_sight;
             }
@@ -8609,7 +8609,7 @@ pose:
         uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
         uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
 
-        if (was != now && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
+        if (now != was && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = was;
     }
 #undef reg
