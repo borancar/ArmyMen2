@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1504 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1506 of
   1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match now: it tracks the set of
   externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
@@ -75,7 +75,7 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
-  From 758 to 1504:
+  From 758 to 1506:
   - **The image's stack frame names its locals** (2026-10-04). Reading each
     slot of the image's frame against our `/FAs` layout showed what the
     source declared. LoadMap went 502 -> 135 and its frame is now exact:
@@ -105,6 +105,20 @@ main result so far (details in `src/vc6/README.md`):
     for its change test (a `now` local let VC6 store the constant itself),
     and once a successful lost-device retry falls into the same `hr` test
     as the plain path rather than skipping it from an else-if.
+  - **A stored value is read back from where it was stored** (2026-10-04
+    evening). `$T/storeback.py` sweeps every `LHS = local;` for later uses
+    of the local that the image reads back from LHS. State2Enter logs the
+    attempt count from the global; DeployTrooper hands SetFieldInAll the
+    slot from TABLE_REC_KIND and -- the other half -- takes
+    NearestClearPoint's answer in a second point rather than the input
+    one; both match. CommRegisterSelf 42 -> 34, SightScan 362 -> 360
+    (`theirs` and `cand` were one variable), FindPath, ScriptPad,
+    UpdateTrooperAction a few each. Rejected hits: the sweep matches a
+    MACRO as the local (TOKVAL, AM2_POSE_CARRY) and cannot see a
+    conditional store (HudEdgeUpdate). Two `} else if` arms whose test
+    excludes the first are separate ifs in the image (Step3Drive 428 ->
+    419, ScrollMapCache 171 -> 167); the same split in HudSquadUpdate and
+    ObjCollidesWith only scores when it changes behaviour, so it stays.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
