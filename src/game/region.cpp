@@ -4286,8 +4286,11 @@ done:
  * arrays of records, and SightScan indexes them as arrays -- `[rank*28 + 0x473DC0 + field]`,
  * `[dir*16 + 0x4F8FB8 + field]` -- rather than through element pointers. */
 
-static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t dir,
-                                int32_t viewerAttr, int32_t gen)
+/* The parameters are references: inlined, a by-value parameter is one more
+ * variable to VC6, and the image has none (RegionFindPath 96 -> 37). */
+static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &seen,
+                                const uint32_t &dir, const int32_t &viewerAttr,
+                                const int32_t &gen)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
     const uint8_t *attrs = g_tileAttrs;
@@ -6309,7 +6312,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
  * log, so x and y come out of the tile index by a mask and a shift, written
  * as one expression the way the original computes it, inline, three times
  * in RegionFindPath. */
-static inline int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
+static inline int32_t RegionSpan(const uint8_t *const &a, const uint8_t *const &b)
 {
 #define TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
 #define SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift    \
