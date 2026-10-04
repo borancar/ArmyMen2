@@ -1761,7 +1761,7 @@ void __cdecl SendVehicleFire(void *vehicle)
 void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 {
 #define comm (g_commObject)
-    uint8_t  *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out, *outStart;
     uint32_t  seq, flags = 0, interval;
@@ -1961,6 +1961,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 
     *(uint16_t *)m += (uint16_t)(out - outStart);
 #undef comm
+#undef o
 }
 
 /* SendVehicleUpdates -- original 0x0045E480, one caller. The vehicle batch

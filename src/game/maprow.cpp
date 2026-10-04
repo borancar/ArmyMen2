@@ -1624,7 +1624,7 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
 void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
                          int32_t dx, int32_t dy, const void *rect)
 {
-    uint8_t *h = (uint8_t *)set;
+#define h ((uint8_t *)set)
     int32_t  i;
 
     *(int32_t *)h = 0;
@@ -1646,6 +1646,7 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
 
     *(int32_t *)(h + 0x0C) = 0;
     memcpy(h + ROWSET_OFF_RECT, rect, 16);
+#undef h
 }
 
 /* 0x004600F0. May this weapon kind respawn?

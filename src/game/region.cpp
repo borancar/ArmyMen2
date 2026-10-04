@@ -2687,7 +2687,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
 #define cells (rec + TILEMASK_OFF_CELLS)
-    int32_t        *ring  = g_tilemaskNeighbours;
+#define ring (g_tilemaskNeighbours)
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
     const uint8_t  *m;
@@ -2829,6 +2829,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
 
     return marked;
 #undef cells
+#undef ring
 }
 
 /* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
@@ -8599,13 +8600,14 @@ pose:
      * current one, and only when the two differ and it does not already hold
      * the new one. */
     {
-        const uint8_t *reg = g_regionOfCell;
+#define reg (g_regionOfCell)
         uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
         uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
 
         if (was != now && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = was;
     }
+#undef reg
 }
 
 /* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
