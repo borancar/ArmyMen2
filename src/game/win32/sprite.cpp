@@ -1941,7 +1941,7 @@ void __cdecl BuildVehicleMask(int32_t kind)
     for (dir = 0; dir < a->directions; dir++) {
         AM2_Sprite *spr;
         AM2_Point   found[AM2_MASK_POINTS];
-        int32_t     count = 0;
+        int32_t     count;
         int32_t     x, y;
 
         if (g_traceVeh)
@@ -1949,6 +1949,7 @@ void __cdecl BuildVehicleMask(int32_t kind)
 
         spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * dir].sprite];
 
+        count = 0;
         /* Block centres, as BuildRoachMask. */
         for (y = AM2_MASK_STEP / 2; y < spr->bounds.bottom - AM2_MASK_STEP / 2;
              y += AM2_MASK_STEP)

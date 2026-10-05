@@ -1471,7 +1471,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
     if (request == AM2_DO_PICKUP) {
         /* `slot` lands in the message argument's dead slot. */
         int32_t slot;
-        int32_t unused = 0;
+        int32_t unused;
 
         if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
             orig_log("Tell pickup item received; ammo %d\n",

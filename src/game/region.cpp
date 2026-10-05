@@ -1345,7 +1345,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         considered += AM2_TILE_STEP8_COUNT;
 
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
-            int32_t  nb = curTile + step[i];
+            uint32_t nb = curTile + step[i];
             int32_t  nbRegion, g, h, prev, next, fNew;
             uint16_t walk, before;
 
