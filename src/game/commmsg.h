@@ -11,6 +11,7 @@
 #define AM2_COMMMSG_H
 
 #include "msgslot.h"
+#include "objtable.h"   /* AM2_Object */
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,7 +38,7 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army);
  * changed enough, with one presence bit each in the top three bits of its
  * first dword. Five bytes at least and NINE at most, which is what makes the
  * caller's ten-byte reservation a bound rather than a guess. */
-void __cdecl AppendTroopState(void *msg, void *obj);
+void __cdecl AppendTroopState(void *msg, AM2_Object *obj);
 void __cdecl RecvTroopPair(void *msg);
 
 /* 0x0044C3E0, kind 0x22 -- the twin of armymsg.cpp's SendTrooperSetWeapon, so

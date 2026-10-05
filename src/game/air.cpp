@@ -315,23 +315,22 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
  * "I see everything!" is what reaches this function. */
 void __cdecl RevealObj(void *obj)
 {
-    uint8_t  *o = (uint8_t *)obj;
-    uint32_t  flags;
-    int32_t   i;
+    AM2_Object *o = (AM2_Object *)obj;
+    uint32_t    flags;
+    int32_t     i;
 
     if (!obj)
         return;
 
-    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
+    flags = o->flags |= OBJ_FLAG_REVEALED;
     if (!(flags & OBJ_FLAG_CONCEALED))
         return;
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
+    o->flags = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
 
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
-                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+    for (i = 0; i < o->rowCount; i++) {
+        AM2_MapRow *row = &o->rows[i];
 
-        *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
+        row->flags &= ~(uint32_t)ROW_FLAG_REMOVED;
         RowUpdate(row, 0, g_mapDesc);
     }
 }

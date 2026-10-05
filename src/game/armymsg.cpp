@@ -544,7 +544,7 @@ void __cdecl TellOneSlot(int32_t slot)
                 && ObjIsType2((const AM2_Object *)obj)) {
                 if (h->uid == 0)
                     h->uid = *(const uint32_t *)(obj + 4);
-                AppendTroopState(msg, obj);
+                AppendTroopState(msg, (AM2_Object *)obj);
             }
             if (h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {

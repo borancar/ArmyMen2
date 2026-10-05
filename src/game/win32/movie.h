@@ -16,12 +16,12 @@ struct AM2_Movie {
     static void *operator new(size_t n);
     static void operator delete(void *p);
 #endif
-    void __attribute__((thiscall)) MovieStop();
-    /* MovieStop is the destructor's body -- it re-stamps the vtable first,
-     * as a destructor does -- and the original's teardowns are `delete`:
-     * test, the stop, then operator delete. Inline, so the delete sites
-     * call MovieStop by name. */
-    ~AM2_Movie() { MovieStop(); }
+    /* 0x00445120 (ADDR_MOVIE_STOP). The destructor, OUT of line: it
+     * re-stamps the vtable first, as a destructor does, and the original's
+     * teardowns are `delete` -- test, this call, then operator delete. Inline,
+     * VC6 loaded the pointer straight into esi; out of line it goes through
+     * ecx as `this` first, which is what the image's delete sites do. */
+    ~AM2_Movie();
     /* 0x00445170, in the movie's own address band and called with the movie
      * in ecx: a member that ignores `this`. Defined in palette.cpp. */
     void __attribute__((thiscall)) SnapshotSystemPalette();
@@ -69,8 +69,6 @@ extern "C" {
  * the movie was decoding onto, and closes the Smacker handle. Does nothing at
  * all unless both a handle and an active flag are present, so it is safe to
  * call on a movie that never started. */
-static inline void __attribute__((thiscall)) MovieStop(void *movie)
-{ ((AM2_Movie *)movie)->MovieStop(); }
 
 /* Original: 0x00445280, 1 call site. Set the volume on every audio track.
  *

@@ -69,13 +69,14 @@ def _aggregated(va):
     return any(lo <= va < hi for lo, hi in AGGREGATE_RANGES)
 
 
-# Aggregated ranges whose members stay DECLARED (see render()). Empty now:
-# once AM2_Object, AM2_MapRow, AM2_Comm and the player message were typed,
-# no range's declarations are needed, and CheatLine and PlacementScreenClick
-# both match without any. It was five ranges, then four, then three, retuned
-# each time a shared struct grew. The empty set matched in every state
-# measured, so a flip should first be tried against it.
-KEEP_DECLS = ()
+# Aggregated ranges whose members stay DECLARED (see render()). Retuned
+# whenever a shared struct grows: CheatLine's and PlacementScreenClick's
+# operand order is a tie VC6 breaks by state the whole TU builds up, so
+# adding struct members or externs can tip it. Empty matched once the
+# comm and player-message structs were typed; the trooper fields on
+# AM2_Object tipped it back, and keeping the level block's declarations
+# settles both again. Search the subsets (empty first) when it flips.
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
 
 
 def _kept(va):

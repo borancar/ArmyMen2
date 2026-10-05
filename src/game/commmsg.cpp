@@ -983,9 +983,8 @@ typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
  * The nibble byte is `((x8 ^ y4) & 0xF) ^ y4`, which takes its low nibble from
  * x's high bits and its high nibble from y's -- the merge idiom, and exactly
  * what TroopSubParse unpacks. */
-void __cdecl AppendTroopState(void *msg, void *obj)
+void __cdecl AppendTroopState(void *msg, AM2_Object *o)
 {
-    uint8_t  *o = (uint8_t *)obj;
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out;
     uint8_t  *outStart;
@@ -993,38 +992,31 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     uint32_t  flags;
     uint32_t  interval;
     int32_t   dx, dy;
-    int16_t   px, py, lx, ly;
 
-    if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
+    if (!o->health)
         return;
 
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              *(const uint32_t *)(g_commObject + COMM_OFF_OUR_PLAYER_ID))
-              + FLOW_OFF_SEQUENCE);
+              AM2_THE_COMM->selfId) + FLOW_OFF_SEQUENCE);
 
-    if (*(const uint32_t *)(o + TROOPER_OFF_LAST_SEQ) == seq)
+    if (o->lastSeq == seq)
         return;
-    if (*(const uint32_t *)(o + TROOPER_OFF_SENT_POSE_T) == seq
-        && IsKind10To17(*(const int32_t *)(o + TROOPER_OFF_SENT_POSE)))
+    if (o->sentPoseSeq == seq && IsKind10To17(o->sentPose))
         return;
 
-    px = *(const int16_t *)(o + OBJ_OFF_POS);
-    lx = *(const int16_t *)(o + TROOPER_OFF_SENT_POS);
-    py = *(const int16_t *)(o + OBJ_OFF_POS + 2);
-    dx = px - lx;
-    ly = *(const int16_t *)(o + TROOPER_OFF_SENT_POS + 2);
-    dy = py - ly;
+    dx = o->pos.x - o->sentPos.x;
+    dy = o->pos.y - o->sentPos.y;
     if (dx < 0) dx = -dx;
     if (dy < 0) dy = -dy;
 
     {
         /* The comm object is read at every use. */
-#define comm ((uint8_t *)(g_commObject))
-        interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
-        if (*(const int32_t *)(o + OBJ_OFF_SARGE) && interval > 1)
+#define comm AM2_THE_COMM
+        interval = comm->sendInterval;
+        if (o->sarge && interval > 1)
             interval = 1;
 
-        uint32_t age = seq - *(const uint32_t *)(o + TROOPER_OFF_SENT_POS_T);
+        uint32_t age = seq - o->sentPosSeq;
 
         /* The exact test JUMPS PAST the coarse one when it sets the flag, and
          * FALLS INTO it when it does not -- so a position that has not moved
@@ -1032,29 +1024,23 @@ void __cdecl AppendTroopState(void *msg, void *obj)
          * zero), so an `else if` would answer the same; written as the branch
          * runs rather than as the answer it happens to give. */
         flags = 0;
-        if (age >= interval && (lx != px || py != ly))
+        if (age >= interval && (o->sentPos.x != o->pos.x || o->pos.y != o->sentPos.y))
             flags = 0x80000000u;
-        else if (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
-                 && (dx > 8 || dy > 8))
+        else if (age >= comm->enoughChangeLimit && (dx > 8 || dy > 8))
             flags = 0x80000000u;
 
         {
-            uint32_t age = seq - *(const uint32_t *)
-                               (o + TROOPER_OFF_SENT_FACING_T);
-#define F  (*(const uint8_t *)(o + OBJ_OFF_FACING))
-#define LF (*(const uint8_t *)(o + TROOPER_OFF_SENT_FACING))
-            if ((age >= interval && F != LF)
-                || (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
-                    && (((uint32_t)LF ^ (uint32_t)F) & 0xFFFFFFF0u)))
-#undef F
-#undef LF
+            uint32_t age = seq - o->sentFacingSeq;
+
+            if ((age >= interval && o->facing != o->sentFacing)
+                || (age >= comm->enoughChangeLimit
+                    && (((uint32_t)o->sentFacing ^ (uint32_t)o->facing)
+                        & 0xFFFFFFF0u)))
                 flags |= 0x40000000u;
         }
 
-        if (seq - *(const uint32_t *)(o + TROOPER_OFF_SENT_POSE_T)
-                >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
-            && *(const int32_t *)(o + OBJ_OFF_POSE)
-               != *(const int32_t *)(o + TROOPER_OFF_SENT_POSE))
+        if (seq - o->sentPoseSeq >= comm->enoughChangeLimit
+            && o->pose != o->sentPose)
             flags |= 0x20000000u;
     }
 
@@ -1069,8 +1055,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     flags |= 0x20000000u;
 
     {
-        uint32_t head = (UidOnWire(((const AM2_Object *)o)->uid) & 0x1FFFFFFFu)
-                        | flags;
+        uint32_t head = (UidOnWire(o->uid) & 0x1FFFFFFFu) | flags;
 
         *out++ = (uint8_t)(head >> 24);
         *out++ = (uint8_t)(head >> 16);
@@ -1080,38 +1065,32 @@ void __cdecl AppendTroopState(void *msg, void *obj)
 
     if (flags & 0x80000000u) {
         /* Clamped to twelve bits IN THE OBJECT, not just on the wire. */
-        if (*(const int16_t *)(o + OBJ_OFF_POS) > 0xFFF)
-            *(int16_t *)(o + OBJ_OFF_POS) = 0xFFF;
-        if (*(const int16_t *)(o + OBJ_OFF_POS + 2) > 0xFFF)
-            *(int16_t *)(o + OBJ_OFF_POS + 2) = 0xFFF;
+        if (o->pos.x > 0xFFF)
+            o->pos.x = 0xFFF;
+        if (o->pos.y > 0xFFF)
+            o->pos.y = 0xFFF;
 
         /* The position re-read from the object at each use. */
-#define X (*(const int16_t *)(o + OBJ_OFF_POS))
-#define Y (*(const int16_t *)(o + OBJ_OFF_POS + 2))
-        *out++ = (uint8_t)X;
-        *out++ = (uint8_t)Y;
-        *out++ = (uint8_t)(((((uint8_t)(X >> 8)) ^ ((uint8_t)(Y >> 4))) & 0x0F)
-                           ^ ((uint8_t)(Y >> 4)));
-#undef X
-#undef Y
+        *out++ = (uint8_t)o->pos.x;
+        *out++ = (uint8_t)o->pos.y;
+        *out++ = (uint8_t)(((((uint8_t)(o->pos.x >> 8))
+                             ^ ((uint8_t)(o->pos.y >> 4))) & 0x0F)
+                           ^ ((uint8_t)(o->pos.y >> 4)));
 
-        *(uint32_t *)(o + TROOPER_OFF_SENT_POS) =
-            *(const uint32_t *)(o + OBJ_OFF_POS);
-        *(uint32_t *)(o + TROOPER_OFF_SENT_POS_T) = seq;
+        o->sentPos = o->pos;
+        o->sentPosSeq = seq;
     }
 
     if (flags & 0x40000000u) {
-        *out++ = *(const uint8_t *)(o + OBJ_OFF_FACING);
-        *(uint8_t *)(o + TROOPER_OFF_SENT_FACING) =
-            *(const uint8_t *)(o + OBJ_OFF_FACING);
-        *(uint32_t *)(o + TROOPER_OFF_SENT_FACING_T) = seq;
+        *out++ = o->facing;
+        o->sentFacing = o->facing;
+        o->sentFacingSeq = seq;
     }
 
     if (flags & 0x20000000u) {
-        *out++ = *(const uint8_t *)(o + OBJ_OFF_POSE);
-        *(int32_t *)(o + TROOPER_OFF_SENT_POSE) =
-            *(const int32_t *)(o + OBJ_OFF_POSE);
-        *(uint32_t *)(o + TROOPER_OFF_SENT_POSE_T) = seq;
+        *out++ = (uint8_t)o->pose;
+        o->sentPose = o->pose;
+        o->sentPoseSeq = seq;
     }
 
     /* THE LENGTH GAINS WHAT THIS CALL WROTE, NOT WHERE THE CURSOR ENDED.

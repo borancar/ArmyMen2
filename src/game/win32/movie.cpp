@@ -220,7 +220,7 @@ LPDIRECTDRAWSURFACE __cdecl MovieMakeSurface(int32_t w, int32_t h)
 #define SMACK_TRACK_COUNT 7
 #define SMACK_PAN_CENTRE  0x7FF6u
 
-void __attribute__((thiscall)) AM2_Movie::MovieStop()
+AM2_Movie::~AM2_Movie()
 {
     void *movie = this;
 
@@ -800,13 +800,18 @@ void CALLBACK MovieTimerProc(UINT id, UINT msg, DWORD_PTR user,
         fld(movie, MOVIE_UNKNOWN14, int32_t) = 1;
 }
 
+#if defined(__GNUC__)
+void __attribute__((thiscall)) am2_dtor_AM2_Movie(AM2_Movie *m)
+{ m->AM2_Movie::~AM2_Movie(); }
+#endif
+
 int movie_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_MOVIE_MAKE_SURFACE, (const void *)MovieMakeSurface,
                         "MovieMakeSurface", 2);
-    rc |= patch_replace(ADDR_MOVIE_STOP, pmf_addr(&AM2_Movie::MovieStop), "MovieStop", 0);
+    rc |= patch_replace(ADDR_MOVIE_STOP, AM2_DTOR(AM2_Movie), "MovieStop", 0);
     rc |= patch_replace(ADDR_MOVIE_SET_VOLUME, pmf_addr(&AM2_Movie::MovieSetVolume),
                         "MovieSetVolume", 1);
     rc |= patch_replace(ADDR_MOVIE_DRAW_FRAME, pmf_addr(&AM2_Movie::MovieDrawFrame),

@@ -522,6 +522,9 @@ struct AM2_Comm {
     void        *dplay;         /* +0x3EC COMM_OFF_DPLAY */
     uint8_t      pad3f0[0x28];  /* +0x3F0 */
     int32_t      verbose;       /* +0x418 COMM_OFF_VERBOSE, AM2_COMM_LOG_ENABLED */
+    uint8_t      pad41c[0x5C];  /* +0x41C */
+    uint32_t     enoughChangeLimit; /* +0x478 COMM_OFF_ENOUGH_CHANGE_LIMIT */
+    uint32_t     sendInterval;  /* +0x47C COMM_OFF_SEND_INTERVAL */
 
     void    __attribute__((thiscall)) CommSetSlotRemote(int32_t slot);
     void    __attribute__((thiscall)) CommClearSlotRemote(int32_t slot);
@@ -593,6 +596,7 @@ static_assert(offsetof(AM2_Comm, isHost)      == 0x3D8, "isHost");
 static_assert(offsetof(AM2_Comm, sessionDesc) == 0x3E8, "sessionDesc");
 static_assert(offsetof(AM2_Comm, dplay)       == 0x3EC, "dplay");
 static_assert(offsetof(AM2_Comm, verbose)     == 0x418, "verbose");
+static_assert(offsetof(AM2_Comm, sendInterval) == 0x47C, "sendInterval");
 #endif
 static inline int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
 { return ((AM2_Comm *)comm)->ArmyInPlay(uid); }

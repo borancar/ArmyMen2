@@ -66,12 +66,13 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1507 of
-  1645 byte-identical (2026-10-04), piecewise 399.** The CheatLine /
-  PlacementScreenClick coin pair both match now: it tracks the set of
-  externs `src/vc6/include/am2_relink_os.h` declares, and keeping every
-  aggregate range's declarations (relinkos.py KEEP_DECLS) settles both
-  sides -- any change to that set can flip it again. Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1509 of
+  1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
+  PlacementScreenClick coin pair both match. It is an operand-order tie that
+  VC6 breaks by state the whole TU builds up: adding struct members or
+  externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
+  only) is the knob that settles it; retune it by searching the subsets,
+  empty first, whenever it flips. Earlier: 1507 before the typed structs, 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
@@ -181,6 +182,25 @@ main result so far (details in `src/vc6/README.md`):
     flipped the coin (PlacementScreenClick lost). Dropping the menu cursor's
     range 0x004FCAA8 from KEEP_DECLS settles both sides again, and the count
     holds at 1507 with nothing lost.
+  - **Typed structs close matches** (2026-10-05/06), 1507 -> 1509.
+    SetAnimFrame matches over AM2_MapRow, the drawable node's fields, once
+    the hit re-test reads `i >= t->count`. SendPlayerMsg matches once AM2_Comm
+    has data members (four 0x70-byte player slots from +0x20C, selfId,
+    playerCount, isHost, connected, the send thresholds) and the player
+    message is AM2_PlayerMsg. relinkos.py gives a scalar typed member an
+    address-of redirect. Closer, still off:
+    - ReceivePlayerMsg 60 -> 2: index the records, set slotSetting before i.
+    - AddToItemList 72 -> 41: a select for the counter, count-first grow
+      test, a local n for the memmove.
+    - AppendTroopState 31 -> 19: typed trooper sent-state fields, and the
+      position compared through the fields rather than int16 locals.
+    The movie destructor is out of line, as the image has it: the function
+    at 0x00445120 is `~AM2_Movie`, installed with AM2_DTOR. The rest (113
+    of 136 by a register-renaming classifier) are register-assignment and
+    scheduling ties, which no source spelling tried moves: declaration
+    order, operand order, scope, typed or untyped, bitfields, statement
+    order. ObjCollidesWith's swap is use weight: in the source, obj
+    outweighs from by two uses.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`

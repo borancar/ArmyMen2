@@ -4470,7 +4470,7 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
          * the weapon half of the context around it. */
         if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
             > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            SelectRankedWeapon(obj);
+            SelectRankedWeapon((AM2_Object *)obj);
             UnitWeaponInfo(obj, ctx);
         }
 

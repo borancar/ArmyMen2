@@ -9201,27 +9201,23 @@ void __cdecl ResetObjOnCof(void *obj)
  * AddLevelRecord and AddNameRecord are: the original has two functions, and
  * the duplication is what makes a later divergence visible.
  */
-void __cdecl SelectRankedWeapon(void *unit)
+void __cdecl SelectRankedWeapon(AM2_Object *u)
 {
-    uint8_t *u = (uint8_t *)unit;
-    int32_t  best;
-    int32_t  bestSlot = 0;
-    int32_t  i;
+    int32_t best;
+    int32_t bestSlot = 0;
+    int32_t i;
 
     best = MapCode18To28(**(const int32_t *const *)
-        ((const uint8_t *)WeaponByUid(
-             *(const uint32_t *)(u + UNIT_OFF_INVENTORY)) + OBJ_OFF_FIELD_C0));
+        ((const uint8_t *)WeaponByUid(u->inventory[0]) + OBJ_OFF_FIELD_C0));
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
-        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                           + (size_t)i * 4);
-        int32_t  rank;
+        int32_t rank;
 
-        if (!uid)
+        if (!u->inventory[i])
             continue;
 
         rank = MapCode18To28(**(const int32_t *const *)
-            ((const uint8_t *)WeaponByUid(uid) + OBJ_OFF_FIELD_C0));
+            ((const uint8_t *)WeaponByUid(u->inventory[i]) + OBJ_OFF_FIELD_C0));
 
         if (rank > best) {
             bestSlot = i;
@@ -9230,7 +9226,7 @@ void __cdecl SelectRankedWeapon(void *unit)
     }
 
     if (bestSlot > 0)
-        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = bestSlot;
+        u->inventorySel = bestSlot;
 }
 
 /* ObjRowsMaskAt -- original 0x00435440, one caller.

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"
+#include "dist.h"     /* AM2_Point */
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -29,13 +30,17 @@ typedef struct {
  * in. Only the named fields are claimed; the gaps are the other object
  * variants' fields at the same offsets, filled in as functions convert.
  * `owner` is the army byte (OBJ_OFF_ARMY). */
+struct AM2_MapRow;
+
 typedef struct {
     uint32_t       type;            /* +0x00  switch selector, 0..8 */
     uint32_t       uid;             /* +0x04  written back on registration */
     uint32_t       flags;           /* +0x08  OBJ_OFF_FLAGS */
     uint8_t        _pad0c[4];       /* +0x0C */
     int8_t         owner;           /* +0x10  OBJ_OFF_ARMY, read with movsx */
-    uint8_t        _pad11[0x2F];    /* +0x11 */
+    uint8_t        _pad11[1];       /* +0x11 */
+    AM2_Point      pos;             /* +0x12 OBJ_OFF_POS */
+    uint8_t        _pad16[0x2A];    /* +0x16 */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
     uint8_t        _pad41[0x17];    /* +0x41 */
     uint32_t       deadline58;      /* +0x58  OBJ_OFF_DEADLINE_58, a clock stamp */
@@ -44,7 +49,10 @@ typedef struct {
     int16_t        health;          /* +0x62  OBJ_OFF_HEALTH */
     int8_t         heightAdj;       /* +0x64  OBJ_OFF_HEIGHT_ADJ */
     int8_t         heightSet;       /* +0x65  OBJ_OFF_HEIGHT_SET */
-    uint8_t        _pad66[0x2E];    /* +0x66 */
+    uint8_t        _pad66[0x0A];    /* +0x66 */
+    int32_t        rowCount;        /* +0x70 OBJ_OFF_ROW_COUNT */
+    struct AM2_MapRow *rows;        /* +0x74 OBJ_OFF_ROWS, AM2_OBJ_ROW_STRIDE apart */
+    uint8_t        _pad78[0x1C];    /* +0x78 */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     uint8_t        _pad9c[4];       /* +0x9C */
@@ -55,10 +63,25 @@ typedef struct {
     int32_t        field10C;        /* +0x10C OBJ_OFF_FIELD_10C */
     uint8_t        _pad110[0x41C];  /* +0x110 */
     int32_t        vehicleKind;     /* +0x52C VEHICLE_OFF_KIND */
-    uint8_t        _pad530[0x14];   /* +0x530 */
+    uint8_t        _pad530[8];      /* +0x530 */
+    int32_t        pose;            /* +0x538 OBJ_OFF_POSE */
+    uint8_t        _pad53c[8];      /* +0x53C */
     int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
-    uint8_t        _pad548[0x28];   /* +0x548 */
+    int32_t        sarge;           /* +0x548 OBJ_OFF_SARGE */
+    uint32_t       inventory[6];    /* +0x54C UNIT_OFF_INVENTORY, weapon uids */
+    uint32_t       _pad564;         /* +0x564 */
+    int32_t        inventorySel;    /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
+    uint32_t       _pad56c;         /* +0x56C */
     uint32_t       riding;          /* +0x570 OBJ_OFF_RIDING, the uid ridden */
+    uint8_t        _pad574[0x40];   /* +0x574 */
+    AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */
+    uint32_t       sentPosSeq;      /* +0x5B8 TROOPER_OFF_SENT_POS_T */
+    uint8_t        sentFacing;      /* +0x5BC TROOPER_OFF_SENT_FACING */
+    uint8_t        _pad5bd[3];
+    uint32_t       sentFacingSeq;   /* +0x5C0 TROOPER_OFF_SENT_FACING_T */
+    int32_t        sentPose;        /* +0x5C4 TROOPER_OFF_SENT_POSE */
+    uint32_t       sentPoseSeq;     /* +0x5C8 TROOPER_OFF_SENT_POSE_T */
+    uint32_t       lastSeq;         /* +0x5CC TROOPER_OFF_LAST_SEQ */
 } AM2_Object;
 
 #if defined(__cplusplus) && !defined(_MSC_VER)
@@ -82,6 +105,14 @@ static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
 static_assert(offsetof(AM2_Object, heightSet)     == 0x65,  "heightSet");
 static_assert(offsetof(AM2_Object, field10C)      == 0x10C, "field10C");
 static_assert(offsetof(AM2_Object, vehicleKind)   == 0x52C, "vehicleKind");
+static_assert(offsetof(AM2_Object, pos)           == 0x12,  "pos");
+static_assert(offsetof(AM2_Object, rows)          == 0x74,  "rows");
+static_assert(offsetof(AM2_Object, pose)          == 0x538, "pose");
+static_assert(offsetof(AM2_Object, sarge)         == 0x548, "sarge");
+static_assert(offsetof(AM2_Object, sentPos)       == 0x5B4, "sentPos");
+static_assert(offsetof(AM2_Object, lastSeq)       == 0x5CC, "lastSeq");
+static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
+static_assert(offsetof(AM2_Object, inventorySel)  == 0x568, "inventorySel");
 static_assert(offsetof(AM2_Object, riding)        == 0x570, "riding");
 #endif
 

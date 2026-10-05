@@ -934,7 +934,7 @@ void __cdecl ResetObjOnCof(void *obj);
 
 /* 0x00406AB0, SelectBestWeapon's twin: scored by WeaponRank, and it writes the
  * slot only when the winner is not slot 0. */
-void __cdecl SelectRankedWeapon(void *unit);
+void __cdecl SelectRankedWeapon(AM2_Object *unit);
 
 /* 0x00435440, one caller. Is a point on a solid pixel of the object's FIRST
  * row? Rectangle first, then the sprite's own mask.
