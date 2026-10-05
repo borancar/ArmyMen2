@@ -201,6 +201,20 @@ main result so far (details in `src/vc6/README.md`):
     order, operand order, scope, typed or untyped, bitfields, statement
     order. ObjCollidesWith's swap is use weight: in the source, obj
     outweighs from by two uses.
+  - **What c2 keys the ties on** (2026-10-06). build/vc6host can now compile
+    hand-edited IL (VC6_IL_OVERRIDE, with VC6_KEEPTMP to keep c1xx's
+    output), and a function's bytecode is found through gl's
+    `0e <id> 00 <name>` and the `53 53 26 <id> 46` prologue in ex. On
+    EvtRuleA none of these move the register choice: jump-label numbering,
+    local symbol numbering, line numbers, commuting a comparison, where a
+    comma expression sits in an argument list. Statement order in the IL
+    does move it. With the DeployItem call ahead of the facing store, the
+    spawn point lands in eax as in the image, but the store then follows the
+    call, which the image does not do. So the original's IL has a shape not
+    yet reproduced, and no source form tried yields it: an inline respawn
+    helper, a comma in the call, dword- or mixed-typed point arguments.
+    FormationPoint/Far differ only in which frame slot two compiler
+    temporaries take, and no spelling tried moves that either.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
