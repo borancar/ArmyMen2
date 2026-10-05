@@ -717,7 +717,7 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
     int32_t  restored = 0;
     void    *ptr1, *ptr2;
     DWORD    len1, len2;
-    DWORD    status = 0, statusAgain, play, write;
+    DWORD    status, statusAgain, play, write;
     uint32_t avail, toWrite, got;
 
     (void)uID; (void)uMsg; (void)dwUser; (void)dw1; (void)dw2;

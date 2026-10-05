@@ -74,9 +74,9 @@ def _aggregated(va):
 # operand order is a tie VC6 breaks by state the whole TU builds up, so
 # adding struct members or externs can tip it. Empty matched once the
 # comm and player-message structs were typed; the trooper fields on
-# AM2_Object tipped it back, and keeping the level block's declarations
-# settles both again. Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
+# AM2_Object tipped it back; keeping the sprite list's and the level
+# block's declarations settles both. Search the subsets (empty first) when it flips.
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x00511BC8, 0x00511DA0))
 
 
 def _kept(va):
