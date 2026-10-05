@@ -37,19 +37,28 @@ typedef struct {
     int8_t         owner;           /* +0x10  OBJ_OFF_ARMY, read with movsx */
     uint8_t        _pad11[0x2F];    /* +0x11 */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
-    uint8_t        _pad41[0x1F];    /* +0x41 */
+    uint8_t        _pad41[0x17];    /* +0x41 */
+    uint32_t       deadline58;      /* +0x58  OBJ_OFF_DEADLINE_58, a clock stamp */
+    uint8_t        _pad5c[4];       /* +0x5C */
     int16_t        maxHealth;       /* +0x60  OBJ_OFF_MAX_HEALTH */
     int16_t        health;          /* +0x62  OBJ_OFF_HEALTH */
     int8_t         heightAdj;       /* +0x64  OBJ_OFF_HEIGHT_ADJ */
-    uint8_t        _pad65[0x2F];    /* +0x65 */
+    int8_t         heightSet;       /* +0x65  OBJ_OFF_HEIGHT_SET */
+    uint8_t        _pad66[0x2E];    /* +0x66 */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     uint8_t        _pad9c[4];       /* +0x9C */
     int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
     uint8_t        _pada4[0xC];     /* +0xA4 */
     uint8_t        power;           /* +0xB0  OBJ_OFF_SCRIPT_ID, a shot's power byte */
-    uint8_t        _padb1[0x493];   /* +0xB1 */
+    uint8_t        _padb1[0x5B];    /* +0xB1 */
+    int32_t        field10C;        /* +0x10C OBJ_OFF_FIELD_10C */
+    uint8_t        _pad110[0x41C];  /* +0x110 */
+    int32_t        vehicleKind;     /* +0x52C VEHICLE_OFF_KIND */
+    uint8_t        _pad530[0x14];   /* +0x530 */
     int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
+    uint8_t        _pad548[0x28];   /* +0x548 */
+    uint32_t       riding;          /* +0x570 OBJ_OFF_RIDING, the uid ridden */
 } AM2_Object;
 
 #if defined(__cplusplus) && !defined(_MSC_VER)
@@ -69,6 +78,11 @@ static_assert(offsetof(AM2_Object, shooterUid)    == 0x98,  "shooterUid");
 static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");
 static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
 static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
+static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
+static_assert(offsetof(AM2_Object, heightSet)     == 0x65,  "heightSet");
+static_assert(offsetof(AM2_Object, field10C)      == 0x10C, "field10C");
+static_assert(offsetof(AM2_Object, vehicleKind)   == 0x52C, "vehicleKind");
+static_assert(offsetof(AM2_Object, riding)        == 0x570, "riding");
 #endif
 
 /* Live globals inside the running image. */

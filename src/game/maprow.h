@@ -9,6 +9,32 @@
 extern "C" {
 #endif
 
+struct AM2_AnimTable;
+struct AM2_Anim;
+
+/* A map row: the drawable node every map object carries, linked into the
+ * cell grid and the depth list. Transcribed as the struct the original
+ * accessed by member; only the named fields are claimed. */
+typedef struct AM2_MapRow {
+    uint32_t              flags;        /* +0x00  bit 0: on the map */
+    void                 *sprite;       /* +0x04  ROW_OFF_SPRITE */
+    void                 *prevSprite;   /* +0x08  ROW_OFF_PREV_SPRITE */
+    uint8_t               _pad0c[0x20]; /* +0x0C  ROW_OFF_RECT .. */
+    const void           *lut;          /* +0x2C  MAPOBJ_OFF_LUT */
+    uint8_t               _pad30[0x0C]; /* +0x30 */
+    int16_t               field3C;      /* +0x3C  ROW_OFF_FIELD_3C */
+    uint8_t               _pad3e[2];    /* +0x3E */
+    struct AM2_AnimTable *animCur;      /* +0x40  ROW_OFF_ANIM_CUR */
+    struct AM2_Anim      *animPlaying;  /* +0x44  ROW_OFF_ANIM_PLAYING */
+    struct AM2_AnimTable *animNext;     /* +0x48  ROW_OFF_ANIM_NEXT */
+    int16_t               frame;        /* +0x4C  ROW_OFF_FRAME */
+    int16_t               animNextId;   /* +0x4E  ROW_OFF_ANIM_NEXT_ID */
+    uint8_t               heading;      /* +0x50  ROW_OFF_HEADING */
+    uint8_t               cell;         /* +0x51  ROW_OFF_CELL */
+    uint8_t               _pad52[0x0A]; /* +0x52 */
+    uint8_t               headingBias;  /* +0x5C  ROW_OFF_HEADING_BIAS */
+} AM2_MapRow;
+
 /* Original: 0x0041D740. Order two objects for drawing: layer first when both
  * have one, then a slope-weighted screen position. */
 int32_t __cdecl DepthCompare(void *a, void *b);
@@ -56,7 +82,7 @@ void __cdecl RowSetSprite(void *row, void *sprite, void *desc);
 /* 0x0040A1A0. Put a row on an animation frame. -2 does nothing, -1 means the
  * frame it is already on, 0 clears bit 0 of the row and returns; anything else
  * is an entry id, and one not in the table takes entry 0. */
-void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force);
+void __cdecl SetAnimFrame(AM2_MapRow *row, int16_t frame, int32_t force);
 
 int maprow_install(void);
 

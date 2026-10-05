@@ -69,12 +69,12 @@ def _aggregated(va):
     return any(lo <= va < hi for lo, hi in AGGREGATE_RANGES)
 
 
-# Aggregated ranges whose members stay DECLARED (see render()). The menu
-# cursor's range left this set when AM2_Object gained its real fields: the
-# extra struct members moved the same tie-breaks, and without its decls
-# CheatLine and PlacementScreenClick both match again.
-KEEP_DECLS = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
-              (0x004F96C0, 0x004F96CC))
+# Aggregated ranges whose members stay DECLARED (see render()). The set is
+# retuned whenever a shared struct grows: AM2_Object's member count moves the
+# same tie-breaks. The menu cursor's range left first (the shot fields), the
+# live game settings 0x00515FD8 next (the collision fields); with this set
+# CheatLine and PlacementScreenClick both match.
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0), (0x004F96C0, 0x004F96CC))
 
 
 def _kept(va):

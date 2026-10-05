@@ -798,36 +798,34 @@ found:
  * from its OTHER callers, since this one now calls by name. The usual cost,
  * named here so the drop is not read as a regression.
  */
-void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
+void __cdecl SetAnimFrame(AM2_MapRow *row, int16_t frame, int32_t force)
 {
-    uint8_t       *r = (uint8_t *)row;
     AM2_AnimTable *t;
     int32_t        i;
     uint8_t        heading;
     int16_t        v;
     int16_t        dir;
 
-    if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
+    if (!force && frame == row->frame)
         return;
 
     switch (frame) {
     case -2:
         return;
     case -1:
-        frame = *(const int16_t *)(r + ROW_OFF_FRAME);
+        frame = row->frame;
         break;
     case 0:
-        *(uint32_t *)r &= 0xFFFFFFFEu;
+        row->flags &= 0xFFFFFFFEu;
         return;
     }
 
-    if (*(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT)) {
-        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR) =
-            *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
-        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_NEXT) = (AM2_AnimTable *)0;
+    if (row->animNext) {
+        row->animCur = row->animNext;
+        row->animNext = 0;
     }
 
-    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    t = row->animCur;
     if (!t)
         return;
 
@@ -838,36 +836,31 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
             goto found;
     goto first;
 found:
-    if (t->count <= i) {
+    if (i >= t->count) {
     first:
         i = 0;
     }
 
     /* The entry and the playing animation are re-read at every use. */
-#define PLAYING (*(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING))
-    *(uint8_t *)(r + ROW_OFF_CELL)  = 0;
-    *(int16_t *)(r + ROW_OFF_FRAME) = frame;
-    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = t->entries[i].anim;
-    *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
-        (g_frameHeadingBias)[frame];
-    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)t->entries[i].next;
+    row->cell        = 0;
+    row->frame       = frame;
+    row->animPlaying = t->entries[i].anim;
+    row->headingBias = (g_frameHeadingBias)[frame];
+    row->animNextId  = (int16_t)t->entries[i].next;
 
-    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
-                        + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
+    heading = (uint8_t)(row->heading + row->headingBias);
 
-    dir = RoundTo8(heading, PLAYING->directionBits);
+    dir = RoundTo8(heading, row->animPlaying->directionBits);
     RowSetSprite(row,
                  (g_spriteList)
-                     [PLAYING->cells[dir * PLAYING->frames
-                                     + *(const uint8_t *)(r + ROW_OFF_CELL)].sprite],
+                     [row->animPlaying->cells[dir * row->animPlaying->frames
+                                              + row->cell].sprite],
                  g_mapDesc);
 
-    v = PLAYING->field4;
-    *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
-    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
-        == g_rowLutDoubles)
-        *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
-#undef PLAYING
+    v = row->animPlaying->field4;
+    row->field3C = v;
+    if (row->lut == g_rowLutDoubles)
+        row->field3C = (int16_t)(v + v);
 }
 
 /* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from

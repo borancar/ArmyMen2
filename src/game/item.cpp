@@ -2120,7 +2120,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 1;
     *(uint8_t *)(o + OBJ_OFF_FIELD_540)   = 0;
 
-    SetAnimFrame(ROWS, g_roachStartFrame, 0);
+    SetAnimFrame((AM2_MapRow *)ROWS, g_roachStartFrame, 0);
 #undef ROWS
     SetObjField530(o, 1);
 
@@ -3755,37 +3755,25 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
  * MEASURED, see the note on the batch: its two callers are the original's, so
  * the counter is not blind.
  */
-int32_t __cdecl ObjCollidesWith(void *from, void *obj)
+int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
 {
-    uint8_t *f = (uint8_t *)from;
-    uint8_t *o = (uint8_t *)obj;
-
     /* Every "no" falls to the one return at the end, as the image has it. */
-    if (abs((int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-            - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
-        <= AM2_BLOCK_HEIGHT_STEP) {
-        if ((*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT24)
-            && (*(const int32_t *)(f + VEHICLE_OFF_KIND) == 1
-                || *(const int32_t *)(f + VEHICLE_OFF_KIND) == 2))
+    if (abs(obj->heightSet - from->heightSet) <= AM2_BLOCK_HEIGHT_STEP) {
+        if ((obj->flags & OBJ_FLAG_BIT24)
+            && (from->vehicleKind == 1 || from->vehicleKind == 2))
             return 1;
 
-        if (ObjIsTypeIn238((const AM2_Object *)o)) {
-            if (!ObjIsType3((const AM2_Object *)o)
-                || *(const int8_t *)(o + OBJ_OFF_ARMY)
-                       != *(const int8_t *)(f + OBJ_OFF_ARMY)) {
-                if (!ObjsAreAllied(f, o, 0)
-                    || (*(const uint32_t *)((const uint8_t *)LookupOwnerObj(
-                            g_defaultOwner)
-                        + OBJ_OFF_RIDING) == ((const AM2_Object *)f)->uid
-                        && !*(const int32_t *)(f + OBJ_OFF_FIELD_10C)))
+        if (ObjIsTypeIn238(obj)) {
+            if (!ObjIsType3(obj) || obj->owner != from->owner) {
+                if (!ObjsAreAllied(from, obj, 0)
+                    || (((AM2_Object *)LookupOwnerObj(g_defaultOwner))->riding
+                            == from->uid
+                        && !from->field10C))
                     return 1;
             }
-        } else if (ObjIsWatchedKind(o)) {
-            if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-                    != *(const int8_t *)(f + OBJ_OFF_ARMY)
-                || g_gameClockMs
-                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
-                   > AM2_COLLIDE_OWN_DELAY)
+        } else if (ObjIsWatchedKind(obj)) {
+            if (obj->owner != from->owner
+                || g_gameClockMs - obj->deadline58 > AM2_COLLIDE_OWN_DELAY)
                 return 1;
         }
     }
@@ -7387,7 +7375,7 @@ void __cdecl StepRowAnim(void *row)
 
     if (*(const int16_t *)(r + ROW_OFF_FRAME) >= AM2_ROW_DELAY_BASE) {
         if (*(const int16_t *)(r + ROW_OFF_FRAME) == AM2_ROW_DELAY_BASE) {
-            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
             return;
         }
         *(int16_t *)(r + ROW_OFF_FRAME) -= 1;
@@ -7430,7 +7418,7 @@ void __cdecl StepRowAnim(void *row)
         if (*(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) != AM2_ROW_ANIM_HOLD) {
             *(uint8_t *)(r + ROW_OFF_CELL)      = 0;
             *(uint32_t *)(r + ROW_OFF_STAMP_54) = NOW;
-            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
         } else {
             --*(uint8_t *)(r + ROW_OFF_CELL);
         }
@@ -7491,16 +7479,16 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
                                           (o + UNIT_OFF_INVENTORY_SEL) * 4));
 
             if (w) {
-                SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS),
+                SetAnimFrame((AM2_MapRow *)*(uint8_t **)(o + OBJ_OFF_ROWS),
                              (int16_t)(g_weaponPoseFrames)[WeaponPoseIndex(obj, w)],
                              1);
             } else {
-                SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
+                SetAnimFrame((AM2_MapRow *)*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
             }
         } else {
             uint8_t *r = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
-            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
+            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
         }
     }
 
@@ -7991,7 +7979,7 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
         break;
     }
 
-    SetAnimFrame(row, (int16_t)FRAME, 0);
+    SetAnimFrame((AM2_MapRow *)row, (int16_t)FRAME, 0);
 #undef FRAME
 }
 
@@ -8730,7 +8718,7 @@ void __cdecl SetObjField530(void *obj, int32_t state)
 
     *(int32_t *)(o + OBJ_OFF_FIELD_530) = state;
 
-    SetAnimFrame(row,
+    SetAnimFrame((AM2_MapRow *)row,
                  (int16_t)(g_field530Frames)[state],
                  0);
 
@@ -8913,7 +8901,7 @@ void __cdecl SetKindFrames(void *obj, int32_t kind)
 
     if (!RowMidAnimation(row)) {
         *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = kind;
-        SetAnimFrame(row,
+        SetAnimFrame((AM2_MapRow *)row,
                      (int16_t)(g_kindFrames)[kind],
                      0);
     }
@@ -8924,7 +8912,7 @@ void __cdecl SetKindFrames(void *obj, int32_t kind)
     row = *(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE;
 
     if (!RowMidAnimation(row))
-        SetAnimFrame(row, AM2_SECOND_ROW_FRAME, 0);
+        SetAnimFrame((AM2_MapRow *)row, AM2_SECOND_ROW_FRAME, 0);
 }
 
 /* SpawnRandomBarrage -- original 0x00417890, one caller, and that caller
@@ -10153,7 +10141,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
                     if (o == v)
                         continue;
-                    if (!ObjCollidesWith(v, o))
+                    if (!ObjCollidesWith((AM2_Object *)v, (AM2_Object *)o))
                         continue;
                     if (g_gameClockMs
                         <= *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58))
@@ -10208,7 +10196,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                     if (o == v)
                         continue;
 
-                    if (ObjCollidesWith(v, o)
+                    if (ObjCollidesWith((AM2_Object *)v, (AM2_Object *)o)
                         && g_gameClockMs
                            > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
                         int32_t hp;
@@ -11855,7 +11843,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     if (delay > 0)
         SubrecHideRows(o + OBJ_OFF_SUBRECORD);
 
-    SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS), (int16_t)kind, 1);
+    SetAnimFrame((AM2_MapRow *)*(uint8_t **)(o + OBJ_OFF_ROWS), (int16_t)kind, 1);
     return o;
 }
 

@@ -498,7 +498,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
  * flag-and-vehicle-kind shortcut, then the type 2/3/8 rules -- of which the
  * one worth knowing is that a vehicle the PLAYER is driving stops for
  * friendly troops and one the AI is driving does not. See item.cpp. */
-int32_t __cdecl ObjCollidesWith(void *from, void *obj);
+int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj);
 
 /* 0x0043BBE0, one caller. What a shot does to what it hit: a thirty-arm jump
  * table over the shot's TYPEREC_OFF_CODE scales its TYPEREC_OFF_DAMAGE, and

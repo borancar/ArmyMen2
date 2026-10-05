@@ -1415,7 +1415,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
             (int16_t)(ScaleBy32Blocks(*(const int16_t *)
                           (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
         *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
-        SetAnimFrame(rows, (int16_t)frame, 1);
+        SetAnimFrame((AM2_MapRow *)rows, (int16_t)frame, 1);
     }
     return o;
 #undef rows
@@ -1501,7 +1501,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
     *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
     *(uint8_t *)(ROWS + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
 
-    SetAnimFrame(ROWS, (int16_t)frame, 1);
+    SetAnimFrame((AM2_MapRow *)ROWS, (int16_t)frame, 1);
 #undef ROWS
     return o;
 }
