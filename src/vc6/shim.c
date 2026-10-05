@@ -195,6 +195,8 @@ static const char *xpath(const char *p, char *buf, size_t cap)
     return buf;
 }
 #define WP(p) xpath((p), (char[4096]){0}, 4096)
+/* For the host: a DOS-or-Unix path as the shim would open it. */
+const char *vc6_xpath(const char *p, char *buf, size_t cap) { return xpath(p, buf, cap); }
 
 /* ------------------------------------------------------------------- stdio  */
 /* MSVC FILE: ptr,cnt,base,flag,file,charbuf,bufsiz,tmpfname (32 bytes). We run

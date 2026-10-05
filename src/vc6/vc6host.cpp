@@ -384,10 +384,65 @@ extern "C" uint32_t vc6_loadlibrary(const char *name)
     return mod->base;
 }
 
+/* VC6_IL_OVERRIDE=DIR: a probe of the code generator. Before c2 runs, the
+ * intermediate files c1xx just wrote (BASEex, BASEgl, BASEin, BASEsy, BASE
+ * taken from c2's -il argument) are replaced by DIR/ex, DIR/gl, DIR/in and
+ * DIR/sy where those exist, so c2 compiles hand-edited IL. VC6_IL_LOG=1
+ * prints c2's argv. */
+extern "C" const char *vc6_xpath(const char *p, char *buf, size_t cap);
+typedef int (STDCALL *Vc6PassFn)(int argc, char **argv, int mode);
+static Vc6PassFn g_c2_pass;
+
+static void c2_override_il(const char *dir, const char *il)
+{
+    char base[4096];
+    snprintf(base, sizeof base, "%s", vc6_xpath(il, (char[4096]){0}, 4096));
+    {
+        static const char *const sfx[] = { "ex", "gl", "in", "sy" };
+        for (int k = 0; k < 4; k++) {
+            char src[4096], dst[4200];
+            snprintf(src, sizeof src, "%s/%s", dir, sfx[k]);
+            snprintf(dst, sizeof dst, "%s%s", base, sfx[k]);
+            FILE *in = fopen(src, "rb");
+            if (!in) continue;
+            FILE *out = fopen(dst, "wb");
+            if (out) { char b[65536]; size_t n;
+                while ((n = fread(b, 1, sizeof b, in)) > 0) fwrite(b, 1, n, out);
+                fclose(out); }
+            fclose(in);
+            if (getenv("VC6_IL_LOG")) fprintf(stderr, "vc6host: IL override %s -> %s\n", src, dst);
+        }
+    }
+}
+
+/* c2's switches arrive in MSC_CMD_FLAGS, not argv: the -il token is there. */
+static int STDCALL c2_override_pass(int argc, char **argv, int mode)
+{
+    const char *dir = getenv("VC6_IL_OVERRIDE");
+    const char *fl = getenv("MSC_CMD_FLAGS");
+    if (getenv("VC6_IL_LOG")) fprintf(stderr, "vc6host: c2 MSC_CMD_FLAGS=[%s]\n", fl ? fl : "");
+    for (const char *p = fl; dir && *dir && p && (p = strstr(p, "-il")); p += 3) {
+        char tok[4096]; size_t n = 0;
+        const char *q = p + 3;
+        while (*q == ' ') q++;
+        if (*q == '"') { q++; while (*q && *q != '"' && n < sizeof tok - 1) tok[n++] = *q++; }
+        else while (*q && *q != ' ' && n < sizeof tok - 1) tok[n++] = *q++;
+        tok[n] = 0;
+        if (n) c2_override_il(dir, tok);
+        break;
+    }
+    return g_c2_pass(argc, argv, mode);
+}
+
 extern "C" uint32_t vc6_getproc(uint32_t hmod, const char *name)
 {
     const Vc6Module *m = mod_by_base(hmod);
     if (!m) return 0;
+    if ((getenv("VC6_IL_OVERRIDE") || getenv("VC6_IL_LOG")) && m->image
+        && !strcasecmp(m->name, "C2.DLL") && !strcmp(name, "_InvokeCompilerPass@12")) {
+        g_c2_pass = (Vc6PassFn)(uintptr_t)vc6_get_proc(m, name);
+        return g_c2_pass ? (uint32_t)(uintptr_t)c2_override_pass : 0;
+    }
     if (!m->image) {  /* synthetic system-DLL stub: a shimmed export if we have
                        * one (e.g. ole32!CLSIDFromString), else an abort-stub */
         const void *fn = vc6_shim_lookup(m->name, name);
