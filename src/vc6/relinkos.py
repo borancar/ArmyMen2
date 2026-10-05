@@ -69,9 +69,12 @@ def _aggregated(va):
     return any(lo <= va < hi for lo, hi in AGGREGATE_RANGES)
 
 
-# Aggregated ranges whose members stay DECLARED (see render()).
+# Aggregated ranges whose members stay DECLARED (see render()). The menu
+# cursor's range left this set when AM2_Object gained its real fields: the
+# extra struct members moved the same tie-breaks, and without its decls
+# CheatLine and PlacementScreenClick both match again.
 KEEP_DECLS = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
-              (0x004FCAA8, 0x004FCDF4), (0x004F96C0, 0x004F96CC))
+              (0x004F96C0, 0x004F96CC))
 
 
 def _kept(va):

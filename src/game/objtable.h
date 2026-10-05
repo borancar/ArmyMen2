@@ -24,14 +24,52 @@ typedef struct {
     uint32_t stamp;
 } AM2_ObjEntry;
 
-/* A registered object, so far as AddToItemList needs to know it. Only the
- * fields it touches are named; the real structure is larger. */
+/* A registered object. Transcribed as a typed struct and accessed through
+ * members rather than OBJ_OFF_* casts -- the shape the original was written
+ * in. Only the named fields are claimed; the gaps are the other object
+ * variants' fields at the same offsets, filled in as functions convert.
+ * `owner` is the army byte (OBJ_OFF_ARMY). */
 typedef struct {
-    uint32_t type;      /* +0x00  switch selector, 0..8 */
-    uint32_t uid;       /* +0x04  written back on registration */
-    uint8_t  pad[8];    /* +0x08 */
-    int8_t   owner;     /* +0x10  read with movsx */
+    uint32_t       type;            /* +0x00  switch selector, 0..8 */
+    uint32_t       uid;             /* +0x04  written back on registration */
+    uint32_t       flags;           /* +0x08  OBJ_OFF_FLAGS */
+    uint8_t        _pad0c[4];       /* +0x0C */
+    int8_t         owner;           /* +0x10  OBJ_OFF_ARMY, read with movsx */
+    uint8_t        _pad11[0x2F];    /* +0x11 */
+    uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
+    uint8_t        _pad41[0x1F];    /* +0x41 */
+    int16_t        maxHealth;       /* +0x60  OBJ_OFF_MAX_HEALTH */
+    int16_t        health;          /* +0x62  OBJ_OFF_HEALTH */
+    int8_t         heightAdj;       /* +0x64  OBJ_OFF_HEIGHT_ADJ */
+    uint8_t        _pad65[0x2F];    /* +0x65 */
+    const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
+    uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
+    uint8_t        _pad9c[4];       /* +0x9C */
+    int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
+    uint8_t        _pada4[0xC];     /* +0xA4 */
+    uint8_t        power;           /* +0xB0  OBJ_OFF_SCRIPT_ID, a shot's power byte */
+    uint8_t        _padb1[0x493];   /* +0xB1 */
+    int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
 } AM2_Object;
+
+#if defined(__cplusplus) && !defined(_MSC_VER)
+#include <stddef.h>   /* offsetof: GCC-side only -- an extra header in front
+                         * of VC6 shifts its declaration order and flips the
+                         * CheatLine/PlacementScreenClick evaluation-order coin */
+/* VC6 is C++98 (no static_assert); GCC shares this POD's i386 layout, so the
+ * offsets are guarded on the native build. */
+static_assert(offsetof(AM2_Object, flags)         == 0x08,  "flags");
+static_assert(offsetof(AM2_Object, owner)         == 0x10,  "owner");
+static_assert(offsetof(AM2_Object, facing)        == 0x40,  "facing");
+static_assert(offsetof(AM2_Object, maxHealth)     == 0x60,  "maxHealth");
+static_assert(offsetof(AM2_Object, health)        == 0x62,  "health");
+static_assert(offsetof(AM2_Object, heightAdj)     == 0x64,  "heightAdj");
+static_assert(offsetof(AM2_Object, field94)       == 0x94,  "field94");
+static_assert(offsetof(AM2_Object, shooterUid)    == 0x98,  "shooterUid");
+static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");
+static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
+static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
+#endif
 
 /* Live globals inside the running image. */
 

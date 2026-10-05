@@ -3351,19 +3351,19 @@ static inline int32_t ShotCodeChecksArmour(int32_t code)
 /* Does the shot get through `target`'s armour? Only the eight codes above ask;
  * everything else is stopped. Both jump tables end here, once returning 1 for
  * "stopped" and once 0, which is the only difference between them. */
-static inline int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotPiercesArmour(const AM2_Object *target, const AM2_Object *shot)
 {
     const uint8_t *rec;
     uint8_t        need;
 
-    if (!ObjIsItem((const AM2_Object *)target))
+    if (!ObjIsItem(target))
         return 1;
 
-    rec  = *(const uint8_t *const *)(target + OBJ_OFF_FIELD_94);
+    rec  = target->field94;
     need = *(const uint8_t *)(rec + TYPEREC_OFF_FIELD_3C);
     if (need <= 0)
         return 1;
-    if (*(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID) < need)
+    if (shot->power < need)
         return 0;
     return 1;
 }
@@ -3373,10 +3373,10 @@ static inline int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *sh
  * UNSIGNED against the shot's own +0xB0, and anything else is hit outright.
  * The original writes this out twice, once in each height branch, from the
  * same `sbb`/`neg` idiom. */
-static inline int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotBeatsClass(const AM2_Object *target, const AM2_Object *shot)
 {
     /* The shot's power is read inside each case, not before the switch. */
-#define power (*(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID))
+#define power (shot->power)
     switch (ClassifyByCode74(target)) {
     case 1:  return power > AM2_SHOT_PIERCE_CLASS1 ? 1 : 0;
     case 2:  return power > AM2_SHOT_PIERCE_CLASS2 ? 1 : 0;
@@ -3388,10 +3388,9 @@ static inline int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
 /* Is the target facing within AM2_SHOT_FACING_ARC of the shot? The original
  * takes the absolute value with the `cdq`/`xor`/`sub` idiom, in both height
  * branches, with the arguments in the same order each time. */
-static inline int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotFacingArc(const AM2_Object *target, const AM2_Object *shot)
 {
-    return abs(AngleDelta(*(const uint8_t *)(target + OBJ_OFF_FACING),
-                          *(const uint8_t *)(shot + OBJ_OFF_FACING)))
+    return abs(AngleDelta(target->facing, shot->facing))
            < AM2_SHOT_FACING_ARC ? 1 : 0;
 }
 
@@ -3434,48 +3433,44 @@ static inline int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
  * plain calls; nothing depends on the order and the original simply
  * interleaved them.
  */
-int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
-                            int16_t height, void *shot, int32_t *out)
+int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
+                            int16_t height, AM2_Object *s, int32_t *out)
 {
-    uint8_t *t = (uint8_t *)target;
-    uint8_t *s = (uint8_t *)shot;
     int32_t  objH;
     int32_t  allied;
 
     *out = 0;
 
     /* The army test is asked twice, once for each rule it guards. */
-    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army
-        && (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & OBJ_FLAG_SHOT_PROOF)) {
+    if (t->owner == army
+        && (t->flags & OBJ_FLAG_SHOT_PROOF)) {
         /* The image sends every later refusal back to this block. Ours
          * still gives them their own copy (at the `refuse` label below)
          * at the end of the function. */
         return 0;
     }
 
-    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army) {
-        if (ObjIsTypeIn238((const AM2_Object *)t)) {
-            if (ObjIsType2((const AM2_Object *)t)) {
+    if (t->owner == army) {
+        if (ObjIsTypeIn238(t)) {
+            if (ObjIsType2(t)) {
                 int32_t sarge;
 
                 if (g_mpSession
-                    && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
-                       == AM2_SARGE_SOLDIER_KIND)
+                    && t->soldierKind == AM2_SARGE_SOLDIER_KIND)
                     sarge = 1;
                 else
                     sarge = 0;
 
-                if (!Type2Field5A4Set((const AM2_Object *)t) && !sarge
+                if (!Type2Field5A4Set(t) && !sarge
                     && code != AM2_SHOT_CODE_RANDOM)
                     return 0;
-            } else if (*(const uint32_t *)(s + OBJ_OFF_RANK)
-                       == ((const AM2_Object *)t)->uid) {
+            } else if (s->shooterUid == t->uid) {
                 return 0;       /* the shooter never hits itself */
             }
         }
     }
 
-    if (!*(const int8_t *)(t + OBJ_OFF_HEIGHT_ADJ))
+    if (!t->heightAdj)
         return 0;
 
     objH   = ObjHeight(t);
@@ -3489,22 +3484,22 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
             goto refuse;
 
         if (code == AM2_SHOT_CODE_RANDOM
-            && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
+            && t->health > 0) {
             if (objH >= height + AM2_SHOT_OVER_UNDER) {
             refuse:
                 return 0;
             }
-            if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
+            if (s->formationSlot)
                 goto refuse;
             return 1;
         }
 
-        if (!allied && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
+        if (!allied && t->health > 0) {
             if (objH >= height + AM2_SHOT_OVER_UNDER)
                 goto refuse;
-            if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
+            if (s->formationSlot)
                 goto refuse;
-            if (!ObjIsType2((const AM2_Object *)t))
+            if (!ObjIsType2(t))
                 return 1;
 
             if (ShotFacingArc(t, s))
@@ -3520,13 +3515,13 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
         if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
             return 0;
 
-        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 1;
+        s->formationSlot = 1;
         return 1;
     }
 
     /* The object is at or ABOVE the shot. */
-    if (!allied && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0
-        && ObjIsType2((const AM2_Object *)t)) {
+    if (!allied && t->health > 0
+        && ObjIsType2(t)) {
         if (ShotFacingArc(t, s))
             *out = 1;
 
@@ -3591,9 +3586,9 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
             == *(const uint32_t *)(s + OBJ_OFF_RANK))
             continue;
 
-        if (!ShotHitsObj(o, code,
+        if (!ShotHitsObj((AM2_Object *)o, code,
                                 *(const int8_t *)(s + OBJ_OFF_ARMY),
-                                height, shot, &scratch))
+                                height, (AM2_Object *)shot, &scratch))
             continue;
 
         ApplyShotDamage(o, shot, (int32_t)at, height, scratch);

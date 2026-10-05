@@ -166,8 +166,21 @@ main result so far (details in `src/vc6/README.md`):
     A receive thread that is not byte-identical cannot be installed without
     behavioural verification this byte-match pass cannot do, so it stays
     un-installed. NET: there is NO genuinely-missing function left; all 138
-    are VC6 register-allocation and loop-rotation differences that no source
-    form steers. 1507 is the practical ceiling of piecewise re-spelling.
+    look like VC6 register-allocation and loop-rotation differences. That
+    reading is premature, not a ceiling: a body still reaching memory
+    through `t + OBJ_OFF_*` casts on a stub struct has not had its real
+    source shape tried yet (next bullet).
+  - **Typed AM2_Object, no offset casts** (2026-10-05). `objtable.h`'s stub
+    AM2_Object now names the shot/target fields at their offsets (owner,
+    facing, health, heightAdj, the type record, shooterUid, formationSlot,
+    power, soldierKind), with GCC-side offsetof asserts. ShotHitsObj and its
+    three helpers (ShotPiercesArmour, ShotBeatsClass, ShotFacingArc) take
+    `AM2_Object *` and read members, with no casts. ShotHitsObj stays NORM 0 /
+    raw 7: its refusals jump to a trailing epilogue copy, where the image
+    jumps back to the first arm's `return 0`. The extra struct members
+    flipped the coin (PlacementScreenClick lost). Dropping the menu cursor's
+    range 0x004FCAA8 from KEEP_DECLS settles both sides again, and the count
+    holds at 1507 with nothing lost.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
