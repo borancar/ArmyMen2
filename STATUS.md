@@ -215,6 +215,17 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Initialisers the original did not have** (2026-10-06), 1509 -> 1510.
+    A local zeroed at its declaration when the original zeroes it later,
+    or never, makes VC6 keep 0 in a register, and that shifts allocation
+    through the whole function. AudioTimerProc matches once `status` loses
+    its `= 0` (GetStatus writes it). BuildVehicleMask goes 34 -> 4 with its
+    count zeroed just before the scan. Sweeps over all unmatched functions
+    (drop or move a constant initialiser, flip a local's signedness,
+    commute a comparison) found these and FindPath's unsigned neighbour
+    tile. Most other hits change behaviour (a jump past the moved
+    assignment) or contradict the image's sar/shr and jl/jb choices, so
+    every hit is checked before it is kept.
   - **Which copy of a shared exit survives, and where locals go**
     (2026-10-04). VC6 folds identical return blocks, and the site carrying
     the label decides which copy is kept and where it sits. `if (c) goto L;`
