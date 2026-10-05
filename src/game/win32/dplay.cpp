@@ -3036,99 +3036,67 @@ int32_t __cdecl CommGlobalInit(void)
 void __cdecl SendPlayerMsg(int32_t arg)
 {
     /* The comm object is read at every use. */
-#define comm (g_commObject)
-    uint8_t *msg  = g_playerMsg;
-    int32_t  i;
+#define comm AM2_THE_COMM
+    AM2_PlayerMsg *msg = &g_playerMsg;
+    int32_t        i;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_DPLAY))
+    if (!comm->dplay)
         return;
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!comm->isHost)
         return;
 
-    *(int32_t *)(msg + MSG_PLAYER_HAS_MAP) = arg;
+    msg->hasMap = arg;
 
-    /* A non-zero argument clears each slot's +0x278 except the default
+    /* A non-zero argument clears each slot's field278 except the default
      * owner's, before anything is packed. */
     if (arg) {
-        for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++)
+        for (i = 0; i < comm->playerCount; i++)
             if (i != (int32_t)g_defaultOwner)
-                *(int32_t *)(comm + COMM_OFF_SLOT_FIELD_278
-                             + i * AM2_COMM_SLOT_STRIDE) = 0;
+                comm->slots[i].field278 = 0;
     }
 
-    *(uint32_t *)(msg + MSG_PLAYER_MAP_SUM) =
-        g_mapChecksum;
-    *(uint32_t *)(msg + MSG_PLAYER_RULE_SUM) =
-        *(const uint32_t *)(uintptr_t)(((uintptr_t)&g_mapChecksum) + 4);
-    *(uint32_t *)(msg + MSG_PLAYER_RULE_ARG) =
-        *(const uint32_t *)(uintptr_t)(((uintptr_t)&g_mapChecksum) + 8);
-    *(int32_t *)(msg + MSG_PLAYER_VERSION) =
-        g_gameVersion;
-    *(int32_t *)(msg + MSG_PLAYER_CHECKSUM) =
-        g_dataChecksum;
+    msg->mapSum  = g_mapChecksum;
+    msg->ruleSum = *(const uint32_t *)(uintptr_t)(((uintptr_t)&g_mapChecksum) + 4);
+    msg->ruleArg = *(const uint32_t *)(uintptr_t)(((uintptr_t)&g_mapChecksum) + 8);
+    msg->version  = g_gameVersion;
+    msg->checksum = g_dataChecksum;
 
-    strcpy((char *)(msg + MSG_PLAYER_LEVEL_NAME),
-           &g_mapName_);
-    strcpy((char *)(msg + MSG_PLAYER_MAP_NAME),
-           &g_mpScriptName);
+    strcpy(msg->levelName, &g_mapName_);
+    strcpy(msg->mapName, &g_mpScriptName);
 
-    *(int32_t *)(msg + MSG_PLAYER_COUNT) =
-        *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
-    *(uint32_t *)(msg + MSG_PLAYER_CONNECTED) =
-        *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
-    *(int32_t *)(msg + MSG_PLAYER_SCORE_LIMIT) =
-        g_scoreLimit;
-    *(int32_t *)(msg + MSG_PLAYER_OVER_FLAGS) =
-        *(const int32_t *)&g_gameOverFlags;
-    *(int32_t *)(msg + MSG_PLAYER_SETTING_22C) =
-        g_gameSetting22c;
+    msg->count      = comm->playerCount;
+    msg->connected  = comm->selfId;
+    msg->scoreLimit = g_scoreLimit;
+    msg->overFlags  = *(const int32_t *)&g_gameOverFlags;
+    msg->setting22c = g_gameSetting22c;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log("SendPlayerMsg for %d  Players: \n",
-                 *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+    if (comm->verbose)
+        orig_log("SendPlayerMsg for %d  Players: \n", comm->playerCount);
 
-    if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 2) {
+    if ((uint32_t)comm->playerCount < 2) {
         /* Nobody to send to: list the slots and leave. */
-        if (!*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (!comm->verbose)
             return;
-        for (i = 0; i < AM2_COMM_PLAYERS; i++) {
-            uint8_t *slot = comm + i * AM2_COMM_SLOT_STRIDE;
-
-            orig_log("  player: %s %x %d\n",
-                     (const char *)(slot + COMM_OFF_SLOT_NAME),
-                     *(const uint32_t *)(slot + COMM_OFF_PLAYER_SLOTS),
-                     *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_210));
-        }
+        for (i = 0; i < AM2_COMM_PLAYERS; i++)
+            orig_log("  player: %s %x %d\n", comm->slots[i].name,
+                     comm->slots[i].id, comm->slots[i].colour);
         return;
     }
 
     for (i = 0; i < AM2_COMM_PLAYERS; i++) {
-        uint8_t       *rec  = msg + MSG_PLAYER_RECORDS
-                              + i * MSG_PLAYER_STRIDE;
-        const uint8_t *slot = comm + i * AM2_COMM_SLOT_STRIDE;
+        msg->recs[i].id          = comm->slots[i].id;
+        msg->recs[i].colour      = comm->slots[i].colour;
+        msg->recs[i].team        = comm->slots[i].team;
+        msg->recs[i].readyToLoad = comm->slots[i].readyToLoad;
+        msg->recs[i].zero        = 0;
+        msg->recs[i].setting     = (g_armyPoints)[i];
+        msg->recs[i].wasHere     = comm->slots[i].wasHere;
 
-        *(uint32_t *)(rec + MSGREC_OFF_ID) =
-            *(const uint32_t *)(slot + COMM_OFF_PLAYER_SLOTS);
-        *(int32_t *)(rec + MSGREC_OFF_FIELD_04) =
-            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_210);
-        *(int32_t *)(rec + MSGREC_OFF_FIELD_54) =
-            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_258);
-        *(int32_t *)(rec + MSGREC_OFF_FIELD_58) =
-            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_270);
-        *(int32_t *)(rec + MSGREC_OFF_ZERO) = 0;
-        *(int32_t *)(rec + MSGREC_OFF_POINTS) =
-            (g_armyPoints)[i];
-        *(int32_t *)(rec + MSGREC_OFF_FIELD_5C) =
-            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_25C);
+        strcpy(msg->recs[i].name, comm->slots[i].name);
 
-        strcpy((char *)(rec + MSGREC_OFF_NAME),
-               (const char *)(slot + COMM_OFF_SLOT_NAME));
-
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log("  player: %s %x %d\n",
-                     (const char *)(rec + MSGREC_OFF_NAME),
-                     *(const uint32_t *)(rec + MSGREC_OFF_ID),
-                     *(const int32_t *)(rec + MSGREC_OFF_FIELD_04));
+        if (comm->verbose)
+            orig_log("  player: %s %x %d\n", msg->recs[i].name,
+                     msg->recs[i].id, msg->recs[i].colour);
     }
 
     SendGameMsg(msg, 0, 1);

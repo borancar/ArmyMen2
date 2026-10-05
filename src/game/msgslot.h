@@ -32,6 +32,7 @@
 #define AM2_MSGSLOT_H
 
 #include <stdint.h>
+#include "globaltypes.h"   /* AM2_PlayerMsg */
 
 #ifdef __cplusplus
 extern "C" {
@@ -355,7 +356,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid);
  * The version-mismatch message names OUR player, not the sender's: "%s has a
  * different version of the game" is filled from ADDR_DEFAULT_OWNER. A client
  * that disagrees with the host announces itself. */
-void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid);
+void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid);
 
 /* Original: 0x0040FBB0, "Unknown Army Msg Item Type %d, msgtype:%d, item uid:
  * %x; msgsize: %d". The SECOND dispatcher -- one message out of a packet,
@@ -492,7 +493,36 @@ int msgslot_install(void);
  * free-function forwarders keep every existing call site -- CommFoo(comm, ...)
  * -- unchanged: at -O2 each inlines to the method call with byte-identical
  * caller code, so the injected build is unaffected. */
+/* One player slot of the comm object, 0x70 bytes, four from +0x20C. */
+struct AM2_CommSlot {
+    uint32_t pad00;             /* +0x00 */
+    int32_t  colour;            /* +0x04 COMM_ARMY_OFF_COLOUR */
+    uint32_t id;                /* +0x08 AM2_PLAYER_ID, the DirectPlay id */
+    char     name[0x40];        /* +0x0C COMM_SLOT_OFF_NAME */
+    int32_t  team;              /* +0x4C COMM_ARMY_OFF_TEAM */
+    int32_t  wasHere;           /* +0x50 COMM_ARMY_OFF_WAS_HERE */
+    uint8_t  pad54[0x0C];       /* +0x54 */
+    uint32_t joinedMs;          /* +0x60 COMM_OFF_SLOT_JOINED_MS */
+    int32_t  readyToLoad;       /* +0x64 COMM_ARMY_OFF_READY_TO_LOAD */
+    uint32_t pad68;             /* +0x68 */
+    int32_t  field278;          /* +0x6C COMM_OFF_SLOT_FIELD_278 */
+};
+
 struct AM2_Comm {
+    /* The fields its users read by name; the gaps are not yet transcribed. */
+    uint8_t      pad000[0x20C];
+    AM2_CommSlot slots[4];      /* +0x20C */
+    uint32_t     selfId;        /* +0x3CC AM2_COMM_SELF_ID, our own player id */
+    int32_t      playerCount;   /* +0x3D0 COMM_OFF_PLAYER_COUNT */
+    uint32_t     pad3d4;        /* +0x3D4 */
+    int32_t      isHost;        /* +0x3D8 COMM_OFF_IS_HOST */
+    uint8_t      pad3dc[8];     /* +0x3DC */
+    int32_t      connected;     /* +0x3E4 AM2_COMM_CONNECTED */
+    uint8_t     *sessionDesc;   /* +0x3E8 COMM_OFF_SESSION_DESC */
+    void        *dplay;         /* +0x3EC COMM_OFF_DPLAY */
+    uint8_t      pad3f0[0x28];  /* +0x3F0 */
+    int32_t      verbose;       /* +0x418 COMM_OFF_VERBOSE, AM2_COMM_LOG_ENABLED */
+
     void    __attribute__((thiscall)) CommSetSlotRemote(int32_t slot);
     void    __attribute__((thiscall)) CommClearSlotRemote(int32_t slot);
     int32_t __attribute__((thiscall)) CommSlotRemote(int16_t slot);
@@ -552,6 +582,18 @@ struct AM2_Comm {
                                                   uint32_t flags, void *data,
                                                   uint32_t *size);
 };
+#if !defined(_MSC_VER)
+#include <stddef.h>   /* offsetof: GCC-side only, as in objtable.h */
+static_assert(offsetof(AM2_Comm, slots)       == 0x20C, "slots");
+static_assert(sizeof(AM2_CommSlot)            == 0x70,  "slot stride");
+static_assert(offsetof(AM2_Comm, selfId)      == 0x3CC, "selfId");
+static_assert(offsetof(AM2_Comm, connected)   == 0x3E4, "connected");
+static_assert(offsetof(AM2_Comm, playerCount) == 0x3D0, "playerCount");
+static_assert(offsetof(AM2_Comm, isHost)      == 0x3D8, "isHost");
+static_assert(offsetof(AM2_Comm, sessionDesc) == 0x3E8, "sessionDesc");
+static_assert(offsetof(AM2_Comm, dplay)       == 0x3EC, "dplay");
+static_assert(offsetof(AM2_Comm, verbose)     == 0x418, "verbose");
+#endif
 static inline int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
 { return ((AM2_Comm *)comm)->ArmyInPlay(uid); }
 static inline void * __attribute__((thiscall)) CommConstruct(void *comm)

@@ -1845,48 +1845,37 @@ static inline void RepaintDialog(void)
     ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
-void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
+void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 {
-    const uint8_t *m    = (const uint8_t *)msg;
-    int32_t       *slotSetting;
-    const uint8_t *rec;
-    int32_t       *ours;
-    int32_t        i;
+    int32_t             *slotSetting;
+    int32_t             *ours;
+    int32_t              i;
 
     (void)dpid;
 
     /* Every use re-reads the comm object, as the original does. */
-#define comm kCommObj
-#define REC_ID (*(const int32_t *)(rec + REC_PLAYER_ID - REC_PLAYER_COLOUR))
+#define comm AM2_THE_COMM
 #define SETTING_END ((int32_t)((uintptr_t)&g_scoreLimit))
 
     /* The host sends it. */
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (comm->isHost)
         return;
 
     /* Not gated on verbosity, alone among this function's logs. */
     am2_log("ReceivePlayerMsg for %d Players. I reckoned there were %d "
             "Players \n",
-            *(const int32_t *)(m + MSG_PLAYER_COUNT),
-            *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+            msg->count, comm->playerCount);
 
-    *(int32_t *)(comm + AM2_COMM_CONNECTED) =
-        *(const int32_t *)(m + MSG_PLAYER_CONNECTED);
+    comm->connected = msg->connected;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (comm->verbose)
         am2_log("      map: %s, mapSum=%X, ruleSum=%X\n",
-                (const char *)(m + MSG_PLAYER_MAP_NAME),
-                *(const int32_t *)(m + MSG_PLAYER_MAP_SUM),
-                *(const int32_t *)(m + MSG_PLAYER_RULE_SUM));
+                msg->mapName, msg->mapSum, msg->ruleSum);
 
-    *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
-        *(const int32_t *)(m + MSG_PLAYER_COUNT);
-    g_scoreLimit =
-        *(const int32_t *)(m + MSG_PLAYER_SCORE_LIMIT);
-    *(int32_t *)&g_gameOverFlags =
-        *(const int32_t *)(m + MSG_PLAYER_OVER_FLAGS);
-    g_gameSetting22c =
-        *(const int32_t *)(m + MSG_PLAYER_SETTING_22C);
+    comm->playerCount = msg->count;
+    g_scoreLimit = msg->scoreLimit;
+    *(int32_t *)&g_gameOverFlags = msg->overFlags;
+    g_gameSetting22c = msg->setting22c;
 
     /* Four entries, and the end is the address of the next global, compared
      * SIGNED both times: once as the loop's own bottom test (`jl`) and once
@@ -1894,94 +1883,75 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
      * break can never fire; it is in the image all the same. (This was once
      * written as an unbounded loop with only the break, which ran a fifth
      * record through the log and CommSetSlotRemote.) */
-    i = 0;
-    rec = m + MSG_PLAYER_RECORDS + REC_PLAYER_COLOUR;
     slotSetting = g_armyPoints;
+    i = 0;
     while ((int32_t)(uintptr_t)slotSetting < SETTING_END) {
-        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        if (comm->verbose)
             am2_log("                 player: %s %x %d\n",
-                    (const char *)(rec + REC_PLAYER_NAME - REC_PLAYER_COLOUR), REC_ID,
-                    *(const int32_t *)(rec + REC_PLAYER_COLOUR - REC_PLAYER_COLOUR));
+                    msg->recs[i].name, msg->recs[i].id, msg->recs[i].colour);
 
         /* Done before the (dead) mid-body bound check. */
-        if (REC_ID == *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+        if (msg->recs[i].id == comm->selfId) {
             g_ourSlot      = i;
             g_defaultOwner = (uint32_t)i;
-            CommClearSlotRemote(comm, i);
+            comm->CommClearSlotRemote(i);
         } else {
-            ((AM2_Comm *)comm)->CommSetSlotRemote(i);
+            comm->CommSetSlotRemote(i);
         }
 
         if ((int32_t)(uintptr_t)slotSetting >= SETTING_END)
             break;
 
-#define SLOT(off) (*(int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE + (off)))
-        SLOT(AM2_PLAYER_ID)               = REC_ID;
-        SLOT(COMM_ARMY_OFF_COLOUR)        = *(const int32_t *)(rec + REC_PLAYER_COLOUR - REC_PLAYER_COLOUR);
-        SLOT(COMM_ARMY_OFF_TEAM)          = *(const int32_t *)(rec + REC_PLAYER_TEAM - REC_PLAYER_COLOUR);
-        SLOT(COMM_ARMY_OFF_WAS_HERE)      = *(const int32_t *)(rec + REC_PLAYER_WAS_HERE - REC_PLAYER_COLOUR);
-        SLOT(COMM_ARMY_OFF_READY_TO_LOAD) = *(const int32_t *)(rec + REC_PLAYER_F270 - REC_PLAYER_COLOUR);
-        *slotSetting = *(const int32_t *)(rec + REC_PLAYER_SETTING - REC_PLAYER_COLOUR);
+        comm->slots[i].id          = msg->recs[i].id;
+        comm->slots[i].colour      = msg->recs[i].colour;
+        comm->slots[i].team        = msg->recs[i].team;
+        comm->slots[i].wasHere     = msg->recs[i].wasHere;
+        comm->slots[i].readyToLoad = msg->recs[i].readyToLoad;
+        *slotSetting = msg->recs[i].setting;
 
-        if (REC_ID != *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+        if (msg->recs[i].id != comm->selfId) {
             /* The SECOND time for this record, and this one is bounded by the
              * count where the first is not. */
-            if (i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
-                ((AM2_Comm *)comm)->CommSetSlotRemote(i);
-            if (!FindPlayerById((uint32_t)SLOT(AM2_PLAYER_ID)))
+            if (i < comm->playerCount)
+                comm->CommSetSlotRemote(i);
+            if (!FindPlayerById(comm->slots[i].id))
                 am2_log("PlayerMsg received before DPSYS_CREATEPLAYERORGROUP. "
                         "Unusual but should work. No flowq yet for id %x\n",
-                        SLOT(AM2_PLAYER_ID));
+                        comm->slots[i].id);
         }
 
-        strcpy((char *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                        + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
-               (const char *)(rec + REC_PLAYER_NAME - REC_PLAYER_COLOUR));
-#undef SLOT
+        strcpy(comm->slots[i].name, msg->recs[i].name);
         /* The three steps at the bottom of the body, not in a `for` header:
          * VC6 lays the loop out differently for the two. */
-        i++, rec += MSG_PLAYER_STRIDE, slotSetting++;
+        i++, slotSetting++;
     }
 #undef SETTING_END
-#undef REC_ID
 
     /* Our own slot may have arrived empty; fill in the id we already know. */
-    ours = (int32_t *)(comm + (uint32_t)g_ourSlot * COMM_ARMY_RECORD_SIZE
-                       + AM2_PLAYER_ID);
+    ours = (int32_t *)&comm->slots[g_ourSlot].id;
     if (*ours == 0 || *ours == -1)
-        *ours = *(const int32_t *)(comm + AM2_COMM_SELF_ID);
+        *ours = comm->selfId;
 
-    if (*(const int32_t *)(m + MSG_PLAYER_HAS_MAP)) {
+    if (msg->hasMap) {
         int32_t rules;
 
-        strcpy(&g_mpScriptName,
-               (const char *)(m + MSG_PLAYER_MAP_NAME));
-        strcpy(&g_mapName_,
-               (const char *)(m + MSG_PLAYER_LEVEL_NAME));
-        rules = CheckMapRules(
-                    *(const uint32_t *)(m + MSG_PLAYER_RULE_ARG),
-                    *(const uint32_t *)(m + MSG_PLAYER_RULE_SUM),
-                    *(const uint32_t *)(m + MSG_PLAYER_MAP_SUM));
-        SendMapMsg(rules, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
+        strcpy(&g_mpScriptName, msg->mapName);
+        strcpy(&g_mapName_, msg->levelName);
+        rules = CheckMapRules(msg->ruleArg, msg->ruleSum, msg->mapSum);
+        SendMapMsg(rules, comm->connected);
     }
 
-    if (*(const int32_t *)(m + MSG_PLAYER_VERSION)
-            != g_gameVersion
-        || *(const int32_t *)(m + MSG_PLAYER_CHECKSUM)
-            != g_dataChecksum) {
+    if (msg->version != g_gameVersion
+        || msg->checksum != g_dataChecksum) {
         char buf[0x40];
 
         /* OUR name, from ADDR_DEFAULT_OWNER -- the disagreeing client
          * announces itself rather than naming the host. */
         orig_sprintf(buf, "%s has a different version of the game.",
-                     (const char *)(kCommObj
-                                    + g_defaultOwner
-                                      * COMM_ARMY_RECORD_SIZE
-                                    + COMM_OFF_PLAYERS
-                                    + COMM_SLOT_OFF_NAME));
+                     comm->slots[g_defaultOwner].name);
         MenuMessage(buf, 4, 0);
         SendChatMsg(buf, 1);
-        SendMapMsg(5, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
+        SendMapMsg(5, comm->connected);
     }
 
     RepaintDialog();
@@ -2056,7 +2026,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
         /* Tested only to complain; the handler runs either way. */
         if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             am2_log("Message Error:  Host should not receive PLAYERMSG\n");
-        ReceivePlayerMsg(m, from);
+        ReceivePlayerMsg((const AM2_PlayerMsg *)m, from);
         return;
 
     case 15:
@@ -2559,13 +2529,13 @@ void __cdecl CommInitDefaults(void)
 #define MSG_SIZE(addr, size) \
     *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_SIZE) = (size);
 #define MSG_INIT(addr, kind, size) MSG_KIND(addr, kind) MSG_SIZE(addr, size)
-    MSG_KIND(((uintptr_t)g_playerMsg)       , 0x08)
+    MSG_KIND(((uintptr_t)&g_playerMsg)       , 0x08)
     MSG_INIT(((uintptr_t)g_msgKind01)       , 0x01, 0x404)
     MSG_INIT(((uintptr_t)g_msgKind02)       , 0x02, 0x010)
     MSG_INIT(((uintptr_t)g_msgChat)         , 0x03, 0x108)
     MSG_INIT(((uintptr_t)g_msgKind04)       , 0x04, 0x010)
     MSG_INIT(((uintptr_t)g_msgGameStart)   , 0x05, 0x194)
-    MSG_SIZE(((uintptr_t)g_playerMsg)       , 0x238)
+    MSG_SIZE(((uintptr_t)&g_playerMsg)       , 0x238)
     MSG_INIT(((uintptr_t)g_msgGamePause)   , 0x06, 0x010)
     MSG_INIT(((uintptr_t)g_msgReadyToLoad), 0x12, 0x00C)
     MSG_INIT(((uintptr_t)g_msgGameReady)   , 0x07, 0x00C)

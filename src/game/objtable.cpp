@@ -102,6 +102,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
     uint32_t *counter;
     uint32_t  owner;
     uint32_t  id;       /* the uid registered; `uid` is only the request */
+    int32_t   n;
 #if defined(_MSC_VER) && !defined(__GNUC__)
     int32_t   pos;      /* uninitialised in the original; see the note below */
 #else
@@ -145,10 +146,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
         id   = uid;
         next = *counter + 1;
         need = (uid & AM2_UID_COUNTER_MASK) + 1;
-        if (next > need)
-            *counter = next;
-        else
-            *counter = need;
+        *counter = next > need ? next : need;
     }
 
     if (*counter > AM2_UID_COUNTER_MAX) {
@@ -195,15 +193,16 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
      * expected to supply fresh UIDs. */
     FindSlot(id, &pos);
 
-    if (g_objCap <= g_objCount) {
+    if (g_objCount >= g_objCap) {
         g_objCap += 100;
         g_objTable = (AM2_ObjEntry *)am2_realloc(
             g_objTable, (size_t)g_objCap * sizeof(AM2_ObjEntry));
     }
 
-    if (g_objCount - pos > 0)
+    n = g_objCount - pos;
+    if (n > 0)
         orig_memmove(&g_objTable[pos + 1], &g_objTable[pos],
-                     (size_t)(g_objCount - pos) * sizeof(AM2_ObjEntry));
+                     n * sizeof(AM2_ObjEntry));
 
     g_objCount++;
     g_objTable[pos].uid   = id;

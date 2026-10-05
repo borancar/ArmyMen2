@@ -81,4 +81,39 @@ typedef struct AM2_OptionRec {
     const char *label;      /* +0x20 */
 } AM2_OptionRec;
 
+/* One player's record inside the player message, 0x60 bytes. SendPlayerMsg
+ * fills it from the comm object's slot of the same index. */
+typedef struct AM2_PlayerRec {
+    uint32_t id;            /* +0x00 MSGREC_OFF_ID, the player id */
+    int32_t  colour;        /* +0x04 REC_PLAYER_COLOUR */
+    int32_t  zero;          /* +0x08 MSGREC_OFF_ZERO, written 0 */
+    int32_t  pad0c;         /* +0x0C */
+    int32_t  setting;       /* +0x10 REC_PLAYER_SETTING, the army's points */
+    char     name[0x40];    /* +0x14 MSGREC_OFF_NAME */
+    int32_t  team;          /* +0x54 REC_PLAYER_TEAM */
+    int32_t  readyToLoad;   /* +0x58 REC_PLAYER_F270 */
+    int32_t  wasHere;       /* +0x5C REC_PLAYER_WAS_HERE */
+} AM2_PlayerRec;
+
+/* The player message, ADDR_PLAYER_MSG, 0x238 bytes: the host's view of the
+ * session, one record per player slot. */
+typedef struct AM2_PlayerMsg {
+    uint32_t      header[2];        /* +0x00 kind and size */
+    int32_t       count;            /* +0x08 MSG_PLAYER_COUNT */
+    uint32_t      connected;        /* +0x0C MSG_PLAYER_CONNECTED */
+    uint32_t      pad10;            /* +0x10 */
+    int32_t       hasMap;           /* +0x14 MSG_PLAYER_HAS_MAP */
+    int32_t       scoreLimit;       /* +0x18 MSG_PLAYER_SCORE_LIMIT */
+    char          mapName[0x40];    /* +0x1C MSG_PLAYER_MAP_NAME */
+    char          levelName[0x40];  /* +0x5C MSG_PLAYER_LEVEL_NAME */
+    uint32_t      mapSum;           /* +0x9C MSG_PLAYER_MAP_SUM */
+    uint32_t      ruleSum;          /* +0xA0 MSG_PLAYER_RULE_SUM */
+    uint32_t      ruleArg;          /* +0xA4 MSG_PLAYER_RULE_ARG */
+    AM2_PlayerRec recs[4];          /* +0xA8 MSG_PLAYER_RECORDS */
+    int32_t       overFlags;        /* +0x228 MSG_PLAYER_OVER_FLAGS */
+    int32_t       setting22c;       /* +0x22C MSG_PLAYER_SETTING_22C */
+    int32_t       version;          /* +0x230 MSG_PLAYER_VERSION */
+    int32_t       checksum;         /* +0x234 MSG_PLAYER_CHECKSUM */
+} AM2_PlayerMsg;
+
 #endif /* AM2_GLOBALTYPES_H */

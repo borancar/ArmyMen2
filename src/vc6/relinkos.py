@@ -69,12 +69,13 @@ def _aggregated(va):
     return any(lo <= va < hi for lo, hi in AGGREGATE_RANGES)
 
 
-# Aggregated ranges whose members stay DECLARED (see render()). The set is
-# retuned whenever a shared struct grows: AM2_Object's member count moves the
-# same tie-breaks. The menu cursor's range left first (the shot fields), the
-# live game settings 0x00515FD8 next (the collision fields); with this set
-# CheatLine and PlacementScreenClick both match.
-KEEP_DECLS = ((0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0), (0x004F96C0, 0x004F96CC))
+# Aggregated ranges whose members stay DECLARED (see render()). Empty now:
+# once AM2_Object, AM2_MapRow, AM2_Comm and the player message were typed,
+# no range's declarations are needed, and CheatLine and PlacementScreenClick
+# both match without any. It was five ranges, then four, then three, retuned
+# each time a shared struct grew. The empty set matched in every state
+# measured, so a flip should first be tried against it.
+KEEP_DECLS = ()
 
 
 def _kept(va):
@@ -158,7 +159,9 @@ def render():
             out.append("extern uint8_t am2_os_%s[];  /* 0x%08X */" % (m, vas[m]))
     out += ["#ifdef __cplusplus", "}", "#endif", ""]
     for a, m in reds:
-        out += ["#undef %s" % a, "#define %s ((uintptr_t)(const void *)am2_os_%s)" % (a, m)]
+        scalar = m in typed and not typed[m][1]
+        out += ["#undef %s" % a, "#define %s ((uintptr_t)(const void *)%sam2_os_%s)"
+                % (a, "&" if scalar else "", m)]
     out += ["", "#endif /* AM2_RELINK_OS_H */", ""]
     return "\n".join(out)
 

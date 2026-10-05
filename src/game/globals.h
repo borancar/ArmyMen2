@@ -577,7 +577,7 @@
 #define g_placementCap           (*(int32_t *)(uintptr_t)ADDR_PLACEMENT_CAP)  /* 0x00654C84 */
 #define g_placementCount         (*(int32_t *)(uintptr_t)ADDR_PLACEMENT_COUNT)  /* 0x00654C80 */
 #define g_placements             (*(AM2_Placement **)(uintptr_t)ADDR_PLACEMENTS)  /* 0x00654C7C */
-#define g_playerMsg              ((uint8_t *)(uintptr_t)ADDR_PLAYER_MSG)  /* 0x004FC3B8 */
+#define g_playerMsg              (*(AM2_PlayerMsg *)(uintptr_t)ADDR_PLAYER_MSG)  /* 0x004FC3B8 */
 #define g_playerRecords          ((uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS)  /* 0x004F1980 */
 #define g_playerSlotMask         (*(uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK)  /* 0x004F48DC */
 #define g_pointerAction          (*(int32_t *)(uintptr_t)ADDR_POINTER_ACTION)  /* 0x005122E4 */

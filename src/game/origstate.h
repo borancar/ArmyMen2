@@ -179,7 +179,7 @@ struct AM2_OrigState {
     uint8_t msg_kind01[1032];  /* 0x004FBF80 */
     uint8_t msg_kind0c[32];  /* 0x004FC388 */
     uint8_t msg_end_setup[16];  /* 0x004FC3A8 */
-    uint8_t player_msg[568];  /* 0x004FC3B8 */
+    AM2_PlayerMsg player_msg;  /* 0x004FC3B8 */
     uint8_t msg_game_start[400];  /* 0x004FC5F0 */
     uint8_t game_seed_sent[8];  /* 0x004FC780 */
     uint8_t msg_kind0d[272];  /* 0x004FC788 */

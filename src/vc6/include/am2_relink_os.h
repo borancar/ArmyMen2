@@ -47,9 +47,6 @@ extern uint8_t am2_os_air_leg1_x0[];  /* 0x004F96AC */
 extern uint8_t am2_os_air_leg1_dx[];  /* 0x004F96B0 */
 extern uint8_t am2_os_air_leg3_x1[];  /* 0x004F96B4 */
 extern uint8_t am2_os_dir_scratch[];  /* 0x004F96B8 */
-extern uint8_t am2_os_sprite_list_cap[];  /* 0x004F96C0 */
-extern uint8_t am2_os_sprite_list_count[];  /* 0x004F96C4 */
-extern uint8_t am2_os_sprite_list[];  /* 0x004F96C8 */
 extern uint8_t am2_os_army_ramp_tables[];  /* 0x004F96CC */
 extern uint8_t am2_os_obj_table_records[];  /* 0x004F9ACC */
 extern uint8_t am2_os_chat_colour_table[];  /* 0x004F9AD0 */
@@ -109,7 +106,7 @@ extern uint8_t am2_os_msg_kind04[];  /* 0x004FBB80 */
 extern uint8_t am2_os_msg_kind01[];  /* 0x004FBF80 */
 extern uint8_t am2_os_msg_kind0c[];  /* 0x004FC388 */
 extern uint8_t am2_os_msg_end_setup[];  /* 0x004FC3A8 */
-extern uint8_t am2_os_player_msg[];  /* 0x004FC3B8 */
+extern AM2_PlayerMsg am2_os_player_msg;  /* 0x004FC3B8 */
 extern uint8_t am2_os_msg_game_start[];  /* 0x004FC5F0 */
 extern uint8_t am2_os_game_seed_sent[];  /* 0x004FC780 */
 extern uint8_t am2_os_msg_kind0d[];  /* 0x004FC788 */
@@ -235,19 +232,6 @@ extern uint8_t am2_os_map_name[];  /* 0x00511A88 */
 extern uint8_t am2_os_map_folder[];  /* 0x00511AC8 */
 extern uint8_t am2_os_movie_to_play[];  /* 0x00511B08 */
 extern uint8_t am2_os_gameproc_str_b[];  /* 0x00511B88 */
-extern uint8_t am2_os_script_reload_path[];  /* 0x00511BC8 */
-extern uint8_t am2_os_mp_script_name[];  /* 0x00511C08 */
-extern uint8_t am2_os_level_str_a[];  /* 0x00511C48 */
-extern uint8_t am2_os_level_str_b[];  /* 0x00511C88 */
-extern uint8_t am2_os_tileset_reserve[];  /* 0x00511CC8 */
-extern uint8_t am2_os_map_checksum_val[];  /* 0x00511CCC */
-extern uint8_t am2_os_mp_script_chksum_val[];  /* 0x00511CD0 */
-extern uint8_t am2_os_rules_checksum_val[];  /* 0x00511CD4 */
-extern uint8_t am2_os_level_str_d[];  /* 0x00511CD8 */
-extern uint8_t am2_os_level_str_c[];  /* 0x00511D18 */
-extern uint8_t am2_os_level_sound_name[];  /* 0x00511D58 */
-extern uint8_t am2_os_level_id[];  /* 0x00511D98 */
-extern uint8_t am2_os_level_index[];  /* 0x00511D9C */
 extern uint8_t am2_os_mp_session[];  /* 0x00511DA0 */
 extern uint8_t am2_os_game_state[];  /* 0x00511DA4 */
 extern uint8_t am2_os_state_entered[];  /* 0x00511DA8 */
@@ -346,10 +330,6 @@ extern uint8_t am2_os_slow_machine[];  /* 0x005125C0 */
 extern uint8_t am2_os_opt_big_movies[];  /* 0x005125C4 */
 extern uint8_t am2_os_keys_buffer_a[];  /* 0x005125C8 */
 extern uint8_t am2_os_keys_buffer_b[];  /* 0x005126C8 */
-extern uint8_t am2_os_keys_now_ptr[];  /* 0x005127C8 */
-extern uint8_t am2_os_keys_prev_ptr[];  /* 0x005127CC */
-extern uint8_t am2_os_key_repeat_at[];  /* 0x005127D0 */
-extern uint8_t am2_os_key_pressed[];  /* 0x00512BD0 */
 extern uint8_t am2_os_dinput[];  /* 0x00512FD0 */
 extern uint8_t am2_os_di_mouse[];  /* 0x00512FD4 */
 extern uint8_t am2_os_di_keyboard[];  /* 0x00512FD8 */
@@ -427,12 +407,6 @@ extern uint8_t am2_os_game_over_saved[];  /* 0x00515F8C */
 extern uint8_t am2_os_state_movie[];  /* 0x00515F98 */
 extern uint8_t am2_os_mp_panel_sprites_b[];  /* 0x00515FA0 */
 extern uint8_t am2_os_mp_panel_sprites_b_end[];  /* 0x00515FD4 */
-extern uint8_t am2_os_game_over_flags[];  /* 0x00515FD8 */
-extern uint8_t am2_os_game_setting_22c[];  /* 0x00515FDC */
-extern uint8_t am2_os_army_points[];  /* 0x00515FE0 */
-extern uint8_t am2_os_score_limit[];  /* 0x00515FF0 */
-extern uint8_t am2_os_live_player_name[];  /* 0x00515FF4 */
-extern uint8_t am2_os_live_battle_name[];  /* 0x00516035 */
 extern uint8_t am2_os_host_mask_a[];  /* 0x00516078 */
 extern uint8_t am2_os_host_mask_b[];  /* 0x0051607C */
 extern uint8_t am2_os_host_value_3e8[];  /* 0x00516090 */
@@ -1111,7 +1085,7 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #undef ADDR_MSG_END_SETUP
 #define ADDR_MSG_END_SETUP ((uintptr_t)(const void *)am2_os_msg_end_setup)
 #undef ADDR_PLAYER_MSG
-#define ADDR_PLAYER_MSG ((uintptr_t)(const void *)am2_os_player_msg)
+#define ADDR_PLAYER_MSG ((uintptr_t)(const void *)&am2_os_player_msg)
 #undef ADDR_MSG_GAME_START
 #define ADDR_MSG_GAME_START ((uintptr_t)(const void *)am2_os_msg_game_start)
 #undef ADDR_GAME_SEED_SENT
