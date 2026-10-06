@@ -1818,9 +1818,12 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
         /* SIGNED: the original is `cmp eax,0xf; jge` at 0x004222C0, not jae.
          * Left unsigned, the int32_t promotes and a negative weight would
          * read as huge and take the opposite branch. */
+        /* The reference point is a local copy, the start read in place:
+         * one load, its copy pushed beside it, as the image has it. */
+        AM2_Point ref = *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT);
+
         if (BlockWeightAt((void *)0,
-                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT),
-                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT))
+                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), ref)
             >= (int32_t)AM2_CELL_WEIGHT_STEP)
             return;
     }
