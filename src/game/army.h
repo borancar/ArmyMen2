@@ -217,7 +217,7 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army,
             return 1;
     }
 
-    return AllyFlag(army, b->owner);
+    return (*(AM2_Comm *const *)&g_commObject)->AllyFlag(army, b->owner);
 }
 #endif
 

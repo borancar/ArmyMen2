@@ -734,7 +734,8 @@ struct AM2_LoadGameScreen : AM2_ScreenBase {
 };
 struct AM2_MoviesScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_ScreenBase)];
+    AM2_Sprite *sprites[12][2];     /* 0x0064 MOVIES_OFF_SPRITES: off, on */
+    AM2_Widget *buttons[4];         /* 0x00C4 MOVIES_OFF_BUTTONS */
     AM2_MoviesScreen(const char *bmp);
     ~AM2_MoviesScreen();
 };

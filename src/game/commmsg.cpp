@@ -1024,7 +1024,7 @@ void __cdecl AppendTroopState(void *msg, AM2_Object *o)
          * zero), so an `else if` would answer the same; written as the branch
          * runs rather than as the answer it happens to give. */
         flags = 0;
-        if (age >= interval && (o->sentPos.x != o->pos.x || o->pos.y != o->sentPos.y))
+        if (age >= interval && (o->pos.x != o->sentPos.x || o->pos.y != o->sentPos.y))
             flags = 0x80000000u;
         else if (age >= comm->enoughChangeLimit && (dx > 8 || dy > 8))
             flags = 0x80000000u;

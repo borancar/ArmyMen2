@@ -119,17 +119,6 @@ extern uint8_t am2_os_data_checksum[];  /* 0x004FC8B4 */
 extern uint8_t am2_os_timeout_logged_at[];  /* 0x004FC8B8 */
 extern uint8_t am2_os_change_limit_floor[];  /* 0x004FC8BC */
 extern uint8_t am2_os_bandwidth_last_seq[];  /* 0x004FC8C0 */
-extern uint8_t am2_os_aim_sprites_a[];  /* 0x004FC8C8 */
-extern uint8_t am2_os_aim_live_a[];  /* 0x004FC8E0 */
-extern uint8_t am2_os_aim_point_a[];  /* 0x004FC8F0 */
-extern uint8_t am2_os_aim_stamp_a[];  /* 0x004FC900 */
-extern uint8_t am2_os_aim_deadline_a[];  /* 0x004FC910 */
-extern uint8_t am2_os_aim_sprites_b[];  /* 0x004FC920 */
-extern uint8_t am2_os_aim_live_b[];  /* 0x004FC944 */
-extern uint8_t am2_os_aim_point_b[];  /* 0x004FC954 */
-extern uint8_t am2_os_aim_frame_b[];  /* 0x004FC964 */
-extern uint8_t am2_os_aim_stamp_b[];  /* 0x004FC974 */
-extern uint8_t am2_os_aim_deadline_b[];  /* 0x004FC984 */
 extern uint8_t am2_os_palette_glyphs[];  /* 0x004FC998 */
 extern uint8_t am2_os_menu_saved_rect[];  /* 0x004FCA98 */
 extern uint8_t am2_os_menu_surface[];  /* 0x004FCDF4 */
@@ -252,8 +241,6 @@ extern uint8_t am2_os_state_entered[];  /* 0x00511DA8 */
 extern uint8_t am2_os_state_pending[];  /* 0x00511DAC */
 extern uint8_t am2_os_state_wanted[];  /* 0x00511DB0 */
 extern uint8_t am2_os_game_state_arg[];  /* 0x00511DB4 */
-extern uint8_t am2_os_menu_mode[];  /* 0x00511DBC */
-extern uint8_t am2_os_overlay_dirty[];  /* 0x00511DC0 */
 extern uint8_t am2_os_menu_request_set[];  /* 0x00511DC4 */
 extern uint8_t am2_os_menu_request[];  /* 0x00511DC8 */
 extern uint8_t am2_os_script_reload[];  /* 0x00511DCC */
@@ -288,8 +275,6 @@ extern uint8_t am2_os_leader_facing[];  /* 0x00511E54 */
 extern uint8_t am2_os_weapon_owner_id[];  /* 0x00511E58 */
 extern uint8_t am2_os_weapon_slot[];  /* 0x00511E5C */
 extern uint8_t am2_os_ally_matrix[];  /* 0x00511E60 */
-extern uint8_t am2_os_message_text[];  /* 0x00511EA4 */
-extern uint8_t am2_os_message_bmp_name[];  /* 0x005122A4 */
 extern uint8_t am2_os_current_bitmap[];  /* 0x005122C4 */
 extern uint8_t am2_os_obj_ctx_obj_a[];  /* 0x005122C8 */
 extern uint8_t am2_os_obj_ctx_obj[];  /* 0x005122CC */
@@ -417,6 +402,12 @@ extern uint8_t am2_os_game_over_saved[];  /* 0x00515F8C */
 extern uint8_t am2_os_state_movie[];  /* 0x00515F98 */
 extern uint8_t am2_os_mp_panel_sprites_b[];  /* 0x00515FA0 */
 extern uint8_t am2_os_mp_panel_sprites_b_end[];  /* 0x00515FD4 */
+extern uint8_t am2_os_game_over_flags[];  /* 0x00515FD8 */
+extern uint8_t am2_os_game_setting_22c[];  /* 0x00515FDC */
+extern uint8_t am2_os_army_points[];  /* 0x00515FE0 */
+extern uint8_t am2_os_score_limit[];  /* 0x00515FF0 */
+extern uint8_t am2_os_live_player_name[];  /* 0x00515FF4 */
+extern uint8_t am2_os_live_battle_name[];  /* 0x00516035 */
 extern uint8_t am2_os_host_mask_a[];  /* 0x00516078 */
 extern uint8_t am2_os_host_mask_b[];  /* 0x0051607C */
 extern uint8_t am2_os_host_value_3e8[];  /* 0x00516090 */
@@ -768,10 +759,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_MAP_TILES_H ((uintptr_t)(const void *)am2_os_map_tiles_h)
 #undef ADDR_MAP_TILES_W
 #define ADDR_MAP_TILES_W ((uintptr_t)(const void *)am2_os_map_tiles_w)
-#undef ADDR_MENU_MODE
-#define ADDR_MENU_MODE ((uintptr_t)(const void *)am2_os_menu_mode)
-#undef ADDR_MESSAGE_BMP_NAME
-#define ADDR_MESSAGE_BMP_NAME ((uintptr_t)(const void *)am2_os_message_bmp_name)
 #undef ADDR_MISSILE_DEFS
 #define ADDR_MISSILE_DEFS ((uintptr_t)(const void *)am2_os_missile_defs)
 #undef ADDR_MOVIE_COUNT
@@ -814,8 +801,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_OPT_BIG_MOVIES ((uintptr_t)(const void *)am2_os_opt_big_movies)
 #undef ADDR_OPT_TRACE_PF
 #define ADDR_OPT_TRACE_PF ((uintptr_t)(const void *)am2_os_opt_trace_pf)
-#undef ADDR_OVERLAY_DIRTY
-#define ADDR_OVERLAY_DIRTY ((uintptr_t)(const void *)am2_os_overlay_dirty)
 #undef ADDR_PAD_COUNT
 #define ADDR_PAD_COUNT ((uintptr_t)(const void *)am2_os_pad_count)
 #undef ADDR_PLACEMENTS
@@ -1364,8 +1349,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_WEAPON_OWNER_ID ((uintptr_t)(const void *)am2_os_weapon_owner_id)
 #undef ADDR_WEAPON_SLOT
 #define ADDR_WEAPON_SLOT ((uintptr_t)(const void *)am2_os_weapon_slot)
-#undef ADDR_MESSAGE_TEXT
-#define ADDR_MESSAGE_TEXT ((uintptr_t)(const void *)am2_os_message_text)
 #undef ADDR_OBJ_CTX_OBJ_A
 #define ADDR_OBJ_CTX_OBJ_A ((uintptr_t)(const void *)am2_os_obj_ctx_obj_a)
 #undef ADDR_WEAPON_FN_SLOT0

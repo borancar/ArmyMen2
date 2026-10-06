@@ -66,8 +66,16 @@ AGGREGATES = ()
 # of its loop weights first -- member order, which VC6 follows only for one
 # object -- and indexes the weights as [table + at], which it does for a
 # hoisted load and not for a held local.
+# The message screen's request pair 0x00511DBC..0x00511DC4 (the sub-state
+# and the overlay-dirty flag) and its text and bitmap name
+# 0x00511EA4..0x005122C4: RunScriptAction's showfailure and showpda arms
+# store the pair AFTER both strcpys, which VC6 does only when the copies'
+# destination may alias the stores. One range over both would also hold the
+# game clock at 0x00511E04, and that costs AimStart and AimStartB their load
+# order; two objects give the same arms without it.
 AGGREGATE_RANGES = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994), (0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
-                    (0x004FCAA8, 0x004FCDF4), (0x00514EC0, 0x00514ED0))
+                    (0x004FCAA8, 0x004FCDF4), (0x00514EC0, 0x00514ED0),
+                    (0x00511DBC, 0x00511DC4), (0x00511EA4, 0x005122C4))
 
 
 def _aggregated(va):
@@ -87,7 +95,7 @@ def _aggregated(va):
 # beside the sprite list's settled it; with the object table typed the aim
 # sprites' alone did, and with the map descriptor typed the sprite list's
 # rejoins it. Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994))
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x00515FD8, 0x00516078))
 
 
 def _kept(va):

@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1520 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1522 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,30 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The alliance test calls the comm object directly** (2026-10-06),
+    1520 -> 1522. ArmyAlliedWithObjInline's last line went through the
+    AllyFlag wrapper. The image pushes the owner byte before it loads the
+    comm pointer, which the direct member call gives. PointerPickHeal and
+    PointerPickEnemyTrooper match; ObjAttachTo (13) and PointerActionMode4
+    and 5 (12 each) are down to 2. Also:
+    - ScriptIf 18 -> 6. Six of its eight "unexpected end" steps compare
+      `++*at >= count`. The allof and inorder steps keep the reversed
+      comparison (STEP_LATE_R). Their two steps are tail-merged, so they
+      flip only together, and together they get worse.
+    - RunScriptAction 137 -> 129. relinkos.py gets two more aggregates,
+      the message request pair and the message text and bitmap name. Its
+      showfailure and showpda arms then keep their stores after the
+      strcpys. One range over both would also hold the game clock and
+      cost AimStart and AimStartB.
+    - AppendTroopState 19 -> 18 with the position compare flipped.
+    - AM2_MoviesScreen typed (the twelve sprite pairs, the four buttons),
+      no score change. The image computes the pair's address once with an
+      lea, and no spelling tried does that.
+    Tried without effect: the last 2 in EvtCondition, MovieStart,
+    BuildVehicleMask, UpdateObjectScript, SelectBestWeapon, ReceivePlayerMsg
+    and LoadType2/3/6/8. These are register and schedule choices, and none
+    of the following moved them: declaration order, inline helpers,
+    struct copies, operand order, or loop and case orders.
   - **The multiplayer panel screen typed** (2026-10-06), no count change.
     AM2_MpPanelScreen has its name, chat and score buffers, its list boxes
     and bars, and the four per-player widget arrays with the colour
