@@ -740,6 +740,13 @@ struct AM2_HudCommandBlock am2_hud_commands = {
 /* The layout claims above are compiler-checked rather than commented. */
 static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
 static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
+static_assert(offsetof(AM2_HudTop, rows)     == HUDLOG_OFF_ROWS,    "hud log rows");
+static_assert(offsetof(AM2_HudTop, typing)   == HUDLOG_OFF_TYPING,  "hud typing");
+static_assert(offsetof(AM2_HudTop, count)    == HUDLOG_OFF_COUNT,   "hud log count");
+static_assert(offsetof(AM2_HudTop, checkbox) == HUD_A_OFF_CHECKBOX, "hud checkbox");
+static_assert(sizeof(AM2_HudTop)             == AM2_HUD_A_BYTES,    "hud top size");
+static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
+static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
  * g_drawTarget, under the same name, because it is the same global. */
@@ -1128,10 +1135,9 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
 /* The checkbox a record names, reached through the header's parent -- the
  * dialog holds them in an array at 0x0064, the same shape as the CONTROLS
  * dialog's key rows. */
-static inline AM2_Widget *OptionBox(AM2_Widget *parent, int32_t index)
+static inline AM2_CheckBox *OptionBox(AM2_Widget *parent, int32_t index)
 {
-    return *(AM2_Widget **)((uint8_t *)parent + OPTION_PARENT_BOXES
-                            + index * 4);
+    return static_cast<AM2_MpOptionsScreen *>(parent)->boxes[index];
 }
 
 
@@ -4419,14 +4425,14 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
 
 void __cdecl BuildHudWidgets(void)
 {
-    AM2_Widget *a;
-    AM2_Widget *box;
-    int32_t     ticked;
+    AM2_HudTop   *a;
+    AM2_CheckBox *box;
+    int32_t       ticked;
 
     if (!g_netGame
         && (a = g_hudWidgetA) != 0
-        && (box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX)) != 0
-        && *((uint8_t *)box + CHECKBOX_OFF_CHECKED))
+        && (box = a->checkbox) != 0
+        && box->checked)
         ticked = 1;
     else
         ticked = 0;
@@ -4454,9 +4460,9 @@ void __cdecl BuildHudWidgets(void)
     if (ticked) {
         /* No null test on A -- the original's. */
         a = g_hudWidgetA;
-        box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
+        box = a->checkbox;
         if (box)
-            *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = 1;
+            box->checked = 1;
     }
 }
 
@@ -4484,7 +4490,7 @@ void __cdecl FreeHudWidgets(void)
     w = g_hudWidgetA;
     if (w) {
         WidgetVDelete(w, 1);
-        g_hudWidgetA = (AM2_Widget *)0;
+        g_hudWidgetA = (AM2_HudTop *)0;
     }
 
     w = g_hudWidgetB;
@@ -5152,9 +5158,9 @@ void __cdecl HudMessage(const char *text, uint8_t colour)
 {
     /* The HUD widget and its row count are read afresh at every use, as
      * the original does. */
-#define HM_HUD    (*(uint8_t *const *)&g_hudWidgetA)
-#define HM_COUNT  (*(int32_t *)(HM_HUD + HUDLOG_OFF_COUNT))
-#define HM_ROW(n) (HM_HUD + HUDLOG_OFF_ROWS + (n) * AM2_HUD_MSG_SIZE)
+#define HM_HUD    (g_hudWidgetA)
+#define HM_COUNT  (HM_HUD->count)
+#define HM_ROW(n) (HM_HUD->rows[n])
     char    *dst;
     int32_t  x;
 
@@ -5165,39 +5171,39 @@ void __cdecl HudMessage(const char *text, uint8_t colour)
         int32_t i;
 
         for (i = 0; i < AM2_HUD_MSG_ROWS - 1; i++)
-            memcpy(HM_ROW(i), HM_ROW(i + 1), AM2_HUD_MSG_SIZE);
+            memcpy(&HM_ROW(i), &HM_ROW(i + 1), AM2_HUD_MSG_SIZE);
         HM_COUNT = AM2_HUD_MSG_ROWS - 1;
     }
 
     if ((uint8_t)colour) {
-        HM_ROW(HM_COUNT)[0] = '^';
-        HM_ROW(HM_COUNT)[1] = (uint8_t)colour;
-        dst = (char *)HM_ROW(HM_COUNT) + 2;
+        HM_ROW(HM_COUNT).text[0] = '^';
+        HM_ROW(HM_COUNT).text[1] = (char)colour;
+        dst = HM_ROW(HM_COUNT).text + 2;
     } else {
-        dst = (char *)HM_ROW(HM_COUNT);
+        dst = HM_ROW(HM_COUNT).text;
     }
 
     strcpy(dst, text);
 
-    *(int32_t *)(HM_ROW(HM_COUNT) + HUDMSG_OFF_WIDTH) =
+    HM_ROW(HM_COUNT).width =
         TextExtent(text, 1, (int32_t *)0);
 
     if (HM_COUNT > 0) {
-        x = (int32_t)*(const float *)(HM_ROW(HM_COUNT - 1) + HUDMSG_OFF_X)
-            + *(const int32_t *)(HM_ROW(HM_COUNT - 1) + HUDMSG_OFF_WIDTH)
+        x = (int32_t)HM_ROW(HM_COUNT - 1).x
+            + HM_ROW(HM_COUNT - 1).width
             + AM2_HUD_MSG_GAP;
         if (x < AM2_HUD_MSG_X_MIN)
             x = AM2_HUD_MSG_X_MIN;
     } else {
         x = AM2_HUD_MSG_X_MIN;
     }
-    *(float *)(HM_ROW(HM_COUNT) + HUDMSG_OFF_X) = (float)x;
+    HM_ROW(HM_COUNT).x = (float)x;
 
     HM_COUNT++;
 
     /* min(strlen(text), cap) as the macro expands: strlen is called again
      * for the value. */
-    *(int32_t *)(HM_HUD + HUDLOG_OFF_BLIPS) +=
+    HM_HUD->blips +=
         (int32_t)(strlen(text) < AM2_HUD_TOTAL_CAP ? strlen(text)
                                                    : AM2_HUD_TOTAL_CAP);
 #undef HM_ROW
@@ -7162,7 +7168,6 @@ AM2_HudTop::AM2_HudTop()
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr;
     int32_t     frame;
     int32_t     i;
@@ -7170,51 +7175,50 @@ AM2_HudTop::AM2_HudTop()
 
     if (g_mpSession == 0) {
         frame = 0;
-        *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 2;
+        buttonX = 2;
     } else {
         frame = 1;
-        *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 0x10;
+        buttonX = 0x10;
     }
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 1, frame, 0);
-    *(void **)(self + HUD_OFF_SPRITE0) = spr;
+    sprite0 = spr;
     if (!spr)
         return;
 
     w->sprite = spr;
 
-    *(int32_t *)(self + HUDLOG_OFF_TYPED_Y)  = 3;
-    *(int32_t *)(self + HUDLOG_OFF_TYPED_X)  = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X) + 0x19;
-    *(int32_t *)(self + HUDLOG_OFF_VIEW_W)   = 0x258 - *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X);
-    *(int32_t *)(self + HUDLOG_OFF_FIELD_5B4) = 0x0A;
-    *(int32_t *)(self + HUDLOG_OFF_TYPING)    = 0;
-    *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
-    *(void **)(self + HUDLOG_OFF_BUTTON_SPRITE) = 0;
-    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT)  = 0;
-    *(int32_t *)(self + HUDLOG_OFF_BLIPS)       = 0;
-    *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT)    = 0;
+    typedY  = 3;
+    typedX  = buttonX + 0x19;
+    viewW   = 0x258 - buttonX;
+    field5B4 = 0x0A;
+    typing    = 0;
+    justSent = 0;
+    buttonSprite = 0;
+    rewindAt  = 0;
+    blips       = 0;
+    blipAt    = 0;
 
     for (i = 0; i < AM2_HUDLOG_ROWS; i++) {
-        self[HUDLOG_OFF_ROWS + i * AM2_HUDLOG_ROW_STRIDE + HUDLOGROW_OFF_TEXT] = 0;
-        *(int32_t *)(self + HUDLOG_OFF_ROWS + i * AM2_HUDLOG_ROW_STRIDE
-                     + HUDLOGROW_OFF_FIELD_50) = 0;
+        rows[i].text[0] = 0;
+        rows[i].x = 0;
     }
 
-    *(int32_t *)(self + HUDLOG_OFF_SCROLL) = 0;
+    scroll = 0;
     w->x = 0;
     w->y = 0;
-    w->w = (*(AM2_Sprite **)(self + HUD_OFF_SPRITE0))->bounds.right;
-    w->h = (*(AM2_Sprite **)(self + HUD_OFF_SPRITE0))->bounds.bottom;
-    self[HUDLOG_OFF_TYPED] = 0;
-    *(int32_t *)(self + HUDLOG_OFF_COUNT) = 0;
+    w->w = sprite0->bounds.right;
+    w->h = sprite0->bounds.bottom;
+    typed[0] = 0;
+    count = 0;
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 1, 1);
-    *(void **)(self + HUDLOG_OFF_SPRITE_DOWN) = spr;
+    spriteDown = spr;
     if (!spr)
         return;
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 2, 1);
-    *(void **)(self + HUDLOG_OFF_SPRITE_HOT) = spr;
+    spriteHot = spr;
     if (!spr)
         return;
 
@@ -7226,7 +7230,7 @@ AM2_HudTop::AM2_HudTop()
                                + (size_t)me * AM2_COMM_SLOT_STRIDE
                                + COMM_SLOT_OFF_TEAM) != 0) {
             AM2_Rect    box;
-            AM2_Widget *cb;
+            AM2_CheckBox *cb;
 
             box.left   = 2;
             box.top    = 4;
@@ -7236,13 +7240,13 @@ AM2_HudTop::AM2_HudTop()
                                   "18_001_02_chatto.bmp", "18_001_03_chatto.bmp",
                                   box, 0, 0, 0);
 
-            *(void **)(self + HUD_A_OFF_CHECKBOX) = cb;
+            checkbox = cb;
             ::WidgetAddChild(w, cb);
             return;
         }
     }
 
-    *(void **)(self + HUD_A_OFF_CHECKBOX) = 0;
+    checkbox = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopDelete(int32_t flags)
@@ -7289,13 +7293,11 @@ AM2_HudTop::~AM2_HudTop()
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
-
     AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
 
-    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
-    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
-    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
+    ReleaseSprite(sprite0);
+    ReleaseSprite(spriteHot);
+    ReleaseSprite(spriteDown);
 
     g_charHandler = (void *)0;
 }
@@ -7304,27 +7306,27 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 {
     AM2_Widget *w = this;
 
-    uint8_t *b = (uint8_t *)w;
-    char    *line;
-    char     cheat[AM2_CHEAT_LINE_BYTES];
-    uint8_t *cb;
+    AM2_HudTop   *hud = static_cast<AM2_HudTop *>(w);
+    char         *line;
+    char          cheat[AM2_CHEAT_LINE_BYTES];
+    AM2_CheckBox *cb;
 
-    if (*(const int32_t *)(b + HUDLOG_OFF_TYPING) == 0)
+    if (hud->typing == 0)
         return;
 
-    *(int32_t *)(b + HUDLOG_OFF_TYPING)    = 0;
-    *(int32_t *)(b + HUDLOG_OFF_JUST_SENT) = 1;
+    hud->typing   = 0;
+    hud->justSent = 1;
     g_charHandler = (void *)0;
     PlaySoundAt(0, 0, 0, 0, 0);
 
-    line = (char *)(b + HUDLOG_OFF_TYPED);
+    line = hud->typed;
     HudMessage(line,
         *(const uint8_t *)(g_chatColourTable
             + ((size_t)AM2_THE_COMM->CommArmyOfSlot(
                                       (int32_t)g_defaultOwner) << 8)));
 
-    cb = *(uint8_t **)(b + HUD_A_OFF_CHECKBOX);
-    if (cb && *(const uint8_t *)(cb + CHECKBOX_OFF_CHECKED)) {
+    cb = hud->checkbox;
+    if (cb && cb->checked) {
         int32_t i;
         int32_t id;
 
@@ -7350,12 +7352,12 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 
     /* A line beginning `!` is a cheat -- outside a session only. */
     if (line[0] == '!' && strlen(line) > 1) {
-        strcpy(cheat, (char *)(b + HUDLOG_OFF_TYPED + 1));
+        strcpy(cheat, hud->typed + 1);
         if (g_mpSession == 0)
             CheatLine(cheat);
     }
 
-    *(char *)(*(uint8_t * *)&g_hudWidgetA + HUDLOG_OFF_TYPED) = 0;
+    g_hudWidgetA->typed[0] = 0;
 }
 
 /* 0x004185C0. The WM_CHAR handler the HUD chat line installs into
@@ -7401,21 +7403,21 @@ void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
         return;
     }
 
-    len = (int32_t)strlen((char *)CHAT_W + HUDLOG_OFF_TYPED);
+    len = (int32_t)strlen(CHAT_W->typed);
 
     /* Two shared exits -- the refusal sound and the click -- which is why
      * this is an if/else ladder rather than early returns. */
     if (ch >= 0x20 && ch < 0x80) {
         if (len < AM2_HUD_CHAT_TYPED_MAX) {
-            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len] = (char)ch;
-            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len + 1] = 0;
+            CHAT_W->typed[len] = (char)ch;
+            CHAT_W->typed[len + 1] = 0;
             PlaySoundAt(0, 0, 0, 0, 0);
         } else {
             PlaySoundAt(3, 0, 0, 0, 0);
         }
     } else if (ch == 8) {               /* backspace */
         if (len > 0) {
-            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len - 1] = 0;
+            CHAT_W->typed[len - 1] = 0;
             PlaySoundAt(0, 0, 0, 0, 0);
         } else {
             PlaySoundAt(3, 0, 0, 0, 0);
@@ -7474,79 +7476,79 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self    = (uint8_t *)w;
-    AM2_Widget *button  = (AM2_Widget *)(self + HUDLOG_OFF_BUTTON_SPRITE);
+    AM2_HudTop *hud     = static_cast<AM2_HudTop *>(w);
+    /* The grab token for the rewind button is the address of its sprite
+     * slot, not a widget: nothing else could put that value there. */
+    AM2_Widget *button  = (AM2_Widget *)&hud->buttonSprite;
     AM2_Widget *grab    = *(AM2_Widget * *)&g_mouseGrab;
-    float      *scroll  = (float *)(self + HUDLOG_OFF_SCROLL);
+    float      *scroll  = &hud->scroll;
     RECT        hot;
     int32_t     i;
     float       acc;
 
     /* The frame after a press on the button was released. */
     if (grab == button) {
-        *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
+        hud->rewindAt =
             Ticks() + AM2_HUD_REWIND_HOLD_MS;
         *(AM2_Widget * *)&g_mouseGrab = NULL;
     }
 
     ::WidgetUpdate(w);
 
-    if (!*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+    if (!hud->typing) {
         /* The typing case below is laid out last in the image. */
-        if (*(const int32_t *)(self + HUDLOG_OFF_JUST_SENT)) {
-            *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
+        if (hud->justSent) {
+            hud->justSent = 0;
         } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
             PlaySoundAt(0, 0, 0, 0, 0);
             (*(am2_char_fn *)&g_charHandler) = HudChatChar;   /* ours now, not the image */
-            *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
+            hud->typing = 1;
         } else {
             acc = 0.0f;
-            if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
-                && Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_BLIP_AT)) {
+            if (hud->blips > 0
+                && Ticks() > hud->blipAt) {
                 uint32_t jitter;
 
                 PlaySoundAt(0, 0, 0, 0, 0);
                 /* rand first, then the clock: the original's order, and the LCG
                  * state is the image's, so the sequence is shared. */
                 jitter = (uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER;
-                *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT) =
+                hud->blipAt =
                     jitter + Ticks() + AM2_HUD_BLIP_MS;
-                *(int32_t *)(self + HUDLOG_OFF_BLIPS) -= 1;
+                hud->blips -= 1;
             }
 
             /* The step and the row count are recomputed at every use. */
 #define STEP (g_frameDeltaSec * AM2_HUD_SCROLL_PPS)
-#define COUNT (*(const int32_t *)(self + HUDLOG_OFF_COUNT))
+#define COUNT (hud->count)
             for (i = 0; i < COUNT; i++) {
-                uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
-                float   *x   = (float *)(row + HUDMSG_OFF_X);
+                AM2_HudMsg *row = &hud->rows[i];
+                float      *x   = &row->x;
 
                 if (*x > acc) {
                     *x -= STEP;
                     if (*x < acc)
                         *x = acc;
                 }
-                acc = (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
+                acc = (float)(row->width
                               + AM2_HUD_MSG_GAP) + acc;
             }
 
-            if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT) > 0) {
-                if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
-                    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
+            if (hud->rewindAt > 0) {
+                if (Ticks() > hud->rewindAt)
+                    hud->rewindAt = 0;
 
                 {
                     float v = *scroll - STEP;
 
                     *scroll = 0.0f > v ? 0.0f : v;
                 }
-            } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
-                float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
+            } else if (acc > (float)hud->viewW) {
+                float target = (float)hud->viewW;
                 const float *first;
 
                 for (i = COUNT - 1; i >= 0; i--) {
-                    int32_t width = *(const int32_t *)
-                        (self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE
-                         + HUDMSG_OFF_WIDTH);
+                    int32_t width = hud->rows[i].width;
 
                     if (target - (float)width < 0.0)
                         break;
@@ -7555,8 +7557,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                 if (++i < 0)
                     i = 0;
 
-                first = (const float *)(self + HUDLOG_OFF_ROWS
-                                        + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
+                first = &hud->rows[i].x;
                 if (*scroll > *first) {
                     float v = *scroll - STEP;
                     *scroll = *first > v ? *first : v;
@@ -7572,7 +7573,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
 
 #undef STEP
 #undef COUNT
-    *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) = NULL;
+    hud->buttonSprite = NULL;
 
         if (!PointInRect((const AM2_Rect *)&w->rect,
                          (const AM2_Point *)&g_cursorPoint)) {
@@ -7581,8 +7582,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     }
 
     {
-        int32_t left = w->rect.left + *(const int32_t *)(self
-                                                 + HUDLOG_OFF_BUTTON_X);
+        int32_t left = w->rect.left + hud->buttonX;
         int32_t top  = w->rect.top;
 
         *(AM2_Rect *)&hot = RectMake(left, top, left + AM2_HUD_BUTTON_W,
@@ -7601,11 +7601,11 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     grab = *(AM2_Widget * *)&g_mouseGrab;
     if (!g_mouseButton) {
         if (grab == button)
-            *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
+            hud->rewindAt =
                 Ticks() + AM2_HUD_REWIND_HOLD_MS;
         else
-            *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
-                *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_HOT);
+            hud->buttonSprite =
+                hud->spriteHot;
         return;
     }
 
@@ -7616,9 +7616,9 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     if (grab != button)
         return;
 
-    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = Ticks() + AM2_HUD_REWIND_TAP_MS;
-    *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
-        *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_DOWN);
+    hud->rewindAt = Ticks() + AM2_HUD_REWIND_TAP_MS;
+    hud->buttonSprite =
+        hud->spriteDown;
         return;
     }
 
@@ -7632,7 +7632,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
      * original's and is already known true. */
     if (!g_mouseButton
         && g_mouseChanged
-        && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
+        && hud->typing)
         ::HudChatSend(w);
 }
 
@@ -7722,7 +7722,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
 {
 #define w this
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_HudTop *hud = static_cast<AM2_HudTop *>(w);
     RECT     hit;
     int32_t  x, y;
 
@@ -7733,9 +7733,9 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;
 
-    if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+    if (hud->typing) {
         char        line[120];   /* the original's frame */
-        const char *typed = (const char *)(self + HUDLOG_OFF_TYPED);
+        const char *typed = hud->typed;
         size_t      n;
 
         strcpy(line, typed);
@@ -7743,27 +7743,21 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
         line[n]     = AM2_HUD_CARET;
         line[n + 1] = '\0';
 
-        DrawText(*(const int32_t *)(self + HUDLOG_OFF_TYPED_X)
-                     + w->rect.left,
-                 *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
-                     + w->rect.top,
+        DrawText(hud->typedX + w->rect.left,
+                 hud->typedY + w->rect.top,
                  line, 1, 0,
                  g_whiteInk);
     } else {
         int32_t i;
 
-        for (i = 0; i < *(const int32_t *)(self + HUDLOG_OFF_COUNT); i++) {
-            const uint8_t *row = self + HUDLOG_OFF_ROWS
-                                 + i * AM2_HUD_MSG_SIZE;
+        for (i = 0; i < hud->count; i++) {
+            const AM2_HudMsg *row = &hud->rows[i];
 
-            x = (int32_t)((double)
-                    *(const float *)(row + HUDMSG_OFF_X)
-                    - *(const float *)(self + HUDLOG_OFF_SCROLL))
+            x = (int32_t)((double)row->x - hud->scroll)
                 + w->rect.left
-                + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X);
-            y = *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
-                + w->rect.top;
-            DrawText(x, y, (const char *)row, 1, 0,
+                + hud->typedX;
+            y = hud->typedY + w->rect.top;
+            DrawText(x, y, row->text, 1, 0,
                      g_colourStale);
         }
     }
@@ -7776,12 +7770,11 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
         AM2_Rect    box, part;
 
 /* The button sprite, read again at each use. */
-#define TOP_SPR (*(AM2_Sprite *const *)(self + HUDLOG_OFF_BUTTON_SPRITE))
+#define TOP_SPR (hud->buttonSprite)
         if (!TOP_SPR)
             return;
 
-        x = box.left = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X)
-                       + w->rect.left;
+        x = box.left = hud->buttonX + w->rect.left;
         y = box.top  = w->rect.top;
         box.right  = TOP_SPR->bounds.right + box.left;
         box.bottom = TOP_SPR->bounds.bottom + box.top;
@@ -10642,7 +10635,6 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     AM2_Widget *w = this;
 
     int32_t        record;
-    AM2_Widget   **boxes = (AM2_Widget **)((uint8_t *)w + OPTION_PARENT_BOXES);
     /* Whether we host is read from the comm object at each use. */
 #define host (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
     AM2_CTOR_VTABLE(w, VTABLE_OPTIONS_MENU_MP);
@@ -10653,7 +10645,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
      * cursor. */
 #define REC (g_optionTable[record])
     for (record = 0; record < AM2_OPTION_COUNT; record++) {
-        AM2_Widget *cb = new AM2_CheckBox(
+        AM2_CheckBox *cb = new AM2_CheckBox(
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
@@ -10666,11 +10658,9 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
         cb->flag3C = 0;
 
         if (REC.which)
-            *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
-                (g_gameOverFlags & (uint32_t)REC.bit) != 0;
+            cb->checked = (g_gameOverFlags & (uint32_t)REC.bit) != 0;
         else
-            *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
-                (g_gameSetting22C & (uint32_t)REC.bit) != 0;
+            cb->checked = (g_gameSetting22C & (uint32_t)REC.bit) != 0;
 
         ::WidgetAddChild(w, cb);
         if (!host)
@@ -10682,7 +10672,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     if (host) {
 #define REC (g_optionTable[record])
         for (record = 0; record < AM2_OPTION_COUNT; record++) {
-            AM2_Widget *head;
+            AM2_CheckBox *head;
             int32_t     i;
 
             if (!REC.group)
@@ -10690,8 +10680,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
             head = boxes[REC.widget];
             for (i = REC.first; i <= REC.last;
                  i++)
-                boxes[i]->disabled =
-                    (*((const uint8_t *)head + CHECKBOX_OFF_CHECKED) == 0);
+                boxes[i]->disabled = (head->checked == 0);
         }
 #undef REC
     }
@@ -10756,15 +10745,15 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
     ResetPairMask(&flags, &other);
 
     for (i = 0; i < AM2_OPTION_COUNT; i++) {
-        AM2_Widget *box;
-        uint32_t    bit, mask;
+        AM2_CheckBox *box;
+        uint32_t      bit, mask;
 
         const AM2_OptionRec *r = &g_optionTable[i];
         box = OptionBox(parent, r->widget);
         mask = r->which ? flags : other;
         box->disabled = 0;
         bit = (uint32_t)r->bit;
-        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
+        box->checked = (mask & bit) != 0;
         WidgetVPaint(box, box->rect);
     }
 }
@@ -10777,8 +10766,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
     int32_t     i;
 
     for (i = 0; i < AM2_OPTION_COUNT; i++) {
-        if (*((const uint8_t *)OptionBox(parent, OPT(i).widget)
-              + CHECKBOX_OFF_CHECKED)) {
+        if (OptionBox(parent, OPT(i).widget)->checked) {
             if (OPT(i).which)
                 flags |= (uint32_t)OPT(i).bit;
             else
@@ -10806,11 +10794,10 @@ void __cdecl OptionsRequest(void)
     g_menuRequestSet = 1;
 }
 
-void __cdecl OptionsSyncGroup(AM2_Widget *header)
+void __cdecl OptionsSyncGroup(AM2_CheckBox *header)
 {
     AM2_Widget    *parent = header->parent;
-    const AM2_OptionRec *rec =
-        &g_optionTable[*(const int32_t *)((uint8_t *)header + CHECK_OFF_GROUP)];
+    const AM2_OptionRec *rec = &g_optionTable[header->group];
     int32_t        i;
 
     if (!rec->group)
@@ -10819,13 +10806,11 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
     for (i = rec->first;
          i <= rec->last;
          i++) {
-        AM2_Widget *box = OptionBox(parent, i);
+        AM2_CheckBox *box = OptionBox(parent, i);
 
         /* The header's tick is read again for the disabled test. */
-        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) =
-            *((const uint8_t *)header + CHECKBOX_OFF_CHECKED);
-        box->disabled =
-            (*((const uint8_t *)header + CHECKBOX_OFF_CHECKED) == 0);
+        box->checked  = header->checked;
+        box->disabled = (header->checked == 0);
         WidgetVPaint(box, box->rect);
     }
 }

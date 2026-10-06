@@ -568,9 +568,34 @@ struct AM2_HudPanel : AM2_Widget {
     ~AM2_HudPanel();
 };
 
+/* One row of the top strip's message log, AM2_HUD_MSG_SIZE bytes. */
+struct AM2_HudMsg {
+    char        text[0x50];         /* +0x00  HUDLOGROW_OFF_TEXT, unchecked */
+    float       x;                  /* +0x50  HUDMSG_OFF_X */
+    int32_t     width;              /* +0x54  HUDMSG_OFF_WIDTH */
+};
+
 struct AM2_HudTop : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudTop[AM2_HUD_A_BYTES - sizeof(AM2_Widget)];
+    AM2_Sprite   *sprite0;                  /* 0x0058  HUD_OFF_SPRITE0 */
+    AM2_Sprite   *spriteHot;                /* 0x005C  HUDLOG_OFF_SPRITE_HOT */
+    AM2_Sprite   *spriteDown;               /* 0x0060  HUDLOG_OFF_SPRITE_DOWN */
+    AM2_Sprite   *buttonSprite;             /* 0x0064  HUDLOG_OFF_BUTTON_SPRITE */
+    int32_t       buttonX;                  /* 0x0068  HUDLOG_OFF_BUTTON_X */
+    AM2_HudMsg    rows[AM2_HUDLOG_ROWS];    /* 0x006C  HUDLOG_OFF_ROWS */
+    int32_t       typing;                   /* 0x048C  HUDLOG_OFF_TYPING */
+    int32_t       justSent;                 /* 0x0490  HUDLOG_OFF_JUST_SENT */
+    char          typed[0x100];             /* 0x0494  HUDLOG_OFF_TYPED */
+    int32_t       count;                    /* 0x0594  HUDLOG_OFF_COUNT */
+    float         scroll;                   /* 0x0598  HUDLOG_OFF_SCROLL */
+    int32_t       blips;                    /* 0x059C  HUDLOG_OFF_BLIPS */
+    uint32_t      blipAt;                   /* 0x05A0  HUDLOG_OFF_BLIP_AT */
+    uint32_t      rewindAt;                 /* 0x05A4  HUDLOG_OFF_REWIND_AT */
+    int32_t       typedX;                   /* 0x05A8  HUDLOG_OFF_TYPED_X */
+    int32_t       typedY;                   /* 0x05AC  HUDLOG_OFF_TYPED_Y */
+    int32_t       viewW;                    /* 0x05B0  HUDLOG_OFF_VIEW_W */
+    int32_t       field5B4;                 /* 0x05B4  HUDLOG_OFF_FIELD_5B4 */
+    AM2_CheckBox *checkbox;                 /* 0x05B8  HUD_A_OFF_CHECKBOX */
     AM2_HudTop();
     explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudTop();
@@ -672,7 +697,9 @@ struct AM2_MoviesScreen : AM2_ScreenBase {
 };
 struct AM2_MpOptionsScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_MP_OPTIONS_SIZE - sizeof(AM2_ScreenBase)];
+    /* 0x0064 OPTION_PARENT_BOXES: one checkbox per g_optionTable record,
+     * indexed by the record's `widget`, filling the object to its end. */
+    AM2_CheckBox *boxes[AM2_OPTION_COUNT];
     AM2_MpOptionsScreen(const char *bmp);
 };
 struct AM2_MpPanelScreen : AM2_ScreenBase {
@@ -2068,7 +2095,7 @@ void __cdecl OptionsRequest(void);
  * onto every checkbox in its range -- and set each one's 0x004C, which is the
  * "cannot be focused" field, to the OPPOSITE. A ticked header therefore both
  * ticks its group and locks it. */
-void __cdecl OptionsSyncGroup(AM2_Widget *header);
+void __cdecl OptionsSyncGroup(AM2_CheckBox *header);
 
 /* Originals: 0x004326F0 and 0x00432700, one `jmp` each into DialogDestruct and
  * WidgetUpdateCancel. The alias shape: the OPTIONS dialog wants those two
