@@ -556,7 +556,8 @@ uint32_t __cdecl ChainField14(const void *p);
 
 /* 0x00429F20. Pushes a node onto the front of a doubly linked list: prev at
  * +4, next at +8, and `head` is the address of the head pointer. */
-void __cdecl ListPushFront(void *node, void **head);
+struct AM2_CellEntry;
+void __cdecl ListPushFront(struct AM2_CellEntry *node, struct AM2_CellEntry **head);
 
 /* 0x0041DAD0. The other half of the same list: take `node` out and leave it
  * with both links cleared. Same node layout as ListPushFront -- prev at +4,
@@ -567,7 +568,8 @@ void __cdecl ListPushFront(void *node, void **head);
  * only case where the head has to move. An unlink from the middle never
  * touches it, so the pointer is allowed to be wrong there and nothing would
  * notice -- reproduced, not defended. */
-void __cdecl ListUnlink(void *node, void **head);
+struct AM2_CellEntry;
+void __cdecl ListUnlink(struct AM2_CellEntry *node, struct AM2_CellEntry **head);
 
 /* 0x0041BB60. Copy `count` bytes from src to dst, each one through `table` if
  * there is one. With table NULL it is a plain forward copy instead, and the

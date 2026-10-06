@@ -19,10 +19,13 @@
 extern "C" {
 #endif
 
-void     __cdecl ObjFlagSet0(void *obj);
-void     __cdecl ObjFlagClear0(void *obj);
-uint32_t __cdecl ObjFlagBit0(const void *obj);
-uint32_t __cdecl ObjFlagBit1(const void *obj);
+struct AM2_MapRow;
+
+/* Bits of a map row's flags word, despite the names. */
+void     __cdecl ObjFlagSet0(struct AM2_MapRow *row);
+void     __cdecl ObjFlagClear0(struct AM2_MapRow *row);
+uint32_t __cdecl ObjFlagBit0(const struct AM2_MapRow *row);
+uint32_t __cdecl ObjFlagBit1(const struct AM2_MapRow *row);
 
 int objflag_install(void);
 

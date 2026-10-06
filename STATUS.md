@@ -215,6 +215,24 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **One cell-entry type for rows and objects; the free family typed**
+    (2026-10-06), no count change. AM2_RowEntry became AM2_CellEntry. An
+    object's OBJ_OFF_CELL_ENTRIES holds the same 16-byte entries for
+    g_objMapDesc, with the owner a union of row and object. ListUnlink,
+    ListPushFront, DepthLink and DepthResort take it, and the `(void **)`
+    head casts are gone. Also typed: ObjRemap, ItemPreDestroy, ItemSetBox
+    and ItemLinkCells, using AM2_Object's new box (+0x20), hit rect (+0x30),
+    cell count (+0x8C) and entries (+0x90). The same goes for FreeItem, the
+    eight per-kind destructors, FreeSubrecordRows (an AM2_RowSet),
+    RowRelease, RowUnregisterAll, the row pools' slots and the ObjFlag
+    helpers, which work on a row's flags whatever their names say. A
+    vehicle's rider list is a named `riders` struct like `followers`. Every
+    function that matched still does; RowUnregisterAll no longer needs its
+    integer-address workaround. ObjRemap went 92 -> 73 by walking the grid
+    as ItemLinkCells does: `cols` held, both clamps branchless, and a running
+    `cell += stride`. DepthResort stays 32: the image's two unlinks load
+    prev and next before branching, and unifying ours as locals or as one
+    inline helper made it worse (36/41).
   - **The map row's cell entries and the map descriptor typed** (2026-10-06),
     no count change. AM2_RowEntry is a row's 16-byte cell entry (the row,
     the depth-list links and the cell). AM2_MapDesc is the cell grid (cols,

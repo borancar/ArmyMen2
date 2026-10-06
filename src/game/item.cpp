@@ -606,9 +606,8 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
  * shrinks keeps the larger array and the entries past the new box are the
  * ones ItemLinkCells clears.
  */
-void __cdecl ItemSetBox(void *obj, AM2_Rect box)
+void __cdecl ItemSetBox(AM2_Object *o, AM2_Rect box)
 {
-    uint8_t *o = (uint8_t *)obj;
     int32_t  w, h;
     int32_t  need;
     int32_t  i;
@@ -616,17 +615,17 @@ void __cdecl ItemSetBox(void *obj, AM2_Rect box)
     ItemPreDestroy(o, (int32_t)((uintptr_t)g_objMapDesc));
 
     /* The position is read where it is used, not held. */
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)  = box.left;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)  = box.top;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)  = box.right;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12) = box.bottom;
+    o->box.left   = box.left;
+    o->box.top    = box.top;
+    o->box.right  = box.right;
+    o->box.bottom = box.bottom;
 
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = *(const int16_t *)(o + OBJ_OFF_POS) + box.left;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = *(const int16_t *)(o + OBJ_OFF_POS + 2) + box.top;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = *(const int16_t *)(o + OBJ_OFF_POS) + box.right;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = *(const int16_t *)(o + OBJ_OFF_POS + 2) + box.bottom;
+    o->hit.left   = o->pos.x + box.left;
+    o->hit.top    = o->pos.y + box.top;
+    o->hit.right  = o->pos.x + box.right;
+    o->hit.bottom = o->pos.y + box.bottom;
 
-    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
+    if (!((uint8_t)o->flags & MAPOBJ_FLAG_VISIBLE))
         return;
 
     w = box.right - box.left;
@@ -639,26 +638,25 @@ void __cdecl ItemSetBox(void *obj, AM2_Rect box)
     need = (uint8_t)((uint8_t)((w >> AM2_CELL_SHIFT) + 2)
                      * (uint8_t)((h >> AM2_CELL_SHIFT) + 2));
 
-    if ((int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) < need) {
+    if ((int32_t)o->cellCount < need) {
         /* Sized from the count just stored. */
-        *(o + OBJ_OFF_CELL_COUNT) = (uint8_t)need;
-        *(void **)(o + OBJ_OFF_CELL_ENTRIES) =
-            am2_realloc(*(void **)(o + OBJ_OFF_CELL_ENTRIES),
-                        (size_t)((uint32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT)
-                                 * AM2_CELL_ENTRY_STRIDE));
+        o->cellCount = (uint8_t)need;
+        o->cellEntries = (AM2_CellEntry *)
+            am2_realloc(o->cellEntries,
+                        (size_t)((uint32_t)o->cellCount * AM2_CELL_ENTRY_STRIDE));
     }
 
     /* Each entry is re-indexed from the array for every store. */
-#define ENTRY ((uint32_t)i * AM2_CELL_ENTRY_STRIDE + *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES))
-    for (i = 0; i < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
-        *(void **)(ENTRY + 0) = obj;
-        *(void **)(ENTRY + 8) = (void *)0;   /* next */
-        *(void **)(ENTRY + 4) = (void *)0;   /* prev */
-        *(int32_t *)(ENTRY + CELL_ENTRY_OFF_INDEX) = -1;
+#define ENTRY (&o->cellEntries[i])
+    for (i = 0; i < (int32_t)o->cellCount; i++) {
+        ENTRY->object = o;
+        ENTRY->next   = 0;
+        ENTRY->prev   = 0;
+        ENTRY->cell   = -1;
     }
 #undef ENTRY
 
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if ((uint8_t)o->flags & OBJ_FLAG_DESTROYED)
         return;
 
     ItemLinkCells(o, g_objMapDesc);
@@ -706,30 +704,27 @@ void __cdecl ItemSetBox(void *obj, AM2_Rect box)
  * nothing changes it, exactly as ItemPreDestroy's does, and it writes the two
  * links and the index and never the object pointer at +0.
  */
-void __cdecl ItemLinkCells(void *obj, void *cells)
+void __cdecl ItemLinkCells(AM2_Object *o, AM2_MapDesc *d)
 {
-#define o ((uint8_t *)obj)
     /* Each store indexes the entry array afresh. */
-#define ENTRY(k) (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
-                  + (uint32_t)(k) * AM2_CELL_ENTRY_STRIDE)
-    const uint8_t *d = (const uint8_t *)cells;
+#define ENTRY(k) (&o->cellEntries[k])
     int32_t        cl, ct, cr, cb;
     int32_t        cols, rows, shift;
     int32_t cell, stride;
 
-    cl = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  >> AM2_CELL_SHIFT;
-    ct = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  >> AM2_CELL_SHIFT;
-    cr = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  >> AM2_CELL_SHIFT;
-    cb = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 12) >> AM2_CELL_SHIFT;
+    cl = o->hit.left   >> AM2_CELL_SHIFT;
+    ct = o->hit.top    >> AM2_CELL_SHIFT;
+    cr = o->hit.right  >> AM2_CELL_SHIFT;
+    cb = o->hit.bottom >> AM2_CELL_SHIFT;
 
     if (cb < 0)
         return;
-    rows = *(const int32_t *)(d + MAPDESC_OFF_ROWS);
+    rows = d->rows;
     if (ct > rows - 1)
         return;
     if (cr < 0)
         return;
-    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    cols = d->cols;
     if (cl > cols - 1)
         return;
 
@@ -740,7 +735,7 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
         cb = cols - 1;
 
-    shift  = *(const int32_t *)(d + MAPDESC_OFF_SHIFT);
+    shift  = d->shift;
     rows   = 0;
     cell   = (ct << shift) + cl;
     stride = cols - cr + cl - 1;
@@ -749,20 +744,17 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
         int32_t x;
 
         for (x = cl; x <= cr; x++, rows++, cell++) {
-            *(int32_t *)(ENTRY(rows) + CELL_ENTRY_OFF_INDEX) = cell;
-            ListPushFront(ENTRY(rows),
-                          (void **)(*(uint8_t **)(d + MAPDESC_OFF_CELLS)
-                                    + (uint32_t)cell * 4));
+            ENTRY(rows)->cell = cell;
+            ListPushFront(ENTRY(rows), &d->cells[cell]);
         }
     }
 
-    for (; rows < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); rows++) {
-        *(int32_t *)(ENTRY(rows) + CELL_ENTRY_OFF_INDEX) = -1;
-        *(void **)(ENTRY(rows) + 8) = (void *)0;   /* next */
-        *(void **)(ENTRY(rows) + 4) = (void *)0;   /* prev, as ListPushFront has it */
+    for (; rows < (int32_t)o->cellCount; rows++) {
+        ENTRY(rows)->cell = -1;
+        ENTRY(rows)->next = 0;
+        ENTRY(rows)->prev = 0;   /* as ListPushFront has it */
     }
 #undef ENTRY
-#undef o
 }
 
 /* 0x0042A0A0. Unlink an object from every cell list it is registered in,
@@ -779,31 +771,25 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
  * already unlinked leaves the rest linked. And the second `test al, al`
  * cannot be taken: the first one already returned on zero, and `jbe` on a
  * byte asks the same question. */
-void __cdecl ItemPreDestroy(void *obj, int32_t cells)
+void __cdecl ItemPreDestroy(AM2_Object *o, int32_t cells)
 {
-    uint8_t *o = (uint8_t *)obj;
-    int32_t  i;
+    AM2_MapDesc *desc = (AM2_MapDesc *)(uintptr_t)cells;
+    int32_t      i;
 
     /* The entry table is re-read at each use, as the image does. */
-#define ENTRY(i) (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
-                  + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE)
-#define INDEX(i) (*(int32_t *)(ENTRY(i) + CELL_ENTRY_OFF_INDEX))
-    if (!*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT))
+#define ENTRY(i) (&o->cellEntries[i])
+    if (!o->cellCount)
         return;
-    if (INDEX(0) < 0)
+    if (ENTRY(0)->cell < 0)
         return;
 
-    for (i = 0; i < *(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
-        if (INDEX(i) < 0)
+    for (i = 0; i < o->cellCount; i++) {
+        if (ENTRY(i)->cell < 0)
             return;
-        ListUnlink(ENTRY(i),
-                   (void **)(*(uint8_t **)((uint8_t *)(uintptr_t)cells
-                                           + CELLS_OFF_HEADS)
-                             + (uint32_t)INDEX(i) * 4));
-        INDEX(i) = -1;
+        ListUnlink(ENTRY(i), &desc->cells[ENTRY(i)->cell]);
+        ENTRY(i)->cell = -1;
     }
 #undef ENTRY
-#undef INDEX
 }
 
 #define kCommDbg \
@@ -856,37 +842,27 @@ void __cdecl DirtyCollect(const AM2_Rect *r);
  * work, though that counter is shared with its other call sites and cannot be
  * attributed here on its own. So both the early returns and the loop body run.
  * RowRelease, the caller in this file, reads 0. */
-void __cdecl RowUnregisterAll(void *row, void *desc)
+void __cdecl RowUnregisterAll(AM2_MapRow *r, AM2_MapDesc *desc)
 {
-    uint8_t *r = (uint8_t *)row;
     int32_t  i;
 
-    /* The entry buffer is re-read at each use, as the image does, and as an
-     * integer: pointer arithmetic makes the buffer the address's base, and
-     * the image's base is the scaled index. */
-
-#define ENTRY(i) ((uint8_t *)(uintptr_t)(*(const uint32_t *)(r + ROW_OFF_BUFFER) \
-                                         + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE))
-
-#define CELL(i)  (*(int32_t *)(ENTRY(i) + 0x0C))
-    if (!r[ROW_OFF_OWNS])
+    /* The entry buffer is re-read at each use, as the image does. */
+#define ENTRY(i) (&r->buffer[i])
+    if (!r->owns)
         return;
-    if (CELL(0) < 0)
+    if (ENTRY(0)->cell < 0)
         return;
 
     i = 0;
-    orig_dirty_collect((const AM2_Rect *)(r + ROW_OFF_RECT));
+    orig_dirty_collect(&r->rect);
 
-    for (; i < r[ROW_OFF_OWNS]; i++) {
-        if (CELL(i) < 0)
+    for (; i < r->owns; i++) {
+        if (ENTRY(i)->cell < 0)
             return;
-        ListUnlink(ENTRY(i),
-                   (void **)(*(uint8_t *const *)((const uint8_t *)desc + 0x0C)
-                             + (uint32_t)CELL(i) * 4));
-        CELL(i) = -1;
+        ListUnlink(ENTRY(i), &desc->cells[ENTRY(i)->cell]);
+        ENTRY(i)->cell = -1;
     }
 #undef ENTRY
-#undef CELL
 }
 
 /* 0x0041D3A0, five callers -- one row's teardown.
@@ -901,18 +877,16 @@ void __cdecl RowUnregisterAll(void *row, void *desc)
  * out of the cell lists before the buffer goes is the part that matters:
  * anything walking those lists in between would otherwise reach freed
  * memory. */
-void __cdecl RowRelease(void *row, void *desc)
+void __cdecl RowRelease(AM2_MapRow *r, AM2_MapDesc *desc)
 {
-    uint8_t *r = (uint8_t *)row;
-
-    if (!r[ROW_OFF_OWNS])
+    if (!r->owns)
         return;
 
     RowUnregisterAll(r, desc);
-    am2_free(*(void **)(r + ROW_OFF_BUFFER));
+    am2_free(r->buffer);
 
-    *(void **)(r + ROW_OFF_BUFFER) = (void *)0;
-    r[ROW_OFF_OWNS] = 0;
+    r->buffer = (AM2_CellEntry *)0;
+    r->owns   = 0;
 }
 
 /* 0x00434EC0. Release an object's sub-list: every row's own teardown, then
@@ -927,91 +901,83 @@ void __cdecl RowRelease(void *row, void *desc)
  * family, and the array is freed only when there is one -- but the CAPACITY
  * is cleared unconditionally, so an already-empty list still has that written
  * over it. Neither the count nor the header's first dword is touched. */
-void __cdecl FreeSubrecordRows(void *subrecord)
+void __cdecl FreeSubrecordRows(AM2_RowSet *set)
 {
-    uint8_t *rec = (uint8_t *)subrecord;
-    void    *rows;
-    int32_t  i;
+    AM2_MapRow *rows;
+    int32_t     i;
 
-    for (i = 0; i < *(const int32_t *)(rec + SUBREC_OFF_COUNT); i++)
-        RowRelease(*(uint8_t **)(rec + SUBREC_OFF_ROWS)
-                   + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
-                   g_mapDesc);
+    for (i = 0; i < set->count; i++)
+        RowRelease(&set->rows[i], g_mapDesc);
 
-    rows = *(void **)(rec + SUBREC_OFF_ROWS);
+    rows = set->rows;
     if (rows) {
         am2_free(rows);
-        *(void **)(rec + SUBREC_OFF_ROWS) = (void *)0;
+        set->rows = (AM2_MapRow *)0;
     }
-    *(int32_t *)(rec + SUBREC_OFF_CAPACITY) = 0;
+    set->capacity = 0;
 }
 
-void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
+void __cdecl DestroyTrooper(AM2_Object *t, int32_t unlink)
 {
-    uint8_t *t = (uint8_t *)trooper;
-    int32_t  weaponUid;
-    uint8_t *weapon;
-    void    *alloc;
+    int32_t     weaponUid;
+    AM2_Object *weapon;
+    void       *alloc;
 
-    if (!trooper)
+    if (!t)
         return;
 
-    weaponUid = *(const int32_t *)(t + TROOPER_OFF_WEAPON_UID);
+    weaponUid = (int32_t)t->inventory[0];
     if (weaponUid) {
         /* Answers null, having complained, for anything that is not kind 4. */
-        weapon = (uint8_t *)WeaponByUid(weaponUid);
+        weapon = WeaponByUid(weaponUid);
         if (weapon) {
             if (kCommDbg)
-                orig_log("DestroyTrooper %x\n",
-                         *(const int32_t *)(weapon + 4));
+                orig_log("DestroyTrooper %x\n", weapon->uid);
             /* An 8-bit OR on a 32-bit load, stored back as 32 bits. */
-            *(int32_t *)(weapon + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+            weapon->flags |= WEAPON_FLAG_DEAD;
         }
     }
 
-    alloc = *(void **)(t + TROOPER_OFF_ALLOC);
+    alloc = t->followers.uids;
     if (alloc)
         am2_free(alloc);
 
-    FreeSubrecordRows(t + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(trooper, (int32_t)((uintptr_t)g_objMapDesc),
-                      unlink);
-    am2_free(trooper);
+    FreeSubrecordRows(&t->rowSet);
+    DestroyItemObject(t, (int32_t)((uintptr_t)g_objMapDesc), unlink);
+    am2_free(t);
 }
 
 
-void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
+void __cdecl DestroyVehicle(AM2_Object *v, int32_t unlink)
 {
-    uint8_t *v = (uint8_t *)vehicle;
-    int32_t  weaponUid;
-    uint8_t *weapon;
+    int32_t     weaponUid;
+    AM2_Object *weapon;
 
-    if (!vehicle)
+    if (!v)
         return;
 
-    weaponUid = *(const int32_t *)(v + VEHICLE_OFF_WEAPON_UID);
+    weaponUid = (int32_t)v->weaponUid;
     if (weaponUid) {
-        weapon = (uint8_t *)WeaponByUid(weaponUid);
+        weapon = WeaponByUid(weaponUid);
         /* A 32-bit OR here, an 8-bit one in DestroyTrooper. Same bit. */
         if (weapon)
-            *(int32_t *)(weapon + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+            weapon->flags |= WEAPON_FLAG_DEAD;
     }
 
     /* The one step neither of the other two arms has. */
-    ClearPtrList(v + VEHICLE_OFF_PTR_LIST);
+    ClearPtrList(&v->riders);
 
-    FreeSubrecordRows(v + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(vehicle, (int32_t)((uintptr_t)g_objMapDesc),
-                      unlink);
-    am2_free(vehicle);
+    FreeSubrecordRows(&v->rowSet);
+    DestroyItemObject(v, (int32_t)((uintptr_t)g_objMapDesc), unlink);
+    am2_free(v);
 }
 
-void __cdecl DestroyItemCommon(void *item, int32_t unlink)
+void __cdecl DestroyItemCommon(AM2_Object *item, int32_t unlink)
 {
     if (!item)
         return;
 
-    FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows(&item->rowSet);
     DestroyItemObject(item, (int32_t)((uintptr_t)g_objMapDesc), unlink);
     am2_free(item);
 }
@@ -1023,11 +989,11 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink)
  * the linker then folds (/OPT:ICF). So the source had four; these are the
  * three that have no address of their own. */
 #define AM2_PLAIN_DESTROY(name)                                             \
-    static void __cdecl name(void *item, int32_t unlink)                   \
+    static void __cdecl name(AM2_Object *item, int32_t unlink)             \
     {                                                                       \
         if (!item)                                                          \
             return;                                                         \
-        FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);             \
+        FreeSubrecordRows(&item->rowSet);                                   \
         DestroyItemObject(item, (int32_t)((uintptr_t)g_objMapDesc), unlink); \
         am2_free(item);                                                     \
     }
@@ -1036,7 +1002,7 @@ AM2_PLAIN_DESTROY(DestroyPlain6)
 AM2_PLAIN_DESTROY(DestroyPlain8)
 #undef AM2_PLAIN_DESTROY
 
-void __cdecl DestroyKind7(void *item, int32_t unlink)
+void __cdecl DestroyKind7(AM2_Object *item, int32_t unlink)
 {
     int32_t *live = g_kind7Count;
 
@@ -1048,42 +1014,38 @@ void __cdecl DestroyKind7(void *item, int32_t unlink)
     if (*live < 0)
         *live = 0;
 
-    FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows(&item->rowSet);
     DestroyItemObject(item, (int32_t)((uintptr_t)g_objMapDesc), unlink);
     am2_free(item);
 }
 
-void __cdecl DestroyWeapon(void *weapon, int32_t unlink)
+void __cdecl DestroyWeapon(AM2_Object *w, int32_t unlink)
 {
-    uint8_t *w = (uint8_t *)weapon;
-
-    if (!weapon)
+    if (!w)
         return;
 
     /* Not gated on the verbosity flag, unlike DestroyTrooper's. */
-    orig_log("DestroyWeapon, %x\n", *(const int32_t *)(w + 4));
+    orig_log("DestroyWeapon, %x\n", w->uid);
 
-    FreeSubrecordRows(w + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(weapon, (int32_t)((uintptr_t)g_objMapDesc), unlink);
-    am2_free(weapon);
+    FreeSubrecordRows(&w->rowSet);
+    DestroyItemObject(w, (int32_t)((uintptr_t)g_objMapDesc), unlink);
+    am2_free(w);
 }
 
-void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
+void __cdecl DestroyItemObject(AM2_Object *o, int32_t arg, int32_t notify)
 {
-    uint8_t *o = (uint8_t *)obj;
-
-    if (*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) == 0)
+    if (o->cellCount == 0)
         return;
 
     if (kCommDbg)
-        orig_log("DestroyItemObject, %x\n", *(const int32_t *)(o + 4));
+        orig_log("DestroyItemObject, %x\n", o->uid);
 
     if (notify)
-        ItemPreDestroy(obj, arg);
+        ItemPreDestroy(o, arg);
 
-    am2_free(*(void **)(o + OBJ_OFF_CELL_ENTRIES));
+    am2_free(o->cellEntries);
 
-    *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = 0;
+    o->cellCount = 0;
 }
 
 /* All five per-kind destructors are ours now, and the switch below calls them
@@ -1118,12 +1080,12 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
  *
  * Only kind 4 logs, and it is gated on the comm object's debug flag, the same
  * one the three event functions read. */
-int32_t __cdecl FreeItem(void *item, int32_t unlink)
+int32_t __cdecl FreeItem(AM2_Object *item, int32_t unlink)
 {
-    if (unlink && !RemoveFromItemList((AM2_Object *)item))
+    if (unlink && !RemoveFromItemList(item))
         return 0;
 
-    switch (*(const int32_t *)item) {
+    switch (item->type) {
     case 1:
         DestroyItemCommon(item, unlink);
         return 1;
@@ -1138,7 +1100,7 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
 
     case 4:
         if (kCommDebug)
-            orig_log("FreeItem %0x\n", ((const int32_t *)item)[1]);
+            orig_log("FreeItem %0x\n", item->uid);
         DestroyWeapon(item, unlink);
         return 1;
 
@@ -1672,7 +1634,7 @@ void __cdecl VehicleDied(void *obj, uint32_t by)
     *(int32_t *)(o + VEHICLE_OFF_DEAD)        = 1;
 
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-        ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
+        ObjFlagClear0((AM2_MapRow *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE));
 
     ObjClearFootprint(o);
 
@@ -1728,7 +1690,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
         && force == 0)
         return;
 
-    ObjRemap(o, g_objMapDesc, force);
+    ObjRemap((AM2_Object *)o, g_objMapDesc, force);
     ApplyObjHeight(o, height);
 }
 
@@ -4081,7 +4043,7 @@ void __cdecl ObjMarkIfOverdue(void *obj)
 
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 {
-    ItemPreDestroy(obj, arg);
+    ItemPreDestroy((AM2_Object *)obj, arg);
 }
 
 /* The four teardowns and the broadcast test, all still the original's. */
@@ -4365,7 +4327,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
 
     row = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
-    ObjFlagSet0(row);
+    ObjFlagSet0((AM2_MapRow *)row);
     i = 1;
     RowUpdate((AM2_MapRow *)row, i, g_mapDesc);
 
@@ -4380,7 +4342,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
             *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
             *(int16_t *)(row + ROW_OFF_X) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_X);
             *(int16_t *)(row + ROW_OFF_Y) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_Y);
-            ObjFlagSet0(row);
+            ObjFlagSet0((AM2_MapRow *)row);
             RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
         } while (++i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT));
     }
@@ -5485,7 +5447,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
     *(int32_t *)(o + VEHICLE_OFF_DEAD)        = 1;
 
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-        ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
+        ObjFlagClear0((AM2_MapRow *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE));
 
     ObjClearFootprint(obj);
 
@@ -5933,19 +5895,17 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
  * see that function. */
 void __cdecl FreeOverdueItems(void)
 {
-    void *obj = FirstItem();
+    AM2_Object *obj = FirstItem();
 
     if (!obj)
         return;
 
     do {
-        void   *next  = NextItem();
-        uint8_t *o    = (uint8_t *)obj;
-        uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+        AM2_Object *next  = NextItem();
+        uint32_t    flags = obj->flags;
 
         if ((flags & OBJ_FLAG_REPLACED) && !(flags & OBJ_FLAG_NO_SWEEP)) {
-            if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
-                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+            if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)obj->owner))
                 ItemGoneMessageSend(obj);
             FreeItem(obj, 1);
         }
@@ -11082,7 +11042,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
-    ObjFlagSet0(row0);
+    ObjFlagSet0((AM2_MapRow *)row0);
     RowUpdate((AM2_MapRow *)row0, 0, g_mapDesc);
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
@@ -11099,7 +11059,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
         *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
 #undef SPR0
-        ObjFlagSet0(r);
+        ObjFlagSet0((AM2_MapRow *)r);
         RowUpdate((AM2_MapRow *)r, 0, g_mapDesc);
     }
 
@@ -11120,7 +11080,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         *(int32_t *)(o + OBJ_OFF_RANK) = 0;
         *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
 
-        ObjRemap(o, g_objMapDesc, 1);
+        ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
 
         if (!ObjIsFriendly(o))
             ObjConceal(o, 0);
@@ -11193,7 +11153,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
-    ObjFlagSet0(row0);
+    ObjFlagSet0((AM2_MapRow *)row0);
     RowUpdate((AM2_MapRow *)row0, 1, g_mapDesc);   /* force 1 here */
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
@@ -11218,7 +11178,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
         *(int32_t *)(o + OBJ_OFF_RIDING)    = 0;
         *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
-        ObjRemap(o, g_objMapDesc, 1);
+        ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
         *(int32_t *)(o + OBJ_OFF_POSE) = 0;
 
         if (!ObjIsFriendly(o))
@@ -11288,70 +11248,66 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
  *
  * PointsEqual takes its two points BY VALUE -- rect.h has the signature, and
  * CLAUDE.md records a defect from calling it with pointers instead. */
-void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
+void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
 {
-#define o ((uint8_t *)obj)
-#define grid ((const int32_t *)desc)
     int32_t        x, y, left, top;
-    int32_t        cl, ct, cr, cb, row, col, idx;
+    int32_t        cl, ct, cr, cb, col, idx;
+    int32_t        cols, cell, stride;
 
     if (force == 0
-        && PointsEqual(*(const uint32_t *)(o + OBJ_OFF_PREV_POS),
-                       *(const uint32_t *)(o + OBJ_OFF_POS)))
+        && PointsEqual(*(const uint32_t *)&o->prevPos, *(const uint32_t *)&o->pos))
         return;
 
-    x = *(const int16_t *)(o + OBJ_OFF_X);
-    y = *(const int16_t *)(o + OBJ_OFF_Y);
-#define box(i) (*(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4 * (i)))
-#define hit(i) (*(int32_t *)(o + OBJ_OFF_HIT_RECT + 4 * (i)))
+    x = o->pos.x;
+    y = o->pos.y;
 
-    left   = x + box(0);
-    top    = y + box(1);
-    hit(0) = left;
-    hit(1) = top;
-    hit(2) = x + box(2);
-    hit(3) = y + box(3);
+    left   = x + o->box.left;
+    top    = y + o->box.top;
+    o->hit.left   = left;
+    o->hit.top    = top;
+    o->hit.right  = x + o->box.right;
+    o->hit.bottom = y + o->box.bottom;
 
-    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+    if (!(o->flags & OBJ_FLAG_BIT0))
         return;
 
     ct = top    >> AM2_CELL_SHIFT;
     cl = left   >> AM2_CELL_SHIFT;
-    cr = ((box(2) - box(0)) + left) >> AM2_CELL_SHIFT;
-    cb = ((box(3) - box(1)) + top)  >> AM2_CELL_SHIFT;
+    cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
+    cb = ((o->box.bottom - o->box.top) + top)  >> AM2_CELL_SHIFT;
 
-    /* Off the grid in any direction is an unregister, not a clamp. */
-    if (cb < 0 || ct > grid[1] - 1 || cr < 0 || cl > grid[0] - 1) {
+    /* Off the grid in any direction is an unregister, not a clamp. The
+     * grid size is read where it is compared, rows first, and the column
+     * count is then held -- the walk ItemLinkCells and RowUpdate share. */
+    if (cb < 0 || ct > desc->rows - 1 || cr < 0) {
+        ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
+        return;
+    }
+    cols = desc->cols;
+    if (cl > cols - 1) {
         ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
         return;
     }
 
-    /* The left clamp is a plain test-and-store in the image; the top's is
-     * branchless (setle/dec/and), a ternary. The bottom is clamped against
-     * the WIDTH, grid[0], as the image does. */
-    if (cl <= 0)
-        cl = 0;
-    ct = ct > 0 ? ct : 0;
-    if (grid[0] - 1 <= cr) cr = grid[0] - 1;
-    if (cb >= grid[0] - 1) cb = grid[0] - 1;
+    cl = cl <= 0 ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
+    if (cr >= cols - 1)
+        cr = cols - 1;
+    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
+        cb = cols - 1;
 
-    idx = 0;
-    for (row = ct; row <= cb; row++) {
-        int32_t cell = (row << grid[2]) + cl;
+    idx    = 0;
+    cell   = (ct << desc->shift) + cl;
+    stride = cols - cr + cl - 1;
 
+    for (; ct <= cb; ct++, cell += stride) {
         for (col = cl; col <= cr; col++, idx++, cell++) {
-#define entry (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
-               + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE)
-
-            if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) < 0 || *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) != cell) {
-                if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) >= 0)
-                    ListUnlink(entry,
-                               (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                         + (uint32_t)*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) * 4u));
-                *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
-                ListPushFront(entry,
-                              (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                        + (uint32_t)cell * 4u));
+#define entry (&o->cellEntries[idx])
+            if (entry->cell < 0 || entry->cell != cell) {
+                if (entry->cell >= 0)
+                    ListUnlink(entry, &desc->cells[entry->cell]);
+                entry->cell = cell;
+                ListPushFront(entry, &desc->cells[cell]);
             }
 #undef entry
         }
@@ -11359,21 +11315,14 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
 
     /* Whatever the object was linked into beyond the cells it now covers is
      * released, and -1 written back so a second pass sees it unlinked. */
-    for (; idx < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); idx++) {
-#define entry (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
-               + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE)
-        if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) < 0)
+    for (; idx < (int32_t)o->cellCount; idx++) {
+#define entry (&o->cellEntries[idx])
+        if (entry->cell < 0)
             return;
-        ListUnlink(entry, (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                    + (uint32_t)*(const int32_t *)(entry
-                                                  + CELL_ENTRY_OFF_INDEX) * 4u));
-        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+        ListUnlink(entry, &desc->cells[entry->cell]);
+        entry->cell = -1;
 #undef entry
     }
-#undef hit
-#undef box
-#undef o
-#undef grid
 }
 
 /* 0x00427990, eight callers. The selection changed: drop what is gone,
@@ -11812,7 +11761,7 @@ void __cdecl StepType6(void *obj)
             > g_gameClockMs)
             return;
         *(uint32_t *)(o + BLAST_OFF_DUE_MS) = 0;
-        ObjFlagSet0(*(void **)(o + OBJ_OFF_ROWS));
+        ObjFlagSet0((AM2_MapRow *)(*(void **)(o + OBJ_OFF_ROWS)));
     }
 
     if (*(const int32_t *)(o + BLAST_OFF_SOUND_PENDING) != 0) {
@@ -12589,7 +12538,7 @@ have:
         ItemTeardown(obj);                                                  \
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;              \
         if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {                \
-            ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));                    \
+            ObjFlagClear0(*(AM2_MapRow **)(o + OBJ_OFF_ROWS));              \
             RowUpdate(*(AM2_MapRow **)(o + OBJ_OFF_ROWS), 0,                \
                       g_mapDesc);                                           \
         }                                                                   \

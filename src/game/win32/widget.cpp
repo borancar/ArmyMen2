@@ -2613,7 +2613,7 @@ static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
 static inline int32_t PointerFriendTail(AM2_Object *o)
 {
     if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && !o->field94 && o->riderCount < o->seats) {
+        if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
 
@@ -16783,7 +16783,7 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
         if (o->field94)
             goto next;
         /* An empty vehicle has nobody to give the order to. */
-        if (ObjIsType3Inline(o) && o->riderCount == 0)
+        if (ObjIsType3Inline(o) && o->riders.count == 0)
             goto next;
 
         o->aiMode = AM2_AI_MODE_FOLLOW;
@@ -17928,7 +17928,7 @@ int32_t __cdecl PointerPickBoard(AM2_Object *o)
 
     if (ObjIsType3Inline(o)
         && !o->field94
-        && o->riderCount < o->seats) {
+        && o->riders.count < o->seats) {
         if (!g_mouseButton
             || GetTickCount()
                    - g_mousePressMs

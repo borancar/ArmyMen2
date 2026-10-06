@@ -2,28 +2,29 @@
 #include <stdint.h>
 
 #include "objflag.h"
+#include "maprow.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-void __cdecl ObjFlagSet0(void *obj)
+void __cdecl ObjFlagSet0(AM2_MapRow *row)
 {
-    *(uint32_t *)obj |= 1u;
+    row->flags |= 1u;
 }
 
-void __cdecl ObjFlagClear0(void *obj)
+void __cdecl ObjFlagClear0(AM2_MapRow *row)
 {
-    *(uint32_t *)obj &= ~1u;
+    row->flags &= ~1u;
 }
 
 /* Masked value, not a boolean -- see the note in objflag.h. */
-uint32_t __cdecl ObjFlagBit0(const void *obj)
+uint32_t __cdecl ObjFlagBit0(const AM2_MapRow *row)
 {
-    return *(const uint32_t *)obj & 1u;
+    return row->flags & 1u;
 }
 
-uint32_t __cdecl ObjFlagBit1(const void *obj)
+uint32_t __cdecl ObjFlagBit1(const AM2_MapRow *row)
 {
-    return *(const uint32_t *)obj & 2u;
+    return row->flags & 2u;
 }
 
 int objflag_install(void)

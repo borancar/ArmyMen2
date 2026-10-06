@@ -750,43 +750,36 @@ uint32_t __cdecl ChainField14(const void *p)
     return *(const uint32_t *)(q + 0x14);
 }
 
-void __cdecl ListPushFront(void *node, void **head)
+void __cdecl ListPushFront(AM2_CellEntry *node, AM2_CellEntry **head)
 {
-    uint8_t *n = (uint8_t *)node;
-
-    *(void **)(n + 4) = 0;              /* prev -- zeroed before *head is read,
-                                        * the order the original emits */
-    void *old = *head;
-    *(void **)(n + 8) = old;            /* next */
+    node->prev = 0;                     /* zeroed before *head is read,
+                                         * the order the original emits */
+    AM2_CellEntry *old = *head;
+    node->next = old;
     if (old)
-        *(void **)((uint8_t *)old + 4) = node;
+        old->prev = node;
     *head = node;
 }
 
 /* The inverse. Both arms end by clearing the node's own links, and only the
  * head arm writes through `head`. */
-void __cdecl ListUnlink(void *node, void **head)
+void __cdecl ListUnlink(AM2_CellEntry *node, AM2_CellEntry **head)
 {
-    /* Each link is read again at each use. */
-#define PREV (*(uint8_t **)((uint8_t *)node + 4))
-#define NEXT (*(uint8_t **)((uint8_t *)node + 8))
-    /* Each arm clears the node's own links and returns. */
-    if (!PREV) {
-        *head = NEXT;
-        if (NEXT)
-            *(uint8_t **)(NEXT + 4) = 0;
-        NEXT = 0;
-        PREV = 0;
+    /* Each link is read again at each use. Each arm clears the node's own
+     * links and returns. */
+    if (!node->prev) {
+        *head = node->next;
+        if (node->next)
+            node->next->prev = 0;
+        node->next = 0;
+        node->prev = 0;
         return;
     }
-    *(uint8_t **)(PREV + 8) = NEXT;
-    if (NEXT)
-        *(uint8_t **)(NEXT + 4) = PREV;
-    NEXT = 0;
-    PREV = 0;
-
-#undef PREV
-#undef NEXT
+    node->prev->next = node->next;
+    if (node->next)
+        node->next->prev = node->prev;
+    node->next = 0;
+    node->prev = 0;
 }
 
 /* The remap loop walks dst itself, so the answer is dst + count on the table

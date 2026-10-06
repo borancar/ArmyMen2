@@ -430,7 +430,7 @@ int32_t __cdecl SaveDefaultCof(void)
                 *(uint32_t *)(obj + OBJ_OFF_RIDING) = 0;
                 *(uint32_t *)(obj + OBJ_OFF_FLAGS) &=
                     ~(uint32_t)OBJ_FLAG8_BLOCKED;
-                ObjFlagSet0(*(void **)(obj + OBJ_OFF_ROWS));
+                ObjFlagSet0((AM2_MapRow *)(*(void **)(obj + OBJ_OFF_ROWS)));
             }
         }
 

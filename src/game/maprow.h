@@ -18,15 +18,22 @@ struct AM2_Sprite;
 
 struct AM2_MapRow;
 
-/* One of a row's cell entries, ROW_ENTRY_BYTES each in its buffer: the row
- * it belongs to, its links in a cell's depth-sorted list, and which cell
- * that is (-1 for none). */
-typedef struct AM2_RowEntry {
-    struct AM2_MapRow   *obj;           /* +0x00 DEPTH_OFF_OBJ */
-    struct AM2_RowEntry *prev;          /* +0x04 DEPTH_OFF_PREV */
-    struct AM2_RowEntry *next;          /* +0x08 DEPTH_OFF_NEXT */
+struct AM2_Object;
+
+/* One entry of a cell list, ROW_ENTRY_BYTES (AM2_CELL_ENTRY_STRIDE): what it
+ * stands for, its links in that cell's list, and which cell that is (-1 for
+ * none). A map row's buffer holds them for g_mapDesc, where the lists are
+ * depth-sorted; an object's OBJ_OFF_CELL_ENTRIES holds them for
+ * g_objMapDesc. */
+typedef struct AM2_CellEntry {
+    union {
+        struct AM2_MapRow *obj;         /* +0x00 DEPTH_OFF_OBJ, a row's */
+        struct AM2_Object *object;      /*       an object's */
+    };
+    struct AM2_CellEntry *prev;          /* +0x04 DEPTH_OFF_PREV */
+    struct AM2_CellEntry *next;          /* +0x08 DEPTH_OFF_NEXT */
     int32_t              cell;          /* +0x0C ROW_ENTRY_OFF_CELL */
-} AM2_RowEntry;
+} AM2_CellEntry;
 
 /* A map descriptor: the cell grid the rows register in. g_mapDesc is the
  * drawable one and g_objMapDesc the one objects are found through. */
@@ -34,7 +41,7 @@ typedef struct AM2_MapDesc {
     int32_t        cols;                /* +0x00 MAPDESC_OFF_COLS */
     int32_t        rows;                /* +0x04 MAPDESC_OFF_ROWS */
     int32_t        shift;               /* +0x08 MAPDESC_OFF_SHIFT, log2 of cols */
-    AM2_RowEntry **cells;               /* +0x0C MAPDESC_OFF_CELLS, one list head each */
+    AM2_CellEntry **cells;               /* +0x0C MAPDESC_OFF_CELLS, one list head each */
 } AM2_MapDesc;
 
 /* A map row: the drawable node every map object carries, linked into the
@@ -55,7 +62,7 @@ typedef struct AM2_MapRow {
     void                 *palette;      /* +0x30  MAPOBJ_OFF_PALETTE */
     uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
     uint8_t               _pad35[3];    /* +0x35 */
-    AM2_RowEntry         *buffer;       /* +0x38  ROW_OFF_BUFFER, `owns` entries */
+    AM2_CellEntry         *buffer;       /* +0x38  ROW_OFF_BUFFER, `owns` entries */
     int16_t               field3C;      /* +0x3C  ROW_OFF_FIELD_3C */
     uint8_t               _pad3e[2];    /* +0x3E */
     struct AM2_AnimTable *animCur;      /* +0x40  ROW_OFF_ANIM_CUR */
@@ -93,11 +100,11 @@ int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b);
 
 /* Original: 0x0041D8F0. Link a node that is not yet in the list into its
  * sorted place. The primitive under DepthInsert, a different address. */
-void __cdecl DepthLink(void *node, void **head);
+void __cdecl DepthLink(AM2_CellEntry *node, AM2_CellEntry **head);
 
 /* Original: 0x0041DB90. Put one node back into depth order after the object it
  * points at has moved. Walks outward in one direction and re-links once. */
-void __cdecl DepthResort(void *node, void **head);
+void __cdecl DepthResort(AM2_CellEntry *node, AM2_CellEntry **head);
 
 /* Original: 0x0041D2B0, six callers. Give a row its entry buffer, sized from a
  * width and height in world units, and put it on the map. Returns the buffer's

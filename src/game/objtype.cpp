@@ -233,8 +233,8 @@ void __cdecl SubrecHideRows(void *subrec)
     /* The parameter itself, cast at each use: a local copy of it turns the
      * row address into `i*stride + rows` rather than `rows + i*stride`. */
     for (i = 0; i < *(const int32_t *)((uint8_t *)subrec + SUBREC_OFF_COUNT); i++)
-        ObjFlagClear0(*(uint8_t **)((uint8_t *)subrec + SUBREC_OFF_ROWS)
-                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
+        ObjFlagClear0((AM2_MapRow *)(*(uint8_t **)((uint8_t *)subrec + SUBREC_OFF_ROWS)
+                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE));
 }
 
 /* 0x00434060, eight callers. Make a list: a 0x30-byte header carrying an
@@ -1174,7 +1174,7 @@ named:
     }
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
-        ItemLinkCells(obj, g_objMapDesc);
+        ItemLinkCells((AM2_Object *)obj, g_objMapDesc);
 
     return bytes;
 #undef cells
@@ -1310,7 +1310,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
     }
 
     sub = o + OBJ_OFF_SUBRECORD;
-    FreeSubrecordRows(sub);
+    FreeSubrecordRows((AM2_RowSet *)sub);
     BuildRowsFromDef(sub,
                      (g_recordLists)[slot],
                      (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
@@ -1372,7 +1372,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
                 box.top    = t;
                 box.right  = r;
                 box.bottom = b;
-                ItemSetBox(obj, box);
+                ItemSetBox((AM2_Object *)obj, box);
             }
         }
 

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 #include "dist.h"     /* AM2_Point */
+#include "rect.h"     /* AM2_Rect */
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -54,7 +55,9 @@ typedef struct AM2_Object {
     AM2_Point      pos;             /* +0x12 OBJ_OFF_POS */
     AM2_Point      prevPos;         /* +0x16 OBJ_OFF_PREV_POS, ObjFrameStep's copy */
     uint16_t       tile;            /* +0x1A OBJ_OFF_TILE, indexes the tile tables */
-    uint8_t        _pad1c[0x24];    /* +0x1C */
+    uint8_t        _pad1c[4];       /* +0x1C */
+    AM2_Rect       box;             /* +0x20 OBJ_OFF_BOX_OFFSETS, the hit box about pos */
+    AM2_Rect       hit;             /* +0x30 OBJ_OFF_HIT_RECT, that box in world units */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
     uint8_t        _pad41[1];       /* +0x41 */
     int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
@@ -71,7 +74,10 @@ typedef struct AM2_Object {
     int8_t         heightSet;       /* +0x65  OBJ_OFF_HEIGHT_SET */
     uint8_t        _pad66[6];       /* +0x66 */
     AM2_RowSet     rowSet;          /* +0x6C OBJ_OFF_SUBRECORD */
-    uint8_t        _pad7c[0x18];    /* +0x7C */
+    uint8_t        _pad7c[0x10];    /* +0x7C */
+    uint8_t        cellCount;       /* +0x8C OBJ_OFF_CELL_COUNT */
+    uint8_t        _pad8d[3];
+    struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
@@ -120,11 +126,11 @@ typedef struct AM2_Object {
             int32_t   posePending;  /*   OBJ_OFF_POSE_PENDING */
             int32_t   field540;     /*   OBJ_OFF_FIELD_540 */
         };
-        struct {                    /*   VEHICLE_OFF_PTR_LIST, a vehicle's riders */
-            int32_t   riderCap;
-            int32_t   riderCount;   /*   so OBJ_OFF_POSE_PENDING is its seats used */
-            uint32_t *riderUids;
-        };
+        struct {                    /*   VEHICLE_OFF_PTR_LIST, a vehicle's riders, */
+            int32_t   capacity;     /*   a pointer list */
+            int32_t   count;        /*   so OBJ_OFF_POSE_PENDING is its seats used */
+            uint32_t *uids;
+        } riders;
     };
     int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
     int32_t        sarge;           /* +0x548 OBJ_OFF_SARGE */
@@ -191,7 +197,7 @@ static_assert(offsetof(AM2_Object, sarge)         == 0x548, "sarge");
 static_assert(offsetof(AM2_Object, sentPos)       == 0x5B4, "sentPos");
 static_assert(offsetof(AM2_Object, lastSeq)       == 0x5CC, "lastSeq");
 static_assert(offsetof(AM2_Object, posePending)   == 0x53C, "posePending");
-static_assert(offsetof(AM2_Object, riderCount)    == 0x53C, "riderCount");
+static_assert(offsetof(AM2_Object, riders.count)  == 0x53C, "riders.count");
 static_assert(offsetof(AM2_Object, field540)      == 0x540, "field540");
 static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");

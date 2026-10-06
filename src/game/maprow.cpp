@@ -320,7 +320,7 @@ int maprow_install(void)
  * release only shuffle which slot holds which. That is why the allocator
  * never writes ROWPOOL_OFF_ROW and its callers dereference it immediately. */
 struct AM2_RowSlot {
-    void   *row;
+    AM2_MapRow *row;
     int16_t id;
     int16_t prev;
     int16_t next;
@@ -368,15 +368,15 @@ static inline void RowPoolInit(int32_t *count, int32_t *tail,
     *count = 0;
 
     for (i = 0; i < n; i++) {
-        void *row;
+        AM2_MapRow *row;
 
         slots[i].id = (int16_t)i;
         slots[i].next = -1;
         slots[i].prev = -1;
-        row = am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        row = (AM2_MapRow *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         slots[i].row = row;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(dim, dim, (AM2_MapRow *)row, g_mapDesc);
+        RowAlloc(dim, dim, row, g_mapDesc);
     }
 }
 
@@ -454,13 +454,13 @@ static inline AM2_RowSlot *RowPoolAlloc(int32_t *count, int32_t *tail,
 static inline int32_t RowPoolRelease(int32_t *count, int32_t *tail,
                                      AM2_RowSlot *slots, AM2_RowSlot *e)
 {
-    void        *row = e->row;
+    AM2_MapRow  *row = e->row;
     int32_t      next;
     AM2_RowSlot *last;
 
-    if ((*(uint32_t *)row & 1) != 0) {
-        *(uint32_t *)row &= ~1u;
-        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+    if ((row->flags & 1) != 0) {
+        row->flags &= ~1u;
+        RowUpdate(row, 0, g_mapDesc);
     }
 
     /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
@@ -556,7 +556,7 @@ static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
     do {
         if (!orig_intersect_rect(scratch,
                                  (const void *)&g_viewX,
-                                 (const uint8_t *)slots[i].row + ROW_OFF_RECT)) {
+                                 &slots[i].row->rect)) {
             i = release(&slots[i]);
             if (--left <= 0)
                 break;
@@ -954,7 +954,7 @@ int32_t __cdecl RowAlloc(int32_t w, int32_t h, AM2_MapRow *r, AM2_MapDesc *desc)
     r->owns = (uint8_t)(int8_t)((int8_t)((w >> 8) + 2) * (int8_t)((h >> 8) + 2));
 
     bytes = (int32_t)r->owns * (int32_t)ROW_ENTRY_BYTES;
-    r->buffer = (AM2_RowEntry *)am2_malloc((uint32_t)bytes);
+    r->buffer = (AM2_CellEntry *)am2_malloc((uint32_t)bytes);
 
     /* The buffer pointer is re-read for every field, as the image does. */
     for (i = 0; i < (int32_t)r->owns; i++) {
@@ -1155,29 +1155,29 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         int32_t x;
 
         for (x = cl; x <= cr; x++, cell++, used++) {
-            AM2_RowEntry *entry = &r->buffer[used];
+            AM2_CellEntry *entry = &r->buffer[used];
             int32_t       was   = entry->cell;
 
             if (was == cell) {
-                DepthResort(entry, (void **)&desc->cells[cell]);
+                DepthResort(entry, &desc->cells[cell]);
                 continue;
             }
             if (was >= 0)
-                ListUnlink(entry, (void **)&desc->cells[was]);
+                ListUnlink(entry, &desc->cells[was]);
 
             entry->cell = cell;
-            DepthLink(entry, (void **)&desc->cells[cell]);
+            DepthLink(entry, &desc->cells[cell]);
         }
     }
 
     while (used < (int32_t)r->owns) {
-        AM2_RowEntry *entry = &r->buffer[used];
+        AM2_CellEntry *entry = &r->buffer[used];
         int32_t       was   = entry->cell;
 
         if (was < 0)
             break;
 
-        ListUnlink(entry, (void **)&desc->cells[was]);
+        ListUnlink(entry, &desc->cells[was]);
         entry->cell = -1;
         used++;
     }
@@ -1239,40 +1239,39 @@ int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b)
  * patched entry. A textbook instance of the first kind of counter blindness,
  * recorded here because it happened between two commits and would otherwise
  * read as a function that stopped running. */
-void __cdecl DepthLink(void *node, void **head)
+void __cdecl DepthLink(AM2_CellEntry *n, AM2_CellEntry **head)
 {
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *e = (uint8_t *)*head;
+    AM2_CellEntry *e = *head;
 
     if (!e) {
-        *head          = n;
-        DEPTH_NEXT(n)  = (uint8_t *)0;
-        DEPTH_PREV(n)  = (uint8_t *)0;
+        *head = n;
+        n->next = (AM2_CellEntry *)0;
+        n->prev = (AM2_CellEntry *)0;
         return;
     }
 
-    if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-        DEPTH_PREV(n) = (uint8_t *)0;
-        DEPTH_NEXT(n) = e;
-        DEPTH_PREV(e) = n;
-        *head         = n;
+    if (DepthCompare(n->obj, e->obj) <= 0) {
+        n->prev = (AM2_CellEntry *)0;
+        n->next = e;
+        e->prev = n;
+        *head = n;
         return;
     }
 
-    while (DEPTH_NEXT(e)) {
-        e = DEPTH_NEXT(e);
-        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-            DEPTH_PREV(n)              = DEPTH_PREV(e);  /* read first, */
-            DEPTH_NEXT(n)              = e;              /* as the original */
-            DEPTH_PREV(e)              = n;
-            DEPTH_NEXT(DEPTH_PREV(n))  = n;
+    while (e->next) {
+        e = e->next;
+        if (DepthCompare(n->obj, e->obj) <= 0) {
+            n->prev = e->prev;  /* read first, */
+            n->next = e;        /* as the original */
+            e->prev = n;
+            n->prev->next = n;
             return;
         }
     }
 
-    DEPTH_NEXT(e) = n;
-    DEPTH_PREV(n) = e;
-    DEPTH_NEXT(n) = (uint8_t *)0;
+    e->next = n;
+    n->prev = e;
+    n->next = (AM2_CellEntry *)0;
 }
 
 /* 0x0041D980, one caller. The counterpart of RowUnregisterAll: link every cell
@@ -1335,7 +1334,7 @@ void __cdecl RowRegisterAll(AM2_MapRow *r, AM2_MapDesc *desc)
 
         for (x = cl; x <= cr; x++, used++, cell++) {
             r->buffer[used].cell = cell;
-            DepthLink(&r->buffer[used], (void **)&desc->cells[cell]);
+            DepthLink(&r->buffer[used], &desc->cells[cell]);
         }
     }
 
@@ -1377,79 +1376,78 @@ void __cdecl RowRegisterAll(AM2_MapRow *r, AM2_MapDesc *desc)
  * the hottest function reconstructed in this run of work, and it is pointer
  * surgery, so a wrong re-link would corrupt the draw order and show. Which of
  * the four exits each call takes is NOT measured. */
-void __cdecl DepthResort(void *node, void **head)
+void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
 {
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *e;
+    AM2_CellEntry *e;
 
-    if (DEPTH_NEXT(n)
-        && DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_NEXT(n))) > 0) {
-        for (e = DEPTH_NEXT(n); DEPTH_NEXT(e); ) {
-            e = DEPTH_NEXT(e);
-            if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0)
+    if (n->next
+        && DepthCompare(n->obj, n->next->obj) > 0) {
+        for (e = n->next; e->next; ) {
+            e = e->next;
+            if (DepthCompare(n->obj, e->obj) <= 0)
                 goto before;
         }
 
         /* Ran off the end: unlink and append after `e`, the last node. */
         {
-            uint8_t *pv = DEPTH_PREV(n);
-            uint8_t *nx = DEPTH_NEXT(n);
+            AM2_CellEntry *pv = n->prev;
+            AM2_CellEntry *nx = n->next;
 
             if (!pv)
                 *head = nx;
             else
-                DEPTH_NEXT(pv) = nx;
+                pv->next = nx;
         }
-        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+        n->next->prev = n->prev;
 
-        DEPTH_PREV(n) = e;
-        DEPTH_NEXT(n) = (uint8_t *)0;
-        DEPTH_NEXT(e) = n;
+        n->prev = e;
+        n->next = (AM2_CellEntry *)0;
+        e->next = n;
         return;
 
 before:
         /* Unlink, then insert before `e`. */
-        if (!DEPTH_PREV(n))
-            *head = DEPTH_NEXT(n);
+        if (!n->prev)
+            *head = n->next;
         else
-            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+            n->prev->next = n->next;
+        n->next->prev = n->prev;
 
-        DEPTH_PREV(n) = DEPTH_PREV(e);
-        DEPTH_NEXT(n) = e;
-        DEPTH_NEXT(DEPTH_PREV(e)) = n;
-        DEPTH_PREV(e) = n;
+        n->prev = e->prev;
+        n->next = e;
+        e->prev->next = n;
+        e->prev = n;
         return;
     }
 
-    if (!DEPTH_PREV(n)
-        || DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_PREV(n))) >= 0)
+    if (!n->prev
+        || DepthCompare(n->obj, n->prev->obj) >= 0)
         return;
 
-    for (e = DEPTH_PREV(n); DEPTH_PREV(e); ) {
-        e = DEPTH_PREV(e);
-        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) >= 0) {
+    for (e = n->prev; e->prev; ) {
+        e = e->prev;
+        if (DepthCompare(n->obj, e->obj) >= 0) {
             /* Unlink, then insert after `e`. */
-            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-            if (DEPTH_NEXT(n))
-                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+            n->prev->next = n->next;
+            if (n->next)
+                n->next->prev = n->prev;
 
-            DEPTH_PREV(n) = e;
-            DEPTH_NEXT(n) = DEPTH_NEXT(e);
-            DEPTH_PREV(DEPTH_NEXT(e)) = n;
-            DEPTH_NEXT(e) = n;
+            n->prev = e;
+            n->next = e->next;
+            e->next->prev = n;
+            e->next = n;
             return;
         }
     }
 
     /* Ran off the front: unlink and make `n` the head, before `e`. */
-    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-    if (DEPTH_NEXT(n))
-        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+    n->prev->next = n->next;
+    if (n->next)
+        n->next->prev = n->prev;
 
-    DEPTH_PREV(n) = (uint8_t *)0;
-    DEPTH_NEXT(n) = e;
-    DEPTH_PREV(e) = n;
+    n->prev = (AM2_CellEntry *)0;
+    n->next = e;
+    e->prev = n;
     *head = n;
 }
 
@@ -1518,9 +1516,9 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
                 (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DY) + y);
 
         if (x && !(objFlags & OBJ_FLAG_DESTROYED))
-            ObjFlagSet0(row);
+            ObjFlagSet0((AM2_MapRow *)row);
         else
-            ObjFlagClear0(row);
+            ObjFlagClear0((AM2_MapRow *)row);
 
         *(int16_t *)(row + ROW_OFF_FIELD_26) =
             *(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DEPTH);
@@ -1590,7 +1588,7 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
                               + (size_t)i * AM2_ROW_SPEC_BYTES);
 
         RowInit((AM2_MapRow *)row, (AM2_Sprite *)0, spec[0] + dx, spec[1] + dy);
-        ObjFlagSet0(row);
+        ObjFlagSet0((AM2_MapRow *)row);
         RowAlloc(spec[2], spec[3], (AM2_MapRow *)row, g_mapDesc);
     }
 
@@ -1825,7 +1823,7 @@ void __cdecl SeqCtxFree(void *ctxv)
     if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) != 0) {
         for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
             if (ROW(i) != 0) {
-                RowRelease(ROW(i), g_mapDesc);
+                RowRelease((AM2_MapRow *)ROW(i), g_mapDesc);
                 am2_free(ROW(i));
                 ROW(i) = 0;
             }

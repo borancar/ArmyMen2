@@ -16,6 +16,8 @@
 #include "objtable.h"    /* LookupByUID, for OurLeaderUnit */
 #include "misc.h"        /* AM2_PtrList, the army lists OurLeaderUnit walks */
 
+struct AM2_MapDesc;     /* maprow.h; named here so C sees one type */
+
 #ifdef __cplusplus
 extern "C" {
 /* 0x004494A0, three callers. Which pose a unit takes for the weapon it holds
@@ -82,7 +84,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
  * which is how a machine applies damage it was TOLD about. */
 /* Original: 0x0041DB20. Take one row out of every map cell list it is linked
  * into, marking the region it occupied dirty first. */
-void __cdecl RowUnregisterAll(void *row, void *desc);
+void __cdecl RowUnregisterAll(struct AM2_MapRow *row, struct AM2_MapDesc *desc);
 
 /* Original: 0x00428CA0, seven callers. Put an object into the world at
  * `where` and tell the other machines. `resurrect` takes the revive path,
@@ -117,7 +119,7 @@ void __cdecl AdvanceSecondDeadline(void);
 /* 0x00429D00, three callers. Recompute an object's hit rect after it moves and
  * re-link it into the map's cell lists. Off the grid calls ItemPreDestroy, so
  * leaving the map and being unregistered are the same operation. */
-void __cdecl ObjRemap(void *obj, void *desc, int32_t force);
+void __cdecl ObjRemap(AM2_Object *obj, struct AM2_MapDesc *desc, int32_t force);
 
 /* 0x00427990, eight callers. The selection changed: drop entries whose object
  * is gone, drop and un-flag destroyed ones, promote a leader to index 0, and
@@ -599,7 +601,7 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);
 
 /* 0x0041D3A0. One row's teardown: unregister it from the map's cell lists and
  * free the buffer it owns, both gated on the single flag at +0x34. */
-void __cdecl RowRelease(void *row, void *desc);
+void __cdecl RowRelease(struct AM2_MapRow *row, struct AM2_MapDesc *desc);
 
 /* 0x00428DA0, 22 callers. Destroy an object by type, then broadcast. */
 void __cdecl DestroyByType(void *obj);
@@ -627,7 +629,7 @@ void item_install(void);
 /* 0x004285F0. Destroy one item, dispatching on its kind at +0. `unlink` takes
  * it out of the item list first, and a failed unlink aborts and returns 0. An
  * unknown kind returns 1 having done nothing. Two callers. */
-int32_t __cdecl FreeItem(void *item, int32_t unlink);
+int32_t __cdecl FreeItem(AM2_Object *item, int32_t unlink);
 
 /* 0x00429450. The object registry's teardown -- FreeItem every entry with
  * `unlink` ZERO, which is what keeps the forward walk safe, then free the
@@ -637,24 +639,24 @@ void __cdecl ItemsReset(void);
 /* 0x00434EC0. Release an object's sub-list: every row's own teardown, then
  * the array, then the capacity -- which is cleared unconditionally where the
  * array is freed only when there is one. */
-void __cdecl FreeSubrecordRows(void *subrecord);
+void __cdecl FreeSubrecordRows(AM2_RowSet *set);
 
 /* 0x00429B60, one caller. Give the object a new hit box -- four offsets from
  * its own position -- and put it back on the map under it: unlink, write both
  * views of the box, grow and re-initialise the cell entries, relink. The item
  * counterpart of maprow.cpp's RowAlloc. The box is BY VALUE: ApplyObjFrame
  * builds it in the argument area. */
-void __cdecl ItemSetBox(void *obj, AM2_Rect box);
+void __cdecl ItemSetBox(AM2_Object *obj, AM2_Rect box);
 
 /* 0x00429F40, two callers. The other half of ItemPreDestroy: link the object
  * into every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it
  * did not need. It does NOT unlink first. See the definition. */
-void __cdecl ItemLinkCells(void *obj, void *cells);
+void __cdecl ItemLinkCells(AM2_Object *obj, struct AM2_MapDesc *cells);
 
 /* 0x0042A0A0. Unlink an object from every cell list it is registered in.
  * Each unlink writes -1 back, so a second call returns on the first entry --
  * and entry zero's index is tested BEFORE the loop as well as inside it. */
-void __cdecl ItemPreDestroy(void *obj, int32_t cells);
+void __cdecl ItemPreDestroy(AM2_Object *obj, int32_t cells);
 
 /* 0x0045EE80. A weapon by uid. Null for a zero uid or one that resolves to
  * nothing, and null WITH a log line for one that resolves to a non-weapon. */
@@ -761,7 +763,7 @@ void __cdecl PointActionA(void *obj, uint32_t point);
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
  * BEFORE the free. Five callers. */
-void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify);
+void __cdecl DestroyItemObject(AM2_Object *obj, int32_t arg, int32_t notify);
 
 /* Original: 0x004478C0, "DestroyTrooper %x" -- and it is the KIND 2 arm of
  * FreeItem's switch, which is why orig.h calls the address
@@ -782,7 +784,7 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify);
  * Note the object is freed here AND handed to DestroyItemObject, which frees
  * its 0x0090 allocation and clears the live byte -- so the order matters and
  * is reproduced: DestroyItemObject first, then the object. */
-void __cdecl DestroyTrooper(void *trooper, int32_t unlink);
+void __cdecl DestroyTrooper(AM2_Object *trooper, int32_t unlink);
 
 /* Original: 0x0045B470, the KIND 3 arm, and a near-twin of DestroyTrooper.
  * Three differences and all three are the original's:
@@ -799,7 +801,7 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink);
  *
  * The name is ours: this arm carries no string, and kind 3 is the vehicle
  * because ReceiveArmyMsg's switch sends kind 3 to the vehicle handler. */
-void __cdecl DestroyVehicle(void *vehicle, int32_t unlink);
+void __cdecl DestroyVehicle(AM2_Object *vehicle, int32_t unlink);
 
 /* Original: 0x0045F290, the KIND 4 arm, "DestroyWeapon, %x" -- its own name.
  * The shortest of the three: no weapon of its own to mark, no list to empty,
@@ -807,7 +809,7 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink);
  *
  * Its log is NOT gated on the comm object's verbosity where the trooper's is.
  * Both go to ADDR_LOG, which this build stubs to a single `ret`. */
-void __cdecl DestroyWeapon(void *weapon, int32_t unlink);
+void __cdecl DestroyWeapon(AM2_Object *weapon, int32_t unlink);
 
 /* Original: 0x0043BBB0, the arm kinds 1, 5, 6 and 8 share -- and the BARE
  * version of the family: free the subrecord's rows, hand the object to
@@ -815,7 +817,7 @@ void __cdecl DestroyWeapon(void *weapon, int32_t unlink);
  *
  * Forty-eight bytes, and four kinds reach it, which is why the family's shared
  * tail is visible at all. */
-void __cdecl DestroyItemCommon(void *item, int32_t unlink);
+void __cdecl DestroyItemCommon(AM2_Object *item, int32_t unlink);
 
 /* Original: 0x004355F0, the KIND 7 arm: the bare one plus a population
  * decrement, clamped at zero.
@@ -824,7 +826,7 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink);
  * thirty-third kind-7 object, so the counter is bounded at both ends by
  * design. The name is ours; what a kind-7 object is has not been established,
  * beyond its being 0x94 bytes and limited to 32 live. */
-void __cdecl DestroyKind7(void *item, int32_t unlink);
+void __cdecl DestroyKind7(AM2_Object *item, int32_t unlink);
 
 
 /* Original: 0x0045F2D0, one caller -- the sarge panel's update. Has this
