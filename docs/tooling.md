@@ -351,3 +351,14 @@ It catches a tool whose output changed without being regenerated — tested by
 making `coverage.py` print a different heading, which fails the target. It does
 NOT catch a hand-edit to a generated file, because the tools rewrite those
 before git is consulted; the edit is healed silently rather than reported.
+
+## The clone lab (`tools/vc6lab.py`)
+
+For relink misses that are pure register or scheduling ties, compile a small
+standalone copy of the function with the hosted VC6 and diff it against the
+image in about a second (`tools/vc6lab.py CLONE.cpp FUNCTION -v`). Once the
+clone reproduces our relink output, delete statements one at a time to find
+the one that decides the tie, then try shapes of just that statement. This is
+how EvtRuleA was matched: the original passed the spawn point once in place and
+once from a local copy. The docstring has the full method. `--keep-il` keeps
+c1xx's intermediate files, for use with `VC6_IL_OVERRIDE`.
