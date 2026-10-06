@@ -4733,11 +4733,11 @@ typedef void (__cdecl *AM2_VoidFn)(void);
  * mis-picks were missing. */
 void __cdecl ObjFrameSweep(void)
 {
-    void *obj;
+    AM2_Object *obj;
 
     g_iterStamp++;
 
-    for (obj = FirstItem(); obj; obj = NextItem())
+    for (obj = (AM2_Object *)FirstItem(); obj; obj = (AM2_Object *)NextItem())
         ObjFrameStep(obj);
 
     if (g_mpSession)
@@ -4816,7 +4816,7 @@ static void __cdecl NotifyHealed(void *obj, void *src)
 }
 
 /* Defined below, beside the rest of the animation family. */
-int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
+int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag);
 
 /* OurLeaderUnit is item.h's: the original inlines it at every site. */
 
@@ -4914,7 +4914,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
      * the maximum, and tests the stored sum against the held maximum. */
     if (ObjIsItem((const AM2_Object *)obj)) {
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
-            ChangeObjectFrame(obj, 0, 0);
+            ChangeObjectFrame((AM2_Object *)obj, 0, 0);
         } else {
             hp = HEALTH;
             if (hp <= 0 || hp >= MAXHP)
@@ -6396,7 +6396,7 @@ void __cdecl StepType8(void *obj)
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
 
 /* Defined below, beside the rest of the object stepping. */
-void __cdecl StepType1And4(void *obj);
+void __cdecl StepType1And4(AM2_Object *o);
 
 /* 0x004284D0, one caller -- ObjFrameSweep, for every registered object every
  * frame. Copies the position aside and hands the object to its type's stepper.
@@ -6443,22 +6443,22 @@ void __cdecl StepType1And4(void *obj);
  * The ADDR_EVT_ID15_FLAG gate is the other way round from how it reads: when
  * the flag is SET, only objects carrying OBJ_FLAG8_BIT40 are stepped at all.
  * A clear flag steps everything. */
-void __cdecl ObjFrameStep(void *obj)
+void __cdecl ObjFrameStep(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
+    void *obj = o;   /* the other arms' steppers still take it untyped */
 
-    *(uint32_t *)(o + OBJ_OFF_PREV_POS) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    o->prevPos = o->pos;
 
     if (g_evtId15Flag
-        && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG8_BIT40))
+        && !((uint8_t)o->flags & OBJ_FLAG8_BIT40))
         return;
 
     /* Every arm but type 2's tests OBJ_FLAG_DESTROYED itself: the test is
      * written into each case, not hoisted above the switch. */
-#define LIVE (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
-    switch (*(const int32_t *)o) {
+#define LIVE (!((uint8_t)o->flags & OBJ_FLAG_DESTROYED))
+    switch (o->type) {
     case 1:
-    case 4: if (LIVE) StepType1And4(obj);    break;
+    case 4: if (LIVE) StepType1And4(o);      break;
     case 2:           StepType2(obj);        break;
     case 3: if (LIVE) StepType3(obj);        break;
     case 5: if (LIVE) StepType5(obj);        break;
@@ -6729,48 +6729,42 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
  * Everything below that first call is therefore VERIFIED BY READING, at the
  * same standing as the multiplayer functions, despite sitting on the busiest
  * code path in the game. */
-void __cdecl StepType1And4(void *obj)
+void __cdecl StepType1And4(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
+    UpdateObjectScript(o);
 
-    UpdateObjectScript(obj);
-
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT7) {
-        ObjMoveAlongFacing((AM2_Object *)obj, 0, 0, 0);
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT7;
+    if ((uint8_t)o->flags & OBJ_FLAG_BIT7) {
+        ObjMoveAlongFacing(o, 0, 0, 0);
+        o->flags &= ~(uint32_t)OBJ_FLAG_BIT7;
     }
 
     /* The record and the clock are re-read at each use. */
-#define REC (*(uint8_t **)(o + OBJ_OFF_FIELD_94))
+#define REC (o->field94)
     if (*(const int32_t *)REC == 0x2A
-        && *(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+        && o->health > 0) {
 
-        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+        if ((int32_t)o->owner
                 == (int32_t)g_defaultOwner
             && g_gameClockMs
-               >= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
-                      + AM2_REVEAL_PERIOD_MS) {
-            RevealNearby(*(const AM2_Point *)(o + OBJ_OFF_POS),
-                         AM2_REVEAL_NEAR, AM2_REVEAL_FAR);
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                g_gameClockMs;
+               >= o->deadline58 + AM2_REVEAL_PERIOD_MS) {
+            RevealNearby(o->pos, AM2_REVEAL_NEAR, AM2_REVEAL_FAR);
+            o->deadline58 = g_gameClockMs;
         }
 
         {
-#define row (*(uint8_t **)(o + OBJ_OFF_ROWS))
+#define row (o->rowSet.rows)
             if (g_gameClockMs
-                    - *(const uint32_t *)(row + ROW_OFF_STAMP_54)
+                    - row->stamp54
                 > AM2_FRAME_PERIOD_MS) {
-                int32_t n = *(const int32_t *)(o + OBJ_OFF_FORMATION_SLOT) + 1;
+                int32_t n = o->formationSlot + 1;
 
                 if (n == 1)
                     n = 2;
                 else if (n > 0x10)
                     n = 0;
 
-                ChangeObjectFrame(obj, n, 1);
-                *(uint32_t *)(row + ROW_OFF_STAMP_54) =
-                    g_gameClockMs;
+                ChangeObjectFrame(o, n, 1);
+                row->stamp54 = g_gameClockMs;
             }
 #undef row
         }
@@ -6782,36 +6776,34 @@ void __cdecl StepType1And4(void *obj)
 
     {
         uint32_t secs = (g_gameClockMs
-                         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) / 1000u;
+                         - o->deadline58) / 1000u;
 
         if (secs >= 9u)
             secs = 9u;
-        ChangeObjectFrame(obj, (int32_t)(9u - secs), 1);
+        ChangeObjectFrame(o, (int32_t)(9u - secs), 1);
     }
 
     if (g_gameClockMs
-        <= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) + AM2_FUSE_MS)
+        <= o->deadline58 + AM2_FUSE_MS)
         return;
 
     {
         /* The army re-read at each use; the non-broadcasting client's
          * `extra` is the zero the comm test answered. */
-#define ARMY ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
-        void     *mine = LookupOwnerObj((uint32_t)ARMY);
-        uint32_t  uid  = mine ? ((const AM2_Object *)mine)->uid
-                              : ((const AM2_Object *)obj)->uid;
+#define ARMY ((int32_t)o->owner)
+        const AM2_Object *mine = (const AM2_Object *)LookupOwnerObj((uint32_t)ARMY);
+        uint32_t  uid  = mine ? mine->uid : o->uid;
         int32_t   extra;
 
         if (!*(void *const *)&g_mpSession
             || (extra = AM2_THE_COMM->CommMustBroadcast((int16_t)ARMY)) != 0)
             extra = g_spawnExtra6622bc;
 
-        *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-            g_gameClockMs;
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+        o->deadline58 = g_gameClockMs;
+        o->flags |= OBJ_FLAG_REPLACED;
 
-        orig_spawn_at((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
-                      (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2),
+        orig_spawn_at((int32_t)o->pos.x,
+                      (int32_t)o->pos.y,
                       AM2_SPAWN_KIND_8B, ARMY, uid, extra, 0, 0, 0, 0);
 #undef ARMY
     }
@@ -7589,19 +7581,18 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code)
  *
  * VERIFIED BY READING. Its counter is blind: the callers that reach it here
  * are StepType1And4 and SetSoldierKind, both ours. */
-int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
+int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
 {
-    uint8_t *o   = (uint8_t *)obj;
-    int32_t  any = 0;
-    uint32_t uid;
+    int32_t     any = 0;
+    uint32_t    uid;
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (o->flags & OBJ_FLAG_DESTROYED)
         return 0;
 
     {
-        uint32_t v = *(const uint32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8);
+        uint32_t v = *(const uint32_t *)(o->field94 + 8);
 
-        if (ApplyObjFrame(obj,
+        if (ApplyObjFrame(o,
                           (int32_t)((v >> AM2_OBJREC_SHIFT_B)
                                     & AM2_OBJREC_MASK_B),
                           (int32_t)((v >> AM2_OBJREC_SHIFT_A)
@@ -7610,21 +7601,21 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
             any = 1;
     }
 
-    uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID);
+    uid = o->chainUid;
     while (uid) {
-        uint8_t *link = (uint8_t *)LookupByUID(uid);
+        AM2_Object *link = (AM2_Object *)LookupByUID(uid);
         int32_t  type;
 
         /* Both of these return 0, not `any` -- see above. */
         if (!link)
             return 0;
-        type = *(const int32_t *)link;
+        type = (int32_t)link->type;
         if (type != 1 && type != 4)
             return 0;
 
-        if (!(*(const uint32_t *)(link + OBJ_OFF_FLAGS) & OBJ_FLAG_NO_FRAME)) {
+        if (!(link->flags & OBJ_FLAG_NO_FRAME)) {
             uint32_t v =
-                *(const uint32_t *)(*(uint8_t **)(link + OBJ_OFF_FIELD_94) + 8);
+                *(const uint32_t *)(link->field94 + 8);
 
             if (ApplyObjFrame(link,
                               (int32_t)((v >> AM2_OBJREC_SHIFT_B)
@@ -7635,7 +7626,7 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
                 any = 1;
         }
 
-        uid = *(const uint32_t *)(link + OBJ_OFF_CHAIN_NEXT_UID);
+        uid = link->chainNextUid;
     }
 
     return any;

@@ -77,9 +77,12 @@ def _aggregated(va):
 # AM2_Object tipped it back; keeping the sprite list's and the level
 # block's declarations settled both, until the map row, row set and sprite
 # record were typed and empty matched again; the font record tipped it once
-# more, and the sprite list's alone settles it. Search the subsets (empty
-# first) when it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC),)
+# more, and the sprite list's alone settles it; the object-script fields
+# tipped it again, and the aim sprites' and the menu row's declarations
+# beside the sprite list's settle it. Search the subsets (empty first) when
+# it flips.
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994),
+              (0x004FCAA8, 0x004FCDF4))
 
 
 def _kept(va):

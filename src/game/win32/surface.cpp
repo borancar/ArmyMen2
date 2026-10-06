@@ -39,6 +39,7 @@
 #include "../misc.h"
 #include "../../inject/patch.h"
 #include "frame.h"     /* RefreshDraw */
+#include "movie.h"     /* AM2_Movie, for the current movie's size flag */
 
 #include <stdint.h>
 
@@ -689,7 +690,7 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
     /* Two arms on the current movie's field at +0x10, and both make the
      * same call: VC6 merges them and leaves the test in the image with
      * nothing reading it. */
-    if (*(const int32_t *)(g_movieCurrent + 0x10))
+    if (g_movieCurrent->sized)
         IDirectDrawSurface_Blt(dest, &to,
                                *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);

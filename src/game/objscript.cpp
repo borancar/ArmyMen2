@@ -392,7 +392,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
 {
     /* The name table is read afresh at every use. */
 #define names kScriptNames
-    uint8_t              *obj;
+    AM2_Object           *obj;
     AM2_ObjScript        *script;
     uintptr_t             at;
     int32_t               state;
@@ -407,14 +407,14 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         return 0;
     }
 
-    obj = (uint8_t *)LookupByUID((uint32_t)names[nameidx].value);
-    if (!obj || !ObjIsItem((const AM2_Object *)obj)) {
+    obj = (AM2_Object *)LookupByUID((uint32_t)names[nameidx].value);
+    if (!obj || !ObjIsItem(obj)) {
         am2_log("ERROR: SetObjScriptState was called with %s which is not "
                 "a valid object\n", names[nameidx].name);
         return 0;
     }
 
-    id = *(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID);
+    id = obj->scriptId;
     if (id <= 0)
         return 0;
 
@@ -429,7 +429,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         am2_log("Tried to set object script state (%s) in object %s, which "
                 "has no object script.\n",
                 names[stateName].name,
-                names[*(const int32_t *)(obj + AM2_OBJ_NAME_IDX_OFF)].name);
+                names[obj->nameIdx].name);
         return 0;
     }
 
@@ -440,9 +440,9 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         return 0;
     }
 
-    *(int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) = state;
-    *(int32_t *)(obj + OBJ_OFF_SCRIPT_FRAME) = frame - 1;
-    *(int32_t *)(obj + OBJ_OFF_SCRIPT_NEXT)  = 0;
+    obj->scriptState = state;
+    obj->scriptFrame = frame - 1;
+    obj->scriptNext  = 0;
 
     UpdateObjectScript(obj);
     return 1;
@@ -474,10 +474,12 @@ typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
  * The `scr == NULL` test is likewise the original's: it can only fire when the
  * table pointer is null and the id is 1, since the address is computed before
  * it is checked. */
-int32_t __cdecl UpdateObjectScript(void *obj)
+int32_t __cdecl UpdateObjectScript(AM2_Object *obj)
 {
-    uint8_t *o  = (uint8_t *)obj;
-    int32_t  id = *(const int32_t *)(o + OBJ_OFF_SCRIPT_ID);
+    /* A working copy of the parameter: with the parameter used directly
+     * VC6 lays the action loop's address add the other way round. */
+    AM2_Object *o = obj;
+    int32_t  id = o->scriptId;
 
     if (id <= 0)
         return 0;
@@ -486,29 +488,26 @@ int32_t __cdecl UpdateObjectScript(void *obj)
 
     /* Nested on success; the bad state is the one arm that answers 0. */
     if (scr != (AM2_ObjScript *)0
-        && *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) < kScriptTiming) {
-        int32_t st = *(const int32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        && o->scriptNext < kScriptTiming) {
+        int32_t st = o->scriptState;
 
         if (st <= scr->statecount && st >= 0) {
             AM2_ObjState *state = &scr->states[st];
 
             /* The frame is read off the object at each use -- the index
              * after the store is the new frame. */
-            if (*(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1
-                < state->framecount) {
-                *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
-                    *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
+            if (o->scriptFrame + 1 < state->framecount) {
+                o->scriptFrame = o->scriptFrame + 1;
 
                 AM2_ObjFrame *frame =
-                    &state->frames[*(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME)];
+                    &state->frames[o->scriptFrame];
 
-                if (!ChangeObjectFrame(obj, frame->b, 1))
+                if (!ChangeObjectFrame(o, frame->b, 1))
                     orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
 
-                *(int32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                    frame->a + (int32_t)kScriptTiming;
+                o->scriptNext = frame->a + (int32_t)kScriptTiming;
 
-                void *owner = *(void **)(o + OBJ_OFF_OWNER);
+                void *owner = (void *)(uintptr_t)o->uid;
 
                 /* The action array is re-read, and the count, each pass. */
                 for (int32_t i = 0; i < frame->actioncount; i++)

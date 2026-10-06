@@ -46,11 +46,12 @@ typedef struct {
     uint32_t       type;            /* +0x00  switch selector, 0..8 */
     uint32_t       uid;             /* +0x04  written back on registration */
     uint32_t       flags;           /* +0x08  OBJ_OFF_FLAGS */
-    uint8_t        _pad0c[4];       /* +0x0C */
+    int32_t        nameIdx;         /* +0x0C  AM2_OBJ_NAME_IDX_OFF, its kScriptNames slot */
     int8_t         owner;           /* +0x10  OBJ_OFF_ARMY, read with movsx */
     uint8_t        _pad11[1];       /* +0x11 */
     AM2_Point      pos;             /* +0x12 OBJ_OFF_POS */
-    uint8_t        _pad16[0x2A];    /* +0x16 */
+    AM2_Point      prevPos;         /* +0x16 OBJ_OFF_PREV_POS, ObjFrameStep's copy */
+    uint8_t        _pad1a[0x26];    /* +0x1A */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
     uint8_t        _pad41[1];       /* +0x41 */
     int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
@@ -72,9 +73,16 @@ typedef struct {
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
     int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
-    uint8_t        _pada4[0xC];     /* +0xA4 */
-    uint8_t        power;           /* +0xB0  OBJ_OFF_SCRIPT_ID, a shot's power byte */
-    uint8_t        _padb1[0x0F];    /* +0xB1 */
+    uint8_t        _pada4[4];       /* +0xA4 */
+    uint32_t       chainUid;        /* +0xA8  OBJ_OFF_CHAIN_UID, an item's chain head */
+    uint32_t       chainNextUid;    /* +0xAC  OBJ_OFF_CHAIN_NEXT_UID, the next link */
+    union {                         /* +0xB0, by object type: */
+        int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
+        uint8_t    power;           /*   a shot's power byte */
+    };
+    int32_t        scriptState;     /* +0xB4  OBJ_OFF_SCRIPT_STATE */
+    int32_t        scriptFrame;     /* +0xB8  OBJ_OFF_SCRIPT_FRAME */
+    uint32_t       scriptNext;      /* +0xBC  OBJ_OFF_SCRIPT_NEXT, a clock deadline */
     const int32_t *typeRec;         /* +0xC0  OBJ_OFF_FIELD_C0, -> the type record; [0] is its kind */
     uint32_t       followUid;       /* +0xC4  OBJ_OFF_FOLLOW_UID */
     uint8_t        _padc8[4];       /* +0xC8 */

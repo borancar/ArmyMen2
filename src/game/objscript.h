@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include "../inject/orig.h"   /* am2_FILE */
+#include "objtable.h"         /* AM2_Object */
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,7 +105,7 @@ void __cdecl FreeObjScripts(void);
  * passed: pick the next frame, change the sprite, push the deadline out and
  * run the frame's actions. Returns 0 for "no script" and for a bad state
  * index, 1 otherwise. Two callers. */
-int32_t __cdecl UpdateObjectScript(void *obj);
+int32_t __cdecl UpdateObjectScript(AM2_Object *obj);
 
 /* 0x004372A0, one caller -- RunScriptAction's `setobjstate`. Point a named
  * object's object-script at a named state and a frame. FOUR refusals come

@@ -2010,10 +2010,10 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     memcpy(obj + 0x30, blockB, sizeof blockB);
 
     if (*(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME) > 0)
-        ChangeObjectFrame(obj, *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME),
+        ChangeObjectFrame((AM2_Object *)obj, *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME),
                           0);
     if (*(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) > 0)
-        ChangeObjectFrame(obj,
+        ChangeObjectFrame((AM2_Object *)obj,
                           *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT), 1);
 
     return obj;

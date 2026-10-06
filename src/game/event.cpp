@@ -711,7 +711,7 @@ void __cdecl EvtClearAllied(int32_t a, int32_t b)
  * left alone. */
 void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
 {
-    void                 *obj;
+    AM2_Object           *obj;
 
     if (kScriptNames[nameidx].type != AM2_NAME_TYPE_REF) {
         orig_log("ERROR: ScriptSetObjBitmap was called with %s which is not "
@@ -719,9 +719,9 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
         return;
     }
 
-    obj = LookupByUID((uint32_t)kScriptNames[nameidx].value);
+    obj = (AM2_Object *)LookupByUID((uint32_t)kScriptNames[nameidx].value);
 
-    if (ObjIsItem((const AM2_Object *)obj)) {
+    if (ObjIsItem(obj)) {
         if (!ChangeObjectFrame(obj, frame, 1))
             orig_log("Error: ChangeObjectFrame returned false when passed %s "
                      "with index %d\n", kScriptNames[nameidx].name, frame);

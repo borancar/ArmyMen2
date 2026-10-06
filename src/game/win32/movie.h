@@ -6,8 +6,39 @@
 #include "../../inject/orig.h"
 
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+/* The Smacker handle, as far as the player reads it. smackw32 ships no
+ * header, so the offsets are the ones the image reads. */
+struct AM2_Smack {
+    uint32_t version;               /* +0x000 */
+    uint32_t width;                 /* +0x004 */
+    uint32_t height;                /* +0x008 */
+    uint32_t frames;                /* +0x00C */
+    uint8_t  _pad10[0x58];          /* +0x010 */
+    int32_t  newPalette;            /* +0x068 set when this frame changed it */
+    uint8_t  palette[0x304];        /* +0x06C three bytes per entry */
+    uint32_t palType;               /* +0x370 */
+    uint32_t frameNum;              /* +0x374 */
+};
+
 struct AM2_Movie {
-    uint8_t bytes[AM2_MOVIE_SIZE];  /* opaque: movie.cpp names the fields */
+    const void         *vtbl;       /* +0x00 re-stamped on stop */
+    LPDIRECTDRAWSURFACE surface;    /* +0x04 the surface it decodes onto */
+    int32_t             active;     /* +0x08 */
+    int32_t             running;    /* +0x0C cleared at the last frame */
+    int32_t             sized;      /* +0x10 the caller gave a size */
+    int32_t             frameDue;   /* +0x14 raised by the timer */
+    int32_t             big;        /* +0x18 which Smacker buffer size */
+    struct AM2_Smack   *smack;      /* +0x1C from SmackOpen */
+    int32_t             field20;    /* +0x20 */
+    uint32_t            ddType;     /* +0x24 SmackDDSurfaceType's answer */
+    uint32_t            timerId;    /* +0x28 */
+    char                name[0x80]; /* +0x2C the filename, copied in */
+    int32_t             srcX;       /* +0xAC */
+    int32_t             srcY;       /* +0xB0 */
+    int32_t             srcW;       /* +0xB4 */
+    int32_t             srcH;       /* +0xB8 */
+    int32_t             wantW;      /* +0xBC -1 for the film's own */
+    int32_t             wantH;      /* +0xC0 */
     /* 0x00444FC0. PlayMovie builds it with `new`, so this is a real
      * constructor -- the original's `new` carries an EH state for it. */
     AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big);
@@ -31,6 +62,13 @@ struct AM2_Movie {
     void __attribute__((thiscall)) MovieDrawFrame(void *arg);
     int32_t __attribute__((thiscall)) MoviePoll();
 };
+static_assert(offsetof(AM2_Smack, newPalette) == 0x068, "smack newPalette");
+static_assert(offsetof(AM2_Smack, palette)    == 0x06C, "smack palette");
+static_assert(offsetof(AM2_Smack, frameNum)   == 0x374, "smack frameNum");
+static_assert(offsetof(AM2_Movie, smack)      == 0x1C, "movie smack");
+static_assert(offsetof(AM2_Movie, timerId)    == 0x28, "movie timerId");
+static_assert(offsetof(AM2_Movie, srcX)       == 0xAC, "movie srcX");
+static_assert(sizeof(AM2_Movie)               == AM2_MOVIE_SIZE, "movie size");
 static inline void __attribute__((thiscall)) MovieApplyPalette(void *movie, LPDIRECTDRAWSURFACE surf)
 { ((AM2_Movie *)movie)->MovieApplyPalette(surf); }
 #endif
@@ -108,7 +146,7 @@ static inline int32_t __attribute__((thiscall)) MoviePoll(void *movie)
  * MovieForget tests the pointer and then stores zero either way, so the test
  * cannot change anything. Reproduced; it is one instruction and removing it
  * would be tidying rather than porting. */
-void __cdecl MovieSetCurrent(void *movie);   /* 0x00445620 */
+void __cdecl MovieSetCurrent(AM2_Movie *movie);   /* 0x00445620 */
 void __cdecl MovieStepCurrent(void);         /* 0x00445630, states 0 and 3 */
 void __cdecl MovieEndCurrent(void);          /* 0x00445650 */
 void __cdecl MovieForget(void);

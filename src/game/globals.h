@@ -430,7 +430,7 @@
 #define g_mousePress2Ms          (*(uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS2_MS)  /* 0x004854A4 */
 #define g_mousePressMs           (*(uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS)  /* 0x0048549C */
 #define g_movieCount             (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)  /* 0x00512328 */
-#define g_movieCurrent           (*(uint8_t **)(uintptr_t)ADDR_MOVIE_CURRENT)  /* 0x006568A0 */
+#define g_movieCurrent           (*(struct AM2_Movie **)(uintptr_t)ADDR_MOVIE_CURRENT)  /* 0x006568A0 */
 #define g_movieDSound            (*(void **)(uintptr_t)ADDR_DSOUND)  /* 0x004FA46C */
 #define g_movieNames             ((char **)(uintptr_t)ADDR_MOVIE_NAMES)  /* 0x0048AE98 */
 #define g_moviePage              (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)  /* 0x0065A060 */
@@ -756,7 +756,7 @@
 #define g_stateArg               (*(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG)  /* 0x00511DB4 */
 #define g_stateEntered           (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)  /* 0x00511DA8 */
 #define g_stateEnterOnce         (*(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE)  /* 0x00511DD0 */
-#define g_stateMovie             (*(void **)(uintptr_t)ADDR_STATE_MOVIE)  /* 0x00515F98 */
+#define g_stateMovie             (*(struct AM2_Movie **)(uintptr_t)ADDR_STATE_MOVIE)  /* 0x00515F98 */
 #define g_statePending           (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)  /* 0x00511DAC */
 #define g_stateWanted            (*(int32_t *)(uintptr_t)ADDR_STATE_WANTED)  /* 0x00511DB0 */
 #define g_stepFacingSweep        ((int32_t *)(uintptr_t)ADDR_STEP_FACING_SWEEP)  /* 0x00489E00 */

@@ -215,6 +215,19 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The object script, the frame step and the movie typed** (2026-10-06),
+    no count change. AM2_Object gains the script id/state/frame/deadline at
+    +0xB0..+0xBC, the previous position at +0x16 and the chain uids at
+    +0xA8/+0xAC. UpdateObjectScript, SetObjScriptState, ObjFrameSweep,
+    ObjFrameStep, StepType1And4 and ChangeObjectFrame take or walk
+    AM2_Object. The movie is AM2_Movie with real fields, and the Smacker
+    handle is AM2_Smack (the palette at +0x6C is why the opener's +0x8A is
+    entry 10). g_movieCurrent and g_stateMovie are typed, and the `fld()`
+    offset macro is gone. UpdateObjectScript went 7 -> 9 with the parameter
+    used directly and back to 7 through a working copy, which is
+    kept. Typing did not move MovieStart (4), ChangeObjectFrame (14) or
+    ScriptSetObjBitmap (8). Their remaining differences are which register a
+    temporary takes.
   - **ListDraw matched** (2026-10-06), 1517 -> 1518: a `for` loop that tests
     the count at the top, so VC6 does not peel the first visible-row check
     out ahead of the loop, and the row text addressed as `text + idx *

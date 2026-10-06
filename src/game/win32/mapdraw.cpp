@@ -2236,7 +2236,7 @@ void __cdecl AirFrameDraw(void)
                 if (f > AM2_AIR_CYCLE_FRAMES)
                     f = 0;
 
-                ChangeObjectFrame(obj, f, 1);
+                ChangeObjectFrame((AM2_Object *)obj, f, 1);
                 *(int32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
                              + ROW_OFF_STAMP_54) =
                     *(const int32_t *)&g_gameClockMs;
@@ -2252,7 +2252,7 @@ void __cdecl AirFrameDraw(void)
             if (*(const int32_t *)(air + AIR_OFF_FLAG_B)
                     >= g_airCycleMs) {
                 *(int32_t *)(air + AIR_OFF_FLAG_B) = 0;
-                ChangeObjectFrame(obj, 0, 1);
+                ChangeObjectFrame((AM2_Object *)obj, 0, 1);
             }
         }
     }

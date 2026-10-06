@@ -69,34 +69,7 @@ extern "C" const am2_movie_vfn am2_movie_vtable[6] = {
 };
 #endif
 
-/* Fields of the movie object, by offset. */
-#define MOVIE_VTABLE   0x00u   /* re-stamped on stop */
-#define MOVIE_SURFACE  0x04u   /* the surface it decodes onto */
-#define MOVIE_ACTIVE   0x08u
-#define MOVIE_SMACK    0x1Cu   /* the Smack * from SmackOpen */
-#define MOVIE_TIMER_ID 0x28u
-
-#define MOVIE_TIMER_RUN 0x0Cu   /* cleared when the last frame is reached */
-#define MOVIE_UNKNOWN14 0x14u
-#define MOVIE_SIZED     0x10u   /* non-zero when the caller gave a size */
-#define MOVIE_BIG       0x18u   /* selects which Smacker buffer size to ask for */
-#define MOVIE_UNKNOWN20 0x20u
-#define MOVIE_NAME      0x2Cu   /* the filename, copied in */
-#define MOVIE_SRC_X     0xACu
-#define MOVIE_SRC_Y     0xB0u
-#define MOVIE_SRC_W     0xB4u
-#define MOVIE_SRC_H     0xB8u
-#define MOVIE_WANT_W    0xBCu   /* -1 for "whatever the film is" */
-#define MOVIE_WANT_H    0xC0u
-#define MOVIE_DD_TYPE   0x24u   /* what SmackDDSurfaceType made of the surface */
-
-#define fld(m, off, type) (*(type *)((uint8_t *)(m) + (off)))
-
-/* Fields of Smacker's own handle. */
-#define SMACK_HEIGHT      0x008u
-#define SMACK_FRAMES      0x00Cu
-#define SMACK_NEW_PALETTE 0x068u
-#define SMACK_FRAME_NUM   0x374u
+/* The movie object and the Smacker handle are typed in movie.h. */
 
 /* smackw32 entry points, called through the game's IAT exactly as it does. */
 typedef void (__stdcall *am2_smack_close_fn)(void *smack);
@@ -158,8 +131,6 @@ __declspec(dllimport) uint32_t __stdcall SmackDDSurfaceType(void *surface);
 #endif
 
 /* Smack handle fields used only by the opener. */
-#define SMACK_WIDTH   0x004u
-#define SMACK_PALETTE 0x08Au   /* three bytes per entry, in the Smack handle */
 
 /* Windows keeps ten entries at each end; the film gets what is between. */
 #define MOVIE_PALETTE_FIRST 10
@@ -222,46 +193,46 @@ LPDIRECTDRAWSURFACE __cdecl MovieMakeSurface(int32_t w, int32_t h)
 
 AM2_Movie::~AM2_Movie()
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
     /* Re-stamped before anything else, and unconditionally -- so it happens
      * even on the early returns below. */
-    fld(movie, MOVIE_VTABLE, uint32_t) = ((uintptr_t)g_movieVtable);
+    movie->vtbl = g_movieVtable;
 
-    if (!fld(movie, MOVIE_SMACK, void *))
+    if (!movie->smack)
         return;
-    if (!fld(movie, MOVIE_ACTIVE, int32_t))
+    if (!movie->active)
         return;
 
-    if (fld(movie, MOVIE_TIMER_ID, UINT))
-        timeKillEvent(fld(movie, MOVIE_TIMER_ID, UINT));
-    fld(movie, MOVIE_TIMER_ID, UINT)   = 0;
-    fld(movie, MOVIE_ACTIVE, int32_t)  = 0;
+    if (movie->timerId)
+        timeKillEvent(movie->timerId);
+    movie->timerId = 0;
+    movie->active = 0;
 
-    IDirectDrawSurface_Release(fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE));
-    fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE) = NULL;
+    IDirectDrawSurface_Release(movie->surface);
+    movie->surface = NULL;
 
     /* The handle is closed but not cleared, which is what the original does --
      * so a second Stop would close it twice. Both call sites drop the object
      * straight afterwards, which is presumably why it never mattered. */
-    smack_close(fld(movie, MOVIE_SMACK, void *));
+    smack_close(movie->smack);
 }
 
 void __attribute__((thiscall)) AM2_Movie::MovieSetVolume(int32_t volume)
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
     if (!g_soundReady)
         return;
 
     /* Seven calls written out, one per track bit -- no loop in the image. */
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0002000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0004000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0008000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0010000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0020000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0040000u, (uint32_t)volume, SMACK_PAN_CENTRE);
-    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0080000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0002000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0004000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0008000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0010000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0020000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0040000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(movie->smack, 0x0080000u, (uint32_t)volume, SMACK_PAN_CENTRE);
 }
 
 /* Original: 0x00445320, 2 call sites. Push the film's palette to the display.
@@ -276,14 +247,14 @@ void __attribute__((thiscall)) AM2_Movie::MovieSetVolume(int32_t volume)
  * NOCOLLAPSE marks survive a palette change. */
 void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE surf)
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
     LPDIRECTDRAWPALETTE pal = NULL;
     const uint8_t      *src;
     LPPALETTEENTRY      dst = (LPPALETTEENTRY)((uintptr_t)g_systemPalette_);
     int32_t             i;
 
-    src = (const uint8_t *)fld(movie, MOVIE_SMACK, void *) + SMACK_PALETTE;
+    src = &movie->smack->palette[MOVIE_PALETTE_FIRST * 3];
 
     /* Indexed through the global itself, and bounded `< LAST + 1`: both are
      * what put the loop pointer and its test where the original has them. */
@@ -312,31 +283,31 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
  * it and the game would otherwise sit on a still frame forever. */
 int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
 {
-    void   *movie = this;
+    AM2_Movie *movie = this;
     int32_t r = 0;
 
     (void)arg;
 
-    if (fld(movie, MOVIE_SMACK, void *) && !fld(movie, MOVIE_TIMER_RUN, int32_t)) {
-        fld(movie, MOVIE_TIMER_RUN, int32_t) = 1;
+    if (movie->smack && !movie->running) {
+        movie->running = 1;
 
         /* Slot 0 of the current movie's own table, a thiscall on it. */
-        ObjVPoll((*(void * *)&g_movieCurrent));
+        ObjVPoll(g_movieCurrent);
 
-        fld(movie, MOVIE_TIMER_ID, UINT) =
+        movie->timerId =
             timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
                          MovieTimerProc, 0,
                          TIME_PERIODIC);
 
-        if (!fld(movie, MOVIE_TIMER_ID, UINT)) {
+        if (!movie->timerId) {
             /* No timer, so no movie. Tear it down and let the game carry
              * on. */
-            delete (AM2_Movie *)(*(void * *)&g_movieCurrent);
-            (*(void * *)&g_movieCurrent) = NULL;
+            delete g_movieCurrent;
+            g_movieCurrent = NULL;
             PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
             return 0;
         }
-        fld(movie, MOVIE_ACTIVE, int32_t) = 1;
+        movie->active = 1;
         r = 1;
     }
     return r;
@@ -357,30 +328,30 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
  * A real constructor: PlayMovie builds the object with `new`. */
 AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big)
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
-    void *smack;
+    AM2_Smack *smack;
 
-    fld(movie, MOVIE_VTABLE, uint32_t)    = ((uintptr_t)g_movieVtable);
-    fld(movie, MOVIE_ACTIVE, int32_t)     = 0;
-    fld(movie, MOVIE_BIG, int32_t)        = big;
-    fld(movie, MOVIE_WANT_W, int32_t)     = wantW;
-    fld(movie, MOVIE_WANT_H, int32_t)     = wantH;
-    fld(movie, MOVIE_TIMER_RUN, int32_t)  = 0;
-    fld(movie, MOVIE_SIZED, int32_t)      = 0;
-    fld(movie, MOVIE_UNKNOWN14, int32_t)  = 0;
-    fld(movie, MOVIE_SRC_X, int32_t)      = 0;
-    fld(movie, MOVIE_SRC_Y, int32_t)      = 0;
-    fld(movie, MOVIE_SRC_W, int32_t)      = 0;
-    fld(movie, MOVIE_SRC_H, int32_t)      = 0;
-    fld(movie, MOVIE_TIMER_ID, uint32_t)  = 0;
-    fld(movie, MOVIE_SMACK, void *)       = NULL;
-    fld(movie, MOVIE_UNKNOWN20, int32_t)  = 0;
+    movie->vtbl = g_movieVtable;
+    movie->active = 0;
+    movie->big = big;
+    movie->wantW = wantW;
+    movie->wantH = wantH;
+    movie->running = 0;
+    movie->sized = 0;
+    movie->frameDue = 0;
+    movie->srcX = 0;
+    movie->srcY = 0;
+    movie->srcW = 0;
+    movie->srcH = 0;
+    movie->timerId = 0;
+    movie->smack = NULL;
+    movie->field20 = 0;
 
-    strcpy((char *)movie + MOVIE_NAME, name);
+    strcpy(movie->name, name);
 
-    if (fld(movie, MOVIE_WANT_W, int32_t) != -1)
-        fld(movie, MOVIE_SIZED, int32_t) = 1;
+    if (movie->wantW != -1)
+        movie->sized = 1;
 
     /* Once per process, and only if there is a DirectSound to give. */
     if (!g_soundReady && g_movieDSound) {
@@ -388,38 +359,38 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
         g_soundReady = 1;
     }
 
-    fld(movie, MOVIE_SRC_X, int32_t) = 0;
-    fld(movie, MOVIE_SRC_Y, int32_t) = 0;
+    movie->srcX = 0;
+    movie->srcY = 0;
 
-    if (fld(movie, MOVIE_BIG, int32_t))
-        smack = smack_open(name, 0x1FE440u, 0xFFFFFFFFu);
+    if (movie->big)
+        smack = (AM2_Smack *)smack_open(name, 0x1FE440u, 0xFFFFFFFFu);
     else
-        smack = smack_open(name, 0x000FE040u, 0xFFFFFFFFu);
-    fld(movie, MOVIE_SMACK, void *) = smack;
+        smack = (AM2_Smack *)smack_open(name, 0x000FE040u, 0xFFFFFFFFu);
+    movie->smack = smack;
 
     if (smack) {
-        if (fld(movie, MOVIE_SIZED, int32_t)) {
+        if (movie->sized) {
             /* The caller named an extent, so the source rectangle is inclusive
              * of the last pixel rather than one past it. */
-            fld(movie, MOVIE_SRC_W, int32_t) =
-                fld(movie, MOVIE_WANT_W, int32_t) - 1;
-            fld(movie, MOVIE_SRC_H, int32_t) =
-                fld(movie, MOVIE_WANT_H, int32_t) - 1;
+            movie->srcW =
+                movie->wantW - 1;
+            movie->srcH =
+                movie->wantH - 1;
         } else {
-            fld(movie, MOVIE_SRC_W, int32_t) = fld(smack, SMACK_WIDTH, int32_t);
-            fld(movie, MOVIE_SRC_H, int32_t) = fld(smack, SMACK_HEIGHT, int32_t);
+            movie->srcW = smack->width;
+            movie->srcH = smack->height;
         }
     }
 
     /* Note this runs whether or not the open succeeded, on a source rectangle
      * that is still zero if it did not. Kept as written. */
-    fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE) =
-        MovieMakeSurface(fld(movie, MOVIE_SRC_W, int32_t) -
-                          fld(movie, MOVIE_SRC_X, int32_t),
-                          fld(movie, MOVIE_SRC_H, int32_t) -
-                          fld(movie, MOVIE_SRC_Y, int32_t));
-    fld(movie, MOVIE_DD_TYPE, uint32_t) =
-        smack_ddtype(fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE));
+    movie->surface =
+        MovieMakeSurface(movie->srcW -
+                          movie->srcX,
+                          movie->srcH -
+                          movie->srcY);
+    movie->ddType =
+        smack_ddtype(movie->surface);
 
     /* A member: called with `this` in ecx, which it ignores. Being C++ is
      * also what makes this constructor one that may throw, which is why
@@ -471,20 +442,20 @@ void __cdecl MovieFinished(void)
  */
 void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
     DDSURFACEDESC ddsd;
     /* Both are read off the movie at every use. */
-#define smack (fld(movie, MOVIE_SMACK, void *))
-#define surf  (fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE))
+#define smack (movie->smack)
+#define surf  (movie->surface)
     HRESULT       hr;
 
     /* The timer does not stop when the window loses focus, so this does. */
     if (GetFocus() != g_hWnd)
         return;
 
-    if (fld(smack, SMACK_NEW_PALETTE, int32_t) &&
-        !fld(movie, MOVIE_DD_TYPE, int32_t)) {
+    if (smack->newPalette &&
+        !movie->ddType) {
         ::MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
 
         /* See the standing note: a lock used as a question, never answered. */
@@ -507,17 +478,17 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
 
     /* Straight into the locked bits, at the surface's own pitch. */
     smack_tobuffer(smack, 0, 0, (uint32_t)ddsd.lPitch,
-                   fld(smack, SMACK_HEIGHT, uint32_t), ddsd.lpSurface,
-                   fld(movie, MOVIE_DD_TYPE, uint32_t));
+                   smack->height, ddsd.lpSurface,
+                   movie->ddType);
     smack_doframe(smack);
     IDirectDrawSurface_Unlock(surf, NULL);
 
     BlitCentred(movie, (LPDIRECTDRAWSURFACE)arg);
 
     /* Last frame ends the movie; anything else advances it. */
-    if (fld(smack, SMACK_FRAME_NUM, uint32_t) ==
-        fld(smack, SMACK_FRAMES, uint32_t) - 1) {
-        fld(movie, MOVIE_TIMER_RUN, int32_t) = 0;
+    if (smack->frameNum ==
+        smack->frames - 1) {
+        movie->running = 0;
         MovieFinished();
     } else {
         smack_nextframe(smack);
@@ -538,27 +509,22 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
  * what MovieDrawFrame's second argument has been all along. */
 int32_t __attribute__((thiscall)) AM2_Movie::MoviePoll()
 {
-    void *movie = this;
+    AM2_Movie *movie = this;
 
-    if (fld(movie, MOVIE_TIMER_RUN, int32_t) &&
-        smack_wait(fld(movie, MOVIE_SMACK, void *)) == 0)
+    if (movie->running &&
+        smack_wait(movie->smack) == 0)
         ::MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)&g_primarySurface);
     return 1;
 }
 
-/* Only the two fields these four touch are named, as everywhere else in this
- * file: the object is deliberately opaque. */
-#define MOVIE_OFF_FLAG_0C   0x0Cu
-#define MOVIE_OFF_FLAG_14   0x14u
-
-void __cdecl MovieSetCurrent(void *movie)
+void __cdecl MovieSetCurrent(AM2_Movie *movie)
 {
-    (*(void * *)&g_movieCurrent) = movie;
+    g_movieCurrent = movie;
 }
 
 void __cdecl MovieStepCurrent(void)
 {
-    void *movie = (*(void * *)&g_movieCurrent);
+    AM2_Movie *movie = g_movieCurrent;
 
     if (!movie)
         return;
@@ -568,27 +534,27 @@ void __cdecl MovieStepCurrent(void)
     /* Re-read the global, as the original does -- but NOT tested again: the
      * original stores through it unconditionally (end of 0x00445630), so a poll
      * that cleared it would fault there too. It never does. */
-    *(int32_t *)((uint8_t *)(*(void * *)&g_movieCurrent) + MOVIE_OFF_FLAG_14) = 0;
+    g_movieCurrent->frameDue = 0;
 }
 
 void __cdecl MovieEndCurrent(void)
 {
-    void *movie = (*(void * *)&g_movieCurrent);
+    AM2_Movie *movie = g_movieCurrent;
 
     if (!movie)
         return;
-    *(int32_t *)((uint8_t *)movie + MOVIE_OFF_FLAG_0C) = 0;
+    movie->running = 0;
     MovieFinished();
-    (*(void * *)&g_movieCurrent) = 0;
+    g_movieCurrent = 0;
 }
 
 void __cdecl MovieForget(void)
 {
     /* The test cannot change the outcome -- both arms leave the global at
      * zero -- and is reproduced rather than removed. */
-    if (!(*(void * *)&g_movieCurrent))
+    if (!g_movieCurrent)
         return;
-    (*(void * *)&g_movieCurrent) = 0;
+    g_movieCurrent = 0;
 }
 
 /* Spelled as device.cpp and surface.cpp spell it, so the three stay one
@@ -612,13 +578,13 @@ void __cdecl MovieForget(void)
 void __cdecl StateLeave(void)
 {
     if (g_stateMovie) {
-        void *movie;
+        AM2_Movie *movie;
 
         MovieForget();
 
         movie = g_stateMovie;
-        delete (AM2_Movie *)movie;
-        g_stateMovie = (void *)0;
+        delete movie;
+        g_stateMovie = (AM2_Movie *)0;
     }
 
     ClearSurface((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), 0);
@@ -792,12 +758,12 @@ int32_t __cdecl StateMessageMovieToMenu(void)
 void CALLBACK MovieTimerProc(UINT id, UINT msg, DWORD_PTR user,
                              DWORD_PTR dw1, DWORD_PTR dw2)
 {
-    uint8_t *movie = g_movieCurrent;
+    AM2_Movie *movie = g_movieCurrent;
 
     (void)id; (void)msg; (void)user; (void)dw1; (void)dw2;
 
     if (movie)
-        fld(movie, MOVIE_UNKNOWN14, int32_t) = 1;
+        movie->frameDue = 1;
 }
 
 #if defined(__GNUC__)

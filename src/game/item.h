@@ -742,7 +742,7 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by);
 /* 0x004351C0. Changes an object's frame and every object chained to it.
  * Returns whether ANY changed -- but a broken chain returns 0 even when the
  * first one did; see the body. */
-int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
+int32_t __cdecl ChangeObjectFrame(AM2_Object *obj, int32_t frame, int32_t flag);
 
 /* 0x00457CD0. Awards experience and promotes -- and LOOPS, so one award can
  * carry a unit through more than one rank. */
@@ -751,7 +751,7 @@ void __cdecl Type238Action(void *obj, int32_t award);
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */
-void __cdecl ObjFrameStep(void *obj);
+void __cdecl ObjFrameStep(AM2_Object *obj);
 
 /* 0x004582F0. Points an object at a place: detach, clear the script id, and
  * store the point ADDR_NEAREST_ALLOWED_TILE snaps it to -- NOT the point
