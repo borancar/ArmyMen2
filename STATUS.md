@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1514 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1516 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,16 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Alliance and the pointer picks typed** (2026-10-06), 1514 -> 1516.
+    ArmyAlliedWithObj and ObjsAreAllied match once they take
+    `const AM2_Object *` and the two army-4 tests are ONE condition,
+    `army == 4 || b->owner == 4`: as two ifs VC6 lays the shared `return 1`
+    out mid-function instead of last. army.h's inline expansion gets the
+    same shape. AM2_Object grows the variant overlays honestly, as anonymous
+    unions: +0x52C vehicleKind / tableRec2, +0x538 pose / a vehicle's rider
+    list, +0x54C inventory / seats. OurLeaderUnit, WeaponByUid,
+    ObjAttachTo, the select-weapon pair and six pointer handlers are typed;
+    those stay at register ties.
   - **Rows and sprites typed** (2026-10-06), 1514 held. AM2_MapRow is the
     whole 0x60-byte record, the object carries its rows as AM2_RowSet (the
     {list, count, rows, capacity} header at +0x6C), and AM2_Sprite moved to

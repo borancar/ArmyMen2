@@ -411,10 +411,9 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
  * 0, since it is now called by name from here and from ArmiesAllied, which
  * reads 104 on the same run.
  */
-int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
+int32_t __cdecl ObjsAreAllied(const AM2_Object *a, const AM2_Object *b,
+                              int32_t useRec3)
 {
-    const uint8_t *oa = (const uint8_t *)a;
-    const uint8_t *ob = (const uint8_t *)b;
     const uint8_t *rec;
     int32_t        army, idx;
 
@@ -422,28 +421,23 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
      * taken from the first object; every "allied" exit shares one return. */
     if (g_mpSession
         && ObjIsType2Inline(a)
-        && *(const int32_t *)(oa + OBJ_OFF_SOLDIER_KIND) == 7) {
+        && a->soldierKind == 7) {
         if (ObjIsType2Inline(b)
-            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            && b->soldierKind == 7)
             goto allied;
         return 0;
     }
 
-    army = *(const int8_t *)(oa + OBJ_OFF_ARMY);
-    if (army == 4)
-        goto allied;
-    if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
+    army = a->owner;
+    if (army == 4 || b->owner == 4)
         goto allied;
 
     if (ObjIsType2Inline(b)) {
         if (g_mpSession
-            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3
-               && *(const int32_t *)(ob + OBJ_OFF_FIELD_530) != 5)
-              ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
-              : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
+        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
@@ -466,7 +460,7 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
             goto allied;
     }
 
-    return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+    return AllyFlag(army, b->owner);
 
 allied:
     return 1;
@@ -519,45 +513,42 @@ allied:
  * mov ecx,[esp+4]; ...; ret 8`, so ecx is an input to nothing and is clobbered
  * as scratch. Checked in the callee rather than inferred from the call site,
  * which is the only reason a correct declaration was not "corrected". */
-void __cdecl ObjAttachTo(void *subject, void *target)
+void __cdecl ObjAttachTo(AM2_Object *s, AM2_Object *t)
 {
-    uint8_t *s = (uint8_t *)subject;
-    uint8_t *t = (uint8_t *)target;
-    uint8_t *h;
-    uint8_t *other;
-    uint32_t old;
-    int32_t  i;
+    AM2_Object *h;
+    AM2_Object *other;
+    uint32_t    old;
+    int32_t     i;
 
-    if (subject == target || !ObjIsTypeIn238Inline(s))
+    if (s == t || !ObjIsTypeIn238Inline(s))
         return;
 
-    old = *(const uint32_t *)(s + OBJ_OFF_FOLLOW_UID);
-    *(uint32_t *)(s + OBJ_OFF_TARGET_UID) = 0;
+    old = s->followUid;
+    s->targetUid = 0;
 
-    if (old && (h = (uint8_t *)LookupByUID(old)) != (uint8_t *)0
+    if (old && (h = (AM2_Object *)LookupByUID(old)) != (AM2_Object *)0
         && ObjIsTypeIn238Inline(h)) {
-#define LIST (h + OBJ_OFF_PTR_LIST)
+#define LIST ((uint8_t *)h + OBJ_OFF_PTR_LIST)
         i = 0;
         while (i < *(const int32_t *)(LIST + SUBREC_OFF_COUNT)) {
-            if ((*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i]
-                == ((const AM2_Object *)s)->uid) {
+            if ((*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i] == s->uid) {
                 ((AM2_Rec *)LIST)->ListRemoveAt(i);
                 continue;               /* the next one shifted into i */
             }
-            other = (uint8_t *)LookupByUID(
+            other = (AM2_Object *)LookupByUID(
                         (*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i]);
             if (!other) {
                 ((AM2_Rec *)LIST)->ListRemoveAt(i);
                 continue;
             }
             if (ObjIsTypeIn238Inline(other))
-                *(int32_t *)(other + OBJ_OFF_FORMATION_SLOT) = i;
+                other->formationSlot = i;
             i++;
         }
 #undef LIST
     }
 
-    if (target) {
+    if (t) {
 
         /* A kind-7 trooper in a session follows only another kind 7; everything
          * else asks the whole alliance question, which is ArmyAlliedWithObj
@@ -566,42 +557,40 @@ void __cdecl ObjAttachTo(void *subject, void *target)
          * it: the flag is 0 on every drive this project has. */
         if (g_mpSession
             && ObjIsType2Inline(s)
-            && *(const int32_t *)(s + OBJ_OFF_SOLDIER_KIND) == 7) {
+            && s->soldierKind == 7) {
             if (ObjIsType2Inline(t)
-                && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND) == 7)
+                && t->soldierKind == 7)
                 goto attach_and_join;
-        } else if (ArmyAlliedWithObjInline(*(const int8_t *)(s + OBJ_OFF_ARMY),
-                                           t, 0)) {
+        } else if (ArmyAlliedWithObjInline(s->owner, t, 0)) {
             goto attach_and_join;
         }
 
-        if (*(const int8_t *)(s + OBJ_OFF_ARMY) != (int32_t)g_defaultOwner) {
-            *(int32_t *)(s + OBJ_OFF_AI_MODE) = 6;
-            *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = ((const AM2_Object *)t)->uid;
+        if (s->owner != (int32_t)g_defaultOwner) {
+            s->aiMode    = 6;
+            s->followUid = t->uid;
             return;
         }
         goto own;
 
 attach_and_join:
-        *(int32_t *)(s + OBJ_OFF_AI_MODE) = 3;
-        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
-            ((const AM2_Object *)t)->uid;
+        s->aiMode    = 3;
+        s->followUid = t->uid;
 
         if (ObjIsTypeIn238Inline(t)) {
-            *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) =
-                *(const int32_t *)(t + OBJ_OFF_PTR_LIST + SUBREC_OFF_COUNT);
-            ((AM2_Rec *)(t + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)
-                        ((const AM2_Object *)s)->uid);
+            s->formationSlot =
+                *(const int32_t *)((uint8_t *)t + OBJ_OFF_PTR_LIST + SUBREC_OFF_COUNT);
+            ((AM2_Rec *)((uint8_t *)t + OBJ_OFF_PTR_LIST))->PtrListPush(
+                (void *)(uintptr_t)s->uid);
         }
         return;
 
 own:
-        *(int32_t *)(s + OBJ_OFF_AI_MODE) = 0;
-        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = ((const AM2_Object *)t)->uid;
+        s->aiMode    = 0;
+        s->followUid = t->uid;
         return;
     } else {
-        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 0;
-        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = 0;
+        s->formationSlot = 0;
+        s->followUid     = 0;
     }
 }
 
@@ -636,27 +625,23 @@ own:
  * kind-7 refusal is unreachable here as it is there, ADDR_MP_SESSION being 0
  * on every drive.
  */
-int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
+int32_t __cdecl ArmyAlliedWithObj(int32_t army, const AM2_Object *b, int32_t useRec3)
 {
-    const uint8_t *ob = (const uint8_t *)b;
     const uint8_t *rec;
     int32_t        idx;
 
-    /* army.h's inline, with every "allied" exit sharing one return. */
-    if (army == 4)
-        goto allied;
-    if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
+    /* army.h's inline, with every "allied" exit sharing one return. The two
+     * army-4 tests are one condition: written as two ifs, VC6 lays the
+     * shared return out in the middle rather than last. */
+    if (army == 4 || b->owner == 4)
         goto allied;
 
     if (ObjIsType2Inline(b)) {
         if (g_mpSession
-            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3
-               && *(const int32_t *)(ob + OBJ_OFF_FIELD_530) != 5)
-              ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
-              : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
+        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
@@ -679,7 +664,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
             goto allied;
     }
 
-    return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+    return AllyFlag(army, b->owner);
 
 allied:
     return 1;

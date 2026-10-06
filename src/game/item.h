@@ -14,6 +14,7 @@
 #include "dist.h"        /* AM2_Point */
 #include "rect.h"        /* AM2_Rect, ItemSetBox's box by value */
 #include "objtable.h"    /* LookupByUID, for OurLeaderUnit */
+#include "misc.h"        /* AM2_PtrList, the army lists OurLeaderUnit walks */
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,31 +181,30 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src);
  * NOT A FUNCTION IN THE ORIGINAL -- it is inlined at all eight sites, so there
  * is no address to patch and nothing to install. `static inline` here, so it
  * is expanded at the widget sites and in MedkitHealOne as the original has it. */
-static inline uint8_t *OurLeaderUnit(void)
+static inline AM2_Object *OurLeaderUnit(void)
 {
     int32_t owner = *(const int32_t *)&g_defaultOwner;
 
     if (owner == *(const int32_t *)&g_defaultOwner)
-        return (uint8_t *)LookupByUID(
+        return (AM2_Object *)LookupByUID(
             g_ourLeaderUid);
 
     /* Dead. The NULL check lives in here, which is why the live path above
      * has none. The army's list is re-read through its slot each time. */
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
-        const uint8_t *const *slot =
-            &((const uint8_t *const *)g_armyObjLists)[owner];
+        AM2_PtrList *const *slot =
+            &((AM2_PtrList *const *)g_armyObjLists)[owner];
         int32_t i;
 
-        for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
-            uint8_t *o = (uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(*slot + LIST_OFF_UIDS))[i]);
+        for (i = 0; i < (*slot)->count; i++) {
+            AM2_Object *o = (AM2_Object *)LookupByUID(
+                (uint32_t)(uintptr_t)(*slot)->items[i]);
 
-            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+            if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
                 return o;
         }
     }
-    return (uint8_t *)0;
+    return (AM2_Object *)0;
 }
 
 /* 0x00458AB0, four call sites. Heal a trooper by the MEDKIT definition's
@@ -656,7 +656,7 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells);
 
 /* 0x0045EE80. A weapon by uid. Null for a zero uid or one that resolves to
  * nothing, and null WITH a log line for one that resolves to a non-weapon. */
-void *__cdecl WeaponByUid(uint32_t uid);
+AM2_Object *__cdecl WeaponByUid(uint32_t uid);
 
 /* 0x00448880. The code of the weapon in a unit's selected inventory slot, or 0
  * when the slot is empty or does not hold a weapon. */
@@ -871,7 +871,7 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
 
 /* 0x004069B0, one caller. Select the inventory slot whose weapon has the
  * highest map code, and apply the soldier kind that goes with it. */
-void __cdecl SelectBestWeapon(void *unit);
+void __cdecl SelectBestWeapon(AM2_Object *u);
 
 /* 0x0043CD40, two callers. Move an object to a new field-530 state and put its
  * first row on the frame that goes with it, when the animation allows. */

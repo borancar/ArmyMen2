@@ -16,6 +16,7 @@
 #define AM2_ARMY_H
 
 #include <stdint.h>
+#include "objtable.h"   /* AM2_Object */
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,7 +34,7 @@ extern "C" {
 /* 0x00458070, twenty callers. Detach an object from whatever it is attached
  * to, then attach it to a target if one is given -- a NULL target is the pure
  * detach the three per-type destroy handlers use. Types 2, 3 and 8 only. */
-void __cdecl ObjAttachTo(void *subject, void *target);
+void __cdecl ObjAttachTo(AM2_Object *s, AM2_Object *t);
 
 /* 0x00457720, two callers. The same question with army 4 answering yes to
  * everything, on either side. */
@@ -55,11 +56,12 @@ int32_t __cdecl ObjIsFriendly(const void *obj);
  * exceptions -- a multiplayer kind 7 is allied only to another kind 7, army 4
  * is allied to everything, and sharing an object-table record is alliance.
  * `useRec3` chooses which of the second object's two record pointers to use. */
-int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3);
+int32_t __cdecl ObjsAreAllied(const AM2_Object *a, const AM2_Object *b,
+                              int32_t useRec3);
 
 /* 0x00457620. The same question with an army on the left: ObjsAreAllied from
  * its `army == 4` test onward, held as a separate body in the image. */
-int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3);
+int32_t __cdecl ArmyAlliedWithObj(int32_t army, const AM2_Object *b, int32_t useRec3);
 
 /* 0x00457750, twenty-one callers, and the name was already in orig.h -- kept,
  * because it is the more careful of the two readings.
@@ -177,27 +179,22 @@ static inline int32_t AllyFlag(int32_t a, int32_t b)
  * functions have it: the type test materialised with sete, the session flag
  * and the comm object read where they are used. Same answers as the
  * function in army.cpp. */
-static inline int32_t ArmyAlliedWithObjInline(int32_t army, void *b,
+static inline int32_t ArmyAlliedWithObjInline(int32_t army,
+                                              const AM2_Object *b,
                                               int32_t useRec3)
 {
-    const uint8_t *ob = (const uint8_t *)b;
     const uint8_t *rec;
     int32_t        idx;
 
-    if (army == 4)
-        return 1;
-    if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
+    if (army == 4 || b->owner == 4)
         return 1;
 
     if (ObjIsType2Inline(b)) {
         if (g_mpSession
-            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3
-               && *(const int32_t *)(ob + OBJ_OFF_FIELD_530) != 5)
-              ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
-              : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
+        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
@@ -220,7 +217,7 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army, void *b,
             return 1;
     }
 
-    return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+    return AllyFlag(army, b->owner);
 }
 #endif
 

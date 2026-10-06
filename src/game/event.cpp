@@ -2169,7 +2169,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
     if (ObjIsType2((const AM2_Object *)a))
         *(int32_t *)(a + OBJ_OFF_FIELD_540) = 0;
 
-    ObjAttachTo(a, b);
+    ObjAttachTo((AM2_Object *)a, (AM2_Object *)b);
 }
 
 /* --------------------------------------------------- bitmaps ---- */
@@ -3067,7 +3067,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
         if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             && ObjIsTypeIn238((const AM2_Object *)obj)
             && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA(obj)))
-            ObjAttachTo(obj, target);
+            ObjAttachTo((AM2_Object *)obj, (AM2_Object *)target);
         i++;
     }
 #undef LIST

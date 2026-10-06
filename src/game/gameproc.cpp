@@ -2737,7 +2737,7 @@ void __cdecl DefFinish(void)
  * the negation rather than transcribed as three instructions. */
 int32_t __cdecl WalkCellKeepEnemy(void *obj)
 {
-    return ArmyAlliedWithObj((int32_t)g_defaultOwner, obj, 0) == 0;
+    return ArmyAlliedWithObj((int32_t)g_defaultOwner, (const AM2_Object *)obj, 0) == 0;
 }
 
 void *__cdecl WalkCellWrapper(void *unused, uint32_t at)

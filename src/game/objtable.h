@@ -67,20 +67,47 @@ typedef struct {
     uint8_t        _pad7c[0x18];    /* +0x7C */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
-    uint8_t        _pad9c[4];       /* +0x9C */
+    int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
     int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
     uint8_t        _pada4[0xC];     /* +0xA4 */
     uint8_t        power;           /* +0xB0  OBJ_OFF_SCRIPT_ID, a shot's power byte */
-    uint8_t        _padb1[0x5B];    /* +0xB1 */
+    uint8_t        _padb1[0x0F];    /* +0xB1 */
+    const int32_t *typeRec;         /* +0xC0  OBJ_OFF_FIELD_C0, -> the type record; [0] is its kind */
+    uint32_t       followUid;       /* +0xC4  OBJ_OFF_FOLLOW_UID */
+    uint8_t        _padc8[4];       /* +0xC8 */
+    uint32_t       targetUid;       /* +0xCC  OBJ_OFF_TARGET_UID */
+    uint8_t        _padd0[0x14];    /* +0xD0 */
+    int32_t        aiMode;          /* +0xE4  OBJ_OFF_AI_MODE */
+    uint8_t        _pade8[0x24];    /* +0xE8 */
     int32_t        field10C;        /* +0x10C OBJ_OFF_FIELD_10C */
     uint8_t        _pad110[0x41C];  /* +0x110 */
-    int32_t        vehicleKind;     /* +0x52C VEHICLE_OFF_KIND */
-    uint8_t        _pad530[8];      /* +0x530 */
-    int32_t        pose;            /* +0x538 OBJ_OFF_POSE */
-    uint8_t        _pad53c[8];      /* +0x53C */
+    union {                         /* +0x52C, by object type: */
+        int32_t        vehicleKind; /*   VEHICLE_OFF_KIND */
+        const uint8_t *tableRec2;   /*   SAVED_OFF_TABLE_REC2, a type 2's record */
+    };
+    int32_t        field530;        /* +0x530 OBJ_OFF_FIELD_530, ObjConceal compares to 5 */
+    const uint8_t *tableRec3;       /* +0x534 SAVED_OFF_TABLE_REC3, a type 3's record */
+    union {                         /* +0x538, by object type: */
+        struct {
+            int32_t   pose;         /*   OBJ_OFF_POSE */
+            int32_t   posePending;  /*   OBJ_OFF_POSE_PENDING */
+            int32_t   field540;     /*   OBJ_OFF_FIELD_540 */
+        };
+        struct {                    /*   VEHICLE_OFF_PTR_LIST, a vehicle's riders */
+            int32_t   riderCap;
+            int32_t   riderCount;   /*   so OBJ_OFF_POSE_PENDING is its seats used */
+            uint32_t *riderUids;
+        };
+    };
     int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
     int32_t        sarge;           /* +0x548 OBJ_OFF_SARGE */
-    uint32_t       inventory[6];    /* +0x54C UNIT_OFF_INVENTORY, weapon uids */
+    union {                         /* +0x54C, by object type: */
+        uint32_t   inventory[6];    /*   UNIT_OFF_INVENTORY, a unit's weapon uids */
+        struct {
+            uint8_t _pad54c[8];
+            int32_t seats;          /*   VEHICLE_OFF_SEATS (+0x554), a vehicle's */
+        };
+    };
     uint32_t       _pad564;         /* +0x564 */
     int32_t        inventorySel;    /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
     uint32_t       _pad56c;         /* +0x56C */
@@ -110,6 +137,7 @@ static_assert(offsetof(AM2_Object, health)        == 0x62,  "health");
 static_assert(offsetof(AM2_Object, heightAdj)     == 0x64,  "heightAdj");
 static_assert(offsetof(AM2_Object, field94)       == 0x94,  "field94");
 static_assert(offsetof(AM2_Object, shooterUid)    == 0x98,  "shooterUid");
+static_assert(offsetof(AM2_Object, repairFrame)   == 0x9C,  "repairFrame");
 static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");
 static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
 static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
@@ -117,15 +145,25 @@ static_assert(offsetof(AM2_Object, row0YAdjust)   == 0x42,  "row0YAdjust");
 static_assert(offsetof(AM2_Object, field44)       == 0x44,  "field44");
 static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
 static_assert(offsetof(AM2_Object, heightSet)     == 0x65,  "heightSet");
+static_assert(offsetof(AM2_Object, typeRec)       == 0xC0,  "typeRec");
+static_assert(offsetof(AM2_Object, followUid)     == 0xC4,  "followUid");
+static_assert(offsetof(AM2_Object, targetUid)     == 0xCC,  "targetUid");
+static_assert(offsetof(AM2_Object, aiMode)        == 0xE4,  "aiMode");
 static_assert(offsetof(AM2_Object, field10C)      == 0x10C, "field10C");
 static_assert(offsetof(AM2_Object, vehicleKind)   == 0x52C, "vehicleKind");
 static_assert(offsetof(AM2_Object, pos)           == 0x12,  "pos");
 static_assert(offsetof(AM2_Object, rowSet.count)  == 0x70,  "rowSet.count");
 static_assert(offsetof(AM2_Object, rowSet.rows)   == 0x74,  "rowSet.rows");
+static_assert(offsetof(AM2_Object, tableRec2)     == 0x52C, "tableRec2");
+static_assert(offsetof(AM2_Object, tableRec3)     == 0x534, "tableRec3");
 static_assert(offsetof(AM2_Object, pose)          == 0x538, "pose");
 static_assert(offsetof(AM2_Object, sarge)         == 0x548, "sarge");
 static_assert(offsetof(AM2_Object, sentPos)       == 0x5B4, "sentPos");
 static_assert(offsetof(AM2_Object, lastSeq)       == 0x5CC, "lastSeq");
+static_assert(offsetof(AM2_Object, posePending)   == 0x53C, "posePending");
+static_assert(offsetof(AM2_Object, riderCount)    == 0x53C, "riderCount");
+static_assert(offsetof(AM2_Object, field540)      == 0x540, "field540");
+static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
 static_assert(offsetof(AM2_Object, inventorySel)  == 0x568, "inventorySel");
 static_assert(offsetof(AM2_Object, riding)        == 0x570, "riding");

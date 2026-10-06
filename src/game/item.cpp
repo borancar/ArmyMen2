@@ -474,19 +474,19 @@ int32_t __cdecl TakeSoldierName(void)
     return (int32_t)i;
 }
 
-void *__cdecl WeaponByUid(uint32_t uid)
+AM2_Object *__cdecl WeaponByUid(uint32_t uid)
 {
-    uint32_t *obj;
+    AM2_Object *obj;
 
     if (!uid)
-        return (void *)0;
-    obj = (uint32_t *)LookupByUID(uid);
+        return (AM2_Object *)0;
+    obj = (AM2_Object *)LookupByUID(uid);
     if (!obj)
-        return (void *)0;
-    if (obj[0] == AM2_OBJ_TYPE_WEAPON)
+        return (AM2_Object *)0;
+    if (obj->type == AM2_OBJ_TYPE_WEAPON)
         return obj;
     am2_log("uid wasn't a weapon!\n");
-    return (void *)0;
+    return (AM2_Object *)0;
 }
 
 int32_t __cdecl SaveItems(am2_FILE *fp)
@@ -2772,7 +2772,7 @@ void __cdecl RoachBite(void *roach)
     for (hit = (uint8_t *)AllObjectsInRect(
                    &box, g_objMapDesc);
          hit; hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
-        if (!ObjsAreAllied(o, hit, 0))
+        if (!ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)hit, 0))
             DamageObject(hit,
                          g_roachDamage,
                          AM2_ROACH_DAMAGE_KIND,
@@ -3698,7 +3698,7 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
                                    + AM2_SHOT_DIR_BIAS),
                  0);
 
-    if (ObjsAreAllied((void *)sh, target, 0))
+    if (ObjsAreAllied((const AM2_Object *)sh, (const AM2_Object *)target, 0))
         return;
 
     owner = (uint8_t *)LookupByUID(*(const uint32_t *)(sh + OBJ_OFF_RANK));
@@ -3849,7 +3849,7 @@ static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
                == ((const AM2_Object *)f)->uid
             && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
             goto zero;
-        if (ObjsAreAllied((void *)f, o, 0))
+        if (ObjsAreAllied((const AM2_Object *)f, (const AM2_Object *)o, 0))
             return AM2_BLOCK_FULL;
     zero:
         return 0;
@@ -4167,7 +4167,7 @@ void __cdecl DestroyType2(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    ObjAttachTo(obj, 0);
+    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
     DestroyObjCommon(obj);
 }
 
@@ -4192,7 +4192,7 @@ void __cdecl DestroyType3(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    ObjAttachTo(obj, 0);
+    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
     DestroyObjCommon(obj);
 }
 
@@ -4215,7 +4215,7 @@ void __cdecl DestroyType8(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    ObjAttachTo(obj, 0);
+    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
     DestroyObjCommon(obj);
 }
 
@@ -6600,7 +6600,7 @@ void __cdecl PointActionA(void *obj, uint32_t point)
     if (type > 3 && type != 8)
         return;
 
-    ObjAttachTo(obj, 0);
+    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
 
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID) = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
@@ -8029,8 +8029,8 @@ void __cdecl DeselectAll(void)
 
             if (other
                 && ArmyAlliedWithObj(
-                       (int32_t)g_defaultOwner, other, 0))
-                ObjAttachTo(obj, (void *)0);
+                       (int32_t)g_defaultOwner, (const AM2_Object *)other, 0))
+                ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
         }
 
         i++;
@@ -8612,27 +8612,22 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
  * being carried out of the loop. Nothing can have changed in between; it is
  * the original's and it is one lookup, so it is written as one.
  */
-void __cdecl SelectBestWeapon(void *unit)
+void __cdecl SelectBestWeapon(AM2_Object *u)
 {
-    uint8_t *u = (uint8_t *)unit;
-    int32_t  best;
-    int32_t  bestSlot = 0;
-    int32_t  i;
+    int32_t best;
+    int32_t bestSlot = 0;
+    int32_t i;
 
-    best = MapCode(**(const int32_t *const *)
-        ((const uint8_t *)WeaponByUid(
-             *(const uint32_t *)(u + UNIT_OFF_INVENTORY)) + OBJ_OFF_FIELD_C0));
+    best = MapCode(*WeaponByUid(u->inventory[0])->typeRec);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
-        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                           + (size_t)i * 4);
+        uint32_t uid = u->inventory[i];
         int32_t  code;
 
         if (!uid)
             continue;
 
-        code = MapCode(**(const int32_t *const *)
-            ((const uint8_t *)WeaponByUid(uid) + OBJ_OFF_FIELD_C0));
+        code = MapCode(*WeaponByUid(uid)->typeRec);
 
         if (code > best) {
             bestSlot = i;
@@ -8640,12 +8635,9 @@ void __cdecl SelectBestWeapon(void *unit)
         }
     }
 
-    *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = bestSlot;
+    u->inventorySel = bestSlot;
 
-    SoldierKindForWeapon(u, (uint32_t)**(const int32_t *const *)
-        ((const uint8_t *)WeaponByUid(
-             *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                 + (size_t)bestSlot * 4)) + OBJ_OFF_FIELD_C0));
+    SoldierKindForWeapon(u, (uint32_t)*WeaponByUid(u->inventory[bestSlot])->typeRec);
 }
 
 /* SetObjField530 -- original 0x0043CD40, two callers.
@@ -9146,7 +9138,7 @@ void __cdecl ResetObjOnCof(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FIELD_100)   = 0;
     *(int32_t  *)(o + OBJ_OFF_FIELD_FC)    = orig_rand() % AM2_COF_PHASE_MAX;
 
-    ObjAttachTo(o, (void *)0);
+    ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
 
     /* The inline type test, whose null check is dead here: the five stores
      * above already used the pointer. */
@@ -9190,8 +9182,7 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
     int32_t bestSlot = 0;
     int32_t i;
 
-    best = MapCode18To28(**(const int32_t *const *)
-        ((const uint8_t *)WeaponByUid(u->inventory[0]) + OBJ_OFF_FIELD_C0));
+    best = MapCode18To28(*WeaponByUid(u->inventory[0])->typeRec);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
         int32_t rank;
@@ -9199,8 +9190,7 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
         if (!u->inventory[i])
             continue;
 
-        rank = MapCode18To28(**(const int32_t *const *)
-            ((const uint8_t *)WeaponByUid(u->inventory[i]) + OBJ_OFF_FIELD_C0));
+        rank = MapCode18To28(*WeaponByUid(u->inventory[i])->typeRec);
 
         if (rank > best) {
             bestSlot = i;
@@ -9526,7 +9516,7 @@ void __cdecl SelectionClick(void)
              * whatever it was following. Omitting it leaves the object
              * attached with nothing selecting it, which the A/B would show
              * only if something later walked that list. */
-            ObjAttachTo(e, (void *)0);
+            ObjAttachTo((AM2_Object *)e, (AM2_Object *)0);
             OnSelectionChanged(
                 g_zeroPoint);
             return;
@@ -10026,7 +10016,7 @@ void __cdecl ToggleSelect(void *obj)
                     if (n > 1) {
                         ((AM2_Rec *)g_selectedUids)->ListRemoveAt(i);
                         *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
-                        ObjAttachTo(o, (void *)0);
+                        ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
                         OnSelectionChanged(
                             g_zeroPoint);
                     }

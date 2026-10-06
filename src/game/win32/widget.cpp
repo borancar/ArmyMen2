@@ -16744,8 +16744,8 @@ void __cdecl PointerInvokeFreezeSelected(void)
  * cannot run at all. */
 void __cdecl PointerActionFollow(void *obj, uint32_t at)
 {
-    uint8_t *leader;
-    int32_t  i;
+    AM2_Object *leader;
+    int32_t     i;
 
     (void)obj;
     (void)at;
@@ -16757,9 +16757,8 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
     if (!leader)
         return;
 
-    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)) {
-        leader = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(leader + OBJ_OFF_RIDING));
+    if (leader->riding) {
+        leader = (AM2_Object *)LookupByUID(leader->riding);
         if (!leader)
             return;
     }
@@ -16767,16 +16766,14 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
     DeselectAll();
 
     for (i = 0; ; ) {
-        const uint8_t *list = (const uint8_t *)
-            (g_armyObjLists)
-                [*(const int32_t *)&g_defaultOwner];
-        uint8_t *o;
+        AM2_PtrList *list = ((AM2_PtrList **)g_armyObjLists)
+                                [*(const int32_t *)&g_defaultOwner];
+        AM2_Object  *o;
 
-        if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
+        if (i >= list->count)
             return;
 
-        o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+        o = (AM2_Object *)LookupByUID((uint32_t)(uintptr_t)list->items[i]);
 
         if (!o) {
             /* Gone: drop it and DO NOT advance. */
@@ -16786,13 +16783,11 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
             continue;
         }
 
-        if ((*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
-            || *(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        if ((o->flags & OBJ_FLAG_DESTROYED) || o->health == 0)
             goto next;
 
         /* Sarge himself is selected and never attached to anything. */
-        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-            && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
+        if (o->type == AM2_OBJ_TYPE_TROOPER && o->sarge) {
             SelectUnit(o);
             goto next;
         }
@@ -16800,26 +16795,23 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
         /* The vehicle our leader is riding is selected, not ordered. The
          * leader is looked up again and NOT tested: the original reads its
          * riding uid straight off whatever comes back. */
-        if (ObjIsType3Inline(o)
-            && *(const uint32_t *)(OurLeaderUnit() + OBJ_OFF_RIDING)
-               == *(const uint32_t *)(o + OBJ_OFF_UID)) {
+        if (ObjIsType3Inline(o) && OurLeaderUnit()->riding == o->uid) {
             SelectUnit(o);
             goto next;
         }
 
-        if (*(const int32_t *)o < AM2_OBJ_TYPE_TROOPER)
+        if ((int32_t)o->type < AM2_OBJ_TYPE_TROOPER)
             goto next;
-        if (*(const int32_t *)o > AM2_OBJ_TYPE_VEHICLE
-            && *(const int32_t *)o != AM2_OBJ_TYPE_ROACH)
+        if ((int32_t)o->type > AM2_OBJ_TYPE_VEHICLE
+            && o->type != AM2_OBJ_TYPE_ROACH)
             goto next;
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+        if (o->field94)
             goto next;
         /* An empty vehicle has nobody to give the order to. */
-        if (ObjIsType3Inline(o)
-            && *(const int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) == 0)
+        if (ObjIsType3Inline(o) && o->riderCount == 0)
             goto next;
 
-        *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_AI_MODE_FOLLOW;
+        o->aiMode = AM2_AI_MODE_FOLLOW;
         SelectUnit(o);
         ObjAttachTo(o, leader);
 
@@ -16900,14 +16892,14 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
         }
 
         FormationSlotPoint(i, at, o, &slot);
-        ObjAttachTo(o, (void *)0);
+        ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
 
         /* Written before the test that may replace it -- see above. */
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = 0;
 
         if (tgt
             && !ArmyAlliedWithObjInline(
-                   *(const int32_t *)&g_defaultOwner, tgt, 0)) {
+                   *(const int32_t *)&g_defaultOwner, (const AM2_Object *)tgt, 0)) {
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
             *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
                 *(const uint32_t *)(tgt + OBJ_OFF_UID);
@@ -16977,7 +16969,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
 
     if (tgt
         && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                              tgt, 0)) {
+                              (const AM2_Object *)tgt, 0)) {
         PointerActionMode4(tgt, at);   /* an enemy: mode 4's job */
         return;
     }
@@ -17015,7 +17007,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         /* Ordered PointActionA then ObjAttachTo -- the reverse of modes 4
          * and 6. */
         PointActionA(o, at);
-        ObjAttachTo(o, (void *)0);
+        ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
 
         if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
@@ -17099,7 +17091,7 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
              * slot is overwritten with this unit's place in the formation. */
             FormationSlotPoint(i, at, o, (uint32_t *)&target);
 
-            ObjAttachTo(o, (void *)0);
+            ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
             *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 1;
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = AM2_AI_MODE_IGNORE;
 
@@ -17178,7 +17170,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
             (*(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540))[1]);
 
         if (ObjIsType2Inline(o))
-            ObjAttachTo(o, driver);
+            ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
 
         if (!ExitOneFromVehicle(1, veh))
             break;
@@ -17195,7 +17187,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
             ((AM2_Rec *)(veh + OBJ_OFF_PTR_LIST))->ListRemoveAt(i);
             continue;
         }
-        ObjAttachTo(o, driver);
+        ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
         i++;
     }
 }
@@ -17257,17 +17249,18 @@ void __cdecl VehicleDismountAll(void *a, void *b)
  * verified by reading. */
 void __cdecl PointerDropItem(void *obj, uint32_t at)
 {
-    uint8_t *unit;
-    int32_t  slot;
+    AM2_Object *unit;
+    int32_t     slot;
 
     (void)obj;
     (void)at;
 
-    /* No null test on the leader, as the original. */
+    /* No null test on the leader, as the original. The position goes over as
+     * the packed dword every point argument in this API is. */
     unit = OurLeaderUnit();
-    slot = *(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL);
+    slot = unit->inventorySel;
     if (slot > 0) {
-        TrooperDropItem(unit, slot, *(const uint32_t *)(unit + OBJ_OFF_X));
+        TrooperDropItem(unit, slot, *(const uint32_t *)&unit->pos);
         SetPointerMode(0);
     }
 }
@@ -17527,7 +17520,7 @@ int32_t __cdecl PointerPickMode4(void *obj)
         return 0;   /* hoisted above the alliance test -- see above */
 
     if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0)) {
+                           (const AM2_Object *)o, 0)) {
         OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
         g_pointerHoverUid =
             *(const uint32_t *)(o + OBJ_OFF_UID);
@@ -17549,7 +17542,7 @@ int32_t __cdecl PointerPickMode5(void *obj)
     /* No hoisted refusal: a neutral object reaches the alliance test, which
      * answers ALLIED for army 4. That is the whole difference from mode 4. */
     if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0)) {
+                           (const AM2_Object *)o, 0)) {
         OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
         g_pointerHoverUid =
             *(const uint32_t *)(o + OBJ_OFF_UID);
@@ -17678,7 +17671,7 @@ int32_t __cdecl PointerPickMode0(void *obj)
      * neutral-owner case. The enemy arm comes first, the friend tail last,
      * as the image lays them out. */
     if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                                 o, 0)) {
+                                 (const AM2_Object *)o, 0)) {
         if (g_mouseButton && GetMenuRow() != 1)
             return 0;
 
@@ -17756,10 +17749,9 @@ int32_t __cdecl PointerPickMode0(void *obj)
  * offsets this function does not name, and that offset belongs to the sibling
  * at 0x004599A0. A merged entry makes that tool over-report the same way it
  * makes coverage over-credit. */
-int32_t __cdecl PointerPickHeal(void *obj)
+int32_t __cdecl PointerPickHeal(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *leader;
+    AM2_Object *leader;
 
     if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_HEAL)
@@ -17768,27 +17760,21 @@ int32_t __cdecl PointerPickHeal(void *obj)
         && GetMenuRow() != AM2_MENU_ROW_HEAL)
         return 0;
 
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0))
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner, o, 0))
         return 0;
 
     leader = OurLeaderUnit();
     if (!leader)
         return 0;
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
-        >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+    if (o->health >= o->maxHealth)
         return 0;
     if (!ObjIsType2Inline(o))
         return 0;
-    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)
-
-        != *(const uint32_t *)(o + OBJ_OFF_RIDING))
+    if (leader->riding != o->riding)
         return 0;
 
-    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                   (const AM2_Point *)(o + OBJ_OFF_X))
-        > g_pickReach6624ec)
+    if (ApproxDist(&leader->pos, &o->pos) > g_pickReach6624ec)
         return 0;
 
     OverlayPrepare(AM2_MENU_ROW_HEAL, 1);
@@ -17824,36 +17810,34 @@ int32_t __cdecl PointerPickHeal(void *obj)
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table.
  *
  * Not exercised: no drive here opens menu row 0xC. */
-static inline uint8_t *OurLeaderUnitUidLocal(void)
+static inline AM2_Object *OurLeaderUnitUidLocal(void)
 {
     int32_t owner = *(const int32_t *)&g_defaultOwner;
     uint32_t uid;
 
     if (owner == *(const int32_t *)&g_defaultOwner) {
         uid = g_ourLeaderUid;
-        return (uint8_t *)LookupByUID(uid);
+        return (AM2_Object *)LookupByUID(uid);
     }
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
-        const uint8_t *const *slot =
-            &((const uint8_t *const *)g_armyObjLists)[owner];
+        AM2_PtrList *const *slot =
+            &((AM2_PtrList *const *)g_armyObjLists)[owner];
         int32_t i;
 
-        for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
-            uint8_t *o = (uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(*slot + LIST_OFF_UIDS))[i]);
+        for (i = 0; i < (*slot)->count; i++) {
+            AM2_Object *o = (AM2_Object *)LookupByUID(
+                (uint32_t)(uintptr_t)(*slot)->items[i]);
 
-            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+            if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
                 return o;
         }
     }
-    return (uint8_t *)0;
+    return (AM2_Object *)0;
 }
-int32_t __cdecl PointerPickRepair(void *obj)
+int32_t __cdecl PointerPickRepair(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *leader;
-    uint32_t riding;
+    AM2_Object *leader;
+    uint32_t    riding;
 
     if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_REPAIR)
@@ -17862,24 +17846,20 @@ int32_t __cdecl PointerPickRepair(void *obj)
         && GetMenuRow() != AM2_MENU_ROW_REPAIR)
         return 0;
 
-    if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+    if (o->owner == AM2_ARMY_NEUTRAL)
         return 0;
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0))
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner, o, 0))
         return 0;
 
     if (ObjIsType2Inline(o))
         return 0;
 
 
-    if (ObjIsItem((const AM2_Object *)o)) {
-        if (!*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
-            && *(const int16_t *)(o + OBJ_OFF_HEALTH)
-                   >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+    if (ObjIsItem(o)) {
+        if (!o->repairFrame && o->health >= o->maxHealth)
             return 0;
     } else if (ObjIsType3Inline(o)) {
-        if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
-            >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+        if (o->health >= o->maxHealth)
             return 0;
     }
     /* Neither an item nor a vehicle: no health test at all -- see above. */
@@ -17889,18 +17869,15 @@ int32_t __cdecl PointerPickRepair(void *obj)
     if (!leader)
         return 0;
 
-    riding = *(const uint32_t *)(leader + OBJ_OFF_RIDING);
-    if (riding && *(const uint32_t *)(o + OBJ_OFF_UID) != riding)
+    riding = leader->riding;
+    if (riding && o->uid != riding)
         return 0;
 
-    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                   (const AM2_Point *)(o + OBJ_OFF_X))
-        > g_pickReach662894)
+    if (ApproxDist(&leader->pos, &o->pos) > g_pickReach662894)
         return 0;
 
-    if (*(const int32_t *)o == AM2_OBJ_TYPE_ITEM
-        && *(const int32_t *)(*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
-                              + AAIREC_OFF_TYPE) == AM2_AAI_TYPE_26)
+    if (o->type == AM2_OBJ_TYPE_ITEM
+        && *(const int32_t *)(o->field94 + AAIREC_OFF_TYPE) == AM2_AAI_TYPE_26)
         return 0;
 
     OverlayPrepare(AM2_MENU_ROW_REPAIR, 1);
@@ -17929,10 +17906,9 @@ int32_t __cdecl PointerPickRepair(void *obj)
  * written once here, since the second cannot fail.
  *
  * Not exercised: no drive here opens menu row 0xA. */
-int32_t __cdecl PointerPickEnemyTrooper(void *obj)
+int32_t __cdecl PointerPickEnemyTrooper(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *leader;
+    AM2_Object *leader;
 
     if (g_mouseButton
         && GetMenuRow() != AM2_MENU_ROW_0A)
@@ -17941,15 +17917,12 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
     /* Allied -- including either side being army 4 -- means no. Nested
      * positively onto one shared `return 0`, as the image lays it out. */
     if (o && ObjIsType2Inline(o)
-        && !(*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-             && *(const int32_t *)(o + OBJ_OFF_SARGE))
-        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                                    o, 0)
-        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < 6) {
+        && !(o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
+        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner, o, 0)
+        && o->soldierKind < 6) {
         leader = OurLeaderUnit();
         if (leader
-            && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                          (const AM2_Point *)(o + OBJ_OFF_X))
+            && ApproxDist(&leader->pos, &o->pos)
                <= g_pickReach6628c8) {
             OverlayPrepare(AM2_MENU_ROW_0A, 1);
             return 1;
@@ -17988,15 +17961,13 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
  *
  * NOT EXERCISED: nothing in this band runs except mode 0's action, and the
  * table this belongs to has no identified consumer yet. Verified by reading. */
-int32_t __cdecl PointerPickBoard(void *obj)
+int32_t __cdecl PointerPickBoard(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *leader;
+    AM2_Object *leader;
 
     if (!o)
         return 0;
-    if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-        != *(const int32_t *)&g_defaultOwner)
+    if (o->owner != *(const int32_t *)&g_defaultOwner)
         return 0;
 
     leader = OurLeaderUnit();
@@ -18004,16 +17975,14 @@ int32_t __cdecl PointerPickBoard(void *obj)
         return 0;
 
     if (ObjIsType3Inline(o)
-        && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
-        && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
-               < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
+        && !o->field94
+        && o->riderCount < o->seats) {
         if (!g_mouseButton
             || GetTickCount()
                    - g_mousePressMs
                    < AM2_CLICK_MS) {
             OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 1);
-            g_pointerHoverUid =
-                *(const uint32_t *)(o + OBJ_OFF_UID);
+            g_pointerHoverUid = o->uid;
         }
         return 0;   /* a hint, not a yes -- see above */
     }
@@ -18021,8 +17990,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
     if (!ObjIsType2Inline(o))
         return 0;
 
-    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                   (const AM2_Point *)(o + OBJ_OFF_X))
+    if (ApproxDist(&leader->pos, &o->pos)
         > g_pickReach66275c)
         return 0;
 
@@ -18052,19 +18020,17 @@ int32_t __cdecl PointerPickBoard(void *obj)
  *
  * Not exercised: nothing in this band runs except mode 0's action, and this
  * table has no identified consumer. Verified by reading. */
-int32_t __cdecl PointerPickWatchedItem(void *obj)
+int32_t __cdecl PointerPickWatchedItem(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *leader;
+    AM2_Object *leader;
 
     /* Nested positively onto one shared `return 0`, as the image lays it
      * out. */
     if (o && ObjIsWatchedKind(o)
-        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)) {
+        && !(o->flags & OBJ_FLAG_CONCEALED)) {
         leader = OurLeaderUnit();
         if (leader
-            && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                          (const AM2_Point *)(o + OBJ_OFF_X))
+            && ApproxDist(&leader->pos, &o->pos)
                <= g_pickReach662450) {
             OverlayPrepare(AM2_OVERLAY_ROW_SELL, 1);
             return 1;

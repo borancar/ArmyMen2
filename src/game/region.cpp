@@ -5151,7 +5151,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         uint8_t  candBearing = 0x80;
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
-        if (ObjsAreAllied(o, it, 0))
+        if (ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)it, 0))
             goto allied;
 
         if (IsKind7(it)) {
@@ -5238,7 +5238,7 @@ in_sight:
             && (uint32_t)(g_gameClockMs
                           - *(const uint32_t *)(o + OBJ_OFF_HIT_TIME))
                    > AM2_SIGHT_KIND7_RANGE
-            && ObjsAreAllied(it, o, 0))
+            && ObjsAreAllied((const AM2_Object *)it, (const AM2_Object *)o, 0))
             cand = (uint8_t *)0;
 
         if (ObjIsOurs(o, 0)) {
@@ -5267,7 +5267,7 @@ allied:
                 *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
                 continue;
             }
-            if (ObjsAreAllied(o, cand, 0))
+            if (ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)cand, 0))
                 continue;
             DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
                          (const AM2_Point *)(cand + OBJ_OFF_POS),
@@ -5576,13 +5576,13 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
     if (!LEAD)
         goto hitreact;
 
-    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 1))
+    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 1))
         *(int32_t *)(o + OBJ_OFF_FIELD_110) += 1;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_110) <= 0) {
         /* ---- not provoked ---- */
         if (ObjIsItem((const AM2_Object *)LEAD)
-            && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 0)) {
+            && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 0)) {
             if (RANGE <= AM2_AI_LEAD_NEAR)
                 goto hitreact;
             HEAD_FOR();
@@ -5593,7 +5593,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
             goto promote;
         }
 
-        if (ObjsAreAllied(obj, LEAD, 0)) {
+        if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 0)) {
             d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                            (const AM2_Point *)(LEAD + OBJ_OFF_POS));
             range = RANGE;
@@ -5627,7 +5627,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
 
     /* ---- provoked ---- */
     if (ObjIsItem((const AM2_Object *)LEAD)
-        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 0)) {
+        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 0)) {
         range = RANGE;
         if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
             goto hitreact;
@@ -5635,7 +5635,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
         goto step;
     }
 
-    if (ObjsAreAllied(obj, LEAD, 1)) {
+    if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 1)) {
         if (RANGE > AM2_AI_LEAD_FAR) {
             HEAD_FOR();
             goto step;
@@ -6832,7 +6832,7 @@ void __cdecl SargeAiStep(void *obj, void *out)
     if (!obj)
         return;
 
-    SelectBestWeapon(obj);
+    SelectBestWeapon((AM2_Object *)obj);
     TrooperBuildContext(obj, ctx, 1);
     UnitWeaponInfo(obj, ctx);
 
@@ -7060,7 +7060,7 @@ void __cdecl AiBuildContext(void *obj, void *out)
          * unconditionally, which left a follower ordered into formation
          * standing where the leader is rather than in its slot. */
 #define LEADER (*(uint8_t **)(s + SIGHT_OFF_LEADER))
-        if (ObjsAreAllied(obj, leader, 0)
+        if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)leader, 0)
             && ObjIsTypeIn238((const AM2_Object *)LEADER))
             ResolveFormationPoint(obj, LEADER,
                                   (AM2_Point *)(s + SIGHT_OFF_DEST));
@@ -7338,7 +7338,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
                     && ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                                   (const AM2_Point *)(t + OBJ_OFF_POS))
                        < AM2_AI_ATTACH_RANGE)
-                    ObjAttachTo(obj, t);
+                    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)t);
             }
 #undef list
         }
@@ -7478,7 +7478,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
 
         L = *(uint8_t **)(c + SIGHTC_OFF_LEADER);
         if (L) {
-            if (ObjsAreAllied(obj, L, 1)
+            if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)L, 1)
                 && ObjIsTypeIn238((const AM2_Object *)L)) {
                 ResolveFormationPoint(obj, L,
                                       (AM2_Point *)(c + SIGHTC_OFF_DEST));
@@ -7840,7 +7840,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
         }
 
         *(int32_t *)(other + OBJ_OFF_AI_MODE) = 3;
-        ObjAttachTo(other, obj);
+        ObjAttachTo((AM2_Object *)other, (AM2_Object *)obj);
     }
 }
 
@@ -9006,7 +9006,7 @@ void __cdecl StepType3(void *obj)
             AiStep(obj, out);
             Step3ChooseFacing(obj, out);
         } else {
-            ObjAttachTo(obj, NULL);
+            ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
             *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
             *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
         }
@@ -10284,7 +10284,7 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
             continue;
 
         *(int32_t *)(other + 0xE4u) = 3;
-        ObjAttachTo(other, o);
+        ObjAttachTo((AM2_Object *)other, (AM2_Object *)o);
     }
 }
 

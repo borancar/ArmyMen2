@@ -14,6 +14,7 @@
 #include "../misc.h"
 #include "../../inject/win32.h"
 #include "../rect.h"   /* AM2_Rect, by value in the widget constructors */
+#include "../objtable.h" /* AM2_Object, the pointer-pick handlers' argument */
 
 #ifdef __cplusplus
 extern "C" {
@@ -2657,11 +2658,11 @@ void __cdecl PointerSelect(void *obj, uint32_t at);
 /* 0x00459DA0. The PICK half of four records in the second {pick, action, kind,
  * flags} table: can the pointer act on this object. A vehicle with a free seat
  * shows a hint and still answers 0; a trooper in reach answers 1. */
-int32_t __cdecl PointerPickBoard(void *obj);
+int32_t __cdecl PointerPickBoard(AM2_Object *o);
 
 /* 0x00459EE0. A PICK in the same table: an unconcealed item of the watched
  * kind, within our leader's reach. */
-int32_t __cdecl PointerPickWatchedItem(void *obj);
+int32_t __cdecl PointerPickWatchedItem(AM2_Object *o);
 
 /* 0x00458EE0 and 0x004590F0. Modes 4 and 5's picks: a foe gets the enemy
  * overlay and a yes, a friend falls into the shared tail. They differ in one
@@ -2681,15 +2682,15 @@ int32_t __cdecl PointerPickMode0(void *obj);
 
 /* 0x004597B0. Gated on menu row 0xB: heal a hurt friendly trooper that is
  * riding whatever our leader is riding, within reach. */
-int32_t __cdecl PointerPickHeal(void *obj);
+int32_t __cdecl PointerPickHeal(AM2_Object *o);
 
 /* 0x004599A0. Gated on menu row 0xC: repair an item or vehicle -- never a
  * trooper -- and if our leader is riding, only the thing he is riding. */
-int32_t __cdecl PointerPickRepair(void *obj);
+int32_t __cdecl PointerPickRepair(AM2_Object *o);
 
 /* 0x00459BE0. Gated on menu row 0xA, and the only pick here that refuses an
  * ALLY: an enemy trooper that is not our Sarge, within reach. */
-int32_t __cdecl PointerPickEnemyTrooper(void *obj);
+int32_t __cdecl PointerPickEnemyTrooper(AM2_Object *o);
 
 /* 0x00458930. Empty the current vehicle, attaching each leaver to whoever was
  * in seat 0. Both arguments are ignored -- see the note in widget.cpp. */
