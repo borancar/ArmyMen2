@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include "rect.h"   /* AM2_Point */
 #include "../inject/orig.h"   /* am2_FILE */
+#include "objtable.h"         /* AM2_Object */
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,7 +149,8 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj);
  * flags and they are not symmetric: OBJ_FLAG_REVEALED goes up
  * unconditionally and is what callers test, while OBJ_FLAG_CONCEALED gates the
  * row work and is lowered by it. ADDR_OBJ_CONCEAL is the exact inverse. */
-void __cdecl RevealObj(void *obj);
+
+void __cdecl RevealObj(AM2_Object *o);
 
 /* 0x004295C0. Sets the fog flag from an INVERTED argument -- non-zero turns
  * fog ON -- and, when turning it OFF, reveals every type 2/3/8 object. Not a

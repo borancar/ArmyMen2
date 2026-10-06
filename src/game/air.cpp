@@ -313,19 +313,17 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
  * This was `TakeOffMap`, and both flags were named the other way round too.
  * See the fog-of-war block in orig.h: the cheat table settles it, because
  * "I see everything!" is what reaches this function. */
-void __cdecl RevealObj(void *obj)
+void __cdecl RevealObj(AM2_Object *o)
 {
-    AM2_Object *o = (AM2_Object *)obj;
-    uint32_t    flags;
     int32_t     i;
 
-    if (!obj)
+    if (!o)
         return;
 
-    flags = o->flags |= OBJ_FLAG_REVEALED;
-    if (!(flags & OBJ_FLAG_CONCEALED))
+    o->flags |= OBJ_FLAG_REVEALED;
+    if (!(o->flags & OBJ_FLAG_CONCEALED))
         return;
-    o->flags = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
+    o->flags &= ~(uint32_t)OBJ_FLAG_CONCEALED;
 
     for (i = 0; i < o->rowCount; i++) {
         AM2_MapRow *row = &o->rows[i];
@@ -853,7 +851,7 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
                 > radius)
             continue;
 
-        RevealObj(o);
+        RevealObj((AM2_Object *)o);
         *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) =
             (int32_t)g_gameClockMs + delayMs;
     }
@@ -1283,7 +1281,7 @@ void __cdecl ToggleFogOfWar(void)
             continue;
 
         if (*fog) {
-            RevealObj(p);
+            RevealObj((AM2_Object *)p);
         } else {
             uint32_t until = *(const uint32_t *)(p + OBJ_OFF_REVEALED_UNTIL);
 

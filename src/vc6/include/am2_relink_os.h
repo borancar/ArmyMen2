@@ -47,6 +47,9 @@ extern uint8_t am2_os_air_leg1_x0[];  /* 0x004F96AC */
 extern uint8_t am2_os_air_leg1_dx[];  /* 0x004F96B0 */
 extern uint8_t am2_os_air_leg3_x1[];  /* 0x004F96B4 */
 extern uint8_t am2_os_dir_scratch[];  /* 0x004F96B8 */
+extern uint8_t am2_os_sprite_list_cap[];  /* 0x004F96C0 */
+extern uint8_t am2_os_sprite_list_count[];  /* 0x004F96C4 */
+extern uint8_t am2_os_sprite_list[];  /* 0x004F96C8 */
 extern uint8_t am2_os_army_ramp_tables[];  /* 0x004F96CC */
 extern uint8_t am2_os_obj_table_records[];  /* 0x004F9ACC */
 extern uint8_t am2_os_chat_colour_table[];  /* 0x004F9AD0 */

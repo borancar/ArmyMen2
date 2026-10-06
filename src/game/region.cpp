@@ -5133,7 +5133,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         /* The predicate asks about the SCANNING object, not the candidate,
          * so this is constant across the walk and evaluated every time. */
         if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)it)) {
-            RevealObj(it);
+            RevealObj((AM2_Object *)it);
             *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
                 g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
@@ -5242,7 +5242,7 @@ in_sight:
             cand = (uint8_t *)0;
 
         if (ObjIsOurs(o, 0)) {
-            RevealObj(it);
+            RevealObj((AM2_Object *)it);
             *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
                 g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
@@ -5982,7 +5982,7 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
     if (!ObjIsOurs((void *)observer, 1))
         return;
 
-    RevealObj(s);
+    RevealObj((AM2_Object *)s);
     *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
         *(const int32_t *)&g_gameClockMs + AM2_REVEAL_MS;
 #undef observer
@@ -6048,7 +6048,7 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
                         ((const AM2_Object *)observer)->uid;
 
                     if (ObjIsOurs((void *)observer, 1)) {
-                        RevealObj(s);
+                        RevealObj((AM2_Object *)s);
                         *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
                             *(const int32_t *)&g_gameClockMs
                             + AM2_REVEAL_MS;
@@ -6132,7 +6132,7 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
 
                     if (ObjIsOurs((void *)observer, 1)
                         && maxRange != AM2_SIGHT_OMNI_RANGE) {
-                        RevealObj(s);
+                        RevealObj((AM2_Object *)s);
                         *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
                             *(const int32_t *)&g_gameClockMs
                             + AM2_REVEAL_MS;
@@ -8526,7 +8526,7 @@ watched:
             if (HeldWeaponCode(o) == AM2_ITEM_KIND_MSWP) {
                 /* The mine sweeper reveals rather than sets off. */
                 if (*(const int32_t *)(at + OBJ_OFF_FLAGS) & 0x200) {
-                    RevealObj(at);
+                    RevealObj((AM2_Object *)at);
                     PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
                 }
             } else if ((!g_mpSession

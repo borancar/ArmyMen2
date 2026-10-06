@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1513 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1514 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,11 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **A void* parameter plus a typed alias is two variables** (2026-10-06),
+    1513 -> 1514. RevealObj took `void *obj` and cast it into a local; VC6
+    gives the alias its own register. It matches once the parameter is
+    `AM2_Object *` and the flags are re-read through it. A sweep that turned
+    every remaining such alias into a macro moved no other function to 0.
   - **Forwarders are not free** (2026-10-06), 1511 -> 1513. The inline
     `CommFoo(comm, ...)` forwarders in msgslot.h are meant to compile to the
     same caller code as `comm->CommFoo(...)`, and usually do. BattleJoinOk
