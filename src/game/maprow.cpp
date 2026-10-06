@@ -1105,9 +1105,8 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
 {
 #define r ((uint8_t *)row)
     uint8_t *spr;
-    int32_t  left, top, right, bottom;
     int32_t  cl, ct, cr, cb;
-    int32_t  cols, rows, cell, stride, used;
+    int32_t  cell, stride, used;
 
     if (!ObjFlagBit0(r)) {
         RowUnregisterAll(r, desc);
@@ -1137,29 +1136,24 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     }
     ROW_FLD(r, 0, uint32_t) &= ~(uint32_t)ROW_FLAG_REMOVED_DONE;
 
-    spr    = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
-    left   = ROW_FLD(r, ROW_OFF_X, int16_t)
-             - ROW_FLD(spr, SPR_OFF_HOTX, int16_t);
-    top    = ROW_FLD(r, ROW_OFF_Y, int16_t)
-             - ROW_FLD(spr, SPR_OFF_HOTY, int16_t)
-             - ROW_FLD(r, ROW_OFF_Y_ADJUST, int16_t);
-    bottom = top + ROW_FLD(spr, SPR_OFF_H, int32_t);
-    right  = left + ROW_FLD(spr, SPR_OFF_W, int32_t);
+    spr = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
+    ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) =
+        ROW_FLD(r, ROW_OFF_X, int16_t) - ROW_FLD(spr, SPR_OFF_HOTX, int16_t);
+    ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) =
+        ROW_FLD(r, ROW_OFF_Y, int16_t) - ROW_FLD(spr, SPR_OFF_HOTY, int16_t)
+        - ROW_FLD(r, ROW_OFF_Y_ADJUST, int16_t);
+    ROW_FLD(r, ROW_OFF_RECT + 8, int32_t) =
+        ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) + ROW_FLD(spr, SPR_OFF_W, int32_t);
+    ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) =
+        ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) + ROW_FLD(spr, SPR_OFF_H, int32_t);
 
-    ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) = left;
-    ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) = top;
-    ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) = right;
-    ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) = bottom;
+    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
+    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
+    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
+    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
 
-    cl = left >> 8;
-    ct = top >> 8;
-    cr = right >> 8;
-    cb = bottom >> 8;
 
-    cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
-    rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
-
-    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1) {
+    if (cb < 0 || ct > ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t) - 1 || cr < 0 || cl > ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1) {
         RowUnregisterAll(r, desc);
         return;
     }
@@ -1170,14 +1164,14 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     cl = cl <= 0 ? 0 : cl;
     if (ct <= 0)
         ct = 0;
-    if (cr >= cols - 1)
-        cr = cols - 1;
-    if (cb >= cols - 1)          /* COLS, not ROWS -- see above */
-        cb = cols - 1;
+    if (cr >= ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1)
+        cr = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1;
+    if (cb >= ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1)          /* COLS, not ROWS -- see above */
+        cb = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1;
 
     used   = 0;
     cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
-    stride = cols - cr + cl - 1;
+    stride = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;

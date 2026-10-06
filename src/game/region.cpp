@@ -2077,11 +2077,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 #define tab   ((const uint8_t *)(uintptr_t)(g_bitFromN))
     const uint8_t  *m;
     const uint8_t  *bits;
-    int32_t         lw;
-    int32_t         rw;
-    int32_t         tw;
-    int32_t         bw;
-    int32_t         tl, tr, tt, tb;
+    AM2_Rect        world;          /* the clamped world box */
+    AM2_Rect        tile;           /* and in tiles */
     int32_t         w;
     int32_t         span;
     int32_t         rowbits;
@@ -2100,35 +2097,35 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
         return 0;
 
     /* The world clamp, x pair then y pair, with a margin of one tile. */
-    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left, 1 << AM2_TILE_SHIFT,
+    world.left = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left - 1,
+    world.right = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top, 1 << AM2_TILE_SHIFT,
+    world.top = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top - 1,
+    world.bottom = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
     /* and the tile clamp over the same four, kept raw: the margin goes on
      * as the box is written, and the row width below is taken from these. */
-    tl = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    tile.left = Clamp(world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tr = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    tile.right = Clamp(world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tt = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    tile.top = Clamp(world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    tb = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    box[3] = tb + AM2_TILEMASK_MARGIN;
-    box[2] = tr + AM2_TILEMASK_MARGIN;
-    box[1] = tt - AM2_TILEMASK_MARGIN;
-    box[0] = tl - AM2_TILEMASK_MARGIN;
+    box[3] = tile.bottom + AM2_TILEMASK_MARGIN;
+    box[2] = tile.right + AM2_TILEMASK_MARGIN;
+    box[1] = tile.top - AM2_TILEMASK_MARGIN;
+    box[0] = tile.left - AM2_TILEMASK_MARGIN;
 
     memset(cells, 0, (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
     w = GRIDW;
@@ -2157,16 +2154,16 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     ring[18] = 2 * w;
     ring[19] = 2 * w + 1;
 
-    span = tr - tl + 1;
+    span = tile.right - tile.left + 1;
 
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
-    rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
+    rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
     rowbytes = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
-    phase = lw % (1 << AM2_TILE_SHIFT);
+    phase = world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
         k        = (1 << AM2_TILE_SHIFT) - phase;
         splitOdd = 0;
@@ -2175,7 +2172,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
         k        = 8 - phase;
     }
 
-    for (y = tw; y < bw; y += 8) {
+    for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - HIT->top) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
@@ -2710,10 +2707,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     const uint8_t  *spr;
     int32_t         ox;
     int32_t         oy;
-    int32_t         lw;
-    int32_t         rw;
-    int32_t         tw;
-    int32_t         bw;
+    AM2_Rect        world;          /* the clamped world box */
     int32_t         w;
     int32_t         rowbits;
     int32_t         phase;
@@ -2740,31 +2734,31 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
          - *(const int16_t *)(spr + SPR_OFF_HOTY);
 
 
-    lw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox, 1 << AM2_TILE_SHIFT,
+    world.left = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    rw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox - 1,
+    world.right = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    tw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy, 1 << AM2_TILE_SHIFT,
+    world.top = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    bw = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy - 1,
+    world.bottom = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
-    box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    box[3] = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                    g_mapTilesH
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
-    box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    box[2] = Clamp(world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                    g_mapTilesW
                        - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
-    box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    box[1] = Clamp(world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                    g_mapTilesH
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
-    box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    box[0] = Clamp(world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                    g_mapTilesW
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
@@ -2792,12 +2786,14 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[19] = 2 * w + 1;
     ring[18] = 2 * w;
 
-    rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
-    rw = rowbits >> 3;
+    rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
+    /* The right edge is not needed again, and its slot takes the row's byte
+     * count: one variable reused, as the original's frame has it. */
+    world.right = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
-    phase = lw % (1 << AM2_TILE_SHIFT);
+    phase = world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
         rowbits = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
@@ -2809,9 +2805,9 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     tilew = (box[2] - AM2_TILEMASK_MARGIN)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
-    for (y = tw; bw > y; y += 8) {
-        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rw;
-        int32_t end = off + rw;
+    for (y = world.top; world.bottom > y; y += 8) {
+        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * world.right;
+        int32_t end = off + world.right;
         int32_t col = AM2_TILEMASK_MARGIN;
         uint8_t *c   = cells + ((y >> AM2_TILE_SHIFT) - box[1]) * w
                              + AM2_TILEMASK_MARGIN;

@@ -1185,8 +1185,8 @@ void __cdecl ScrollMapCache(void)
 
     g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
     g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
-    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
     g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
+    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
         PaintMapTiles(g_camera);
@@ -1210,6 +1210,7 @@ void __cdecl ScrollMapCache(void)
         int32_t  sx = (dx > 0) ? dx : 0;
         int32_t  sy = (dy > 0) ? dy : 0;
         AM2_Rect tiles;
+        int32_t  dstX, dstY;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
@@ -1220,31 +1221,29 @@ void __cdecl ScrollMapCache(void)
 
         src.left   = sx << TILE_SHIFT;
         src.top    = sy << TILE_SHIFT;
+        dstX       = ((dx > 0) ? 0 : -dx) << TILE_SHIFT;
+        dstY       = ((dy > 0) ? 0 : -dy) << TILE_SHIFT;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
 
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
-        IDirectDrawSurface_BltFast(cache,
-
-                                   (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),
-                                   (DWORD)(((dy > 0) ? 0 : -dy) << TILE_SHIFT),
-                                   g_mapCache, (LPRECT)&src, DDBLTFAST_WAIT);
+        IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
+                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
     wide.left  = g_camera->left;
     wide.right = g_camera->right;
 
-    if (dx > 0) {
-        tall.left  = g_camera->right - dx;
-        tall.right = g_camera->right;
-        wide.right = tall.left;
-    }
-    if (dx < 0) {
-        tall.left  = g_camera->left;
-        tall.right = g_camera->left - dx;
-        wide.left  = tall.right;
-    }
     if (dx != 0) {
+        if (dx > 0) {
+            tall.left  = g_camera->right - dx;
+            wide.right = tall.left;
+            tall.right = tall.left + dx;
+        } else {
+            tall.left  = g_camera->left;
+            tall.right = g_camera->left - dx;
+            wide.left  = tall.right;
+        }
         tall.top    = g_camera->top;
         tall.bottom = g_camera->bottom;
         PaintMapTiles(&tall);
@@ -1902,11 +1901,13 @@ void __cdecl ViewUpdate(void)
      * where ApproxDist exceeds the step and the eye moves less than the target
      * did, stopped short where the original carries on. HOLD's arm is the same
      * tail with the deltas unscaled, which lands exactly on the target. */
-    if (g_viewHold) {
+    if (!g_viewHold) {
+        if (dist > step) {
+            dx = dx * step / dist;
+            dy = dy * step / dist;
+        }
+    } else {
         g_viewHold = 0;
-    } else if (dist > step) {
-        dx = dx * step / dist;
-        dy = dy * step / dist;
     }
     ty = (int16_t)(dy + VIEW_EYE->y);
     tx = (int16_t)(dx + VIEW_EYE->x);
@@ -2451,26 +2452,22 @@ void __cdecl DrawEffectLayer(void)
     int32_t             army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
-        const int16_t *ptA = (const int16_t *)(g_aimPointA + army * 4);
-        int32_t x, y, frame;
+        const AM2_Point *ptA = &((const AM2_Point *)g_aimPointA)[army];
+        int32_t frame;
         RECT    box, hit;
 
         if (!(g_aimLiveA)[army])
             continue;
 
-        frame = (*(const int32_t *)&g_gameClockMs
-                 - (g_aimStampA)[army])
-                / AM2_AIM_STEP_MS + 1;
+        frame = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampA)[army])
+                          / AM2_AIM_STEP_MS) + 1;
         if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
             frame = AM2_AIM_FRAMES_A;
 
-        x = ptA[0];
-        y = ptA[1];
-
-        box.top    = y + AM2_AIM_BOX_TOP;
-        box.left   = x + AM2_AIM_BOX_LEFT;
-        box.right  = x + AM2_AIM_BOX_RIGHT;
-        box.bottom = y + AM2_AIM_BOX_BOTTOM;
+        box.left   = ptA->x + AM2_AIM_BOX_LEFT;
+        box.right  = ptA->x + AM2_AIM_BOX_RIGHT;
+        box.top    = ptA->y + AM2_AIM_BOX_TOP;
+        box.bottom = ptA->y + AM2_AIM_BOX_BOTTOM;
 
         if (IntersectRect(&hit, &box, (const RECT *)g_screenClip)) {
             int32_t row, col;
@@ -2523,10 +2520,9 @@ void __cdecl DrawEffectLayer(void)
         if (!LockSurface(target))
             return;
 
-        DrawSprite((g_aimSpritesA)[frame],
-                   x, y, 0);
+        DrawSprite((g_aimSpritesA)[frame], ptA->x, ptA->y, 0);
         DrawSprite((g_aimSpritesA)[0],
-                   x + AM2_AIM_BOX_LEFT, y + AM2_AIM_BOX_TOP, 0);
+                   ptA->x + AM2_AIM_BOX_LEFT, ptA->y + AM2_AIM_BOX_TOP, 0);
 
         UnlockSurface();
 
@@ -2535,9 +2531,8 @@ void __cdecl DrawEffectLayer(void)
             int32_t *held = &(g_aimFrameB)[army];
             int32_t  frameB;
 
-            frameB = (*(const int32_t *)&g_gameClockMs
-                      - (g_aimStampB)[army])
-                     / AM2_AIM_B_STEP_MS + 1;
+            frameB = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampB)[army])
+                               / AM2_AIM_B_STEP_MS) + 1;
 
             /* Past the fourth step it stops counting and starts flickering. */
             if ((uint32_t)frameB > 4) {
