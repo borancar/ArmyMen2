@@ -4995,6 +4995,8 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
             case 2:
                 STATE = AM2_POSE_FLAME_CLASS2;
                 break;
+            default:
+                return 1;
             }
             /* class 0 writes nothing at all, which no other arm does. */
             break;
@@ -5004,12 +5006,8 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
             case 1:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GRENADE_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else {
-                    /* The two raise poses exist once each in the image, and
-                     * the other arms jump into them. */
-raise_k:
-                    STATE = AM2_POSE_RAISE_KNEEL;
-                }
+                else
+                    goto raise_k;
                 break;
             case 2:
                 STATE = AM2_POSE_KNEEL;
@@ -5017,8 +5015,13 @@ raise_k:
             default:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
-                else
-                    goto raise_s;
+                else {
+                    /* The two raise poses exist once each in the image, and
+                     * the other arms jump into them: standing here, kneeling
+                     * in the bazooka arm. */
+raise_s:
+                    STATE = AM2_POSE_RAISE_STAND;
+                }
                 break;
             }
             break;
@@ -5051,8 +5054,10 @@ raise_k:
             case 1:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else
-                    goto raise_k;
+                else {
+raise_k:
+                    STATE = AM2_POSE_RAISE_KNEEL;
+                }
                 break;
             case 2:
                 STATE = AM2_POSE_KNEEL;
@@ -5060,10 +5065,8 @@ raise_k:
             default:
                 if (BRACED)
                     STATE = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
-                else {
-raise_s:
-                    STATE = AM2_POSE_RAISE_STAND;
-                }
+                else
+                    goto raise_s;
                 break;
             }
             break;
@@ -11616,7 +11619,7 @@ int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
  * to say about the second. */
 void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                               uint32_t src, int32_t damage, int32_t delay,
-                              int32_t unused, uint32_t uid, int32_t facing)
+                              int32_t unused, uint32_t uid, uint8_t facing)
 {
     uint8_t  *o = (uint8_t *)am2_malloc(AM2_EXPLOSION_BYTES);
     uint32_t  at;
@@ -12735,10 +12738,11 @@ void __cdecl StepType5(void *obj)
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0x14)
             speed = speed * life / *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
 
-        travel = (float)life;
         if (*(const int32_t *)(o + MISSILE_OFF_SCALED))
-            travel *= *(const float *)(o + MISSILE_OFF_SPEED_SCALE);
-        travel *= g_frameDeltaSec;
+            travel = (float)life * *(const float *)(o + MISSILE_OFF_SPEED_SCALE)
+                     * g_frameDeltaSec;
+        else
+            travel = (float)life * g_frameDeltaSec;
     }
 
     if (*(const int32_t *)def == 3) {
@@ -12808,7 +12812,8 @@ after_flight:
                                   (const AM2_Point *)(ahead + OBJ_OFF_POS))
                            > 0x14
                        && g_gameClockMs
-                              - *(const uint32_t *)(rows + 0x54) < 0x3E8) {
+                              - *(const uint32_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS)
+                                                    + 0x54) < 0x3E8) {
                 uint8_t spread;
 
                 /* The spread leans AWAY from the turn: a negative delta takes
@@ -12945,11 +12950,9 @@ expire:
         break;
     case 2:
         CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
-                                  - *(const int16_t *)(o
-                                                       + MISSILE_OFF_HEIGHT)
-                                  + *(const int32_t *)(o
-                                                       + MISSILE_OFF_GROUND)),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2)
+                        - *(const int16_t *)(o + MISSILE_OFF_HEIGHT)
+                        + *(const int32_t *)(o + MISSILE_OFF_GROUND),
                         0x8C, (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
                         *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
                         *(const int32_t *)(*(uint8_t *const *)(

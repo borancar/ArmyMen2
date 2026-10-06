@@ -2425,7 +2425,7 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
  *
  * The direction goes through RoundTo8 with three bits, so the grid's rows are
  * eight facings; the row index is that times the column count. */
-int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
+int32_t __cdecl TimedDirFrame(void *rows, uint8_t dir)
 {
     /* The grid's width is re-read at each use, as the image does. */
 #define COLS (g_spriteGridCols)
@@ -2442,7 +2442,7 @@ int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
 
     *(uint32_t *)(r + ROW_OFF_SPRITE) =
         (g_spriteGrid)
-            [(RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF) * COLS + col];
+            [(RoundTo8(dir, 3) & 0xFF) * COLS + col];
 
     return col < COLS - 1;
 #undef COLS

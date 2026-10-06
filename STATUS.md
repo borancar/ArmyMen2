@@ -215,6 +215,27 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Byte parameters, and three shape fixes** (2026-10-06), no count
+    change; nothing lost.
+    - CreateExplosion's facing and TimedDirFrame's direction are byte
+      parameters. The image pushes the byte register without masking or
+      zero-extending it, which VC6 does only for a char parameter. Both
+      functions still match.
+    - StepType5 went from 58 to 22 with these and with three shape fixes:
+      `travel` written as one product per branch; the row pointer re-read
+      from the object at the trail's 0x54 test; the case-2 impact's y left
+      as int arithmetic, not cast to int16.
+    - SelectFirePose went from 76 to 72. RAISE_STAND now sits in the grenade
+      arm's default case and RAISE_KNEEL in the bazooka arm, as the image
+      lays them out. The flamethrower arm gets an explicit
+      `default: return 1`.
+    - CollapseEqualDeltas went from 38 to 34 with `prev = *wr++` as one
+      statement.
+    - A search that added each global a function touches, one at a time,
+      to the shared aggregate object found nothing in 88 functions.
+      Aggregated ranges are members of the one am2_origstate struct, so any
+      two of them alias each other. That is why RunScriptAction needed two
+      ranges and neither alone did anything.
   - **The alliance test calls the comm object directly** (2026-10-06),
     1520 -> 1522. ArmyAlliedWithObjInline's last line went through the
     AllyFlag wrapper. The image pushes the owner byte before it loads the

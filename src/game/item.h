@@ -140,7 +140,7 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint);
  * passes. Was ADDR_SPAWN_AT. */
 void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                               uint32_t src, int32_t damage, int32_t delay,
-                              int32_t unused, uint32_t uid, int32_t facing);
+                              int32_t unused, uint32_t uid, uint8_t facing);
 
 /* 0x0043C110, one caller: a missile's per-frame flight. Sub-stepped three
  * units at a time so a fast one cannot tunnel, fixed-point on all three axes,
