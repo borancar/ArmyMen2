@@ -69,7 +69,7 @@ extern "C" int32_t am2_trace_window(void) __attribute__((weak));
  * spelled `orig_`, and every non-orig_ #define was skipped. */
 void __cdecl DirtyCollect(const AM2_Rect *r);
 
-#define DEPTH_OBJ(n)  (*(void **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
+#define DEPTH_OBJ(n)  (*(AM2_MapRow **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
 #define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
 #define DEPTH_NEXT(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_NEXT))
 
@@ -114,24 +114,22 @@ static inline int32_t DepthProject(int32_t dx, float slope, int32_t y)
 #if defined(AM2_RELINK)
 /* The relink has no trace wrapper: the body IS DepthCompare. */
 #define DepthCompareBody DepthCompare
-int32_t __cdecl DepthCompareBody(void *a, void *b)
+int32_t __cdecl DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
 #else
-static int32_t DepthCompareBody(void *a, void *b)
+static int32_t DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
 #endif
 {
-    const uint8_t *pa = (const uint8_t *)a;
-    const uint8_t *pb = (const uint8_t *)b;
-    int32_t        p;
+    int32_t p;
 
     /* Every field is read where it is used, as the image does. */
-#define LA (*(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER))
-#define LB (*(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER))
-#define SA (*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE))
-#define SB (*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE))
-#define AX ((int32_t)*(const int16_t *)(pa + ROW_OFF_X))
-#define AY ((int32_t)*(const int16_t *)(pa + ROW_OFF_Y))
-#define BX ((int32_t)*(const int16_t *)(pb + ROW_OFF_X))
-#define BY ((int32_t)*(const int16_t *)(pb + ROW_OFF_Y))
+#define LA (pa->depthLayer)
+#define LB (pb->depthLayer)
+#define SA (pa->depthSlope)
+#define SB (pb->depthSlope)
+#define AX ((int32_t)pa->pos.x)
+#define AY ((int32_t)pa->pos.y)
+#define BX ((int32_t)pb->pos.x)
+#define BY ((int32_t)pb->pos.y)
     if (!pa || !pb)
         return 0;
 
@@ -139,30 +137,27 @@ static int32_t DepthCompareBody(void *a, void *b)
         if (LA > LB)
             return 1;
         if (LA < LB)
-            goto minus;
+            return -1;
     }
 
+    /* Each arm answers 1 itself and falls into one shared tail for the rest:
+     * less is -1, and a tie goes to the pointers. */
     if (SA != 0.0f) {
         if (SB != 0.0f) {
-            /* b's y is read once and kept across both projections (the
-             * image spills it to the frame). */
-            int32_t by = BY;
-            int32_t aInFront = DepthProject(BX - AX, SA, AY) > by ? 1 : 0;
+            /* b's y read where it is used, twice, and VC6 keeps it across
+             * both projections itself (spilled to the frame). A `by` local
+             * instead makes it re-read the field after the first call. */
+            int32_t front = DepthProject(BX - AX, SA, AY) > BY;
 
-            p = DepthProject(AX - BX, SB, by);
-            if (AY > p && aInFront)
+            p = DepthProject(AX - BX, SB, BY);
+            if (AY > p && front)
                 return 1;
-            if (AY < p && !aInFront)
-                goto minus;
-            /* They disagree: plain y decides -- written out here as well as
-             * below, as the image has it twice; every arm's `< then -1`
-             * meets at the one `minus` block VC6 places before the pointer
-             * comparison. */
-            if (*(const int16_t *)(pa + ROW_OFF_Y) > *(const int16_t *)(pb + ROW_OFF_Y))
-                return 1;
-            if (*(const int16_t *)(pa + ROW_OFF_Y) < *(const int16_t *)(pb + ROW_OFF_Y))
+            if (AY < p && !front)
                 return -1;
-            return (pb < pa) ? 1 : -1;
+            if (pa->pos.y > pb->pos.y)
+                return 1;
+            if (pa->pos.y < pb->pos.y)
+                return -1;
         } else {
             /* Only A has a slope, so only A's projection is available. */
             p = DepthProject(BX - AX, SA, AY);
@@ -170,7 +165,6 @@ static int32_t DepthCompareBody(void *a, void *b)
                 return 1;
             if (p < BY)
                 return -1;
-            return (pb < pa) ? 1 : -1;
         }
     } else if (SB != 0.0f) {
         p = DepthProject(AX - BX, SB, BY);
@@ -178,17 +172,14 @@ static int32_t DepthCompareBody(void *a, void *b)
             return 1;
         if (AY < p)
             return -1;
-        return (pb < pa) ? 1 : -1;
+    } else {
+        if (pa->pos.y > pb->pos.y)
+            return 1;
+        if (pa->pos.y < pb->pos.y)
+            return -1;
     }
 
-    if (*(const int16_t *)(pa + ROW_OFF_Y) > *(const int16_t *)(pb + ROW_OFF_Y))
-        return 1;
-    if (*(const int16_t *)(pa + ROW_OFF_Y) < *(const int16_t *)(pb + ROW_OFF_Y))
-        goto minus;
-
     return (pb < pa) ? 1 : -1;
-minus:
-    return -1;
 #undef LA
 #undef LB
 #undef SA
@@ -1240,7 +1231,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
 }
 
 #if !defined(AM2_RELINK)   /* the harness's trace wrapper */
-int32_t __cdecl DepthCompare(void *a, void *b)
+int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b)
 {
     int32_t r = DepthCompareBody(a, b);
     static int32_t trace = -1;
@@ -1431,20 +1422,8 @@ void __cdecl DepthResort(void *node, void **head)
         && DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_NEXT(n))) > 0) {
         for (e = DEPTH_NEXT(n); DEPTH_NEXT(e); ) {
             e = DEPTH_NEXT(e);
-            if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-                /* Unlink, then insert before `e`. */
-                if (!DEPTH_PREV(n))
-                    *head = DEPTH_NEXT(n);
-                else
-                    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
-
-                DEPTH_PREV(n) = DEPTH_PREV(e);
-                DEPTH_NEXT(n) = e;
-                DEPTH_NEXT(DEPTH_PREV(e)) = n;
-                DEPTH_PREV(e) = n;
-                return;
-            }
+            if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0)
+                goto before;
         }
 
         /* Ran off the end: unlink and append after `e`, the last node. */
@@ -1463,6 +1442,20 @@ void __cdecl DepthResort(void *node, void **head)
         DEPTH_NEXT(n) = (uint8_t *)0;
         DEPTH_NEXT(e) = n;
         return;
+
+before:
+        /* Unlink, then insert before `e`. */
+        if (!DEPTH_PREV(n))
+            *head = DEPTH_NEXT(n);
+        else
+            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
+        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+
+        DEPTH_PREV(n) = DEPTH_PREV(e);
+        DEPTH_NEXT(n) = e;
+        DEPTH_NEXT(DEPTH_PREV(e)) = n;
+        DEPTH_PREV(e) = n;
+        return;
     }
 
     if (!DEPTH_PREV(n)
@@ -1478,8 +1471,8 @@ void __cdecl DepthResort(void *node, void **head)
                 DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
 
             DEPTH_PREV(n) = e;
-            DEPTH_PREV(DEPTH_NEXT(e)) = n;
             DEPTH_NEXT(n) = DEPTH_NEXT(e);
+            DEPTH_PREV(DEPTH_NEXT(e)) = n;
             DEPTH_NEXT(e) = n;
             return;
         }

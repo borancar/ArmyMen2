@@ -72,7 +72,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
 /* 0x0041E160. Insert one object into the sorted depth list. 0 means the list
  * is FULL, which is what makes the walker subdivide; an object outside the
  * region is dropped and 1 is returned. */
-int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world);
+int32_t __cdecl DepthInsert(struct AM2_MapRow *obj, const AM2_Rect *world);
 
 /* 0x0040A090. Draw one map object: clip, convert the clipped rectangle into a
  * destination position and a source rectangle inside the sprite, put the

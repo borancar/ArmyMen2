@@ -110,7 +110,7 @@ typedef struct {
     };
     uint32_t       _pad564;         /* +0x564 */
     int32_t        inventorySel;    /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
-    uint32_t       _pad56c;         /* +0x56C */
+    uint32_t       uid56C;          /* +0x56C OBJ_OFF_UID_56C, a uid the menu row 8 order targets */
     uint32_t       riding;          /* +0x570 OBJ_OFF_RIDING, the uid ridden */
     uint8_t        _pad574[0x40];   /* +0x574 */
     AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */

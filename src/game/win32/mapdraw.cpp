@@ -595,7 +595,7 @@ static inline int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
 /* One node of the depth list: the object, and the two links. The array is
  * fixed at 500 and the cursor sits eight bytes in front of it. */
 typedef struct AM2_DepthNode {
-    void                 *obj;
+    AM2_MapRow           *obj;
     struct AM2_DepthNode *prev;
     struct AM2_DepthNode *next;
 } AM2_DepthNode;
@@ -695,7 +695,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
  *
  * An equal comparison inserts AFTER the cursor, so objects that compare the
  * same are drawn in the order the walk found them. */
-int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
+int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
 {
     RECT           hit;
     int32_t        cmp;
@@ -705,7 +705,7 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
     if (g_depthCount >= AM2_DEPTH_MAX)
         return 0;
 
-    if (!IntersectRect(&hit, (const RECT *)((uint8_t *)obj + OBJ_OFF_BOUNDS),
+    if (!IntersectRect(&hit, (const RECT *)&obj->rect,
                        (const RECT *)world))
         return 1;
 
@@ -761,18 +761,18 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
         return 1;                                                           \
     } while (0)
 
-    if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_FRONT) {
+    if (obj->flags & OBJ_DEPTH_FLAG_FRONT) {
         for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
-            if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_BACK) {
+            if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_BACK) {
                 g_depthCursor = at;
                 if (!at->next)
                     goto append;
                 goto link_after;
             }
-    } else if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_BACK) {
+    } else if (obj->flags & OBJ_DEPTH_FLAG_BACK) {
         head = &g_depthNodes[g_depthHead];
         for (at = head; at; at = at->next)
-            if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_FRONT) {
+            if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_FRONT) {
                 if (at == head)
                     goto at_front;  /* at the front, and the head moves */
                 goto link_before;
@@ -920,18 +920,18 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
             const uint8_t *node = *cell++;
 
             while (node) {
-                void *obj = *(void *const *)(node + CELL_NODE_OFF_OBJ);
+                AM2_MapRow *obj = *(AM2_MapRow *const *)(node + CELL_NODE_OFF_OBJ);
 
                 if (!obj)
                     break;
                 if (ObjFlagBit1(obj))
                     goto nextNode;
 
-                if (*(const int32_t *)((uint8_t *)obj + OBJ_OFF_BOUNDS + 4)
+                if (obj->rect.top
                         >> AM2_CELL_SHIFT < row
                     && row > t0)
                     goto nextNode;
-                if (*(const int32_t *)((uint8_t *)obj + OBJ_OFF_BOUNDS)
+                if (obj->rect.left
                         >> AM2_CELL_SHIFT < col
                     && col > l0)
                     goto nextNode;

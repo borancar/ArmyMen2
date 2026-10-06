@@ -13845,7 +13845,7 @@ void __cdecl OpenGameMenu(void)
  * SaveListOnSave puts an extension back on if there is none. */
 void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 {
-    uint8_t    *dlg;
+    AM2_DlgSaveListScreen *dlg;
     AM2_Widget *edit;
     char       *dot;
 
@@ -13854,19 +13854,19 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     if (!rows || row < 0 || row >= rows->count)
         return;
 
-    dlg = g_paintObject;
+    dlg = (AM2_DlgSaveListScreen *)g_paintObject;
     if (!dlg)
         return;
 
-    strcpy((char *)(dlg + SAVELIST_OFF_NAME),
+    strcpy(dlg->name,
            rows->text + (size_t)row * LIST_ROW_STRIDE);
 
-    dot = orig_strstr((char *)(dlg + SAVELIST_OFF_NAME),
+    dot = orig_strstr(dlg->name,
                       ".sav");
     if (dot)
         *dot = '\0';
 
-    edit = *(AM2_Widget **)(dlg + SAVELIST_OFF_EDIT);
+    edit = dlg->edit;
     WidgetVPaint(edit, edit->rect);
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
@@ -16934,27 +16934,25 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
  * the other two. Written where the original has it.
  *
  * Not exercised: no drive here installs a pointer mode above 0. */
-void __cdecl PointerActionMode5(void *target, uint32_t at)
+void __cdecl PointerActionMode5(AM2_Object *tgt, uint32_t at)
 {
-    uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
-    uint8_t *tgt = (uint8_t *)target;
-    int32_t  type;
-    int32_t  i;
+    AM2_Object *ctx = *(AM2_Object * *)&g_objCtxObjA;
+    int32_t     type;
+    int32_t     i;
 
     if (!ctx)
         return;
     if (tgt == ctx)
         return;
 
-    type = *(const int32_t *)ctx;
+    type = (int32_t)ctx->type;
     if (type < AM2_OBJ_TYPE_TROOPER)
         return;
     if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
         return;
 
     if (tgt
-        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                              (const AM2_Object *)tgt, 0)) {
+        && !ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner, tgt, 0)) {
         PointerActionMode4(tgt, at);   /* an enemy: mode 4's job */
         return;
     }
@@ -16964,7 +16962,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
 
     for (i = 0; i < g_selectedCount; ) {
         uint32_t home = at;   /* this pass's point; `at` becomes the slot */
-        uint8_t *o = (uint8_t *)LookupByUID(
+        AM2_Object *o = (AM2_Object *)LookupByUID(
             (g_selectedItems)[i]);
         int32_t  ot;
 
@@ -16973,7 +16971,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
-        ot = *(const int32_t *)o;
+        ot = (int32_t)o->type;
         if (ot < AM2_OBJ_TYPE_TROOPER
             || (ot > AM2_OBJ_TYPE_VEHICLE && ot != AM2_OBJ_TYPE_ROACH)) {
             i++;
@@ -16981,7 +16979,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         }
 
         /* Set before the call, unlike the other two. */
-        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+        o->aiMode = 1;
 
         /* The original passes the address of its `at` argument slot and
          * never restores it, so each unit's slot is computed from the one
@@ -16992,15 +16990,14 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         /* Ordered PointActionA then ObjAttachTo -- the reverse of modes 4
          * and 6. */
         PointActionA(o, at);
-        ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
+        ObjAttachTo(o, (AM2_Object *)0);
 
         if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
-                *(uint32_t *)(o + OBJ_OFF_UID_56C) =
-                    g_pointerHoverUid;
+                o->uid56C = g_pointerHoverUid;
                 PointActionA(o, home);
             } else {
-                *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+                o->uid56C = 0;
             }
         }
         i++;

@@ -28,8 +28,8 @@ typedef struct AM2_MapRow {
     int16_t               yAdjust;      /* +0x20  ROW_OFF_Y_ADJUST */
     int16_t               prevX;        /* +0x22  ROW_OFF_PREV_X */
     int16_t               prevY;        /* +0x24  ROW_OFF_PREV_Y */
-    int16_t               field26;      /* +0x26  ROW_OFF_FIELD_26 */
-    int32_t               field28;      /* +0x28  ROW_OFF_FIELD_28 */
+    int16_t               depthLayer;   /* +0x26  ROW_OFF_FIELD_26 / OBJ_OFF_DEPTH_LAYER, only when > 0 on both */
+    float                 depthSlope;   /* +0x28  ROW_OFF_FIELD_28 / OBJ_OFF_DEPTH_SLOPE */
     const void           *lut;          /* +0x2C  MAPOBJ_OFF_LUT */
     void                 *palette;      /* +0x30  MAPOBJ_OFF_PALETTE */
     uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
@@ -56,7 +56,7 @@ typedef struct AM2_MapRow {
 static_assert(offsetof(AM2_MapRow, rect)        == 0x0C, "rect");
 static_assert(offsetof(AM2_MapRow, pos)         == 0x1C, "pos");
 static_assert(offsetof(AM2_MapRow, yAdjust)     == 0x20, "yAdjust");
-static_assert(offsetof(AM2_MapRow, field28)     == 0x28, "field28");
+static_assert(offsetof(AM2_MapRow, depthSlope)  == 0x28, "depthSlope");
 static_assert(offsetof(AM2_MapRow, lut)         == 0x2C, "lut");
 static_assert(offsetof(AM2_MapRow, buffer)      == 0x38, "buffer");
 static_assert(offsetof(AM2_MapRow, field3C)     == 0x3C, "field3C");
@@ -68,7 +68,7 @@ static_assert(sizeof(AM2_MapRow)                == 0x60, "AM2_OBJ_ROW_STRIDE");
 
 /* Original: 0x0041D740. Order two objects for drawing: layer first when both
  * have one, then a slope-weighted screen position. */
-int32_t __cdecl DepthCompare(void *a, void *b);
+int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b);
 
 /* Original: 0x0041D8F0. Link a node that is not yet in the list into its
  * sorted place. The primitive under DepthInsert, a different address. */

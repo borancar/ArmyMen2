@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1516 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1517 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,14 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **DepthCompare matched by reading the image's shape** (2026-10-06),
+    1516 -> 1517. It had been written as four self-contained arms; the image
+    has each arm answer 1 itself and fall into ONE shared "less is -1, a tie
+    goes to the pointers" tail, and it reads b's y where it is used -- a `by`
+    local made VC6 re-read the field after the first projection instead of
+    spilling it. 175 differing instructions to 0. The map row's +0x26/+0x28
+    are the depth layer and slope, and the depth list's node holds an
+    AM2_MapRow.
   - **Alliance and the pointer picks typed** (2026-10-06), 1514 -> 1516.
     ArmyAlliedWithObj and ObjsAreAllied match once they take
     `const AM2_Object *` and the two army-4 tests are ONE condition,

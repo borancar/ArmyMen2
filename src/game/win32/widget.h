@@ -673,7 +673,10 @@ struct AM2_DlgOverwriteScreen : AM2_ScreenBase {
 };
 struct AM2_DlgSaveListScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_SAVE_LIST_SIZE - sizeof(AM2_ScreenBase)];
+    struct AM2_Rec *list;           /* 0x0064  DLG_OFF_LIST, the .sav names */
+    AM2_Widget     *edit;           /* 0x0068  SAVELIST_OFF_EDIT, the name field */
+    char            name[0x18];     /* 0x006C  SAVELIST_OFF_NAME, what it types into */
+    uint8_t pad_[AM2_SAVE_LIST_SIZE - 0x84];
     AM2_DlgSaveListScreen(const char *bmp, int32_t flag);
     ~AM2_DlgSaveListScreen();
 };
@@ -2739,7 +2742,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at);
 
 /* 0x00458620. Mode 5's action: an enemy target is handed to mode 4's action,
  * everything else is a plain move with AI mode 1. */
-void __cdecl PointerActionMode5(void *target, uint32_t at);
+void __cdecl PointerActionMode5(AM2_Object *tgt, uint32_t at);
 
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
