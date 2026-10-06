@@ -12789,7 +12789,7 @@ void __cdecl StepType5(void *obj)
     uint8_t *rows;
     int32_t  outcome = 6;
     int32_t  speed;
-    int32_t  strike = 1;
+    int32_t  strike;
     float    travel;
 
     if (!o)
@@ -12847,6 +12847,7 @@ void __cdecl StepType5(void *obj)
     if (!*(const int32_t *)(def + MISSILEDEF_OFF_LIFE))
         goto after_flight;
 
+    strike = 1;
     {
         int32_t life = *(const int32_t *)(o + OBJ_OFF_FIELD_44)
                        + *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
