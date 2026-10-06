@@ -87,9 +87,8 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
             continue;
         }
 
-        offset = g_glyphOffset[(int8_t)ch + font * AM2_FONT_OFFSET_STEP];
-        glyph  = (const AM2_Rle16 *)(g_fontBase[font * AM2_FONT_BASE_STEP]
-                                     + offset);
+        offset = g_fonts[font].offsets[(int8_t)ch];
+        glyph  = (const AM2_Rle16 *)(g_fonts[font].base + offset);
         gw     = glyph->width;
         gh     = glyph->height;
 
@@ -143,7 +142,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
 int32_t __cdecl TextStackHeight(const char *text, int32_t font)
 {
     int32_t        total = 0;
-    const uint8_t *base  = g_fontBase[font * AM2_FONT_BASE_STEP];
+    const uint8_t *base  = g_fonts[font].base;
     int32_t        i;
 
     /* Indexed rather than walked, so the character is read again after the
@@ -154,7 +153,7 @@ int32_t __cdecl TextStackHeight(const char *text, int32_t font)
         } else if (text[i] >= 0x1F) {
             /* The glyph table indexed afresh, by the signed character. */
             total += *(const uint16_t *)(base
-                         + g_glyphOffset[font * AM2_FONT_OFFSET_STEP + text[i]] + 2)
+                         + g_fonts[font].offsets[text[i]] + 2)
                      - 3;
         }
     }

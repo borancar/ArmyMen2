@@ -5108,7 +5108,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
 
     /* ---- phase one: split the chain, and build the blockers as we go ---- */
     while (it) {
-        uint8_t *next;
+        uint8_t *cur;
 
         if (o == it) {
             it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
@@ -5123,18 +5123,20 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
             it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
             continue;
         }
-        next = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
-        *(uint8_t **)(it + OBJ_OFF_QUERY_NEXT) = keep;
-        keep = it;
+        /* Moved onto the kept list through its link: the walk advances
+         * first, then the node is relinked and kept. */
+        cur = it;
+        it  = *(uint8_t *const *)(cur + OBJ_OFF_QUERY_NEXT);
+        *(uint8_t **)(cur + OBJ_OFF_QUERY_NEXT) = keep;
+        keep = cur;
         /* The predicate asks about the SCANNING object, not the candidate,
          * so this is constant across the walk and evaluated every time. */
-        if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)it)) {
-            RevealObj((AM2_Object *)it);
-            *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
+        if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)cur)) {
+            RevealObj((AM2_Object *)cur);
+            *(uint32_t *)(cur + OBJ_OFF_REVEALED_UNTIL) =
                 g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
         }
-        it = next;
     }
 
     if (!keep)
@@ -8428,7 +8430,7 @@ settle_facing:
      * and a healer arm. `found` says whether anything was there at all. */
     found = 0;
     for (; at; at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT)) {
-        int32_t slot = 0, qty = 0;
+        int32_t slot, qty = 0;   /* slot is only read once CanPickUpWeapon fills it */
 
         if (at == o)
             continue;
@@ -8476,25 +8478,41 @@ settle_facing:
                  * already in that slot is carrying, and simply the item's own
                  * count when the slot is empty. Passing the out-param instead
                  * asks for the wrong number and looks entirely reasonable. */
-                uint8_t *old = (uint8_t *)WeaponByUid(
-                    *(const uint32_t *)(o + UNIT_OFF_INVENTORY
-                                        + (uint32_t)slot * 4));
-                int32_t  cap = *(const int32_t *)(
-                    *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
-                    + ITEMTYPE_OFF_CAPACITY);
+                uint8_t *old;
+                int32_t  cap;
                 int32_t  had = 0;
 
-                if (!cap)
-                    cap = AM2_TROOPER_NO_CAPACITY;
-                if (!old) {
-                    qty = *(const int32_t *)(at + OBJ_OFF_TARGET_UID);
+                /* The hold is stamped BEFORE the quantity is worked out. */
+                *(uint32_t *)(at + OBJ_OFF_PICKUP_AFTER) =
+                    g_gameClockMs
+                    + AM2_SIGHT_REVEAL_MS;
+
+                /* No slot -- not a weapon -- asks for one, and the slot is
+                 * never indexed. */
+                if (slot < 0) {
+                    qty = 1;
+                    old = (uint8_t *)0;
+                    cap = qty;
                 } else {
-                    had = *(const int32_t *)(old + OBJ_OFF_TARGET_UID);
-                    qty = cap - had;
+                    old = (uint8_t *)WeaponByUid(
+                        *(const uint32_t *)(o + UNIT_OFF_INVENTORY
+                                            + (uint32_t)slot * 4));
+                    cap = *(const int32_t *)(
+                        *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
+                        + ITEMTYPE_OFF_CAPACITY);
+                    if (!cap)
+                        cap = AM2_TROOPER_NO_CAPACITY;
+                    if (!old) {
+                        qty = *(const int32_t *)(at + OBJ_OFF_TARGET_UID);
+                    } else {
+                        had = *(const int32_t *)(old + OBJ_OFF_TARGET_UID);
+                        qty = cap - had;
+                    }
                 }
 
                 /* Gated on a comm-object flag, and reached through the folded
-                 * `ret` at ADDR_LOG -- which is what NAMES this function. */
+                 * `ret` at ADDR_LOG -- which is what NAMES this function. The
+                 * last argument is the item's army. */
                 if (*(const int32_t *)(
                         (const uint8_t *)*(void *const *)&g_commObject + 0x418))
                     orig_log_six(
@@ -8506,11 +8524,8 @@ settle_facing:
                             *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
                             + ITEMTYPE_OFF_CAPACITY),
                         had, qty,
-                        *(void *const *)&g_commObject);
+                        (int32_t)*(const int8_t *)(at + OBJ_OFF_ARMY));
 
-                *(uint32_t *)(at + OBJ_OFF_PICKUP_AFTER) =
-                    g_gameClockMs
-                    + AM2_SIGHT_REVEAL_MS;
                 TrooperWantItemSend(o, at, 0, slot, qty);
             } else {
                 TrooperPickupItem(o, at, slot);
@@ -8604,7 +8619,7 @@ pose:
             else
                 v = speed;
         }
-        ObjMoveAlongFacing(o, v, 0, 0);
+        ObjMoveAlongFacing((AM2_Object *)o, v, 0, 0);
     }
 
     *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)(g_trooperClassValue)[klass];
@@ -10773,7 +10788,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
             tileArg = *(const int8_t *)(o + 0x65u);
     }
 
-    ObjMoveAlongFacing(o, tileArg, 0, 0);
+    ObjMoveAlongFacing((AM2_Object *)o, tileArg, 0, 0);
 }
 
 /* Step3Input -- original 0x0045C050, 1424 bytes, one caller in StepType3,

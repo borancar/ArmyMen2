@@ -256,7 +256,6 @@
 #define g_floatZero              (*(float *)(uintptr_t)ADDR_FLOAT_ZERO)  /* 0x0046F928 */
 #define g_focusedEdit            (*(AM2_Widget **)(uintptr_t)ADDR_FOCUSED_EDIT)  /* 0x0065A05C */
 #define g_fogOfWar               (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)  /* 0x00476FB0 */
-#define g_fontBase               ((uint8_t **)(uintptr_t)ADDR_FONT_BASES)  /* 0x00659AD4 */
 #define g_fontDescs              ((AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)  /* 0x004897E8 */
 #define g_formationSlots         ((AM2_FormationSlot *)(uintptr_t)ADDR_FORMATION_SLOTS)  /* 0x00473EA0 */
 #define g_frameBuf               (*(uint8_t **)(uintptr_t)ADDR_FRAMEBUFFER)  /* 0x004FE1A8 */
@@ -279,9 +278,7 @@
 #define g_gameVersion            (*(int32_t *)(uintptr_t)ADDR_GAME_VERSION)  /* 0x00475894 */
 #define g_gameWinner             (*(int32_t *)(uintptr_t)ADDR_GAME_WINNER)  /* 0x00512300 */
 #define g_gdiPalette             ((uint8_t *)(uintptr_t)ADDR_GDI_PALETTE)  /* 0x00477E6C */
-#define g_glyphOffset            ((uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)  /* 0x006598D4 */
-#define g_glyphOffsetSpace       ((uint8_t *)(uintptr_t)ADDR_GLYPH_OFFSET_SPACE)  /* 0x00659914 */
-#define g_glyphSize              ((uint8_t *)(uintptr_t)ADDR_GLYPH_SIZE)  /* 0x006598D0 */
+#define g_fonts                  ((AM2_FontRec *)(uintptr_t)ADDR_GLYPH_SIZE)  /* 0x006598D0 */
 #define g_gravity                (*(float *)(uintptr_t)ADDR_GRAVITY)  /* 0x004852EC */
 #define g_haveDefaultCof         (*(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF)  /* 0x00511DDC */
 #define g_hiliteColour           (*(uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR)  /* 0x004FE089 */

@@ -2714,7 +2714,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
         *(const uint8_t *)(o + OBJ_OFF_FACING);
     StepObjRows((AM2_Object *)obj);
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
-    ObjMoveAlongFacing(obj, 0, 0, 0);
+    ObjMoveAlongFacing((AM2_Object *)obj, 0, 0, 0);
 #undef c
 #undef anim
 #undef reverse
@@ -6736,7 +6736,7 @@ void __cdecl StepType1And4(void *obj)
     UpdateObjectScript(obj);
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT7) {
-        ObjMoveAlongFacing(obj, 0, 0, 0);
+        ObjMoveAlongFacing((AM2_Object *)obj, 0, 0, 0);
         *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT7;
     }
 
@@ -10950,14 +10950,13 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj))
  * pointer stays null and ROW_OFF_ANIM_PLAYING is read off it anyway, as is
  * ROW_OFF_HEADING_BIAS. Same standing as LockSurface's descriptor after a
  * successful Restore. */
-void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
+void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
                                 int32_t reverse)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *row0;
-    uint8_t *anim;
-    int32_t  nrows;
-    int32_t  i = 0;
+    AM2_MapRow *row0;
+    AM2_Anim   *anim;
+    int32_t     nrows;
+    int32_t     i = 0;
 
     (void)unused;   /* the original never reads its third argument */
 
@@ -10965,35 +10964,32 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
         return;
 
     /* The row count is read once and bounds the loop below. */
-    nrows = *(const int32_t *)(o + OBJ_OFF_ROW_COUNT);
-    row0 = (uint8_t *)0;
+    nrows = o->rowSet.count;
+    row0 = (AM2_MapRow *)0;
     if (nrows > 0)
-        row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
+        row0 = o->rowSet.rows;
 
     /* Read off a null row0 when there are no rows -- the original's. */
-    anim = *(uint8_t **)(row0 + ROW_OFF_ANIM_PLAYING);
-    if (anim != (uint8_t *)0) {
+    anim = row0->animPlaying;
+    if (anim != (AM2_Anim *)0) {
 #define scale (g_frameDeltaSec)
-        uint8_t     angle = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        uint8_t     angle = o->facing;
         int32_t     speed;
 
-        if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING)
-            && row0 != (uint8_t *)0) {
-            uint32_t bits = ((const AM2_Anim *)anim)->directionBits;
+        if ((uint8_t)o->flags & OBJ_FLAG_SNAP_HEADING && row0 != (AM2_MapRow *)0) {
+            uint32_t bits = anim->directionBits;
 
             angle = (uint8_t)RoundTo8((int32_t)angle, bits);
             /* Re-read the animation off the row, as the original does. */
-            bits = ((const AM2_Anim *)
-                    *(uint8_t **)(row0 + ROW_OFF_ANIM_PLAYING))->directionBits;
+            bits = row0->animPlaying->directionBits;
             angle = (uint8_t)((uint32_t)angle << (8u - bits));
         }
 
         if (reverse != 0)
             angle = (uint8_t)(angle + 0x80u);
-        angle = (uint8_t)(angle
-                          + *(const uint8_t *)(row0 + ROW_OFF_HEADING_BIAS));
+        angle = (uint8_t)(angle + row0->headingBias);
 
-        speed = *(const int32_t *)(o + OBJ_OFF_FIELD_44);
+        speed = o->field44;
         if (speed != 0) {
             float       step;
             long double ny;
@@ -11002,77 +10998,59 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
             step = speed * scale;
 
             /* Stored and read back: X rounds to float here. */
-            *(float *)(o + OBJ_OFF_SUBPIXEL_X) = (float)
-                ((long double)Cos8(angle) * (long double)step
-                 + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_X));
+            o->subpixelX = (float)((long double)Cos8(angle) * (long double)step
+                                   + (long double)o->subpixelX);
             /* Never stored: Y stays at 80 bits until its own store below. */
             ny = (long double)Sin8(angle) * (long double)step
-                 + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Y);
+                 + (long double)o->subpixelY;
 
-            ix = (int32_t)*(const float *)(o + OBJ_OFF_SUBPIXEL_X);
+            ix = (int32_t)o->subpixelX;
             iy = (int32_t)ny;
 
-            *(int16_t *)(o + OBJ_OFF_X) =
-                (int16_t)(*(const int16_t *)(o + OBJ_OFF_X) + (int16_t)ix);
-            *(int16_t *)(o + OBJ_OFF_Y) =
-                (int16_t)(*(const int16_t *)(o + OBJ_OFF_Y) + (int16_t)iy);
+            o->pos.x = (int16_t)(o->pos.x + (int16_t)ix);
+            o->pos.y = (int16_t)(o->pos.y + (int16_t)iy);
 
-            *(float *)(o + OBJ_OFF_SUBPIXEL_X) =
-                *(const float *)(o + OBJ_OFF_SUBPIXEL_X) - ix;
-            *(float *)(o + OBJ_OFF_SUBPIXEL_Y) =
-                (float)(ny - (long double)iy);
+            o->subpixelX = o->subpixelX - ix;
+            o->subpixelY = (float)(ny - (long double)iy);
         }
 
-        if (*(const float *)(o + OBJ_OFF_VEL_Z) != 0.0f) {
+        if (o->velZ != 0.0f) {
             /* A float that never leaves the FPU stack: both compilers keep
              * it in a register through the truncation and the add. */
-            float       dz = scale * *(const float *)(o + OBJ_OFF_VEL_Z);
+            float       dz = scale * o->velZ;
             int32_t     iz = (int32_t)dz;
 
-            *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)
-                (*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) + (int16_t)iz);
-            *(float *)(o + OBJ_OFF_SUBPIXEL_Z) = (float)
-                (dz + *(const float *)(o + OBJ_OFF_SUBPIXEL_Z) - iz);
+            o->row0YAdjust = (int16_t)(o->row0YAdjust + (int16_t)iz);
+            o->subpixelZ   = (float)(dz + o->subpixelZ - iz);
 
-            if (*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) < 0) {
-                *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = 0;
-                *(int32_t *)(o + OBJ_OFF_VEL_Z) = 0;
+            if (o->row0YAdjust < 0) {
+                o->row0YAdjust = 0;
+                *(int32_t *)&o->velZ = 0;
             } else {
-                *(float *)(o + OBJ_OFF_VEL_Z) =
-                    *(const float *)(o + OBJ_OFF_VEL_Z)
-                    - g_gravity * scale;
+                o->velZ = o->velZ - g_gravity * scale;
                 /* Against a DOUBLE zero (0x0046F920), and on the register
                  * the store just left behind -- `fst` then `fcomp qword` --
                  * not on the rounded float read back. */
-                if (*(const float *)(o + OBJ_OFF_VEL_Z) == 0.0)
-                    *(uint32_t *)(o + OBJ_OFF_VEL_Z) = AM2_VEL_Z_MIN;
+                if (o->velZ == 0.0)
+                    *(uint32_t *)&o->velZ = AM2_VEL_Z_MIN;
             }
         }
     }
 
-    if (row0 != (uint8_t *)0) {
-        if (*(void **)(row0 + ROW_OFF_SPRITE) == (void *)0)
+    if (row0 != (AM2_MapRow *)0) {
+        if (row0->sprite == (AM2_Sprite *)0)
             return;
-        *(int32_t *)(row0 + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
-        *(int16_t *)(row0 + ROW_OFF_Y_ADJUST) =
-            *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
+        row0->pos     = o->pos;
+        row0->yAdjust = o->row0YAdjust;
         RowUpdate(row0, 0, g_mapDesc);
     }
 
     for (i = 1; i < nrows; i++) {
-        uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
-                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-        const uint8_t *spr;
+        AM2_MapRow *r = &o->rowSet.rows[i];
 
-        *(int32_t *)(r + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
-        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_X) = (int16_t)
-            (*(const int16_t *)(r + ROW_OFF_X)
-             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
-        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_Y) = (int16_t)
-            (*(const int16_t *)(r + ROW_OFF_Y)
-             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+        r->pos    = o->pos;
+        r->pos.x += row0->sprite->attachX;
+        r->pos.y += row0->sprite->attachY;
         RowUpdate(r, 0, g_mapDesc);
     }
 
@@ -11931,7 +11909,7 @@ void __cdecl StepType6(void *obj)
     }
 
     StepObjRows((AM2_Object *)o);
-    ObjMoveAlongFacing(o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
+    ObjMoveAlongFacing((AM2_Object *)o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
 }
 
 /* CreateTrooper -- original 0x00447620, and it was DEFERRED. orig.h recorded
@@ -14391,7 +14369,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         SendItemCreate(o);
 
-    ObjMoveAlongFacing(o, 0, 0, 0);
+    ObjMoveAlongFacing((AM2_Object *)o, 0, 0, 0);
     return o;
 #undef def
 }

@@ -157,4 +157,15 @@ typedef struct AM2_DirtyRec {
     uint16_t next;                      /* +0x12 DIRTY_OFF_NEXT */
 } AM2_DirtyRec;
 
+/* One built font, ADDR_GLYPH_SIZE[] at ADDR_FONT_STRIDE (0x20C) apart: the
+ * size of its glyph block, each character's offset into it, the block. The
+ * image indexes it as `font * 0x20C` with the field folded into the
+ * displacement -- an array of these, not three parallel tables. */
+typedef struct AM2_FontRec {
+    uint32_t  size;                     /* +0x000 ADDR_GLYPH_SIZE */
+    uint16_t  offsets[256];             /* +0x004 ADDR_GLYPH_OFFSETS */
+    uint8_t  *base;                     /* +0x204 ADDR_FONT_BASES */
+    uint32_t  field208;                 /* +0x208 */
+} AM2_FontRec;
+
 #endif /* AM2_GLOBALTYPES_H */

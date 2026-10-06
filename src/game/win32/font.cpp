@@ -237,20 +237,15 @@ extern "C" const AM2_FontDesc am2_font_descs[3] = {
 #endif
 
 
-/* Per-font record fields, `f` records apart. */
-#define font_size(f)    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_glyphSize) + (f) * ADDR_FONT_STRIDE))
-#define font_offsets(f) ((uint16_t *)(uintptr_t)(((uintptr_t)g_glyphOffset) + (f) * ADDR_FONT_STRIDE))
-#define font_base(f)    (*(uint8_t **)(uintptr_t)(((uintptr_t)g_fontBase) + (f) * ADDR_FONT_STRIDE))
-
-
 int32_t __cdecl BuildFont(int32_t font)
 {
     uint8_t  *scratch, *out, *kept;
     HFONT     hfont;
     int32_t   ch;
     uint32_t  total;
+    uint16_t *offs;
 
-    if (font_base(font))
+    if (g_fonts[font].base)
         return 1;                       /* already built */
 
     ClearSurface(g_backBuffer, g_backgroundColour);
@@ -267,7 +262,8 @@ int32_t __cdecl BuildFont(int32_t font)
 
     /* The first 32 characters are never rendered, so their offsets are zeroed
      * rather than written; the loop starts at space. */
-    memset(font_offsets(font), 0, 32 * sizeof(uint16_t));
+    memset(g_fonts[font].offsets, 0, 32 * sizeof(uint16_t));
+    offs = &g_fonts[font].offsets[0x20];
 
     for (ch = 0x20; ch < 0x100; ch++) {
         uint32_t n;
@@ -275,7 +271,7 @@ int32_t __cdecl BuildFont(int32_t font)
         /* The offset and the room left are two expressions, not one `used`:
          * the image computes `out - scratch` and `scratch - out + size`
          * separately. */
-        font_offsets(font)[ch] = (uint16_t)(out - scratch);
+        offs[ch - 0x20] = (uint16_t)(out - scratch);
         n = RenderGlyph(font, (char)ch, hfont, (AM2_Rle16 *)out,
                         (uint32_t)(scratch + GLYPH_SCRATCH - out));
         if (!n) {
@@ -289,9 +285,9 @@ int32_t __cdecl BuildFont(int32_t font)
 
     /* Now the size is known, so take exactly that much and let the scratch go. */
     total = (uint32_t)(out - scratch);
-    font_size(font) = total;
+    g_fonts[font].size = total;
     kept = (uint8_t *)orig_malloc(total);
-    font_base(font) = kept;
+    g_fonts[font].base = kept;
     memcpy(kept, scratch, total);
     orig_free(scratch);
     return 1;
@@ -304,14 +300,11 @@ int32_t __cdecl BuildFontAlias(int32_t fontIndex)
 
 void __cdecl FreeFont(int32_t fontIndex)
 {
-    uint32_t off = (uint32_t)fontIndex * ADDR_FONT_STRIDE;
-    uint8_t **base = (uint8_t **)(((uintptr_t)g_fontBase) + off);
-
-    if (!*base)
+    if (!g_fonts[fontIndex].base)
         return;
-    am2_free(*base);
-    *base = 0;
-    *(uint32_t *)(((uintptr_t)g_glyphSize) + off) = 0;
+    am2_free(g_fonts[fontIndex].base);
+    g_fonts[fontIndex].base = 0;
+    g_fonts[fontIndex].size = 0;
 }
 
 void __cdecl FreeAllFonts(void)
@@ -325,8 +318,7 @@ void __cdecl FreeAllFonts(void)
 int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 {
     int32_t        width = 0;
-    uint32_t       off   = (uint32_t)font * ADDR_FONT_STRIDE;
-    const uint8_t *base  = *(const uint8_t **)(((uintptr_t)g_fontBase) + off);
+    const uint8_t *base  = g_fonts[font].base;
     int32_t        i;
 
     for (i = 0; text[i]; i++) {
@@ -338,8 +330,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
                                          * and up are skipped too */
             /* The glyph table indexed afresh, by the signed character. */
             width += *(const uint16_t *)(base
-                         + (g_glyphOffset)
-                               [font * (ADDR_FONT_STRIDE / 2) + ch]);
+                         + g_fonts[font].offsets[ch]);
         }
 #undef ch
     }
@@ -348,8 +339,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
         out[0] = width;
         /* The line height is the space glyph's, whatever the string was. */
         out[1] = *(const uint16_t *)(base
-                                     + *(const uint16_t *)
-                                           (((uintptr_t)g_glyphOffsetSpace) + off)
+                                     + g_fonts[font].offsets[' ']
                                      + 2);
     }
     return width;
@@ -410,7 +400,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
             continue;
         }
 
-        glyph = (const AM2_Rle16 *)(font_base(font) + font_offsets(font)[(int32_t)(int8_t)ch]);
+        glyph = (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)ch]);
         width  = glyph->width;
         height = glyph->height;
 
@@ -495,7 +485,7 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
             continue;
         }
 
-        glyph  = (const AM2_Rle16 *)(font_base(font) + font_offsets(font)[(int32_t)(int8_t)ch]);
+        glyph  = (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)ch]);
         width  = glyph->width;
         height = glyph->height;
 

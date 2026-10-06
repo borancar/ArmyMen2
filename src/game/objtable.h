@@ -55,7 +55,10 @@ typedef struct {
     uint8_t        _pad41[1];       /* +0x41 */
     int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
     int32_t        field44;         /* +0x44  OBJ_OFF_FIELD_44, row 0's field3C */
-    uint8_t        _pad48[0x10];    /* +0x48 */
+    float          velZ;            /* +0x48  OBJ_OFF_VEL_Z */
+    float          subpixelX;       /* +0x4C  OBJ_OFF_SUBPIXEL_X */
+    float          subpixelY;       /* +0x50  OBJ_OFF_SUBPIXEL_Y */
+    float          subpixelZ;       /* +0x54  OBJ_OFF_SUBPIXEL_Z */
     uint32_t       deadline58;      /* +0x58  OBJ_OFF_DEADLINE_58, a clock stamp */
     uint8_t        _pad5c[4];       /* +0x5C */
     int16_t        maxHealth;       /* +0x60  OBJ_OFF_MAX_HEALTH */
@@ -143,6 +146,8 @@ static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
 static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
 static_assert(offsetof(AM2_Object, row0YAdjust)   == 0x42,  "row0YAdjust");
 static_assert(offsetof(AM2_Object, field44)       == 0x44,  "field44");
+static_assert(offsetof(AM2_Object, velZ)          == 0x48,  "velZ");
+static_assert(offsetof(AM2_Object, subpixelZ)     == 0x54,  "subpixelZ");
 static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
 static_assert(offsetof(AM2_Object, heightSet)     == 0x65,  "heightSet");
 static_assert(offsetof(AM2_Object, typeRec)       == 0xC0,  "typeRec");
