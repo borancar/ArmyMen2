@@ -1667,7 +1667,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
     if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
         return;
 
-    if (!ArmyInPlay(comm, uid)) {
+    if (!((AM2_Comm *)(comm))->ArmyInPlay(uid)) {
         am2_log("ignoring message from defunct army\n");
         return;
     }

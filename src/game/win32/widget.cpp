@@ -9077,7 +9077,7 @@ void __cdecl BattleJoinOk(void)
 #define name ((const char *)(dlg + BATTLEJOIN_OFF_NAME))
 
     if (row >= 0 && row < rows->count && strlen(name) >= 1
-        && CommJoinSession(g_commObject,
+        && ((AM2_Comm *)g_commObject)->CommJoinSession(
                            *(const GUID **)(rows->text
                                       + (uint32_t)row * AM2_LIST_ROW_STRIDE
                                       + AM2_LIST_ROW_VALUE))) {
