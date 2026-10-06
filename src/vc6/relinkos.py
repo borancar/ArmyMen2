@@ -61,8 +61,13 @@ AGGREGATES = ()
 # the frame clock and its stamp): OverlayPrepare loads the row's first sprite
 # BEFORE storing the frame index, the source order, which VC6 keeps only
 # when the indexed table load may alias the store.
+# The map's cell tables 0x00514EC0..0x00514ED0 (the weights, then the
+# region of each cell at +0xC): TileRegionOrBorrow hoists both pointers out
+# of its loop weights first -- member order, which VC6 follows only for one
+# object -- and indexes the weights as [table + at], which it does for a
+# hoisted load and not for a held local.
 AGGREGATE_RANGES = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994), (0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0), (0x005127C8, 0x00512FD0),
-                    (0x004FCAA8, 0x004FCDF4))
+                    (0x004FCAA8, 0x004FCDF4), (0x00514EC0, 0x00514ED0))
 
 
 def _aggregated(va):

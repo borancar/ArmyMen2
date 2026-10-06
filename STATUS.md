@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1518 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1519 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,16 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **TileRegionOrBorrow matched through an aggregate** (2026-10-06),
+    1518 -> 1519. Its last instruction was `[eax + ebx]` where the image has
+    `[ebx + eax]`. The clone lab (`tools/vc6lab.py`) isolated the rule. VC6
+    puts a HOISTED global load first in the address and a held local second.
+    It hoists the two cell tables in member order only when they are one
+    object. So the weights pointer is re-read each pass (VC6 hoists it as a
+    temporary), and relinkos.py aggregates 0x514EC0..0x514ED0, the weights
+    and the regions at +0xC. A search tool that tries every pair of a
+    function's globals as one object found nothing else in 19 more
+    functions.
   - **One cell-entry type for rows and objects; the free family typed**
     (2026-10-06), no count change. AM2_RowEntry became AM2_CellEntry. An
     object's OBJ_OFF_CELL_ENTRIES holds the same 16-byte entries for

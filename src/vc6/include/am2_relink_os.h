@@ -392,10 +392,6 @@ extern uint8_t am2_os_visible_tiles[];  /* 0x00514EA8 */
 extern uint8_t am2_os_camera_y[];  /* 0x00514EAC */
 extern uint8_t am2_os_map_tiles[];  /* 0x00514EB8 */
 extern uint8_t am2_os_tile_attrs[];  /* 0x00514EBC */
-extern uint8_t am2_os_cell_weights[];  /* 0x00514EC0 */
-extern uint8_t am2_os_map_padbit_layer[];  /* 0x00514EC4 */
-extern uint8_t am2_os_map_pad_layer[];  /* 0x00514EC8 */
-extern uint8_t am2_os_region_of_cell[];  /* 0x00514ECC */
 extern uint8_t am2_os_tile_flags[];  /* 0x00514ED0 */
 extern uint8_t am2_os_tile_kind[];  /* 0x00514ED4 */
 extern uint8_t am2_os_tile_reveal_grids[];  /* 0x00514ED8 */
@@ -768,10 +764,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_MAP_FOLDER ((uintptr_t)(const void *)am2_os_map_folder)
 #undef ADDR_MAP_NAME
 #define ADDR_MAP_NAME ((uintptr_t)(const void *)am2_os_map_name)
-#undef ADDR_MAP_PADBIT_LAYER
-#define ADDR_MAP_PADBIT_LAYER ((uintptr_t)(const void *)am2_os_map_padbit_layer)
-#undef ADDR_MAP_PAD_LAYER
-#define ADDR_MAP_PAD_LAYER ((uintptr_t)(const void *)am2_os_map_pad_layer)
 #undef ADDR_MAP_TILES_H
 #define ADDR_MAP_TILES_H ((uintptr_t)(const void *)am2_os_map_tiles_h)
 #undef ADDR_MAP_TILES_W
@@ -838,8 +830,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_REGION_COST ((uintptr_t)(const void *)am2_os_region_cost)
 #undef ADDR_REGION_NEXT
 #define ADDR_REGION_NEXT ((uintptr_t)(const void *)am2_os_region_next)
-#undef ADDR_REGION_OF_CELL
-#define ADDR_REGION_OF_CELL ((uintptr_t)(const void *)am2_os_region_of_cell)
 #undef ADDR_REGION_STAMP
 #define ADDR_REGION_STAMP ((uintptr_t)(const void *)am2_os_region_stamp)
 #undef ADDR_REGION_STRIDE
@@ -1534,8 +1524,6 @@ extern uint8_t am2_os_crt_acmdln[];  /* 0x00665C50 */
 #define ADDR_MAP_TILES ((uintptr_t)(const void *)am2_os_map_tiles)
 #undef ADDR_TILE_ATTRS
 #define ADDR_TILE_ATTRS ((uintptr_t)(const void *)am2_os_tile_attrs)
-#undef ADDR_CELL_WEIGHTS
-#define ADDR_CELL_WEIGHTS ((uintptr_t)(const void *)am2_os_cell_weights)
 #undef ADDR_TILE_FLAGS
 #define ADDR_TILE_FLAGS ((uintptr_t)(const void *)am2_os_tile_flags)
 #undef ADDR_TILE_KIND

@@ -3119,7 +3119,6 @@ typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 {
 #define REGIONS (g_regionOfCell)
-    const int8_t  *weights;
     const int32_t *ring;
     int32_t        first;
     int32_t        delta;
@@ -3127,15 +3126,18 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
     if (REGIONS[tile] > 0)
         return REGIONS[tile];
 
-    /* Both tables are read after the rand call, weights first. */
     ring    = g_tileRing8 + (orig_region_rand() & 6);
-    weights = g_cellWeights;
 
     delta   = ring[0];
     first   = delta;
 
     for (;;) {
-        int32_t at = delta + (int32_t)tile;
+        /* Read afresh each pass, which VC6 hoists as a temporary rather than
+         * a variable: that is what puts the table first in its address,
+         * weights[at] as [weights + at] where a held local gives [at +
+         * weights]. */
+        const int8_t *weights = g_cellWeights;
+        int32_t       at      = delta + (int32_t)tile;
 
         if (at > 0
             && at < g_mapTilesW
