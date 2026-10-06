@@ -363,7 +363,12 @@ struct AM2_ButtonBase : AM2_Widget {
 
 struct AM2_Button : AM2_ButtonBase {
     typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_Button[AM2_BUTTON_SIZE - sizeof(AM2_ButtonBase)];
+    struct AM2_Sprite *spriteNormal;   /* 0x0068 BUTTON_OFF_SPRITE_NORMAL */
+    struct AM2_Sprite *spriteFocus;    /* 0x006C BUTTON_OFF_SPRITE_FOCUS */
+    struct AM2_Sprite *spritePressed;  /* 0x0070 BUTTON_OFF_SPRITE_PRESSED */
+    uint8_t     field74;
+    uint8_t     ownsSprites;           /* 0x0075 BUTTON_OFF_OWNS_SPRITES */
+    uint8_t     pad_AM2_Button[AM2_BUTTON_SIZE - 0x76];
     AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
     explicit AM2_Button(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_Button();

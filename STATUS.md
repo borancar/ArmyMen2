@@ -215,6 +215,19 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **AM2_Button typed; ObjMoveAlongFacing 40 -> 35** (2026-10-07), no count
+    change.
+    - AM2_Button names its three sprites and the owns-sprites byte, and the
+      movies screen fills them and its own button and sprite arrays through
+      the types (it stays at 12).
+    - ObjMoveAlongFacing passes the direction bits straight from the
+      animation; the `uint32_t` local zero-extended them where the image
+      pushes the byte.
+    - Tried without gain: the use-weight and zero-register ties in
+      HudPostUpdate (`repeat = 0` in edi), ObjTileHook, DiedEffectB and
+      PointerPickMode4. Also SelectWeapon's case order, which decides how
+      the identical SetWeaponTarget arms tail-merge, and DepthResort's arm
+      layout.
   - **ControlsDialogScreen matched: a typed array in an index loop**
     (2026-10-07), 1523 -> 1524. The key-row loop counts i from 0 to 21 over
     the bindings and positions globals and stores `this->rows[i]` into the

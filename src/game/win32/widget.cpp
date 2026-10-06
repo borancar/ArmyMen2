@@ -767,6 +767,9 @@ static_assert(offsetof(AM2_MoviesScreen, buttons) == MOVIES_OFF_BUTTONS, "movies
 static_assert(sizeof(AM2_MoviesScreen)       == AM2_MOVIES_SIZE,    "movies size");
 static_assert(offsetof(AM2_ControlsDialogScreen, rows) == KEYROW_PARENT_ROWS, "controls rows");
 static_assert(sizeof(AM2_ControlsDialogScreen) == AM2_CONTROLS_SIZE,  "controls size");
+static_assert(offsetof(AM2_Button, spriteNormal) == BUTTON_OFF_SPRITE_NORMAL, "button normal");
+static_assert(offsetof(AM2_Button, ownsSprites)  == BUTTON_OFF_OWNS_SPRITES,  "button owns");
+static_assert(sizeof(AM2_Button)                 == AM2_BUTTON_SIZE,          "button size");
 #pragma GCC diagnostic pop
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
@@ -11651,9 +11654,7 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_Widget  *panel;
-    AM2_Widget  *btn;
-    AM2_Widget **slots = (AM2_Widget **)((uint8_t *)w + MOVIES_OFF_BUTTONS);
-    AM2_Sprite **spr   = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
+    AM2_Button  *btn;
     int32_t      i;
     int32_t      idx;
     AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
@@ -11664,19 +11665,15 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     panel->flag44 = 1;
 
     /* The twelve movies' sprite pairs, off and on: the first four from
-     * index 0xC8, the rest from 0xD2. Each pair is addressed from its
-     * second sprite, which is where the original's loop register points. */
+     * index 0xC8, the rest from 0xD2. VC6 walks each pair from its second
+     * sprite, which is where the original's loop register points. */
     for (i = 0; i < 4; i++) {
-        AM2_Sprite **p = spr + i * 2 + 1;
-
-        p[-1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 0, 1, 1);
-        p[0]  = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 1, 1, 1);
+        this->sprites[i][0] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 0, 1, 1);
+        this->sprites[i][1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 1, 1, 1);
     }
     for (i = 4; i < 12; i++) {
-        AM2_Sprite **p = spr + i * 2 + 1;
-
-        p[-1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 0, 1, 1);
-        p[0]  = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 1, 1, 1);
+        this->sprites[i][0] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 0, 1, 1);
+        this->sprites[i][1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 1, 1, 1);
     }
 
     /* Up to four movie buttons, one per unlocked movie on this page, each
@@ -11688,16 +11685,16 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                          kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
     idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 0;
     *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
-    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = this->sprites[idx][1];
-    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = this->sprites[idx][0];
-    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = this->sprites[idx][0];
-    ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+    btn->spriteNormal = this->sprites[idx][1];
+    btn->spriteFocus = this->sprites[idx][0];
+    btn->spritePressed = this->sprites[idx][0];
+    btn->ownsSprites = 0;
     ::WidgetAddChild(panel, btn);
     panel->focusedChild = btn;
-    slots[0] = btn;
-    slots[1] = (AM2_Widget *)0;
-    slots[2] = (AM2_Widget *)0;
-    slots[3] = (AM2_Widget *)0;
+    this->buttons[0] = btn;
+    this->buttons[1] = (AM2_Widget *)0;
+    this->buttons[2] = (AM2_Widget *)0;
+    this->buttons[3] = (AM2_Widget *)0;
 
     if (g_movieCount > 0) {
         btn = new AM2_Button(g_dirScratch,
@@ -11707,12 +11704,12 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 1;
         *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = this->sprites[idx][1];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = this->sprites[idx][0];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = this->sprites[idx][0];
-        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        btn->spriteNormal = this->sprites[idx][1];
+        btn->spriteFocus = this->sprites[idx][0];
+        btn->spritePressed = this->sprites[idx][0];
+        btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
-        slots[1] = btn;
+        this->buttons[1] = btn;
     }
     if (g_movieCount > 1) {
         btn = new AM2_Button(g_dirScratch,
@@ -11722,12 +11719,12 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 2;
         *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = this->sprites[idx][1];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = this->sprites[idx][0];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = this->sprites[idx][0];
-        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        btn->spriteNormal = this->sprites[idx][1];
+        btn->spriteFocus = this->sprites[idx][0];
+        btn->spritePressed = this->sprites[idx][0];
+        btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
-        slots[2] = btn;
+        this->buttons[2] = btn;
     }
     if (g_movieCount > 2) {
         btn = new AM2_Button(g_dirScratch,
@@ -11737,12 +11734,12 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
         idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 3;
         *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = this->sprites[idx][1];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = this->sprites[idx][0];
-        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = this->sprites[idx][0];
-        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        btn->spriteNormal = this->sprites[idx][1];
+        btn->spriteFocus = this->sprites[idx][0];
+        btn->spritePressed = this->sprites[idx][0];
+        btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
-        slots[3] = btn;
+        this->buttons[3] = btn;
     }
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_BACK19_0, (const char *)(uintptr_t)AM2_BMP_BACK19_1,
