@@ -215,6 +215,28 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Three more distance reductions, and a classifier** (2026-10-06), no
+    count change.
+    - AddToItemList went from 29 to 25: the given uid is masked in place
+      before the counter is raised.
+    - RecvTrooperWantItem went from 30 to 29: the pickup arm sets
+      `unused = 0` before stamping the clock.
+    - BlockWeightTroops went from 32 to 29: the riding-leader test returns
+      0 directly instead of jumping to the shared zero.
+    The register-renaming classifier, re-run (registers and stack slots
+    renamed away, then diffed),
+    puts 15 of the 122 at zero structural difference: BuildVehicleMask,
+    EvtCondition, FormationPoint and FormationPointFar, HudEdgePaint,
+    ObjAttachTo, PointerPickRepair, RecvTrooperWantItem, UpdateObjectScript
+    and WndProc, plus DrawMenuCursor, ObjCollidesWith, ScriptSetObjBitmap
+    and SelectionClick, which differ only in padding. ShotHitsObj is the
+    fifteenth. What is left in them is register and stack-slot choice.
+    ObjCollidesWith's swap is confirmed as use weight in the clone lab:
+    deleting any single `obj` use (the flags test, or the deadline test)
+    gives `from` esi as in the image. So the original has one `obj` use
+    fewer, or one `from` use more, than ours. These did not move it:
+    restructured conditions, inline helpers (their parameters propagate),
+    expression order, and dead uses (removed before allocation).
   - **BuildFont matched: a zeroing loop, not memset** (2026-10-06),
     1522 -> 1523. The first 32 glyph offsets are cleared by a `for` loop.
     VC6 turns it into `rep stosd` and sets up the destination first, as

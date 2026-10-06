@@ -133,7 +133,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
             goto own;
         }
     } else {
-        uint32_t next, need;
+        uint32_t next;
 
         owner = (uint32_t)(uint8_t)obj->owner & 7;
 
@@ -145,8 +145,8 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
         /* Keep the counter ahead of any UID handed to us. */
         id   = uid;
         next = *counter + 1;
-        need = (uid & AM2_UID_COUNTER_MASK) + 1;
-        *counter = next > need ? next : need;
+        uid &= AM2_UID_COUNTER_MASK;
+        *counter = next > uid + 1 ? next : uid + 1;
     }
 
     if (*counter > AM2_UID_COUNTER_MAX) {

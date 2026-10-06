@@ -3808,7 +3808,7 @@ static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
                    + OBJ_OFF_RIDING)
                == ((const AM2_Object *)f)->uid
             && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
-            goto zero;
+            return 0;
         if (ObjsAreAllied((const AM2_Object *)f, (const AM2_Object *)o, 0))
             return AM2_BLOCK_FULL;
     zero:

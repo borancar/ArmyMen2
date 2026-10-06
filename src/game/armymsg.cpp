@@ -1477,6 +1477,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
             orig_log("Tell pickup item received; ammo %d\n",
                      *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
 
+        unused = 0;
         *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
             g_gameClockMs;
 
