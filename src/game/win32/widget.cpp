@@ -751,6 +751,12 @@ static_assert(offsetof(AM2_HudTop, checkbox) == HUD_A_OFF_CHECKBOX, "hud checkbo
 static_assert(sizeof(AM2_HudTop)             == AM2_HUD_A_BYTES,    "hud top size");
 static_assert(offsetof(AM2_HudEdge, captionB) == EDGE_OFF_CAPTION_B, "edge caption b");
 static_assert(sizeof(AM2_HudEdge)            == AM2_HUD_C_BYTES,    "hud edge size");
+static_assert(offsetof(AM2_HudSquad, recs)  == HUD_SQUAD_RECS,     "squad records");
+static_assert(sizeof(AM2_SquadRec)           == HUD_SQUAD_REC_SIZE, "squad record size");
+static_assert(sizeof(AM2_HudSquad)           == AM2_HUD_SQUAD_BYTES, "hud squad size");
+static_assert(offsetof(AM2_ListBox, topRow)  == LIST_OFF_TOP_ROW,   "list top row");
+static_assert(offsetof(AM2_ListBox, blinker) == LIST_OFF_BLINKER,   "list blinker");
+static_assert(sizeof(AM2_ListBox)            == AM2_LISTBOX_SIZE,   "list box size");
 static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
 static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
 #pragma GCC diagnostic pop
@@ -3865,8 +3871,8 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
  * strength-reduces each field to a pointer of its own. Every copy scales
  * health by 41 and clamps at 41, and every copy runs the same three-colour
  * ladder off the same three bytes. */
-#define SQUAD_HP(o)    (*(const int16_t *)((o) + OBJ_OFF_HEALTH))
-#define SQUAD_MAXHP(o) (*(const int16_t *)((o) + OBJ_OFF_MAX_HEALTH))
+#define SQUAD_HP(o)    (((const AM2_Object *)(o))->health)
+#define SQUAD_MAXHP(o) (((const AM2_Object *)(o))->maxHealth)
 #define SQUAD_BAR(field, o)                                                   \
     if (SQUAD_MAXHP(o) > 0) {                                                 \
         int32_t bw = SQUAD_HP(o) * AM2_HUD_SQUAD_BAR_MAX / SQUAD_MAXHP(o);    \
@@ -3884,8 +3890,8 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
         (field) = g_hiliteColour
 /* min(rank + 1, 5) -- the same count HudSquadDetail draws as pips. */
 #define SQUAD_PIPS(o)                                                         \
-    (*(const int32_t *)((o) + OBJ_OFF_RANK) + 1 >= AM2_HUD_SQUAD_PIPS_MAX     \
-         ? AM2_HUD_SQUAD_PIPS_MAX : *(const int32_t *)((o) + OBJ_OFF_RANK) + 1)
+    (((const AM2_Object *)(o))->rank + 1 >= AM2_HUD_SQUAD_PIPS_MAX            \
+         ? AM2_HUD_SQUAD_PIPS_MAX : ((const AM2_Object *)(o))->rank + 1)
 
 /* The weapon's icon, a SWITCH in the original (two copies of the byte index
  * and jump table follow the function, at 0x004162AC/0x00416290 and
@@ -6105,8 +6111,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self = (uint8_t *)w;
-    uint8_t    *obj;
+    AM2_HudSquad *sq = static_cast<AM2_HudSquad *>(w);
+    AM2_Object *obj;
     int32_t     i, slot;
 
     if (g_charHandler
@@ -6118,11 +6124,6 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 /* The panel is read from its global at every use, the records indexed at
  * every store. */
 #define PANEL   (*(uint8_t *const *)&g_hudWidgetB)
-#define REC(n, f) (*(int32_t *)(self + HUD_SQUAD_RECS                          \
-                                 + (n) * HUD_SQUAD_REC_SIZE + (f)))
-#define INKOF(n) (*(uint8_t *)(self + HUD_SQUAD_RECS                          \
-                               + (n) * HUD_SQUAD_REC_SIZE                      \
-                               + SQUAD_REC_BAR_COLOUR))
 /* Who holds the mouse, then whether this is a release over us. Each click
  * arm runs it for itself; the weapon arm's misses fall into the generic
  * arm's copy, which answers the same way. */
@@ -6141,17 +6142,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             AM2_Rect          cell;
             AM2_PointerPickFn pick;
 
-            if (REC(i, SQUAD_REC_INDEX) < 0)
+            if (sq->recs[i].index < 0)
                 continue;
 
             /* SQUAD_REC_WIDE picks which of the two sprite arrays the
              * portrait comes from -- ::HudSquadPaint's own choice. */
-            if (REC(i, SQUAD_REC_WIDE))
-                spr = *(const AM2_Sprite *const *)(self + HUD_SQUAD_PAIR_HI
-                          + REC(i, SQUAD_REC_INDEX) * 4);
+            if (sq->recs[i].wide)
+                spr = sq->pairHi[sq->recs[i].index];
             else
-                spr = *(const AM2_Sprite *const *)(self + HUD_SQUAD_PAIR_LO
-                          + REC(i, SQUAD_REC_INDEX) * 4);
+                spr = sq->pairLo[sq->recs[i].index];
 
             cell.left   = (g_hudSquadSlotXy)[i * 2]
                           + w->rect.left;
@@ -6164,8 +6163,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                              (const AM2_Point *)&g_cursorPoint))
                 continue;
 
-            obj = (uint8_t *)LookupByUID(
-                      (uint32_t)REC(i, SQUAD_REC_DETAIL_ARG));
+            obj = LookupByUID((uint32_t)sq->recs[i].detailArg);
             if (!obj || SQUAD_HP(obj) == 0)
                 continue;
 
@@ -6183,27 +6181,22 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                     PlaySoundAt(0, 0, 0, 0, 0);
                     act = *(AM2_PointerActionFn *)&g_weaponFnSlot1;
                     if (act)
-                        act(obj, *(const uint32_t *)(obj + OBJ_OFF_POS));
+                        act(obj, *(const uint32_t *)&obj->pos);
                     break;
                 }
-            } else if (REC(i, SQUAD_REC_EJECT)) {
+            } else if (sq->recs[i].eject) {
                 /* A PASSENGER of the vehicle in slot 0: clicking him finds
                  * him in its VEHICLE_OFF_PTR_LIST and gets him out. */
                 GRAB();
                 if (CLICKED) {
-                    uint8_t *veh;
+                    AM2_Object *veh;
                     int32_t  k;
 
                     PlaySoundAt(0, 0, 0, 0, 0);
-                    veh = (uint8_t *)LookupByUID(
-                              (uint32_t)REC(0, SQUAD_REC_DETAIL_ARG));
-                    if (ObjIsType3((const AM2_Object *)veh)) {
-                        for (k = 0;
-                             k < *(const int32_t *)(veh + VEHICLE_OFF_PTR_LIST + 4);
-                             k++)
-                            if ((*(const uint32_t *const *)(
-                                    veh + VEHICLE_OFF_PTR_LIST + 8))[k]
-                                == *(const uint32_t *)(obj + OBJ_OFF_UID))
+                    veh = LookupByUID((uint32_t)sq->recs[0].detailArg);
+                    if (ObjIsType3(veh)) {
+                        for (k = 0; k < veh->riders.count; k++)
+                            if (veh->riders.uids[k] == obj->uid)
                                 break;
                         /* Tested for NEGATIVE, which a count that only
                          * increments cannot be. Reproduced. */
@@ -6215,7 +6208,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             }
 
             GRAB();
-            if (CLICKED && ObjIsTypeIn238((const AM2_Object *)obj)) {
+            if (CLICKED && ObjIsTypeIn238(obj)) {
                 PlaySoundAt(0, 0, 0, 0, 0);
                 ToggleSelect(obj);
                 g_viewSnap = 1;
@@ -6230,21 +6223,20 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 <= AM2_HUD_TOOLTIP_DWELL)
                 continue;
 
-            if (ObjType2Field548((const AM2_Object *)obj)) {
+            if (ObjType2Field548(obj)) {
                 strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION), "Sarge");
-            } else if (ObjIsType2((const AM2_Object *)obj)) {
-                if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0)
+            } else if (ObjIsType2(obj)) {
+                if (obj->nameIdx >= 0)
                     strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION),
                            *(const char *const *)(
                                (const uint8_t *)g_scriptNames
-                               + (uint32_t)*(const int32_t *)
-                                     (obj + ITEM_OFF_NAME_INDEX)
+                               + (uint32_t)obj->nameIdx
                                  * AM2_NAME_TABLE_STRIDE));
                 else
                     /* The OBJECT is first -- see ADDR_SOLDIER_NAME_OF. */
                     SoldierNameOf(obj,
                                   (char *)(PANEL + HUDPANEL_OFF_CAPTION));
-            } else if (ObjIsType3((const AM2_Object *)obj)) {
+            } else if (ObjIsType3(obj)) {
                 strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION),
                        VehicleKindName(obj));
             }
@@ -6253,10 +6245,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         /* Pass two: every record back to empty before the refill -- the
          * index, WIDE, HILITE and EJECT. The uid is left as it was. */
         for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
-            REC(i, SQUAD_REC_INDEX)  = -1;
-            REC(i, SQUAD_REC_WIDE)   = 0;
-            REC(i, SQUAD_REC_HILITE) = 0;
-            REC(i, SQUAD_REC_EJECT)  = 0;
+            sq->recs[i].index  = -1;
+            sq->recs[i].wide   = 0;
+            sq->recs[i].hilite = 0;
+            sq->recs[i].eject  = 0;
         }
     }
 
@@ -6267,59 +6259,56 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         if (slot >= AM2_HUD_SQUAD_SLOTS)
             break;
 
-        obj = (uint8_t *)LookupByUID(
-                  (g_selectedItems)[i]);
+        obj = LookupByUID((g_selectedItems)[i]);
         if (!obj) {
             ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;
         }
 
-        if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        if (obj->flags & OBJ_FLAG_DESTROYED)
             goto next;
 
-        if (ObjIsTypeIn238((const AM2_Object *)obj)
-            && *(const int32_t *)(obj + OBJ_OFF_FIELD_94))
+        if (ObjIsTypeIn238(obj) && obj->field94)
             goto next;
 
-        if (ObjType2Field548((const AM2_Object *)obj)) {
-            if (*(const int32_t *)(obj + OBJ_OFF_RIDING))
+        if (ObjType2Field548(obj)) {
+            if (obj->riding)
                 goto next;
 
-            REC(slot, SQUAD_REC_INDEX) = 0;
-            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
-            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
-            SQUAD_INK(INKOF(slot), obj);
-            REC(slot, SQUAD_REC_ICONS) = AM2_HUD_SQUAD_PIPS_MAX;
+            sq->recs[slot].index = 0;
+            sq->recs[slot].detailArg = (int32_t)obj->uid;
+            SQUAD_BAR(sq->recs[slot].barW, obj);
+            SQUAD_INK(sq->recs[slot].barColour, obj);
+            sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
             slot++;
 
-        } else if (ObjIsType2((const AM2_Object *)obj)) {
+        } else if (ObjIsType2(obj)) {
             const uint8_t *weapon;
 
-            if (*(const int32_t *)(obj + OBJ_OFF_RIDING))
+            if (obj->riding)
                 goto next;
 
             /* NO WEAPON STILL FILLS THE SLOT, with icon 1 -- where the
              * passenger loop below SKIPS such a unit outright. */
-            weapon = (const uint8_t *)WeaponByUid(
-                         *(const uint32_t *)(obj + OBJ_OFF_WEAPON_UID));
+            weapon = (const uint8_t *)WeaponByUid(obj->inventory[0]);
             if (weapon)
-                REC(slot, SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon);
+                sq->recs[slot].index = HudSquadWeaponIcon(weapon);
             else
-                REC(slot, SQUAD_REC_INDEX) = 1;
-            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
-            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
-            SQUAD_INK(INKOF(slot), obj);
-            REC(slot, SQUAD_REC_ICONS) = SQUAD_PIPS(obj);
+                sq->recs[slot].index = 1;
+            sq->recs[slot].detailArg = (int32_t)obj->uid;
+            SQUAD_BAR(sq->recs[slot].barW, obj);
+            SQUAD_INK(sq->recs[slot].barColour, obj);
+            sq->recs[slot].icons = SQUAD_PIPS(obj);
             slot++;
 
-        } else if (ObjIsType3((const AM2_Object *)obj)) {
+        } else if (ObjIsType3(obj)) {
             int32_t k;
 
-            REC(slot, SQUAD_REC_INDEX) = HudSquadVehicleIcon(obj);
-            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
-            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
-            REC(slot, SQUAD_REC_ICONS) = 0;
-            SQUAD_INK(INKOF(slot), obj);
+            sq->recs[slot].index = HudSquadVehicleIcon((const uint8_t *)obj);
+            sq->recs[slot].detailArg = (int32_t)obj->uid;
+            SQUAD_BAR(sq->recs[slot].barW, obj);
+            sq->recs[slot].icons = 0;
+            SQUAD_INK(sq->recs[slot].barColour, obj);
             slot++;
 
             /* A LONE vehicle brings its riders with it, and they start at
@@ -6329,45 +6318,42 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (g_selectedCount == 1) {
                 slot = AM2_HUD_SQUAD_SLOTS / 2;
                 for (k = 0;
-                     k < *(const int32_t *)(obj + VEHICLE_OFF_PTR_LIST + 4);
+                     k < obj->riders.count;
                      k++) {
-                    uint8_t *rider = (uint8_t *)LookupByUID(
-                        (*(const uint32_t *const *)(
-                             obj + VEHICLE_OFF_PTR_LIST + 8))[k]);
+                    AM2_Object *rider = LookupByUID(obj->riders.uids[k]);
 
                     if (!rider) {
-                        ((AM2_Rec *)(obj + VEHICLE_OFF_PTR_LIST))->ListRemoveAt(k);
+                        ((AM2_Rec *)&obj->riders)->ListRemoveAt(k);
                         continue;
                     }
                     if (SQUAD_HP(rider) == 0)
                         continue;
-                    if (ObjIsTypeIn238((const AM2_Object *)rider)
-                        && *(const int32_t *)(rider + OBJ_OFF_FIELD_94))
+                    if (ObjIsTypeIn238(rider) && rider->field94)
                         continue;
 
-                    if (ObjType2Field548((const AM2_Object *)rider)) {
-                        REC(slot, SQUAD_REC_INDEX) = 0;
-                        REC(slot, SQUAD_REC_DETAIL_ARG) =
-                            *(const int32_t *)(rider + OBJ_OFF_UID);
-                        REC(slot, SQUAD_REC_EJECT) = 1;
-                        SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), rider);
-                        REC(slot, SQUAD_REC_ICONS) = AM2_HUD_SQUAD_PIPS_MAX;
-                        SQUAD_INK(INKOF(slot), rider);
+                    if (ObjType2Field548(rider)) {
+                        sq->recs[slot].index = 0;
+                        sq->recs[slot].detailArg =
+                            (int32_t)rider->uid;
+                        sq->recs[slot].eject = 1;
+                        SQUAD_BAR(sq->recs[slot].barW, rider);
+                        sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
+                        SQUAD_INK(sq->recs[slot].barColour, rider);
                         slot++;
-                    } else if (ObjIsType2((const AM2_Object *)rider)) {
+                    } else if (ObjIsType2(rider)) {
                         const uint8_t *weapon = (const uint8_t *)WeaponByUid(
-                            *(const uint32_t *)(rider + OBJ_OFF_WEAPON_UID));
+                            rider->inventory[0]);
 
                         if (!weapon)
                             continue;
 
-                        REC(slot, SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon);
-                        REC(slot, SQUAD_REC_DETAIL_ARG) =
-                            *(const int32_t *)(rider + OBJ_OFF_UID);
-                        REC(slot, SQUAD_REC_EJECT) = 1;
-                        SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), rider);
-                        REC(slot, SQUAD_REC_ICONS) = SQUAD_PIPS(rider);
-                        SQUAD_INK(INKOF(slot), rider);
+                        sq->recs[slot].index = HudSquadWeaponIcon(weapon);
+                        sq->recs[slot].detailArg =
+                            (int32_t)rider->uid;
+                        sq->recs[slot].eject = 1;
+                        SQUAD_BAR(sq->recs[slot].barW, rider);
+                        sq->recs[slot].icons = SQUAD_PIPS(rider);
+                        SQUAD_INK(sq->recs[slot].barColour, rider);
                         slot++;
                     }
                 }
@@ -6380,10 +6366,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
     /* Slot 1 still empty means exactly one thing is selected, so slot 0 goes
      * WIDE and the grid becomes the ::HudSquadDetail readout. */
-    if (REC(1, SQUAD_REC_INDEX) < 0)
-        REC(0, SQUAD_REC_WIDE) = 1;
+    if (sq->recs[1].index < 0)
+        sq->recs[0].wide = 1;
 #undef PANEL
-#undef REC
 #undef INKOF
 #undef GRAB
 #undef CLICKED
@@ -15532,28 +15517,27 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t            *self = (uint8_t *)w;
+    AM2_ListBox        *lb   = static_cast<AM2_ListBox *>(w);
     /* The row array is re-read at every use, as the image has it. */
-#define rows (*(const AM2_ListRows *const *)(self + LIST_OFF_ROWS))
     void (__cdecl      *tick)(AM2_Widget *);
     int32_t             wasTop, wasSel, wasChosen;
 
-    wasTop = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+    wasTop = lb->topRow;
 
     ::WidgetScreenRect(w);
 
     /* A list with no row array RETURNS -- it does not fall through to the
      * repaint tail. The `je` lands on the epilogue, which is the second of
      * this function's two exits. */
-    if (!rows)
+    if (!lb->rows)
         return;
 
-    tick = *(void (__cdecl *const *)(AM2_Widget *))(self + LIST_OFF_ON_TICK);
+    tick = lb->onTick;
     if (tick)
         tick(w);
 
-    wasChosen = *(const int32_t *)(self + LIST_OFF_CHOSEN);
-    wasSel    = *(const int32_t *)(self + LIST_OFF_SELECTED);
+    wasChosen = lb->chosen;
+    wasSel    = lb->selected;
 
     /* ---- the mouse ---------------------------------------------------- */
     if (w->parent
@@ -15575,15 +15559,15 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
             row = (*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                    - w->rect.top - LIST_ROW_TOP_MARGIN) / LIST_ROW_HEIGHT
-                  + *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+                  + lb->topRow;
 
-            *(int32_t *)(self + LIST_OFF_SELECTED) = row;
-            if (row >= rows->count)
-                *(int32_t *)(self + LIST_OFF_SELECTED) = rows->count - 1;
+            lb->selected = row;
+            if (row >= lb->rows->count)
+                lb->selected = lb->rows->count - 1;
 
-            if (wasSel != *(const int32_t *)(self + LIST_OFF_SELECTED)) {
+            if (wasSel != lb->selected) {
                 AM2_Widget *blink =
-                    *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                    lb->blinker;
                 if (blink)
                     BlinkerStart(blink, TYPER_BLINK_MS, 1);
             }
@@ -15593,28 +15577,25 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
                 WidgetVPaint(w, w->rect);
 
-                sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+                sel = lb->selected;
                 if (!g_mouseButton && sel >= 0) {
-                    if (ListRowIsDead(rows, sel)) {
+                    if (ListRowIsDead(lb->rows, sel)) {
                         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
                     } else {
                         AM2_Widget *blink =
-                            *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                            lb->blinker;
                         void (__cdecl *pick)(AM2_Widget *,
                                              const AM2_ListRows *, int32_t);
 
-                        *(int32_t *)(self + LIST_OFF_CHOSEN) = sel;
+                        lb->chosen = sel;
                         if (blink)
                             BlinkerStart(blink, TYPER_BLINK_MS, 3);
 
-                        pick = *(void (__cdecl *const *)(
-                                   AM2_Widget *, const AM2_ListRows *,
-                                   int32_t))(self + LIST_OFF_CALLBACK);
+                        pick = (void (__cdecl *)(AM2_Widget *, const AM2_ListRows *, int32_t))lb->callback;
                         if (pick)
                             pick(w,
-                                 *(const AM2_ListRows *const *)
-                                     (self + LIST_OFF_ROWS),
-                                 *(const int32_t *)(self + LIST_OFF_SELECTED));
+                                 lb->rows,
+                                 lb->selected);
                     }
                 }
             }
@@ -15623,16 +15604,16 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
     /* ---- the keyboard, only with the focus ----------------------------- */
     if (w->flag44) {
-        AM2_Widget *blink = *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+        AM2_Widget *blink = lb->blinker;
 
         if (KeyPressed(AM2_DIK_UP)) {
-            int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+            int32_t sel = lb->selected;
 
             if (sel > 0) {
                 sel--;
-                *(int32_t *)(self + LIST_OFF_SELECTED) = sel;
-                if (sel < *(const int32_t *)(self + LIST_OFF_TOP_ROW))
-                    *(int32_t *)(self + LIST_OFF_TOP_ROW) = sel;
+                lb->selected = sel;
+                if (sel < lb->topRow)
+                    lb->topRow = sel;
                 if (blink)
                     BlinkerStart(blink, TYPER_BLINK_MS, 1);
             } else {
@@ -15641,16 +15622,16 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
             ConsumeKey(AM2_DIK_UP);
 
         } else if (KeyPressed(AM2_DIK_DOWN)) {
-            int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+            int32_t sel = lb->selected;
 
-            if (sel < rows->count - 1) {
-                int32_t visible = *(const int32_t *)(self + LIST_OFF_VISIBLE);
-                int32_t top     = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+            if (sel < lb->rows->count - 1) {
+                int32_t visible = lb->visible;
+                int32_t top     = lb->topRow;
 
                 sel++;
-                *(int32_t *)(self + LIST_OFF_SELECTED) = sel;
+                lb->selected = sel;
                 if (sel >= top + visible)
-                    *(int32_t *)(self + LIST_OFF_TOP_ROW) = sel - visible + 1;
+                    lb->topRow = sel - visible + 1;
                 if (blink)
                     BlinkerStart(blink, TYPER_BLINK_MS, 1);
             } else {
@@ -15668,28 +15649,25 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
             WidgetVPaint(w, w->rect);
 
-            sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
-            if (sel >= 0 && rows->count > 0) {
-                if (ListRowIsDead(rows, sel)) {
+            sel = lb->selected;
+            if (sel >= 0 && lb->rows->count > 0) {
+                if (ListRowIsDead(lb->rows, sel)) {
                     PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
                 } else {
                     AM2_Widget *blink =
-                        *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                        lb->blinker;
                     void (__cdecl *pick)(AM2_Widget *,
                                          const AM2_ListRows *, int32_t);
 
-                    *(int32_t *)(self + LIST_OFF_CHOSEN) = sel;
+                    lb->chosen = sel;
                     if (blink)
                         BlinkerStart(blink, TYPER_BLINK_MS, 3);
 
-                    pick = *(void (__cdecl *const *)(
-                               AM2_Widget *, const AM2_ListRows *,
-                               int32_t))(self + LIST_OFF_CALLBACK);
+                    pick = (void (__cdecl *)(AM2_Widget *, const AM2_ListRows *, int32_t))lb->callback;
                     if (pick)
                         pick(w,
-                             *(const AM2_ListRows *const *)
-                                 (self + LIST_OFF_ROWS),
-                             *(const int32_t *)(self + LIST_OFF_SELECTED));
+                             lb->rows,
+                             lb->selected);
                 }
             }
             ConsumeKey(AM2_DIK_SPACE);
@@ -15698,28 +15676,28 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
     }
 
     /* ---- what to repaint ----------------------------------------------- */
-    if (*(const int32_t *)(self + LIST_OFF_TOP_ROW) != wasTop) {
+    if (lb->topRow != wasTop) {
         AM2_Widget *bar;
 
         /* The window moved, so everything is stale. */
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
         WidgetVPaint(w, w->rect);
 
-        bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
+        bar = lb->arrowBar;
         if (bar) {
             uint8_t          *b = (uint8_t *)bar;
             const AM2_Sprite *thumb =
                 *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
             const AM2_ListRows *r =
-                *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
+                lb->rows;
 
             *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
-                ThumbShift(*(const int32_t *)(self + LIST_OFF_TOP_ROW),
-                           r->count - *(const int32_t *)(self + LIST_OFF_VISIBLE),
+                ThumbShift(lb->topRow,
+                           r->count - lb->visible,
                            *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
                            - thumb->bounds.bottom);
 
-            bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
+            bar = lb->arrowBar;
             WidgetVPaint(bar,
                                                                    bar->rect);
         }
@@ -15728,25 +15706,25 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
     /* The window held still, so repaint only what changed -- the band that
      * lost the highlight and the band that gained it. */
-    if (*(const int32_t *)(self + LIST_OFF_SELECTED) != wasSel) {
+    if (lb->selected != wasSel) {
         if (wasSel >= 0)
             ListRepaintRow(w, wasSel);
 
-        if (*(const int32_t *)(self + LIST_OFF_SELECTED) < 0)
+        if (lb->selected < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, *(const int32_t *)(self + LIST_OFF_SELECTED));
+        ListRepaintRow(w, lb->selected);
 
-    } else if (*(const int32_t *)(self + LIST_OFF_CHOSEN) != wasChosen) {
+    } else if (lb->chosen != wasChosen) {
         if (wasChosen >= 0)
             ListRepaintRow(w, wasChosen);
 
-        if (*(const int32_t *)(self + LIST_OFF_CHOSEN) < 0)
+        if (lb->chosen < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, *(const int32_t *)(self + LIST_OFF_CHOSEN));
+        ListRepaintRow(w, lb->chosen);
     }
-#undef rows
+
 }
 
 void __cdecl OnArrowUp(AM2_Widget *w)

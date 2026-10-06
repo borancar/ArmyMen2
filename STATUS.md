@@ -215,6 +215,15 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The squad panel and the list box typed** (2026-10-06), no count
+    change. AM2_HudSquad has its icon sprite, its two sprite arrays and twelve
+    AM2_SquadRec slots. AM2_ListBox has all sixteen fields. HudSquadUpdate
+    and ListUpdate use them, and AM2_Object's +0x98 is a union with a unit's
+    rank. Both scores are unchanged (84, 113); what remains is register
+    choice.
+    The original's Rich header records VC6 RTM (build 8168) for both front
+    ends, which matches ours. Compiling clones as C instead of C++ changed
+    nothing, so the front end is not where these ties come from.
   - **BuildRemapTables matched; HudTopUpdate 67 -> 2** (2026-10-06),
     1519 -> 1520. A scan for base/index swaps in addresses found
     BuildRemapTables. Its two army tables are arrays of 256-byte rows,

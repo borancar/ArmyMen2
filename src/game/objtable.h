@@ -79,7 +79,10 @@ typedef struct AM2_Object {
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
-    uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
+    union {                         /* +0x98, by object type: */
+        uint32_t   shooterUid;      /*   a shot's shooter uid */
+        int32_t    rank;            /*   OBJ_OFF_RANK, a unit's 0..7 */
+    };
     int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
     int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
     union {                         /* +0xA4, by object type: */

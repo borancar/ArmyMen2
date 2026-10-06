@@ -407,9 +407,26 @@ struct AM2_CheckBox : AM2_ButtonBase {
     ~AM2_CheckBox();
 };
 
+struct AM2_ListRows;
+
 struct AM2_ListBox : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_ListBox[AM2_LISTBOX_SIZE - sizeof(AM2_Widget)];
+    int32_t       selected;         /* 0x0058  LIST_OFF_SELECTED, the moving highlight */
+    int32_t       chosen;           /* 0x005C  LIST_OFF_CHOSEN, committed by click or RETURN */
+    struct AM2_ListRows *rows;      /* 0x0060  LIST_OFF_ROWS */
+    int32_t       ownsRows;         /* 0x0064  LIST_OFF_OWNS_ROWS */
+    void         *callback;         /* 0x0068  LIST_OFF_CALLBACK, or ADDR_LOG for none */
+    void (__cdecl *onTick)(AM2_Widget *); /* 0x006C  LIST_OFF_ON_TICK */
+    int32_t       arg70;            /* 0x0070  LIST_OFF_ARG70 */
+    int32_t       topRow;           /* 0x0074  LIST_OFF_TOP_ROW, first row drawn */
+    int32_t       visible;          /* 0x0078  LIST_OFF_VISIBLE, rows that fit */
+    AM2_Widget   *arrowBar;         /* 0x007C  LIST_OFF_ARROWBAR */
+    int32_t       ink;              /* 0x0080  LIST_OFF_INK, an ordinary row */
+    int32_t       inkSel;           /* 0x0084  LIST_OFF_INK_SEL */
+    int32_t       inkSelDown;       /* 0x0088  LIST_OFF_INK_SEL_DOWN */
+    int32_t       inkHotSel;        /* 0x008C  LIST_OFF_INK_HOT_SEL */
+    int32_t       field90;          /* 0x0090 */
+    AM2_Widget   *blinker;          /* 0x0094  LIST_OFF_BLINKER */
     AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
     explicit AM2_ListBox(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ListBox();
@@ -503,9 +520,25 @@ struct AM2_HudSarge : AM2_Widget {
     ~AM2_HudSarge();
 };
 
+/* One squad panel slot, HUD_SQUAD_REC_SIZE. */
+struct AM2_SquadRec {
+    int32_t index;       /* SQUAD_REC_INDEX, into the sprite pair; <0 skips */
+    int32_t detailArg;   /* SQUAD_REC_DETAIL_ARG, the unit's uid */
+    int32_t wide;        /* SQUAD_REC_WIDE, portrait from pairHi */
+    int32_t eject;       /* SQUAD_REC_EJECT, a passenger of slot 0's vehicle */
+    int32_t hilite;      /* SQUAD_REC_HILITE */
+    int32_t barW;        /* SQUAD_REC_BAR_W, > 0 draws a bar */
+    uint8_t barColour;   /* SQUAD_REC_BAR_COLOUR */
+    uint8_t _pad19[3];
+    int32_t icons;       /* SQUAD_REC_ICONS, pips along the bottom */
+};
+
 struct AM2_HudSquad : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudSquad[AM2_HUD_SQUAD_BYTES - sizeof(AM2_Widget)];
+    AM2_Sprite   *iconSprite;                  /* 0x0058  HUD_SQUAD_ICON_SPRITE, one pip */
+    AM2_Sprite   *pairLo[AM2_HUD_SQUAD_SLOTS]; /* 0x005C  HUD_SQUAD_PAIR_LO */
+    AM2_Sprite   *pairHi[AM2_HUD_SQUAD_SLOTS]; /* 0x008C  HUD_SQUAD_PAIR_HI */
+    AM2_SquadRec  recs[AM2_HUD_SQUAD_SLOTS];   /* 0x00BC  HUD_SQUAD_RECS */
     AM2_HudSquad();
     explicit AM2_HudSquad(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudSquad();
