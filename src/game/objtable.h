@@ -108,7 +108,10 @@ typedef struct AM2_Object {
     };
     uint32_t       followUid;       /* +0xC4  OBJ_OFF_FOLLOW_UID */
     uint8_t        _padc8[4];       /* +0xC8 */
-    uint32_t       targetUid;       /* +0xCC  OBJ_OFF_TARGET_UID */
+    union {                         /* +0xCC, by object type: */
+        uint32_t   targetUid;       /*   OBJ_OFF_TARGET_UID */
+        int32_t    ammo;            /*   a weapon's: ITEM_OFF_AMMO */
+    };
     uint8_t        _padd0[0x14];    /* +0xD0 */
     int32_t        aiMode;          /* +0xE4  OBJ_OFF_AI_MODE */
     uint8_t        _pade8[0x24];    /* +0xE8 */

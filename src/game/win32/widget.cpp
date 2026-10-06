@@ -749,6 +749,8 @@ static_assert(offsetof(AM2_HudTop, typing)   == HUDLOG_OFF_TYPING,  "hud typing"
 static_assert(offsetof(AM2_HudTop, count)    == HUDLOG_OFF_COUNT,   "hud log count");
 static_assert(offsetof(AM2_HudTop, checkbox) == HUD_A_OFF_CHECKBOX, "hud checkbox");
 static_assert(sizeof(AM2_HudTop)             == AM2_HUD_A_BYTES,    "hud top size");
+static_assert(offsetof(AM2_HudEdge, captionB) == EDGE_OFF_CAPTION_B, "edge caption b");
+static_assert(sizeof(AM2_HudEdge)            == AM2_HUD_C_BYTES,    "hud edge size");
 static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
 static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
 #pragma GCC diagnostic pop
@@ -7504,14 +7506,11 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
             acc = 0.0f;
             if (hud->blips > 0
                 && Ticks() > hud->blipAt) {
-                uint32_t jitter;
-
                 PlaySoundAt(0, 0, 0, 0, 0);
                 /* rand first, then the clock: the original's order, and the LCG
                  * state is the image's, so the sequence is shared. */
-                jitter = (uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER;
-                hud->blipAt =
-                    jitter + Ticks() + AM2_HUD_BLIP_MS;
+                hud->blipAt = ((uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER)
+                              + Ticks() + AM2_HUD_BLIP_MS;
                 hud->blips -= 1;
             }
 
@@ -7555,15 +7554,15 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                     i = 0;
 
                 first = &hud->rows[i].x;
+                /* The step is held in DOUBLE: the image compares the row's x
+                 * loaded onto the FPU against it and stores the winner
+                 * through the FPU, which a float clamp does not do. */
                 if (*scroll > *first) {
-                    float v = *scroll - STEP;
-                    *scroll = *first > v ? *first : v;
+                    double v = *scroll - STEP;
+                    *scroll = (float)(*first > v ? *first : v);
                 } else if (*scroll < *first) {
-                    float v = *scroll + STEP;
-                    if (*first < v)
-                        *scroll = *first;
-                    else
-                        *scroll = v;
+                    double v = *scroll + STEP;
+                    *scroll = (float)(*first < v ? *first : v);
                 }
             }
         }
@@ -7572,32 +7571,18 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
 #undef COUNT
     hud->buttonSprite = NULL;
 
-        if (!PointInRect((const AM2_Rect *)&w->rect,
-                         (const AM2_Point *)&g_cursorPoint)) {
-            w->focusedChild = NULL;
-        return;
-    }
+        if (PointInRect((const AM2_Rect *)&w->rect,
+                        (const AM2_Point *)&g_cursorPoint)) {
 
-    {
-        int32_t left = w->rect.left + hud->buttonX;
-        int32_t top  = w->rect.top;
+    *(AM2_Rect *)&hot = RectMake(w->rect.left + hud->buttonX, w->rect.top,
+                                 w->rect.left + hud->buttonX + AM2_HUD_BUTTON_W,
+                                 w->rect.top + AM2_HUD_BUTTON_H);
 
-        *(AM2_Rect *)&hot = RectMake(left, top, left + AM2_HUD_BUTTON_W,
-                                     top + AM2_HUD_BUTTON_H);
-    }
+    if (PointInRect((const AM2_Rect *)&hot,
+                    (const AM2_Point *)&g_cursorPoint)) {
 
-    if (!PointInRect((const AM2_Rect *)&hot,
-                     (const AM2_Point *)&g_cursorPoint)) {
-        /* On the strip but not on the button: swallow the press anyway, so
-         * the map underneath does not also see it. */
-        if (!*(AM2_Widget * *)&g_mouseGrab && g_mouseChanged)
-            *(AM2_Widget * *)&g_mouseGrab = w;
-        return;
-    }
-
-    grab = *(AM2_Widget * *)&g_mouseGrab;
     if (!g_mouseButton) {
-        if (grab == button)
+        if (*(AM2_Widget * *)&g_mouseGrab == button)
             hud->rewindAt =
                 Ticks() + AM2_HUD_REWIND_HOLD_MS;
         else
@@ -7606,16 +7591,23 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
         return;
     }
 
-    if (!grab && g_mouseChanged) {
-        grab = button;
+    if (!*(AM2_Widget * *)&g_mouseGrab && g_mouseChanged)
         *(AM2_Widget * *)&g_mouseGrab = button;
-    }
-    if (grab != button)
+    if (*(AM2_Widget * *)&g_mouseGrab != button)
         return;
 
     hud->rewindAt = Ticks() + AM2_HUD_REWIND_TAP_MS;
     hud->buttonSprite =
         hud->spriteDown;
+        return;
+    }
+    /* On the strip but not on the button: swallow the press anyway, so
+     * the map underneath does not also see it. */
+    if (!*(AM2_Widget * *)&g_mouseGrab && g_mouseChanged)
+        *(AM2_Widget * *)&g_mouseGrab = w;
+    return;
+        }
+        w->focusedChild = NULL;
         return;
     }
 
@@ -8443,9 +8435,9 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t       *self = (uint8_t *)w;
-    char          *capB = (char *)(self + EDGE_OFF_CAPTION_B);
-    const uint8_t *obj;
+    AM2_HudEdge   *e    = static_cast<AM2_HudEdge *>(w);
+    char          *capB = e->captionB;
+    const AM2_Object *obj;
     int32_t        i;
 
     ::WidgetScreenRect(w);
@@ -8467,34 +8459,30 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
         }
     }
 
-    obj = (const uint8_t *)LookupOwnerObj(
-              g_defaultOwner);
+    obj = (const AM2_Object *)LookupOwnerObj(g_defaultOwner);
 
-    *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) = 0;
-    *(char *)(self + EDGE_OFF_CAPTION_A)     = '\0';
-    *(int32_t *)(self + EDGE_OFF_SECOND_PCT) = 0;
+    e->healthPct = 0;
+    e->captionA[0]     = '\0';
+    e->secondPct = 0;
     *capB                                    = '\0';
-    *(int32_t *)(self + EDGE_OFF_AMMO)       = -1;
+    e->ammo       = -1;
 
     if (!obj) {
         ::WidgetUpdate(w);
         return;
     }
 
-    if (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) > 0)
-        *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) =
-            EdgeBar(*(const int16_t *)(obj + OBJ_OFF_HEALTH),
-                    *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH));
+    if (obj->maxHealth > 0)
+        e->healthPct = EdgeBar(obj->health, obj->maxHealth);
 
-    if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
-        const uint8_t *veh = (const uint8_t *)LookupType3ByUID(
-                                 *(const uint32_t *)(obj + OBJ_OFF_RIDING));
+    if (obj->riding) {
+        const AM2_Object *veh = LookupType3ByUID(obj->riding);
         const char    *name;
 
         if (veh) {
             /* A switch over string literals, and the image's jump table
              * (0x00419A18) sends kind 4 to the default. */
-            switch (*(const uint32_t *)(veh + VEHICLE_OFF_KIND)) {
+            switch ((uint32_t)veh->vehicleKind) {
             case 0:  name = "JEEP"; break;
             case 1:  name = "TANK"; break;
             case 2:  name = "H|T";  break;
@@ -8502,35 +8490,31 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
             case 5:  name = "BOAT"; break;
             default: name = "???";  break;
             }
-            strcpy((char *)(self + EDGE_OFF_CAPTION_A), name);
-            *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
-                EdgeBar(*(const int16_t *)(veh + OBJ_OFF_HEALTH),
-                        *(const int16_t *)(veh + OBJ_OFF_MAX_HEALTH));
+            strcpy(e->captionA, name);
+            e->secondPct = EdgeBar(veh->health, veh->maxHealth);
         }
         ::WidgetUpdate(w);
         return;
     }
 
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-        const uint8_t *item;
+        const AM2_Object *item;
         const char    *name;
 
-        if (!*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4))
+        if (!obj->inventory[i])
             break;
 
-        item = (const uint8_t *)WeaponByUid(
-                   *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4));
+        item = WeaponByUid(obj->inventory[i]);
         if (!item)
             continue;
 
-        if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)) {
-            *(int32_t *)(self + EDGE_OFF_AMMO) =
-                *(const int32_t *)(item + ITEM_OFF_AMMO);
+        if (i == obj->inventorySel) {
+            e->ammo = item->ammo;
 
             /* The caption: a switch over string literals, compiled to the
              * byte table at 0x00419A94 and the jump table before it. The
              * case order is the arms' order in the image. */
-            switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
+            switch ((uint32_t)item->typeRec[0]) {
                 case 2: name = "GREN"; break;
                 case 3: name = "FLAM"; break;
                 case 4: name = "BAZ"; break;
@@ -8561,14 +8545,11 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
         }
 
         /* Falls through from the branch above, deliberately. */
-        if (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)
-            == AM2_ITEM_TYPE_ARMOR) {
-            strcpy((char *)(self + EDGE_OFF_CAPTION_A), "ARMOR");
-            *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
-                EdgeBar(*(const int32_t *)(item + ITEM_OFF_AMMO),
-                        *(const int32_t *)(*(const uint8_t *const *)
-                                               (item + OBJ_OFF_FIELD_C0)
-                                           + ITEMTYPE_OFF_CAPACITY));
+        if ((uint32_t)item->typeRec[0] == AM2_ITEM_TYPE_ARMOR) {
+            strcpy(e->captionA, "ARMOR");
+            e->secondPct =
+                EdgeBar(item->ammo,
+                        item->typeRec[ITEMTYPE_OFF_CAPACITY / 4]);
         }
     }
 
@@ -8602,7 +8583,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self = (uint8_t *)w;
+    AM2_HudEdge *e = static_cast<AM2_HudEdge *>(w);
     RECT        box;
     RECT        vis;
     AM2_Rect    part;
@@ -8641,7 +8622,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
             w->rect.left + AM2_HUD_BAR_X + AM2_HUD_BAR_W,                    \
             pen + AM2_HUD_BAR_BASE);                                         \
     ClearRegion(&box, g_hiliteColour);
-#define spr (*(AM2_Sprite **)(self + EDGE_OFF_SPRITE))
+#define spr (e->sprite)
 
     /* Clipped in place: the by-value clip is the intersection from here. */
     if (!IntersectRect(&clip, (const RECT *)g_screenClip, &clip))
@@ -8658,12 +8639,12 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
            + AM2_HUD_EDGE_GAP;
 
     EDGE_SPRITE(spr)
-    EDGE_BAR(*(const int32_t *)(self + EDGE_OFF_HEALTH_PCT))
+    EDGE_BAR(e->healthPct)
     pen += spr->bounds.bottom + AM2_HUD_EDGE_GAP_BAR;
 
     /* The vehicle or the armour, if there is one, with its own bar. */
     {
-        const char *cap = (const char *)(self + EDGE_OFF_CAPTION_A);
+        const char *cap = e->captionA;
 
         if (*cap) {
             y = pen;
@@ -8672,25 +8653,25 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
             pen += TextStackHeight(cap, 1) + AM2_HUD_EDGE_GAP;
 
             EDGE_SPRITE(spr)
-            EDGE_BAR(*(const int32_t *)(self + EDGE_OFF_SECOND_PCT))
+            EDGE_BAR(e->secondPct)
             pen += spr->bounds.bottom + AM2_HUD_EDGE_GAP_BAR;
         }
     }
 
     /* The item in hand, and its ammo if it counts any. */
-    if (!*(const char *)(self + EDGE_OFF_CAPTION_B))
+    if (!e->captionB[0])
         return;
 
     y = pen;
     x = w->rect.left + (w->rect.right - w->rect.left) / 2;
-    EDGE_TEXT((const char *)(self + EDGE_OFF_CAPTION_B))
-    pen += TextStackHeight((const char *)(self + EDGE_OFF_CAPTION_B), 1)
+    EDGE_TEXT(e->captionB)
+    pen += TextStackHeight(e->captionB, 1)
            + AM2_HUD_EDGE_GAP;
 
-    if (*(const int32_t *)(self + EDGE_OFF_AMMO) < 0)
+    if (e->ammo < 0)
         return;
 
-    EDGE_SPRITE(*(AM2_Sprite **)(self + EDGE_OFF_AMMO_SPRITE))
+    EDGE_SPRITE(e->ammoSprite)
 
     /* The count is centered ONE PIXEL RIGHT of the widget middle
      * (`lea eax,[eax+ecx+1]`), three pixels down; the labels above use the
@@ -8706,11 +8687,11 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     if (!IntersectRect(&vis, &box, &clip))
         return;
 
-    if (*(const int32_t *)(self + EDGE_OFF_AMMO) > AM2_HUD_AMMO_MAX)
+    if (e->ammo > AM2_HUD_AMMO_MAX)
         strcpy(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_OVER)));
     else
         am2_sprintf(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_FMT)),
-                    *(const int32_t *)(self + EDGE_OFF_AMMO));
+                    e->ammo);
 
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
         return;

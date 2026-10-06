@@ -764,32 +764,34 @@ void __cdecl BuildRemapTables(void)
 {
 #define base (g_armyPalBase)
 #define pal ((const uint8_t *)g_paletteCopy)
-    uint8_t        *obj  = g_objTableRecords;
-    uint8_t        *ramp = g_armyRampTables;
+    /* Both tables are an array of 256-byte rows, one per army, and are
+     * indexed [army][i]: a row pointer held per army puts the index first
+     * in the address, the image has the row offset first. */
+    uint8_t       (*obj)[AM2_OBJ_TABLE_REC_SIZE] =
+        (uint8_t (*)[AM2_OBJ_TABLE_REC_SIZE])g_objTableRecords;
+    uint8_t       (*ramp)[AM2_OBJ_TABLE_REC_SIZE] =
+        (uint8_t (*)[AM2_OBJ_TABLE_REC_SIZE])g_armyRampTables;
     uint8_t       **table;
     int32_t         block;
     int32_t         army;
     int32_t         i;
 
     for (army = 0; army < AM2_ARMY_PAL_BASES; army++) {
-        uint8_t *rec = obj + (uint32_t)army * AM2_OBJ_TABLE_REC_SIZE;
-        uint8_t *rmp = ramp + (uint32_t)army * AM2_OBJ_TABLE_REC_SIZE;
-
         for (i = 0; i < AM2_REMAP_COLOURS; i++) {
             uint32_t c = ((uint32_t)base[army] + (uint32_t)i) * 4;
 
-            rec[i] = NearestPalIndexRGB(
+            obj[army][i] = NearestPalIndexRGB(
                 g_activePalette,
                 pal[c], pal[c + 1], pal[c + 2],
                 AM2_PAL_REMAP_FROM);
         }
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
-            rec[i] = (uint8_t)i;
+            obj[army][i] = (uint8_t)i;
 
         for (i = 0; i < AM2_REMAP_COLOURS; i++)
-            rmp[i] = (uint8_t)(base[army] + (i >> 1));
+            ramp[army][i] = (uint8_t)(base[army] + (i >> 1));
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
-            rmp[i] = (uint8_t)i;
+            ramp[army][i] = (uint8_t)i;
     }
 
     table = g_variationTable;

@@ -521,7 +521,14 @@ struct AM2_HudCmd : AM2_Widget {
 
 struct AM2_HudEdge : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudEdge[AM2_HUD_C_BYTES - sizeof(AM2_Widget)];
+    int32_t       field58;        /* 0x0058 */
+    AM2_Sprite   *sprite;         /* 0x005C  EDGE_OFF_SPRITE, under each label */
+    AM2_Sprite   *ammoSprite;     /* 0x0060  EDGE_OFF_AMMO_SPRITE */
+    int32_t       healthPct;      /* 0x0064  EDGE_OFF_HEALTH_PCT, the trooper's bar */
+    char          captionA[0x20]; /* 0x0068  EDGE_OFF_CAPTION_A, the vehicle or ARMOR */
+    int32_t       secondPct;      /* 0x0088  EDGE_OFF_SECOND_PCT, whatever A names */
+    char          captionB[0x20]; /* 0x008C  EDGE_OFF_CAPTION_B, the item in hand */
+    int32_t       ammo;           /* 0x00AC  EDGE_OFF_AMMO, -1 when there is none */
     AM2_HudEdge();
     explicit AM2_HudEdge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudEdge();

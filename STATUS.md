@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1519 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1520 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,25 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **BuildRemapTables matched; HudTopUpdate 67 -> 2** (2026-10-06),
+    1519 -> 1520. A scan for base/index swaps in addresses found
+    BuildRemapTables. Its two army tables are arrays of 256-byte rows,
+    indexed `[army][i]`; a row pointer held per army put the index first.
+    HudTopUpdate took these, in order:
+    - the blip deadline as one expression, with no `jitter` local;
+    - both scroll clamps as conditionals over a DOUBLE step (the image
+      compares on the FPU and stores the winner through it);
+    - the strip and button tests nested positively, with the miss arms
+      after them (the image lays the hit path first);
+    - the button rect built in place;
+    - the mouse grab read from its global.
+    What is left (2) is VC6 jumping straight past `grab != button` after
+    storing the grab, which the image does not do. AirFrameDraw's last
+    difference is the same kind: VC6 knows the frame is 2 after `f++`. In
+    small test files VC6 makes these jumps under every optimisation flag
+    tried, so the original's compiler may have behaved differently there.
+    AM2_HudEdge is typed (its captions, bars, ammo and sprites), and
+    AM2_Object's +0xCC is a union with a weapon's ammo.
   - **TileRegionOrBorrow matched through an aggregate** (2026-10-06),
     1518 -> 1519. Its last instruction was `[eax + ebx]` where the image has
     `[ebx + eax]`. The clone lab (`tools/vc6lab.py`) isolated the rule. VC6
