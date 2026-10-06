@@ -740,6 +740,10 @@ struct AM2_HudCommandBlock am2_hud_commands = {
 /* The layout claims above are compiler-checked rather than commented. */
 static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
 static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
+/* Both derive from AM2_Widget, so GCC calls them non-standard-layout; the
+ * offsets are still fixed and these are the checks that say so. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
 static_assert(offsetof(AM2_HudTop, rows)     == HUDLOG_OFF_ROWS,    "hud log rows");
 static_assert(offsetof(AM2_HudTop, typing)   == HUDLOG_OFF_TYPING,  "hud typing");
 static_assert(offsetof(AM2_HudTop, count)    == HUDLOG_OFF_COUNT,   "hud log count");
@@ -747,6 +751,7 @@ static_assert(offsetof(AM2_HudTop, checkbox) == HUD_A_OFF_CHECKBOX, "hud checkbo
 static_assert(sizeof(AM2_HudTop)             == AM2_HUD_A_BYTES,    "hud top size");
 static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
 static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
+#pragma GCC diagnostic pop
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
  * g_drawTarget, under the same name, because it is the same global. */
@@ -15454,7 +15459,6 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
     RECT     paint;
     RECT     rowRect;
     int32_t  idx;
-    int32_t  offset;
 
     if (!rows)
         return;
@@ -15470,11 +15474,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
     ClearRegion(&paint, g_backgroundColour);
 
     idx = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
-    if (rows->count <= idx)
-        return;
-
-    offset = idx * LIST_ROW_STRIDE;
-    do {
+    for (; idx < rows->count; idx++) {
         int32_t top = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
         int32_t y;
         uint8_t ink;
@@ -15516,12 +15516,10 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
         if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
             return;
         DrawTextClipped(rowRect.left + LIST_TEXT_INDENT, rowRect.top,
-                               rows->text + offset, 1, paint, ink);
+                               rows->text + idx * LIST_ROW_STRIDE, 1, paint, ink);
         UnlockSurface();
 
-        idx++;
-        offset += LIST_ROW_STRIDE;
-    } while (idx < rows->count);
+    }
 #undef rows
 }
 

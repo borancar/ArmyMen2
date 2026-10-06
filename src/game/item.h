@@ -181,6 +181,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src);
  * NOT A FUNCTION IN THE ORIGINAL -- it is inlined at all eight sites, so there
  * is no address to patch and nothing to install. `static inline` here, so it
  * is expanded at the widget sites and in MedkitHealOne as the original has it. */
+#ifdef __cplusplus   /* AM2_PtrList is a class; no C caller */
 static inline AM2_Object *OurLeaderUnit(void)
 {
     int32_t owner = *(const int32_t *)&g_defaultOwner;
@@ -206,6 +207,7 @@ static inline AM2_Object *OurLeaderUnit(void)
     }
     return (AM2_Object *)0;
 }
+#endif
 
 /* 0x00458AB0, four call sites. Heal a trooper by the MEDKIT definition's
  * percentage, crediting our leader as the source. */

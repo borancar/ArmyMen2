@@ -2070,7 +2070,7 @@ void __cdecl DrawSelection(void)
     UnlockSurface();
 
     for (i = 0; i < g_selectedCount; ) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = (AM2_Object *)LookupByUID(
             (g_selectedItems)[i]);
         int32_t  x, y, wide, drop, fill;
         RECT     box;
@@ -2081,35 +2081,31 @@ void __cdecl DrawSelection(void)
             continue;
         }
 
-        if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & AM2_MARK_GONE) {
+        if (obj->flags & AM2_MARK_GONE) {
             ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            obj->flags &= ~OBJ_FLAG_SELECTED;
             continue;
         }
 
-        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0) {
+        if (obj->health == 0) {
             ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            obj->flags &= ~OBJ_FLAG_SELECTED;
             continue;
         }
 
-        x = *(const int16_t *)(obj + OBJ_OFF_POS)
-            - g_viewX;
-        y = *(const int16_t *)(obj + OBJ_OFF_POS + 2)
-            - g_viewY;
+        x = obj->pos.x - g_viewX;
+        y = obj->pos.y - g_viewY;
 
-        if (ObjIsType2((const AM2_Object *)obj)) {
+        if (ObjIsType2(obj)) {
             drop = AM2_MARK_TROOPER_DY;
             wide = AM2_MARK_TROOPER_W;
         } else {
             wide = AM2_MARK_WIDE_W;
 
-            if (*(const uint32_t *)(obj + VEHICLE_OFF_KIND) == 5) {
+            if (obj->vehicleKind == 5) {
                 drop = AM2_MARK_BIG_DY;
             } else {
-                const AM2_Sprite *spr = *(const AM2_Sprite *const *)(
-                    *(const uint8_t *const *)(obj + OBJ_OFF_ROWS)
-                    + ROW_OFF_SPRITE);
+                const AM2_Sprite *spr = obj->rowSet.rows->sprite;
 
                 drop = (int32_t)(((uint32_t)spr->bounds.bottom
                                   - (uint32_t)(uint16_t)spr->hotY)
@@ -2117,8 +2113,8 @@ void __cdecl DrawSelection(void)
             }
         }
 
-#define max (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH))
-#define hp  (*(const int16_t *)(obj + OBJ_OFF_HEALTH))
+#define max (obj->maxHealth)
+#define hp  (obj->health)
 
         if (max / 2 < wide)
             wide = max / 2;

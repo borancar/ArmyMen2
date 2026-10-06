@@ -330,7 +330,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
                                          * and up are skipped too */
             /* The glyph table indexed afresh, by the signed character. */
             width += *(const uint16_t *)(base
-                         + g_fonts[font].offsets[ch]);
+                         + g_fonts[font].offsets[(int32_t)ch]);
         }
 #undef ch
     }

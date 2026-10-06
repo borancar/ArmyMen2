@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1517 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1518 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,16 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ListDraw matched** (2026-10-06), 1517 -> 1518: a `for` loop that tests
+    the count at the top, so VC6 does not peel the first visible-row check
+    out ahead of the loop, and the row text addressed as `text + idx *
+    stride` in place rather than through a running offset local.
+  - **The default `make` was broken by the PtrList typing and nothing
+    noticed** (2026-10-06). OurLeaderUnit, an inline in item.h, walks
+    AM2_PtrList, which misc.h declares only for C++, and selfcheck.c includes
+    item.h. `make check` and the relink never compile selfcheck.c, so both
+    stayed green for three commits. It is behind `__cplusplus` now. Run the
+    plain build too before committing a header change.
   - **DepthCompare matched by reading the image's shape** (2026-10-06),
     1516 -> 1517. It had been written as four self-contained arms; the image
     has each arm answer 1 itself and fall into ONE shared "less is -1, a tie

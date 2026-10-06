@@ -153,7 +153,7 @@ int32_t __cdecl TextStackHeight(const char *text, int32_t font)
         } else if (text[i] >= 0x1F) {
             /* The glyph table indexed afresh, by the signed character. */
             total += *(const uint16_t *)(base
-                         + g_fonts[font].offsets[text[i]] + 2)
+                         + g_fonts[font].offsets[(int32_t)text[i]] + 2)
                      - 3;
         }
     }
