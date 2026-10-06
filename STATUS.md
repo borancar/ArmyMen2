@@ -215,6 +215,14 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Rows and sprites typed** (2026-10-06), 1514 held. AM2_MapRow is the
+    whole 0x60-byte record, the object carries its rows as AM2_RowSet (the
+    {list, count, rows, capacity} header at +0x6C), and AM2_Sprite moved to
+    the flat spritetype.h, its surface arm a forward-declared
+    `struct IDirectDrawSurface *`. StepObjRows keeps its match only through a
+    local `AM2_RowSet *set`: through `o` VC6 adds `i*stride + rows`, which is
+    what the old void*-plus-alias version had been imitating. PointActionC
+    173 -> 20 bytes. KEEP_DECLS is empty again.
   - **A void* parameter plus a typed alias is two variables** (2026-10-06),
     1513 -> 1514. RevealObj took `void *obj` and cast it into a local; VC6
     gives the alias its own register. It matches once the parameter is

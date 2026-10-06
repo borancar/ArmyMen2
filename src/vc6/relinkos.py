@@ -75,8 +75,10 @@ def _aggregated(va):
 # adding struct members or externs can tip it. Empty matched once the
 # comm and player-message structs were typed; the trooper fields on
 # AM2_Object tipped it back; keeping the sprite list's and the level
-# block's declarations settles both. Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x00511BC8, 0x00511DA0))
+# block's declarations settled both, until the map row, row set and sprite
+# record were typed and empty matched again. Search the subsets (empty
+# first) when it flips.
+KEEP_DECLS = ()
 
 
 def _kept(va):

@@ -325,8 +325,8 @@ void __cdecl RevealObj(AM2_Object *o)
         return;
     o->flags &= ~(uint32_t)OBJ_FLAG_CONCEALED;
 
-    for (i = 0; i < o->rowCount; i++) {
-        AM2_MapRow *row = &o->rows[i];
+    for (i = 0; i < o->rowSet.count; i++) {
+        AM2_MapRow *row = &o->rowSet.rows[i];
 
         row->flags &= ~(uint32_t)ROW_FLAG_REMOVED;
         RowUpdate(row, 0, g_mapDesc);

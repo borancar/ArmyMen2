@@ -8566,7 +8566,7 @@ pose:
     SetUnitPose(o, *(const int32_t *)(w + 8));
     *(*(uint8_t **)(o + OBJ_OFF_ROWS) + 0x50) =
         *(const uint8_t *)(o + OBJ_OFF_FACING);
-    StepObjRows(o);
+    StepObjRows((AM2_Object *)o);
     {
         /* The ROW's animation frame, reloaded -- StepObjRows returns nothing. */
         int32_t f = *(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS)
@@ -10664,7 +10664,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
         *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0xB0u) =
             *(const uint8_t *)(o + 0x530u);
 
-    StepObjRows(o);
+    StepObjRows((AM2_Object *)o);
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
 
     /* Drag the passengers to the vehicle's new position, and their held

@@ -67,6 +67,7 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "maprow.h"   /* RowUpdate, SetAnimFrame -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite -- PointActionC reads attachX/Y */
 #include "anim.h"     /* AM2_Anim -- the frame count SetUnitPose waits on */
 #include "trig.h"     /* Cos8, Sin8 -- reconstructed */
 
@@ -1500,47 +1501,36 @@ void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
  * The row-1 offsets are added as 16-BIT arithmetic, on top of a position that
  * was just written as a dword -- so an attach offset that carries out of the
  * low half lands in the row's Y rather than wrapping its X. */
-void __cdecl PointActionC(void *obj, uint32_t point)
+void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *rows;
-    int32_t  i;
+    AM2_MapRow *rows;
+    int32_t     i;
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 0)
+    if (o->rowSet.count <= 0)
         return;
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    rows = o->rowSet.rows;
     ItemTeardown(o);
 
-    *(uint32_t *)(o + OBJ_OFF_POS)      = point;
-    *(uint32_t *)(rows + ROW_OFF_X)     = point;
+    o->pos    = point;
+    rows->pos = point;
     RowUpdate(rows, 1, g_mapDesc);
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 1)
+    if (o->rowSet.count <= 1)
         goto done;
 
-    if (!*(void *const *)(rows + ROW_OFF_SPRITE))
+    if (!rows->sprite)
         return;                    /* the whole function, not just the loop */
 
-    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
-    *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
-        *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
+    rows->pos     = o->pos;
+    rows->yAdjust = o->row0YAdjust;
 
-    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *r   = *(uint8_t **)(o + OBJ_OFF_ROWS)
-                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-        uint8_t *spr;
+    for (i = 1; i < o->rowSet.count; i++) {
+        AM2_MapRow *r = &o->rowSet.rows[i];
 
-        *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
-
-        spr = *(uint8_t **)(rows + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_X) =
-            (int16_t)(*(const int16_t *)(r + ROW_OFF_X)
-                      + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
-        spr = *(uint8_t **)(rows + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_Y) =
-            (int16_t)(*(const int16_t *)(r + ROW_OFF_Y)
-                      + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+        r->pos    = o->pos;
+        r->pos.x += rows->sprite->attachX;
+        r->pos.y += rows->sprite->attachY;
 
         RowUpdate(r, 0, g_mapDesc);
     }
@@ -2722,7 +2712,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
     SetObjField530(obj, *(const int32_t *)(c + ROACHSTEP_OFF_STATE));
     (*(uint8_t *const *)(o + OBJ_OFF_ROWS))[ROW_OFF_HEADING] =
         *(const uint8_t *)(o + OBJ_OFF_FACING);
-    StepObjRows(obj);
+    StepObjRows((AM2_Object *)obj);
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
     ObjMoveAlongFacing(obj, 0, 0, 0);
 #undef c
@@ -7361,35 +7351,33 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
  * exactly the drift checkglobals refuses. */
 #define kSpriteList     (g_spriteList)
 
-void __cdecl StepRowAnim(void *row)
+void __cdecl StepRowAnim(AM2_MapRow *r)
 {
-#define r ((uint8_t *)row)
     const AM2_Anim *anim;
     int32_t         idx;
     int32_t         hold;
     uint8_t         dir;
     int16_t         step;
 
-    if (!(*(const uint8_t *)(r + MAPOBJ_OFF_FLAGS) & 1))
+    if (!(r->flags & 1))
         return;
 
-    if (*(const int16_t *)(r + ROW_OFF_FRAME) >= AM2_ROW_DELAY_BASE) {
-        if (*(const int16_t *)(r + ROW_OFF_FRAME) == AM2_ROW_DELAY_BASE) {
-            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+    if (r->frame >= AM2_ROW_DELAY_BASE) {
+        if (r->frame == AM2_ROW_DELAY_BASE) {
+            SetAnimFrame(r, r->animNextId, 0);
             return;
         }
-        *(int16_t *)(r + ROW_OFF_FRAME) -= 1;
+        r->frame -= 1;
         return;
     }
 
-    anim = *(const AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    anim = r->animPlaying;
     if (!anim)
         return;
 
-    dir = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(r + ROW_OFF_HEADING));
+    dir  = (uint8_t)(r->headingBias + r->heading);
     step = RoundTo8(dir, anim->directionBits);
-    idx  = anim->frames * step + *(const uint8_t *)(r + ROW_OFF_CELL);
+    idx  = anim->frames * step + r->cell;
 
     /* The cell is re-indexed from the animation, and the clock read, at
      * every use. */
@@ -7402,32 +7390,30 @@ void __cdecl StepRowAnim(void *row)
          * had read and still made. */
         void *want = kSpriteList[CELLP->sprite];
 
-        if (*(void *const *)(r + ROW_OFF_SPRITE) != want)
+        if (r->sprite != want)
             RowSetSprite(r, want, g_mapDesc);
     }
 
     hold = CELLP->hold;
-    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
-            == g_rowLutDoubles)
+    if (r->lut == g_rowLutDoubles)
         hold >>= 1;
 
-    if (NOW < (uint32_t)hold + *(const uint32_t *)(r + ROW_OFF_STAMP_54))
+    if (NOW < (uint32_t)hold + r->stamp54)
         return;
 
-    if ((int16_t)++*(uint8_t *)(r + ROW_OFF_CELL) >= anim->frames) {
-        if (*(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) != AM2_ROW_ANIM_HOLD) {
-            *(uint8_t *)(r + ROW_OFF_CELL)      = 0;
-            *(uint32_t *)(r + ROW_OFF_STAMP_54) = NOW;
-            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+    if ((int16_t)++r->cell >= anim->frames) {
+        if (r->animNextId != AM2_ROW_ANIM_HOLD) {
+            r->cell    = 0;
+            r->stamp54 = NOW;
+            SetAnimFrame(r, r->animNextId, 0);
         } else {
-            --*(uint8_t *)(r + ROW_OFF_CELL);
+            --r->cell;
         }
     } else {
-        *(uint32_t *)(r + ROW_OFF_STAMP_54) = NOW;
+        r->stamp54 = NOW;
     }
 #undef CELLP
 #undef NOW
-#undef r
 }
 
 /* 0x00449570, ten callers -- the only writer of OBJ_OFF_SOLDIER_KIND, and the
@@ -7847,22 +7833,19 @@ void __cdecl Type238Action(void *obj, int32_t award)
  * RowAnimFinished, in anim.cpp, reads a row's +0x44 as an AM2_Anim * and the
  * two would otherwise look like one field with two readings.
  */
-void __cdecl StepObjRows(void *obj)
+void __cdecl StepObjRows(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
-    int32_t  i;
+    /* Through a pointer to the row set, which is what makes VC6 add
+     * `rows + i*stride` in the image's order; reading the fields through `o`
+     * gives `i*stride + rows`. */
+    AM2_RowSet *set = &o->rowSet;
+    int32_t     i;
 
-    /* The row address goes through the parameter and everything else through
-     * `o`. Observed, not understood: with `o` throughout, or with no `o` at
-     * all, VC6 emits `i*stride + rows` where the image has `rows + i*stride`. */
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        StepRowAnim(*(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
-                    + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
+    for (i = 0; i < set->count; i++)
+        StepRowAnim(&set->rows[i]);
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
-        *(int32_t *)(o + OBJ_OFF_FIELD_44) =
-            *(const int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
-                               + ROW_OFF_FIELD_3C);
+    if (set->count > 0)
+        o->field44 = set->rows->field3C;
 }
 
 /* 0x0040D930, nine callers. Put a unit into a POSE.
@@ -11957,7 +11940,7 @@ void __cdecl StepType6(void *obj)
         return;
     }
 
-    StepObjRows(o);
+    StepObjRows((AM2_Object *)o);
     ObjMoveAlongFacing(o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
 }
 

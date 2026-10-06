@@ -32,6 +32,16 @@ typedef struct {
  * `owner` is the army byte (OBJ_OFF_ARMY). */
 struct AM2_MapRow;
 
+/* The sub-list header an object carries at OBJ_OFF_SUBRECORD: the record list
+ * its rows were built from, the row count (OBJ_OFF_ROW_COUNT) and the rows
+ * themselves (OBJ_OFF_ROWS), AM2_OBJ_ROW_STRIDE apart. */
+typedef struct {
+    const void        *list;      /* +0x00 SUBREC_OFF_LIST */
+    int32_t            count;     /* +0x04 SUBREC_OFF_COUNT */
+    struct AM2_MapRow *rows;      /* +0x08 */
+    int32_t            capacity;  /* +0x0C */
+} AM2_RowSet;
+
 typedef struct {
     uint32_t       type;            /* +0x00  switch selector, 0..8 */
     uint32_t       uid;             /* +0x04  written back on registration */
@@ -42,17 +52,19 @@ typedef struct {
     AM2_Point      pos;             /* +0x12 OBJ_OFF_POS */
     uint8_t        _pad16[0x2A];    /* +0x16 */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
-    uint8_t        _pad41[0x17];    /* +0x41 */
+    uint8_t        _pad41[1];       /* +0x41 */
+    int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
+    int32_t        field44;         /* +0x44  OBJ_OFF_FIELD_44, row 0's field3C */
+    uint8_t        _pad48[0x10];    /* +0x48 */
     uint32_t       deadline58;      /* +0x58  OBJ_OFF_DEADLINE_58, a clock stamp */
     uint8_t        _pad5c[4];       /* +0x5C */
     int16_t        maxHealth;       /* +0x60  OBJ_OFF_MAX_HEALTH */
     int16_t        health;          /* +0x62  OBJ_OFF_HEALTH */
     int8_t         heightAdj;       /* +0x64  OBJ_OFF_HEIGHT_ADJ */
     int8_t         heightSet;       /* +0x65  OBJ_OFF_HEIGHT_SET */
-    uint8_t        _pad66[0x0A];    /* +0x66 */
-    int32_t        rowCount;        /* +0x70 OBJ_OFF_ROW_COUNT */
-    struct AM2_MapRow *rows;        /* +0x74 OBJ_OFF_ROWS, AM2_OBJ_ROW_STRIDE apart */
-    uint8_t        _pad78[0x1C];    /* +0x78 */
+    uint8_t        _pad66[6];       /* +0x66 */
+    AM2_RowSet     rowSet;          /* +0x6C OBJ_OFF_SUBRECORD */
+    uint8_t        _pad7c[0x18];    /* +0x7C */
     const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     uint8_t        _pad9c[4];       /* +0x9C */
@@ -101,12 +113,15 @@ static_assert(offsetof(AM2_Object, shooterUid)    == 0x98,  "shooterUid");
 static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");
 static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
 static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
+static_assert(offsetof(AM2_Object, row0YAdjust)   == 0x42,  "row0YAdjust");
+static_assert(offsetof(AM2_Object, field44)       == 0x44,  "field44");
 static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
 static_assert(offsetof(AM2_Object, heightSet)     == 0x65,  "heightSet");
 static_assert(offsetof(AM2_Object, field10C)      == 0x10C, "field10C");
 static_assert(offsetof(AM2_Object, vehicleKind)   == 0x52C, "vehicleKind");
 static_assert(offsetof(AM2_Object, pos)           == 0x12,  "pos");
-static_assert(offsetof(AM2_Object, rows)          == 0x74,  "rows");
+static_assert(offsetof(AM2_Object, rowSet.count)  == 0x70,  "rowSet.count");
+static_assert(offsetof(AM2_Object, rowSet.rows)   == 0x74,  "rowSet.rows");
 static_assert(offsetof(AM2_Object, pose)          == 0x538, "pose");
 static_assert(offsetof(AM2_Object, sarge)         == 0x548, "sarge");
 static_assert(offsetof(AM2_Object, sentPos)       == 0x5B4, "sentPos");

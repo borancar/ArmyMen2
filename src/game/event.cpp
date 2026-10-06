@@ -1219,7 +1219,7 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
 
         at.x = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_X) + PT.x);
         at.y = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_Y) + PT.y);
-        PointActionC(obj, *(const uint32_t *)&at);
+        PointActionC((AM2_Object *)obj, at);
         return;
     }
 
@@ -1227,7 +1227,7 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
         && *(const int16_t *)(obj + OBJ_OFF_Y) == PT.y)
         return;
 
-    PointActionC(obj, point);
+    PointActionC((AM2_Object *)obj, PT);
 #undef PT
 }
 

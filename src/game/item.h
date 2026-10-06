@@ -41,7 +41,7 @@ void __cdecl ApplyHeightItem(void *obj, int16_t height);
 
 /* 0x0040A380, one caller -- StepObjRows, so this runs once per row of every
  * object every frame. Advance one row's animation. */
-void __cdecl StepRowAnim(void *row);
+void __cdecl StepRowAnim(struct AM2_MapRow *r);
 
 /* 0x00457BC0, one caller. Bump an object's rank and, for a plain type 2 at
  * ranks 3, 5 and 7, hand it a new weapon. The promotion happens for every
@@ -570,7 +570,7 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height);
 
 /* 0x00428F80. Move an object to a point, taking every one of its rows with
  * it. The secondary rows are offset by the first sprite's attach point. */
-void __cdecl PointActionC(void *obj, uint32_t point);
+void __cdecl PointActionC(AM2_Object *o, AM2_Point point);
 
 /* 0x00435550. Make a kind-7 object, or refuse a thirty-third. */
 void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
@@ -614,7 +614,7 @@ void __cdecl DestroyType3(void *obj);
 void __cdecl DestroyType8(void *obj);
 
 /* 0x00428E00. Step every row of an object's row list. */
-void __cdecl StepObjRows(void *obj);
+void __cdecl StepObjRows(AM2_Object *o);
 
 void item_install(void);
 

@@ -744,7 +744,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
         *(uint8_t *)(rows + ROW_OFF_HEADING) =
             *(const uint8_t *)(made + OBJ_OFF_FACING);
-        StepObjRows(made);
+        StepObjRows((AM2_Object *)made);
         ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
         return;
     }
@@ -769,7 +769,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                          + ROW_OFF_FIELD_B0) =
                 *(const uint8_t *)(made + OBJ_OFF_FIELD_530);
 
-        StepObjRows(made);
+        StepObjRows((AM2_Object *)made);
         ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
 
         n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
@@ -867,7 +867,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             rows = *(uint8_t **)(occupant + OBJ_OFF_ROWS);
             *(uint8_t *)(rows + ROW_OFF_HEADING) =
                 *(const uint8_t *)(occupant + OBJ_OFF_FACING);
-            StepObjRows(occupant);
+            StepObjRows((AM2_Object *)occupant);
 
             *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
             *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) =

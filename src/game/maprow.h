@@ -5,23 +5,36 @@
 
 #include <stdint.h>
 
+#include "dist.h"                /* AM2_Point */
+#include "rect.h"                /* AM2_Rect */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct AM2_AnimTable;
 struct AM2_Anim;
+struct AM2_Sprite;
 
 /* A map row: the drawable node every map object carries, linked into the
  * cell grid and the depth list. Transcribed as the struct the original
  * accessed by member; only the named fields are claimed. */
 typedef struct AM2_MapRow {
     uint32_t              flags;        /* +0x00  bit 0: on the map */
-    void                 *sprite;       /* +0x04  ROW_OFF_SPRITE */
-    void                 *prevSprite;   /* +0x08  ROW_OFF_PREV_SPRITE */
-    uint8_t               _pad0c[0x20]; /* +0x0C  ROW_OFF_RECT .. */
+    struct AM2_Sprite    *sprite;       /* +0x04  ROW_OFF_SPRITE */
+    struct AM2_Sprite    *prevSprite;   /* +0x08  ROW_OFF_PREV_SPRITE */
+    AM2_Rect              rect;         /* +0x0C  ROW_OFF_RECT */
+    AM2_Point             pos;          /* +0x1C  ROW_OFF_X, ROW_OFF_Y */
+    int16_t               yAdjust;      /* +0x20  ROW_OFF_Y_ADJUST */
+    int16_t               prevX;        /* +0x22  ROW_OFF_PREV_X */
+    int16_t               prevY;        /* +0x24  ROW_OFF_PREV_Y */
+    int16_t               field26;      /* +0x26  ROW_OFF_FIELD_26 */
+    int32_t               field28;      /* +0x28  ROW_OFF_FIELD_28 */
     const void           *lut;          /* +0x2C  MAPOBJ_OFF_LUT */
-    uint8_t               _pad30[0x0C]; /* +0x30 */
+    void                 *palette;      /* +0x30  MAPOBJ_OFF_PALETTE */
+    uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
+    uint8_t               _pad35[3];    /* +0x35 */
+    void                 *buffer;       /* +0x38  ROW_OFF_BUFFER */
     int16_t               field3C;      /* +0x3C  ROW_OFF_FIELD_3C */
     uint8_t               _pad3e[2];    /* +0x3E */
     struct AM2_AnimTable *animCur;      /* +0x40  ROW_OFF_ANIM_CUR */
@@ -31,9 +44,27 @@ typedef struct AM2_MapRow {
     int16_t               animNextId;   /* +0x4E  ROW_OFF_ANIM_NEXT_ID */
     uint8_t               heading;      /* +0x50  ROW_OFF_HEADING */
     uint8_t               cell;         /* +0x51  ROW_OFF_CELL */
-    uint8_t               _pad52[0x0A]; /* +0x52 */
+    uint8_t               _pad52[2];    /* +0x52 */
+    uint32_t              stamp54;      /* +0x54  ROW_OFF_STAMP_54 */
+    uint32_t              turnStamp;    /* +0x58  ROW_OFF_TURN_STAMP, game-clock ms */
     uint8_t               headingBias;  /* +0x5C  ROW_OFF_HEADING_BIAS */
+    uint8_t               _pad5d[3];    /* +0x5D, to AM2_OBJ_ROW_STRIDE */
 } AM2_MapRow;
+
+#if defined(__cplusplus) && !defined(_MSC_VER)
+#include <stddef.h>   /* GCC-side only, as in objtable.h */
+static_assert(offsetof(AM2_MapRow, rect)        == 0x0C, "rect");
+static_assert(offsetof(AM2_MapRow, pos)         == 0x1C, "pos");
+static_assert(offsetof(AM2_MapRow, yAdjust)     == 0x20, "yAdjust");
+static_assert(offsetof(AM2_MapRow, field28)     == 0x28, "field28");
+static_assert(offsetof(AM2_MapRow, lut)         == 0x2C, "lut");
+static_assert(offsetof(AM2_MapRow, buffer)      == 0x38, "buffer");
+static_assert(offsetof(AM2_MapRow, field3C)     == 0x3C, "field3C");
+static_assert(offsetof(AM2_MapRow, frame)       == 0x4C, "frame");
+static_assert(offsetof(AM2_MapRow, stamp54)     == 0x54, "stamp54");
+static_assert(offsetof(AM2_MapRow, headingBias) == 0x5C, "headingBias");
+static_assert(sizeof(AM2_MapRow)                == 0x60, "AM2_OBJ_ROW_STRIDE");
+#endif
 
 /* Original: 0x0041D740. Order two objects for drawing: layer first when both
  * have one, then a slope-weighted screen position. */
