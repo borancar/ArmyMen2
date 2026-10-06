@@ -116,4 +116,45 @@ typedef struct AM2_PlayerMsg {
     int32_t       checksum;         /* +0x234 MSG_PLAYER_CHECKSUM */
 } AM2_PlayerMsg;
 
+/* The scenario table, ADDR_SCENARIOS[ADDR_SCENARIO_COUNT]: one 0x40-byte
+ * record per "Scenario<n>" header in the map file, its four parts one per
+ * army slot, each part an array of rows ParseScenarioPart reads off the wire
+ * and PlaceScenario turns into units. See SCEN_ROW_OFF_* in orig.h. */
+typedef struct AM2_ScenRow {
+    int32_t  kind;                  /* +0x00 SCEN_ROW_OFF_KIND, 0x8005 the leader */
+    struct { int16_t x, y; } pos;   /* +0x04 SCEN_ROW_OFF_POS */
+    uint8_t  _pad08[8];             /* +0x08 */
+    uint8_t  amount;                /* +0x10 SCEN_ROW_OFF_AMOUNT */
+    uint8_t  flag;                  /* +0x11 SCEN_ROW_OFF_FLAG, set when the wire byte was ZERO */
+    uint8_t  field12;               /* +0x12 SCEN_ROW_OFF_FIELD_12, forced to 1 if zero */
+    char     name[0x51];            /* +0x13 SCEN_ROW_OFF_NAME, unbounded on the wire */
+    uint32_t at;                    /* +0x64 SCEN_ROW_OFF_AT, a packed point */
+    uint8_t  field68;               /* +0x68 SCEN_ROW_OFF_FIELD_68 */
+    uint8_t  _pad69[3];
+} AM2_ScenRow;
+
+typedef struct AM2_ScenPart {
+    int32_t      field0;            /* +0x00 cleared, never filled */
+    int16_t      count;             /* +0x04 SCENARIO_PART_OFF_COUNT */
+    uint16_t     _pad06;
+    AM2_ScenRow *rows;              /* +0x08 SCENARIO_PART_OFF_ROWS */
+} AM2_ScenPart;
+
+typedef struct AM2_Scenario {
+    char         tag[8];            /* +0x00 "Scenario" */
+    char         digit;             /* +0x08 SCENARIO_HDR_OFF_DIGIT, '1'..'4' */
+    char         _hdr09[7];
+    AM2_ScenPart parts[4];          /* +0x10 SCENARIO_OFF_PARTS, AM2_SCENARIO_PARTS */
+} AM2_Scenario;
+
+/* One entry of the dirty-rectangle list, ADDR_DIRTY_RECTS[], 0x14 bytes
+ * (AM2_DIRTY_RECORD_SIZE): a RECT, then the links of the doubly linked list
+ * ADDR_DIRTY_HEAD and ADDR_DIRTY_TAIL hold the ends of. Index 0 is the
+ * terminator, so the links are indices, not pointers. */
+typedef struct AM2_DirtyRec {
+    int32_t  left, top, right, bottom;  /* +0x00, a RECT */
+    uint16_t prev;                      /* +0x10 DIRTY_OFF_PREV */
+    uint16_t next;                      /* +0x12 DIRTY_OFF_NEXT */
+} AM2_DirtyRec;
+
 #endif /* AM2_GLOBALTYPES_H */

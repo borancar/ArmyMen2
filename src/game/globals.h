@@ -222,7 +222,7 @@
 #define g_dirTitlePtr            (*(char **)(uintptr_t)ADDR_DIR_TITLE_PTR)  /* 0x004852D0 */
 #define g_dirtyHead              (*(uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD)  /* 0x00508AD6 */
 #define g_dirtyPrevHead          (*(uint16_t *)(uintptr_t)ADDR_DIRTY_PREV_HEAD)  /* 0x00508AD4 */
-#define g_dirtyRects             ((uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS)  /* 0x00508AC4 */
+#define g_dirtyRects             ((AM2_DirtyRec *)(uintptr_t)ADDR_DIRTY_RECTS)  /* 0x00508AC4 */
 #define g_dirtyTail              (*(uint16_t *)(uintptr_t)ADDR_DIRTY_TAIL)  /* 0x00508AC0 */
 #define g_dragAnchor             (*(uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR)  /* 0x004FCF68 */
 #define g_drawTarget             (*(void **)(uintptr_t)ADDR_DRAW_TARGET)  /* 0x00507128 */
@@ -664,7 +664,7 @@
 #define g_savedRect              ((AM2_Rect *)(uintptr_t)ADDR_MENU_SAVED_RECT)  /* 0x004FCA98 */
 #define g_savedValid             (*(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID)  /* 0x004FCEFC */
 #define g_scenarioCount          (*(uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT)  /* 0x00656332 */
-#define g_scenarios              (*(uint8_t **)(uintptr_t)ADDR_SCENARIOS)  /* 0x00656334 */
+#define g_scenarios              (*(AM2_Scenario **)(uintptr_t)ADDR_SCENARIOS)  /* 0x00656334 */
 #define g_scenarioUnread         (*(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD)  /* 0x00656330 */
 #define g_scoreLimit             (*(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT)  /* 0x00515FF0 */
 #define g_screenClip             ((uint8_t *)(uintptr_t)ADDR_SCREEN_CLIP)  /* 0x00485310 */

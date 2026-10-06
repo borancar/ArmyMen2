@@ -1151,14 +1151,11 @@ void __cdecl RepaintDirtyList(const AM2_Rect *region)
     while (n) {
         RECT hit;
 
-        if (IntersectRect(&hit,
-                          (const RECT *)(g_dirtyRects
-                                         + n * AM2_DIRTY_RECORD_SIZE),
+        if (IntersectRect(&hit, (const RECT *)&g_dirtyRects[n],
                           (const RECT *)region))
             RedrawMapRegion((const AM2_Rect *)&hit);
 
-        n = *(const uint16_t *)(g_dirtyRects
-                                + n * AM2_DIRTY_RECORD_SIZE + DIRTY_OFF_NEXT);
+        n = g_dirtyRects[n].next;
     }
 }
 
@@ -3028,21 +3025,17 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
  * reach it with no game running. That tool tests THIS one by emulating the
  * original with IntersectRect hooked, so the split costs nothing.
  */
-#define PREV (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV))
-#define NEXT (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT))
 #define UNLINK()                                                          \
     do {                                                                  \
-        *(uint16_t *)(recs + (uint32_t)PREV * AM2_DIRTY_RECORD_SIZE       \
-                      + DIRTY_OFF_NEXT) = NEXT;                           \
-        if (!NEXT)                                                        \
-            g_dirtyTail = PREV;   \
+        recs[e->prev].next = e->next;                                     \
+        if (!e->next)                                                     \
+            g_dirtyTail = e->prev;                                        \
         else                                                              \
-            *(uint16_t *)(recs + (uint32_t)NEXT * AM2_DIRTY_RECORD_SIZE   \
-                          + DIRTY_OFF_PREV) = PREV;                       \
+            recs[e->next].prev = e->prev;                                 \
     } while (0)
 void __cdecl DirtyCollect(const AM2_Rect *r)
 {
-    uint8_t  *recs = g_dirtyRects;
+    AM2_DirtyRec *recs = g_dirtyRects;
     AM2_Rect  cur;
     AM2_Rect  hit;
     int32_t   at;
@@ -3059,12 +3052,9 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
         return;
     }
 
-    for (at = g_dirtyHead; at;
-         at = *(const uint16_t *)(recs + (uint32_t)at * AM2_DIRTY_RECORD_SIZE
-                                  + DIRTY_OFF_NEXT)) {
-        AM2_Rect *e = (AM2_Rect *)(recs
-                                   + (uint32_t)at * AM2_DIRTY_RECORD_SIZE);
-        int32_t   code;
+    for (at = g_dirtyHead; at; at = recs[at].next) {
+        AM2_DirtyRec *e = &recs[at];
+        int32_t       code;
 
         if (!IntersectRect((LPRECT)&hit, (const RECT *)&cur, (const RECT *)e))
             continue;

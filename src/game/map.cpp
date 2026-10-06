@@ -758,21 +758,21 @@ int32_t __cdecl LevelCount(void)
  * ADDR_ZERO_POINT, which is the packed origin, and SCEN_ROW_OFF_FIELD_68 is
  * cleared. Neither comes off the wire.
  */
-int32_t __cdecl ParseScenarioPart(void *part, const void *at)
+int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
 {
-    uint8_t       *p    = (uint8_t *)part;
     const uint8_t *cur  = (const uint8_t *)at + 8;
     int32_t        took;
     int32_t        n;
     int32_t        a;
     int32_t        b;
     int32_t        count;
-    uint8_t       *rows;
+    AM2_ScenRow   *rows;
     int32_t        i;
 
-    *(int32_t *)(p + 0) = 0;
-    *(int32_t *)(p + 4) = 0;
-    *(int32_t *)(p + 8) = 0;
+    /* Three dword stores over the part, the count's padding included. */
+    p->field0 = 0;
+    *(int32_t *)&p->count = 0;
+    p->rows = (AM2_ScenRow *)0;
 
     n = *(const int32_t *)at;
     if (n > 0) {
@@ -797,47 +797,46 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
     count = *(const int32_t *)cur;
     cur  += 4;
     took += 4;
-    *(uint16_t *)(p + SCENARIO_PART_OFF_COUNT) = (uint16_t)count;
+    p->count = (int16_t)count;
     if (count == 0)
         goto done;      /* the one return, as the image has it */
 
-    rows = (uint8_t *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
-    *(uint8_t **)(p + SCENARIO_PART_OFF_ROWS) = rows;
+    rows = (AM2_ScenRow *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
+    p->rows = rows;
     memset(rows, 0, (size_t)((uint32_t)count * SCEN_ROW_BYTES));
     if (count <= 0)
         return took;
 
     for (i = 0; i < count; i++) {
-        uint8_t *row = rows + (uint32_t)i * SCEN_ROW_BYTES;
+        AM2_ScenRow   *row = &rows[i];
         const uint8_t *q;
         int8_t         len;
 
-        *(uint32_t *)(row + SCEN_ROW_OFF_KIND) = *(const uint32_t *)cur;
+        row->kind  = *(const int32_t *)cur;
         cur += 4;
-        *(uint16_t *)(row + SCEN_ROW_OFF_POS)     = *(const uint16_t *)cur;
+        row->pos.x = *(const int16_t *)cur;
         cur += 4;
-        *(uint16_t *)(row + SCEN_ROW_OFF_POS + 2) = *(const uint16_t *)cur;
+        row->pos.y = *(const int16_t *)cur;
         cur += 4;
 
         /* Four bytes read one at a time through a walking pointer. */
         q = cur;
-        row[SCEN_ROW_OFF_AMOUNT]   = *q++;
-        row[SCEN_ROW_OFF_FLAG]     = (uint8_t)(*q++ == 0 ? 1 : 0);
-        row[SCEN_ROW_OFF_FIELD_12] = *q;
-        row[SCEN_ROW_OFF_FIELD_68] = 0;
+        row->amount  = *q++;
+        row->flag    = (uint8_t)(*q++ == 0 ? 1 : 0);
+        row->field12 = *q;
+        row->field68 = 0;
         q++;
-        *(uint32_t *)(row + SCEN_ROW_OFF_AT) =
-            g_zeroPoint;
-        if (!row[SCEN_ROW_OFF_FIELD_12])
-            row[SCEN_ROW_OFF_FIELD_12] = 1;
+        row->at = g_zeroPoint;
+        if (!row->field12)
+            row->field12 = 1;
 
         len = (int8_t)*q++;
         if (len) {
-            strcpy((char *)(row + SCEN_ROW_OFF_NAME), (const char *)q);
+            strcpy(row->name, (const char *)q);
             took += len;
             cur   = q + len;
         } else {
-            row[SCEN_ROW_OFF_NAME] = 0;
+            row->name[0] = 0;
             cur += 4;
         }
 
@@ -888,23 +887,23 @@ done:
 int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
 {
     int32_t        count;
-    uint8_t       *table;
+    AM2_Scenario  *table;
     int32_t        i;
 
     g_scenarioUnread = 0;
-    g_scenarios      = (uint8_t *)0;
+    g_scenarios      = (AM2_Scenario *)0;
 
     count = *(const int32_t *)at;
     at += 4;
     remaining -= 4;
 
-    table = (uint8_t *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
+    table = (AM2_Scenario *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
     g_scenarios = table;
     g_scenarioCount = (uint16_t)count;
 
     for (i = 0; i < count; i++) {
         struct ScenHdr { uint32_t w[AM2_SCENARIO_HDR_BYTES / 4]; } hdr;
-        uint8_t *rec;
+        AM2_Scenario *rec;
         int32_t  which;
         int32_t  part;
 
@@ -924,13 +923,11 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
 
         }
 
-        rec = table + (uint32_t)which * AM2_SCENARIO_BYTES;
+        rec = &table[which];
         *(struct ScenHdr *)rec = hdr;
 
         for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
-            int32_t took = ParseScenarioPart(
-                rec + SCENARIO_OFF_PARTS
-                    + (uint32_t)part * SCENARIO_PART_BYTES, at);
+            int32_t took = ParseScenarioPart(&rec->parts[part], at);
 
             at += took;
             remaining -= took;
@@ -967,10 +964,7 @@ void __cdecl FreeScenarios(void)
 {
     /* The table pointer is re-read after every free, as the original does. */
 #define TAB (g_scenarios)
-#define PART_ROWS(i, k) (*(void **)(TAB + (size_t)(i) * AM2_SCENARIO_BYTES     \
-                                    + SCENARIO_OFF_PARTS                       \
-                                    + (size_t)(k) * SCENARIO_PART_BYTES        \
-                                    + SCENARIO_PART_OFF_ROWS))
+#define PART_ROWS(i, k) (TAB[i].parts[k].rows)
     int32_t i, k;
 
     if (TAB) {

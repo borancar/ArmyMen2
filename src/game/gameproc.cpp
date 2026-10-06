@@ -970,7 +970,7 @@ static inline int32_t ScenRowWeapon(int32_t kind)
  * time. */
 int32_t __cdecl PlaceScenario(void)
 {
-    uint8_t *scen = g_scenarios;
+    AM2_Scenario *scen = g_scenarios;
     int32_t  slot;
 
     if (!scen)
@@ -979,10 +979,9 @@ int32_t __cdecl PlaceScenario(void)
     /* The comm object is read afresh at each use. */
 #define comm (*(void * *)&g_commObject)
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
-        uint8_t *part = scen + SCENARIO_OFF_PARTS
-                      + (size_t)slot * SCENARIO_PART_BYTES;
-        uint8_t *row;
-#define n (*(const int16_t *)(part + SCENARIO_PART_OFF_COUNT))
+        AM2_ScenPart *part = &scen->parts[slot];
+        AM2_ScenRow  *row;
+#define n (part->count)
         int32_t  army;
         int32_t  i;
 
@@ -992,14 +991,14 @@ int32_t __cdecl PlaceScenario(void)
 
         army = ((AM2_Comm *)comm)->CommSlotForArmy(slot);
 
-        row = *(uint8_t **)(part + SCENARIO_PART_OFF_ROWS);
-        for (i = 0; i < n; row += SCEN_ROW_BYTES, i++) {
+        row = part->rows;
+        for (i = 0; i < n; row++, i++) {
             uint8_t *unit;
-#define kind (*(const int32_t *)(row + SCEN_ROW_OFF_KIND))
+#define kind (row->kind)
             int32_t  amount;
             int32_t  flags;
 
-            if (*(const int16_t *)(row + SCEN_ROW_OFF_POS) <= 0)
+            if (row->pos.x <= 0)
                 continue;
 
             /* WHEN A SAVED PLATOON EXISTS, OUR ARMY IS NOT PLACED FROM THE
@@ -1019,7 +1018,7 @@ int32_t __cdecl PlaceScenario(void)
              * The LookupOwnerObj call is the original's and its result is
              * discarded there too. */
             flags = 0;
-            if (!*(const uint8_t *)(row + SCEN_ROW_OFF_FLAG))
+            if (!row->flag)
                 flags = 4;
             if (g_haveDefaultCof
                 && (uint32_t)army == g_defaultOwner) {
@@ -1028,10 +1027,10 @@ int32_t __cdecl PlaceScenario(void)
 
                     (void)LookupOwnerObj(g_defaultOwner);
                     *(int16_t *)&g_leaderPos =
-                        *(const int16_t *)(row + SCEN_ROW_OFF_POS);
+                        row->pos.x;
                     *(int16_t *)(((uintptr_t)&g_leaderPos) + 2) =
-                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
-                    amt = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
+                        row->pos.y;
+                    amt = row->amount;
                     g_leaderFacing =
                         amt < 1 ? 1 : amt;
                     g_viewHold = 1;
@@ -1051,9 +1050,9 @@ int32_t __cdecl PlaceScenario(void)
              * and Sarge's UID reading 1 instead of 0x3E8. The state dump is
              * the only artifact that could see it. */
             unit = (uint8_t *)CreateTrooper(
-                       (char *)(row + SCEN_ROW_OFF_NAME),
-                       *(const int16_t *)(row + SCEN_ROW_OFF_POS),
-                       *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2),
+                       row->name,
+                       row->pos.x,
+                       row->pos.y,
                        ((AM2_Comm *)comm)->CommArmyOfSlot(army), army,
                        flags,
                        1, 0, 1, 0);
@@ -1065,8 +1064,8 @@ int32_t __cdecl PlaceScenario(void)
              * lands in it. Six other sites write 0xF8; settling it means
              * reading one of them, which this commit does not. Reproduced
              * with the offsets as they stand and the conflict recorded. */
-            amount = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT) < 1
-                         ? 1 : *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
+            amount = row->amount < 1
+                         ? 1 : row->amount;
             *(unit + OBJ_OFF_FACING_COPY) = (uint8_t)amount;
 
             if (kind == AM2_SCEN_KIND_LEADER) {
@@ -1084,9 +1083,9 @@ int32_t __cdecl PlaceScenario(void)
                 if ((uint32_t)army == g_defaultOwner) {
                     g_ourLeaderUid = *(const uint32_t *)(unit + OBJ_OFF_UID);
                     *(int16_t *)&g_leaderPos =
-                        *(const int16_t *)(row + SCEN_ROW_OFF_POS);
+                        row->pos.x;
                     *(int16_t *)(((uintptr_t)&g_leaderPos) + 2) =
-                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
+                        row->pos.y;
                     g_leaderFacing =
                         *(const uint8_t *)(unit + OBJ_OFF_FACING);
                     DeselectAll();
