@@ -129,7 +129,7 @@ AM2_Object *__cdecl LookupType3ByUID(uint32_t uid)
 {
     AM2_Object *obj;
 
-    obj = (AM2_Object *)LookupByUID(uid);
+    obj = LookupByUID(uid);
     return ObjIsType3(obj) ? obj : 0;
 }
 

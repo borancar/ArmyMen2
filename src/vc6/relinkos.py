@@ -79,10 +79,9 @@ def _aggregated(va):
 # record were typed and empty matched again; the font record tipped it once
 # more, and the sprite list's alone settles it; the object-script fields
 # tipped it again, and the aim sprites' and the menu row's declarations
-# beside the sprite list's settle it. Search the subsets (empty first) when
-# it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994),
-              (0x004FCAA8, 0x004FCDF4))
+# beside the sprite list's settled it; with the object table typed the aim
+# sprites' alone does. Search the subsets (empty first) when it flips.
+KEEP_DECLS = ((0x004FC8C8, 0x004FC994),)
 
 
 def _kept(va):

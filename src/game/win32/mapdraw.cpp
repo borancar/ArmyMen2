@@ -2070,7 +2070,7 @@ void __cdecl DrawSelection(void)
     UnlockSurface();
 
     for (i = 0; i < g_selectedCount; ) {
-        AM2_Object *obj = (AM2_Object *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (g_selectedItems)[i]);
         int32_t  x, y, wide, drop, fill;
         RECT     box;

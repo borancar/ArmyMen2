@@ -215,6 +215,36 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ShotHitsObj, narrowed** (2026-10-06), still raw 7. Putting the
+    `refuse:` label on the FIRST arm's `return 0` makes all seven refusals
+    target one shared block, as in the image. But VC6 then cross-jumps that
+    block into the identical `return 0` at the end of the function, moving
+    the first arm out of line (NORM 16). The image keeps two copies and
+    aims the refusals at the first. Plain `return 0`s give inline epilogue
+    copies (95). An `else` wrapping everything after the first arm changes
+    nothing on its own (7), and with the label it gives 108. Recasting the
+    final armour test as `!checks || pierces`, a nested first test, and
+    inverting the first test around the label all still merge. The whole
+    function as `if (proof) return 0; else { ... }` with the seven refusals
+    falling out to a closing `return 0` is back to raw 7: VC6 merges that
+    closing block into the LAST identical epilogue, the armour test's.
+    So the end of the original must differ in some way VC6 does not merge
+    across. Rewriting ShotPiercesArmour's tail as `power >= need` is worse
+    (47).
+  - **The object table returns AM2_Object** (2026-10-06), no count change.
+    LookupByUID, LookupByUIDInline, FirstItem, NextItem, ObjByUidAlias and
+    the table entry's `obj` are `AM2_Object *` now, which removed the casts
+    at their typed callers outright. A pointer cast changes no code, so all
+    148 call sites compiled unchanged under VC6. AM2_Object's +0xA4 is a
+    union: an item's chain uids or, for types 2, 3 and 8, the follower list
+    ObjAttachTo maintains. +0xB0 and +0xC0 also have the two-int16 view the
+    per-type destroy arms clear. +0x1A is the tile index, and +0x550 a
+    vehicle's weapon uid. Typed with it are ApplyHeightItem, DamageItemChain,
+    DestroyObjCommon, DestroyType2/3/8, the pointer picks for modes 0, 4, 5
+    and 6 with their shared friend tail and leader lookup, ObjAttachTo's
+    follower walk, and the scenario header (AM2_ScenHdr). DestroyByType keeps
+    `void *` for its 22 untyped callers. Splitting the picks' board hint
+    into an inline did not reproduce the image's copy of the object either.
   - **The object script, the frame step and the movie typed** (2026-10-06),
     no count change. AM2_Object gains the script id/state/frame/deadline at
     +0xB0..+0xBC, the previous position at +0x16 and the chain uids at

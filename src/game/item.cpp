@@ -270,7 +270,7 @@ int32_t __cdecl HeldWeaponCode(void *unit)
                               + (size_t)*(const int32_t *)
                                     (u + UNIT_OFF_INVENTORY_SEL) * 4);
     if (uid) {
-        obj = (AM2_Object *)LookupByUID(uid);
+        obj = LookupByUID(uid);
         if (ObjIsType4(obj))
             return **(const int32_t *const *)((const uint8_t *)obj
                                               + OBJ_OFF_FIELD_C0);
@@ -480,7 +480,7 @@ AM2_Object *__cdecl WeaponByUid(uint32_t uid)
 
     if (!uid)
         return (AM2_Object *)0;
-    obj = (AM2_Object *)LookupByUID(uid);
+    obj = LookupByUID(uid);
     if (!obj)
         return (AM2_Object *)0;
     if (obj->type == AM2_OBJ_TYPE_WEAPON)
@@ -1362,65 +1362,63 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * The parent is guarded on having a def record and the children are not: a
  * child with a null OBJ_OFF_FIELD_94 faults. Both the original's.
  */
-void __cdecl ApplyHeightItem(void *obj, int16_t height)
+void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
 {
-    uint8_t *o = (uint8_t *)obj;
     uint32_t key;
     int32_t  third;
     void    *rec;
     uint32_t uid;
 
-    if (!obj)
+    if (!o)
         return;
-    am2_height_log("ApplyHeightItem", obj, height);
-    if (!*(void **)(o + OBJ_OFF_FIELD_94))
+    am2_height_log("ApplyHeightItem", o, height);
+    if (!o->field94)
         return;
 
-    third = *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME);
+    third = o->repairFrame;
     if (third <= 0)
-        third = *(const int32_t *)(o + OBJ_OFF_FORMATION_SLOT);
+        third = o->formationSlot;
 
-    key = *(const uint32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8);
+    key = *(const uint32_t *)(o->field94 + 8);
     rec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
                                   & AM2_OBJREC_MASK_B),
                         (int32_t)((key >> AM2_OBJREC_SHIFT_A)
                                   & AM2_OBJREC_MASK_A),
                         third);
 
-    *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
-    *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
+    o->heightSet = (int8_t)height;
+    o->rowSet.rows->depthLayer =
         (int16_t)(ScaleBy32Blocks(height) - AM2_DEPTH_BASE);
 
     if (rec)
-        *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) +=
+        o->rowSet.rows->depthLayer +=
             *(const int16_t *)((const uint8_t *)rec + DEF_OBJ_REC_OFF_DEPTH);
 
-    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid; ) {
-        uint8_t *link = (uint8_t *)LookupByUID(uid);
-        void    *lrec;
+    for (uid = o->chainUid; uid; ) {
+        AM2_Object *link = LookupByUID(uid);
+        void       *lrec;
 
         if (!link)
             return;
-        if (*(const int32_t *)link != 1 && *(const int32_t *)link != 4)
+        if (link->type != 1 && link->type != 4)
             return;
 
-        *(uint8_t *)(link + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
-        *(int16_t *)(*(uint8_t **)(link + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
+        link->heightSet = (int8_t)height;
+        link->rowSet.rows->depthLayer =
             (int16_t)(ScaleBy32Blocks(height) - AM2_DEPTH_BASE);
 
-        key = *(const uint32_t *)(*(uint8_t **)(link + OBJ_OFF_FIELD_94) + 8);
+        key = *(const uint32_t *)(link->field94 + 8);
         lrec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
                                        & AM2_OBJREC_MASK_B),
                              (int32_t)((key >> AM2_OBJREC_SHIFT_A)
                                        & AM2_OBJREC_MASK_A),
                              (int32_t)(key & AM2_OBJREC_MASK_B));
         if (lrec)
-            *(int16_t *)(*(uint8_t **)(link + OBJ_OFF_ROWS)
-                         + ROW_OFF_FIELD_26) +=
+            link->rowSet.rows->depthLayer +=
                 *(const int16_t *)((const uint8_t *)lrec
                                    + DEF_OBJ_REC_OFF_DEPTH);
 
-        uid = *(const uint32_t *)(link + OBJ_OFF_CHAIN_NEXT_UID);
+        uid = link->chainNextUid;
     }
 }
 
@@ -1577,7 +1575,7 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
     switch (*(const int32_t *)o) {
     case 1:
     case 4:
-        ApplyHeightItem(o, (int16_t)height);
+        ApplyHeightItem((AM2_Object *)o, (int16_t)height);
         return;
 
     case 2:
@@ -4115,19 +4113,18 @@ typedef void (__cdecl *am2_destroy_fn)(void *obj);
  * SendObjDestroyed stays at 0 and is verified by reading. */
 void __cdecl DestroyByType(void *obj)
 {
-    int32_t type = *(const int32_t *)obj;
+    AM2_Object *o    = (AM2_Object *)obj;   /* twenty-two untyped callers */
+    int32_t     type = (int32_t)o->type;
 
     switch (type) {
-    case 2:  DestroyType2(obj); break;
-    case 3:  DestroyType3(obj); break;
-    case 8:  DestroyType8(obj); break;
-    default: DestroyObjCommon(obj); break;
+    case 2:  DestroyType2(o); break;
+    case 3:  DestroyType3(o); break;
+    case 8:  DestroyType8(o); break;
+    default: DestroyObjCommon(o); break;
     }
 
-    if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
-                                 (int16_t)*(const int8_t *)((const uint8_t *)obj
-                                                            + OBJ_OFF_ARMY)))
-        SendObjDestroyed(obj);
+    if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)o->owner))
+        SendObjDestroyed(o);
 }
 
 
@@ -4158,17 +4155,15 @@ void __cdecl DestroyByType(void *obj)
  * type-2 destroy happens in a Boot Camp mission at all -- DestroyByType runs
  * three times there and which arms those take would need a probe. Said plainly
  * rather than left to read as coverage. */
-void __cdecl DestroyType2(void *obj)
+void __cdecl DestroyType2(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
+    o->fieldC0 = 0;
+    o->fieldC2 = 0;
+    o->fieldB0 = 0;
+    o->fieldB2 = 0;
 
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
-
-    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
-    DestroyObjCommon(obj);
+    ObjAttachTo(o, (AM2_Object *)0);
+    DestroyObjCommon(o);
 }
 
 /* 0x0045A9C0, one caller -- DestroyByType's type-3 arm.
@@ -4181,19 +4176,17 @@ void __cdecl DestroyType2(void *obj)
  * That callee is also why type 3 is probably a VEHICLE: it indexes the vehicle
  * mask with obj->[0x52C] as the kind. Recorded in orig.h with the caveat that
  * it has six other callers. */
-void __cdecl DestroyType3(void *obj)
+void __cdecl DestroyType3(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
+    ObjClearFootprint(o);
 
-    ObjClearFootprint(obj);
+    o->fieldC0 = 0;
+    o->fieldC2 = 0;
+    o->fieldB0 = 0;
+    o->fieldB2 = 0;
 
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
-
-    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
-    DestroyObjCommon(obj);
+    ObjAttachTo(o, (AM2_Object *)0);
+    DestroyObjCommon(o);
 }
 
 /* 0x0043CF30, one caller -- DestroyByType's type-8 arm, and DestroyType3 with
@@ -4204,19 +4197,17 @@ void __cdecl DestroyType3(void *obj)
  * That callee is the evidence that type 8 is a ROACH, exactly as its twin is
  * the evidence that type 3 is a vehicle. Both readings carry the same caveat,
  * recorded in orig.h: the clearer has other callers. */
-void __cdecl DestroyType8(void *obj)
+void __cdecl DestroyType8(AM2_Object *o)
 {
-    uint8_t *o = (uint8_t *)obj;
+    ObjClearRoachFootprint(o);
 
-    ObjClearRoachFootprint(obj);
+    o->fieldC0 = 0;
+    o->fieldC2 = 0;
+    o->fieldB0 = 0;
+    o->fieldB2 = 0;
 
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
-
-    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
-    DestroyObjCommon(obj);
+    ObjAttachTo(o, (AM2_Object *)0);
+    DestroyObjCommon(o);
 }
 
 /* 0x00429320, five callers. The shared tail of every per-type destroy, and the
@@ -4249,50 +4240,48 @@ void __cdecl DestroyType8(void *obj)
  * The broadcast is per chained object, after its own teardown, and asks
  * CommMustBroadcast rather than testing a session -- so a single-player game
  * sends nothing. */
-void __cdecl DestroyObjCommon(void *obj)
+void __cdecl DestroyObjCommon(AM2_Object *o)
 {
     uint32_t next;
     int32_t  insertAt;
     int32_t  i;
 
-    if (!obj)
+    if (!o)
         return;
-    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
+    if (o->flags & OBJ_FLAG8_BLOCKED)
         return;
 
-    for (i = 0; i < *(const int32_t *)((uint8_t *)obj + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
-                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+    for (i = 0; i < o->rowSet.count; i++) {
+        AM2_MapRow *row = &o->rowSet.rows[i];
 
         ObjFlagClear0(row);
         RowUpdate(row, 0, g_mapDesc);
     }
 
-    if (ObjIsItem((const AM2_Object *)obj))
-        ItemTeardown(obj);
+    if (ObjIsItem(o))
+        ItemTeardown(o);
 
-    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & 1u)
-        ItemPreDestroyAlias(obj, (int32_t)((uintptr_t)g_objMapDesc));
+    if (o->flags & 1u)
+        ItemPreDestroyAlias(o, (int32_t)((uintptr_t)g_objMapDesc));
 
-    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BLOCKED;
+    o->flags |= OBJ_FLAG8_BLOCKED;
 
-    if (!ObjIsItem((const AM2_Object *)obj))
+    if (!ObjIsItem(o))
         return;
 
-    next = *(const uint32_t *)((uint8_t *)obj + OBJ_OFF_CHAIN_UID);
+    next = o->chainUid;
     while (next) {
-        int32_t  slot = FindSlot(next, &insertAt);
-        uint8_t *cur  = (slot >= 0) ? (uint8_t *)g_objTable[slot].obj : 0;
+        int32_t     slot = FindSlot(next, &insertAt);
+        AM2_Object *cur  = (slot >= 0) ? g_objTable[slot].obj : 0;
 
-        if (!ObjIsItem((const AM2_Object *)cur))
+        if (!ObjIsItem(cur))
             return;
 
         DestroyObjCommon(cur);
 
-        next = *(const uint32_t *)(cur + OBJ_OFF_CHAIN_NEXT_UID);
+        next = cur->chainNextUid;
 
-        if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(cur + OBJ_OFF_ARMY)))
+        if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)cur->owner))
             SendObjDestroyed(cur);
     }
 }
@@ -4737,7 +4726,7 @@ void __cdecl ObjFrameSweep(void)
 
     g_iterStamp++;
 
-    for (obj = (AM2_Object *)FirstItem(); obj; obj = (AM2_Object *)NextItem())
+    for (obj = FirstItem(); obj; obj = NextItem())
         ObjFrameStep(obj);
 
     if (g_mpSession)
@@ -7603,7 +7592,7 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
 
     uid = o->chainUid;
     while (uid) {
-        AM2_Object *link = (AM2_Object *)LookupByUID(uid);
+        AM2_Object *link = LookupByUID(uid);
         int32_t  type;
 
         /* Both of these return 0, not `any` -- see above. */
@@ -8447,23 +8436,21 @@ int32_t __cdecl WeaponClassOf(uint32_t uid)
  * head is never consulted -- it is the NEXT pointer that continues, which is
  * why a linked item's OBJ_OFF_CHAIN_UID does not start a second walk.
  */
-void __cdecl DamageItemChain(void *obj, int32_t amount, uint8_t d,
+void __cdecl DamageItemChain(AM2_Object *o, int32_t amount, uint8_t d,
                              int32_t kind, uint32_t attacker)
 {
-    uint8_t *o = (uint8_t *)obj;
     uint32_t uid;
 
     DamageItem(o, amount, d, kind, attacker, 1);
 
-    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid;
-         uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_NEXT_UID)) {
+    for (uid = o->chainUid; uid; uid = o->chainNextUid) {
         int32_t type;
 
-        o = (uint8_t *)LookupByUID(uid);
+        o = LookupByUID(uid);
         if (!o)
             return;
 
-        type = *(const int32_t *)o;
+        type = (int32_t)o->type;
         if (type != 1 && type != 4)
             return;
 
@@ -12536,7 +12523,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
 
     if (!inChain) {
         if (*(const uint32_t *)(o + OBJ_OFF_CHAIN_UID)) {
-            DamageItemChain(obj, amount, extra, kind, attacker);
+            DamageItemChain((AM2_Object *)obj, amount, extra, kind, attacker);
             return;
         }
         if (*(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID))

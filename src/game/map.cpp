@@ -902,29 +902,29 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
     g_scenarioCount = (uint16_t)count;
 
     for (i = 0; i < count; i++) {
-        struct ScenHdr { uint32_t w[AM2_SCENARIO_HDR_BYTES / 4]; } hdr;
+        AM2_ScenHdr   hdr;
         AM2_Scenario *rec;
         int32_t  which;
         int32_t  part;
 
-        hdr = *(const struct ScenHdr *)at;
+        hdr = *(const AM2_ScenHdr *)at;
         at += AM2_SCENARIO_HDR_BYTES;
         remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
 
-        if (strncmp((const char *)&hdr, "Scenario",
+        if (strncmp(hdr.tag, "Scenario",
                     AM2_SCENARIO_TAG_BYTES) != 0)
             return 0;
 
 
         {
-            uint8_t digit = ((const uint8_t *)&hdr)[SCENARIO_HDR_OFF_DIGIT];
+            uint8_t digit = (uint8_t)hdr.digit;
 
             which = !digit ? 0 : (int32_t)(int8_t)digit - '1';
 
         }
 
         rec = &table[which];
-        *(struct ScenHdr *)rec = hdr;
+        rec->hdr = hdr;
 
         for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
             int32_t took = ParseScenarioPart(&rec->parts[part], at);
@@ -1974,9 +1974,9 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (obj != 0) {
                 const uint8_t *attrs =
                     g_tileAttrs;
-                int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
+                int32_t tile = ((AM2_Object *)obj)->tile;
 
-                ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
+                ApplyHeightItem((AM2_Object *)obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
             }
         }
 

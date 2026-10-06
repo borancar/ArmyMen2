@@ -66,7 +66,7 @@ int32_t __cdecl FindSlot(uint32_t uid, int32_t *insert_at)
     return -1;
 }
 
-void *__cdecl LookupByUID(uint32_t uid)
+AM2_Object *__cdecl LookupByUID(uint32_t uid)
 {
     int32_t slot;
     int32_t i;
@@ -249,7 +249,7 @@ int32_t __cdecl RemoveFromItemList(AM2_Object *obj)
  * back. An object can therefore be shifted during a walk without being
  * visited twice.
  */
-void *__cdecl FirstItem(void)
+AM2_Object *__cdecl FirstItem(void)
 {
     g_iterCursor = 0;
     if (g_objCount <= 0)
@@ -259,7 +259,7 @@ void *__cdecl FirstItem(void)
     return g_objTable[0].obj;
 }
 
-void *__cdecl NextItem(void)
+AM2_Object *__cdecl NextItem(void)
 {
     int32_t count = g_objCount;
 
@@ -275,7 +275,7 @@ void *__cdecl NextItem(void)
     return g_objTable[g_iterCursor].obj;
 }
 
-void *__cdecl ObjByUidAlias(uint32_t uid)
+AM2_Object *__cdecl ObjByUidAlias(uint32_t uid)
 {
     return LookupByUID(uid);
 }

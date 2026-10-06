@@ -719,7 +719,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
         return;
     }
 
-    obj = (AM2_Object *)LookupByUID((uint32_t)kScriptNames[nameidx].value);
+    obj = LookupByUID((uint32_t)kScriptNames[nameidx].value);
 
     if (ObjIsItem(obj)) {
         if (!ChangeObjectFrame(obj, frame, 1))

@@ -813,9 +813,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                                      0, 0);
 
         if (made)
-            ApplyHeightItem(made,
-                (int8_t)(g_tileAttrs)
-                    [*(const uint16_t *)(made + OBJ_OFF_TILE)]);
+            ApplyHeightItem((AM2_Object *)made,
+                (int8_t)(g_tileAttrs)[((AM2_Object *)made)->tile]);
 
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
             if (kind == AM2_PLACE_KIND_POST_CREATE) {

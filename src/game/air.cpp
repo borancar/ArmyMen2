@@ -820,7 +820,7 @@ void __cdecl ResolveFormationPoint(void *follower, void *leader,
             *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING);
 
         if (riding) {
-            AM2_Object *veh = (AM2_Object *)LookupByUID(riding);
+            AM2_Object *veh = LookupByUID(riding);
 
             if (veh) {
                 *(uint32_t *)(f + OBJ_OFF_FOLLOW_UID) = veh->uid;

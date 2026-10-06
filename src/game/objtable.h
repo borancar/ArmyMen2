@@ -19,10 +19,12 @@ extern "C" {
  * a walk safe while objects are being added, since an insert memmoves the tail
  * and invalidates any index the caller was holding.
  */
+struct AM2_Object;
+
 typedef struct {
-    uint32_t uid;
-    void    *obj;
-    uint32_t stamp;
+    uint32_t           uid;
+    struct AM2_Object *obj;
+    uint32_t           stamp;
 } AM2_ObjEntry;
 
 /* A registered object. Transcribed as a typed struct and accessed through
@@ -42,7 +44,7 @@ typedef struct {
     int32_t            capacity;  /* +0x0C */
 } AM2_RowSet;
 
-typedef struct {
+typedef struct AM2_Object {
     uint32_t       type;            /* +0x00  switch selector, 0..8 */
     uint32_t       uid;             /* +0x04  written back on registration */
     uint32_t       flags;           /* +0x08  OBJ_OFF_FLAGS */
@@ -51,7 +53,8 @@ typedef struct {
     uint8_t        _pad11[1];       /* +0x11 */
     AM2_Point      pos;             /* +0x12 OBJ_OFF_POS */
     AM2_Point      prevPos;         /* +0x16 OBJ_OFF_PREV_POS, ObjFrameStep's copy */
-    uint8_t        _pad1a[0x26];    /* +0x1A */
+    uint16_t       tile;            /* +0x1A OBJ_OFF_TILE, indexes the tile tables */
+    uint8_t        _pad1c[0x24];    /* +0x1C */
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
     uint8_t        _pad41[1];       /* +0x41 */
     int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
@@ -73,17 +76,30 @@ typedef struct {
     uint32_t       shooterUid;      /* +0x98  OBJ_OFF_RANK, a shot's shooter uid */
     int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
     int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
-    uint8_t        _pada4[4];       /* +0xA4 */
-    uint32_t       chainUid;        /* +0xA8  OBJ_OFF_CHAIN_UID, an item's chain head */
-    uint32_t       chainNextUid;    /* +0xAC  OBJ_OFF_CHAIN_NEXT_UID, the next link */
+    union {                         /* +0xA4, by object type: */
+        struct {                    /*   an item's frame chain */
+            uint32_t _chainA4;
+            uint32_t chainUid;      /*   +0xA8 OBJ_OFF_CHAIN_UID, the head */
+            uint32_t chainNextUid;  /*   +0xAC OBJ_OFF_CHAIN_NEXT_UID */
+        };
+        struct {                    /*   types 2, 3 and 8: who follows it, */
+            int32_t   capacity;     /*   OBJ_OFF_PTR_LIST, a pointer list */
+            int32_t   count;        /*   SUBREC_OFF_COUNT */
+            uint32_t *uids;         /*   SUBREC_OFF_ROWS */
+        } followers;
+    };
     union {                         /* +0xB0, by object type: */
         int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
         uint8_t    power;           /*   a shot's power byte */
+        struct { int16_t fieldB0, fieldB2; };  /* types 2, 3, 8: two halves */
     };
     int32_t        scriptState;     /* +0xB4  OBJ_OFF_SCRIPT_STATE */
     int32_t        scriptFrame;     /* +0xB8  OBJ_OFF_SCRIPT_FRAME */
     uint32_t       scriptNext;      /* +0xBC  OBJ_OFF_SCRIPT_NEXT, a clock deadline */
-    const int32_t *typeRec;         /* +0xC0  OBJ_OFF_FIELD_C0, -> the type record; [0] is its kind */
+    union {                         /* +0xC0, by object type: */
+        const int32_t *typeRec;     /*   OBJ_OFF_FIELD_C0, -> the type record; [0] is its kind */
+        struct { int16_t fieldC0, fieldC2; };  /* types 2, 3, 8: two halves */
+    };
     uint32_t       followUid;       /* +0xC4  OBJ_OFF_FOLLOW_UID */
     uint8_t        _padc8[4];       /* +0xC8 */
     uint32_t       targetUid;       /* +0xCC  OBJ_OFF_TARGET_UID */
@@ -115,8 +131,9 @@ typedef struct {
     union {                         /* +0x54C, by object type: */
         uint32_t   inventory[6];    /*   UNIT_OFF_INVENTORY, a unit's weapon uids */
         struct {
-            uint8_t _pad54c[8];
-            int32_t seats;          /*   VEHICLE_OFF_SEATS (+0x554), a vehicle's */
+            uint8_t  _pad54c[4];
+            uint32_t weaponUid;     /*   VEHICLE_OFF_WEAPON_UID (+0x550), a vehicle's gun */
+            int32_t  seats;         /*   VEHICLE_OFF_SEATS (+0x554), a vehicle's */
         };
     };
     uint32_t       _pad564;         /* +0x564 */
@@ -197,11 +214,11 @@ static_assert(offsetof(AM2_Object, riding)        == 0x570, "riding");
 int32_t __cdecl FindSlot(uint32_t uid, int32_t *insert_at);
 
 /* Original: 0x00427820. Returns the registered object for `uid`, or NULL. */
-void *__cdecl LookupByUID(uint32_t uid);
+AM2_Object *__cdecl LookupByUID(uint32_t uid);
 /* The same body expanded in place, which is how several callers have it: the
  * out-slot is uninitialised, so VC6 puts it in a dead argument slot of the
  * caller where there is one (ObjDie) and a stack local where not. */
-static inline void *LookupByUIDInline(uint32_t uid)
+static inline AM2_Object *LookupByUIDInline(uint32_t uid)
 {
     int32_t slot;
     int32_t i = FindSlot(uid, &slot);
@@ -214,7 +231,7 @@ static inline void *LookupByUIDInline(uint32_t uid)
 /* 0x0044BA60, 14 callers. A cdecl wrapper for the line above and nothing else,
  * passing its one argument straight through. Reconstructed as the wrapper it
  * is: the callers reach it, not the thing it forwards to. */
-void *__cdecl ObjByUidAlias(uint32_t uid);
+AM2_Object *__cdecl ObjByUidAlias(uint32_t uid);
 
 /* Original: 0x00429740. Registers `obj`, allocating a UID when `uid` is 0.
  * Returns the UID it registered under. */
@@ -226,8 +243,8 @@ int32_t __cdecl RemoveFromItemList(AM2_Object *obj);
 
 /* Originals: 0x00427850 and 0x00427880. Walk every registered object.
  * Names are ours. Returns NULL at the end of the walk. */
-void *__cdecl FirstItem(void);
-void *__cdecl NextItem(void);
+AM2_Object *__cdecl FirstItem(void);
+AM2_Object *__cdecl NextItem(void);
 
 /* 0x00427CE0. Add an object's uid to the selected group, unless it is already
  * there or the group is over its cap, and mark the object. */

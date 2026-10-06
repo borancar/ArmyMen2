@@ -407,7 +407,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         return 0;
     }
 
-    obj = (AM2_Object *)LookupByUID((uint32_t)names[nameidx].value);
+    obj = LookupByUID((uint32_t)names[nameidx].value);
     if (!obj || !ObjIsItem(obj)) {
         am2_log("ERROR: SetObjScriptState was called with %s which is not "
                 "a valid object\n", names[nameidx].name);

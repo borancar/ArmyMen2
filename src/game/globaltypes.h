@@ -140,10 +140,15 @@ typedef struct AM2_ScenPart {
     AM2_ScenRow *rows;              /* +0x08 SCENARIO_PART_OFF_ROWS */
 } AM2_ScenPart;
 
-typedef struct AM2_Scenario {
+/* The record's header as it comes off the wire, AM2_SCENARIO_HDR_BYTES. */
+typedef struct AM2_ScenHdr {
     char         tag[8];            /* +0x00 "Scenario" */
     char         digit;             /* +0x08 SCENARIO_HDR_OFF_DIGIT, '1'..'4' */
-    char         _hdr09[7];
+    char         _pad09[7];
+} AM2_ScenHdr;
+
+typedef struct AM2_Scenario {
+    AM2_ScenHdr  hdr;               /* +0x00 */
     AM2_ScenPart parts[4];          /* +0x10 SCENARIO_OFF_PARTS, AM2_SCENARIO_PARTS */
 } AM2_Scenario;
 

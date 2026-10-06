@@ -2698,17 +2698,17 @@ int32_t __cdecl PointerPickWatchedItem(AM2_Object *o);
  * overlay and a yes, a friend falls into the shared tail. They differ in one
  * thing -- mode 4 refuses a NEUTRAL object outright, mode 5 treats it as
  * allied. */
-int32_t __cdecl PointerPickMode4(void *obj);
-int32_t __cdecl PointerPickMode5(void *obj);
+int32_t __cdecl PointerPickMode4(AM2_Object *obj);
+int32_t __cdecl PointerPickMode5(AM2_Object *obj);
 
 /* 0x00459300. Mode 6's pick: the same two refusals and then the friend tail,
  * with no alliance test -- so it offers nothing on an enemy. */
-int32_t __cdecl PointerPickMode6(void *obj);
+int32_t __cdecl PointerPickMode6(AM2_Object *obj);
 
 /* 0x00459420. Mode 0's pick -- the default pointer. Stands aside for watched
  * items, refuses neutrals, offers an enemy only if our leader's weapon reaches
  * it, and otherwise falls into the friend tail. */
-int32_t __cdecl PointerPickMode0(void *obj);
+int32_t __cdecl PointerPickMode0(AM2_Object *obj);
 
 /* 0x004597B0. Gated on menu row 0xB: heal a hurt friendly trooper that is
  * riding whatever our leader is riding, within reach. */

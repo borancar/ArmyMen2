@@ -38,7 +38,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where);
 /* 0x00433C20, three callers. The height handler for types 1 and 4: stamp the
  * height, recompute the row's depth key from it, and do the same down the
  * chain until a link that is not an item. */
-void __cdecl ApplyHeightItem(void *obj, int16_t height);
+void __cdecl ApplyHeightItem(AM2_Object *obj, int16_t height);
 
 /* 0x0040A380, one caller -- StepObjRows, so this runs once per row of every
  * object every frame. Advance one row's animation. */
@@ -187,7 +187,7 @@ static inline AM2_Object *OurLeaderUnit(void)
     int32_t owner = *(const int32_t *)&g_defaultOwner;
 
     if (owner == *(const int32_t *)&g_defaultOwner)
-        return (AM2_Object *)LookupByUID(
+        return LookupByUID(
             g_ourLeaderUid);
 
     /* Dead. The NULL check lives in here, which is why the live path above
@@ -198,7 +198,7 @@ static inline AM2_Object *OurLeaderUnit(void)
         int32_t i;
 
         for (i = 0; i < (*slot)->count; i++) {
-            AM2_Object *o = (AM2_Object *)LookupByUID(
+            AM2_Object *o = LookupByUID(
                 (uint32_t)(uintptr_t)(*slot)->items[i]);
 
             if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
@@ -608,12 +608,12 @@ void __cdecl DestroyByType(void *obj);
 void __cdecl FreeOverdueItems(void);
 
 /* 0x00429320. The shared tail of every per-type destroy. */
-void __cdecl DestroyObjCommon(void *obj);
+void __cdecl DestroyObjCommon(AM2_Object *obj);
 
 /* 0x00449460 and 0x0045A9C0. DestroyByType's type-2 and type-3 arms. */
-void __cdecl DestroyType2(void *obj);
-void __cdecl DestroyType3(void *obj);
-void __cdecl DestroyType8(void *obj);
+void __cdecl DestroyType2(AM2_Object *obj);
+void __cdecl DestroyType3(AM2_Object *obj);
+void __cdecl DestroyType8(AM2_Object *obj);
 
 /* 0x00428E00. Step every row of an object's row list. */
 void __cdecl StepObjRows(AM2_Object *o);
@@ -851,7 +851,7 @@ int32_t __cdecl WeaponClassOf(uint32_t uid);
 
 /* 0x00435650, one caller -- DamageItem itself. Damage an item and then every
  * item in the chain hanging off it. */
-void __cdecl DamageItemChain(void *obj, int32_t amount, uint8_t d,
+void __cdecl DamageItemChain(AM2_Object *obj, int32_t amount, uint8_t d,
                              int32_t kind, uint32_t attacker);
 
 /* 0x004356C0, three callers. DamageObject's type-1 arm: armour off the hit,

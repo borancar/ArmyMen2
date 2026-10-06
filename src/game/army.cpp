@@ -85,7 +85,7 @@ void *__cdecl LookupOwnerObj(uint32_t owner)
 
     list = (void **)g_armyObjLists[army];
     for (i = 0; i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT); i++) {
-        AM2_Object *obj = (AM2_Object *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
 
         if (obj && obj->type == AM2_OBJ_TYPE_2
@@ -105,7 +105,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
 
     /* No range check on `army` here, where ArmyLeader has one. */
     while (i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT)) {
-        AM2_Object     *obj = (AM2_Object *)LookupByUID(
+        AM2_Object     *obj = LookupByUID(
             (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
         uint8_t        *raw = (uint8_t *)obj;
 
@@ -337,7 +337,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
             continue;
 
         {
-            AM2_Object *dmg   = (AM2_Object *)LookupByUID(damageOwner);
+            AM2_Object *dmg   = LookupByUID(damageOwner);
             int16_t     army  = dmg ? (int16_t)dmg->owner : AM2_ARMY_ALL;
 
             if (g_mpSession
@@ -526,17 +526,17 @@ void __cdecl ObjAttachTo(AM2_Object *s, AM2_Object *t)
     old = s->followUid;
     s->targetUid = 0;
 
-    if (old && (h = (AM2_Object *)LookupByUID(old)) != (AM2_Object *)0
+    if (old && (h = LookupByUID(old)) != (AM2_Object *)0
         && ObjIsTypeIn238Inline(h)) {
-#define LIST ((uint8_t *)h + OBJ_OFF_PTR_LIST)
+#define LIST (&h->followers)
         i = 0;
-        while (i < *(const int32_t *)(LIST + SUBREC_OFF_COUNT)) {
-            if ((*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i] == s->uid) {
+        while (i < LIST->count) {
+            if (LIST->uids[i] == s->uid) {
                 ((AM2_Rec *)LIST)->ListRemoveAt(i);
                 continue;               /* the next one shifted into i */
             }
-            other = (AM2_Object *)LookupByUID(
-                        (*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i]);
+            other = LookupByUID(
+                        LIST->uids[i]);
             if (!other) {
                 ((AM2_Rec *)LIST)->ListRemoveAt(i);
                 continue;
@@ -577,9 +577,8 @@ attach_and_join:
         s->followUid = t->uid;
 
         if (ObjIsTypeIn238Inline(t)) {
-            s->formationSlot =
-                *(const int32_t *)((uint8_t *)t + OBJ_OFF_PTR_LIST + SUBREC_OFF_COUNT);
-            ((AM2_Rec *)((uint8_t *)t + OBJ_OFF_PTR_LIST))->PtrListPush(
+            s->formationSlot = t->followers.count;
+            ((AM2_Rec *)&t->followers)->PtrListPush(
                 (void *)(uintptr_t)s->uid);
         }
         return;
