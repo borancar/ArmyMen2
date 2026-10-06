@@ -10003,13 +10003,12 @@ void __cdecl ToggleSelect(void *obj)
  *   and the boat path has no sound and no `sound` bookkeeping at all -- it
  *   returns before the tail.
  *
- * THE SOUND'S `y` ARGUMENT STRADDLES TWO ARGUMENTS. All three arms read a
- * DWORD at the caller's point PLUS TWO, which is that point's high word with
- * the low word of the FOURTH argument above it -- and the sound only ever
- * plays when that argument is non-zero, so the straddle is never harmless
- * padding. Written out as the arithmetic it is, because the two adjacent cdecl
- * slots make it exactly reproducible and guessing at a plain int16 would not
- * be the same bits.
+ * THE SOUND'S COORDINATES ARE 16-BIT ARGUMENTS. All three arms push a DWORD
+ * loaded at the caller's point and another at the point PLUS TWO -- the
+ * second carries the low word of the fourth argument above `y`. That is how
+ * VC6 passes an int16 lvalue: it loads the whole dword around it. PlaySoundAt
+ * declares x and y as int16_t and reads only those halves, so the call passes
+ * the point's two fields and VC6 emits the same pushes.
  *
  * The record index is recomputed from OBJ_OFF_TABLE_REC_KIND at the bottom of
  * each loop rather than latched, which is the original's spelling; for the
@@ -10171,18 +10170,17 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
     if (sound) {
         int32_t kind = *(const int32_t *)(v + VEHICLE_OFF_KIND);
-        int32_t sx   = (int32_t)at;
-        /* The DWORD at base+2: the point's y with `apply`'s low word above it.
-         * See this function's note. */
-        int32_t sy   = (int32_t)(((uint32_t)at >> 16)
-                                 | (((uint32_t)apply & 0xFFFFu) << 16));
 
+        /* PlaySoundAt takes 16-bit coordinates; the original pushes each
+         * as the dword loaded from its half of `at`. */
+#define AT ((const AM2_Point *)&at)
         if (kind == AM2_VEHICLE_KIND_TANK)
-            PlaySoundAt(AM2_SND_CRUSH_TANK, 2, 0, sx, sy);
+            PlaySoundAt(AM2_SND_CRUSH_TANK, 2, 0, AT->x, AT->y);
         else if (kind == AM2_VEHICLE_KIND_JEEP)
-            PlaySoundAt(AM2_SND_CRUSH_JEEP, 2, 0, sx, sy);
+            PlaySoundAt(AM2_SND_CRUSH_JEEP, 2, 0, AT->x, AT->y);
         else
-            PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, sx, sy);
+            PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, AT->x, AT->y);
+#undef AT
     }
 
     }

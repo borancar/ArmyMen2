@@ -215,6 +215,13 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **VehicleBlockWeight passes its sound point as two int16 fields**
+    (2026-10-07), no count change. The image's dword loads at the point
+    and at point+2 are VC6 pushing two int16 lvalues, since PlaySoundAt's
+    x and y are int16_t. The composed `sy` workaround is gone and the three
+    calls have the image's shape. The score went from 52 to 58: the per-call
+    register rotation (eax, ecx, edx) follows the earlier allocation, which
+    still differs (the image spills `weight` and gives `pt` its own slot).
   - **AM2_Button typed; ObjMoveAlongFacing 40 -> 35** (2026-10-07), no count
     change.
     - AM2_Button names its three sprites and the owns-sprites byte, and the
