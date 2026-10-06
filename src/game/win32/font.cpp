@@ -262,7 +262,8 @@ int32_t __cdecl BuildFont(int32_t font)
 
     /* The first 32 characters are never rendered, so their offsets are zeroed
      * rather than written; the loop starts at space. */
-    memset(g_fonts[font].offsets, 0, 32 * sizeof(uint16_t));
+    for (ch = 0; ch < 0x20; ch++)
+        g_fonts[font].offsets[ch] = 0;
     offs = &g_fonts[font].offsets[0x20];
 
     for (ch = 0x20; ch < 0x100; ch++) {

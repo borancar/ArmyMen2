@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1522 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1523 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,14 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **BuildFont matched: a zeroing loop, not memset** (2026-10-06),
+    1522 -> 1523. The first 32 glyph offsets are cleared by a `for` loop.
+    VC6 turns it into `rep stosd` and sets up the destination first, as
+    the image does; memset sets it up last. The converse holds in
+    LoadType2: its dword clear was a memset, and the loop form made it
+    worse. Copy loops are not turned into `rep movs`, so the LoadType
+    copies stay open. ObjRemap went from 73 to 65 by clamping ct before cl.
+    ItemLinkCells, which has the same code, needs the opposite order.
   - **Byte parameters, and three shape fixes** (2026-10-06), no count
     change; nothing lost.
     - CreateExplosion's facing and TimedDirFrame's direction are byte

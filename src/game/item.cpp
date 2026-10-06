@@ -11292,8 +11292,8 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
         return;
     }
 
-    cl = cl <= 0 ? 0 : cl;
     ct = ct <= 0 ? 0 : ct;
+    cl = cl <= 0 ? 0 : cl;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
