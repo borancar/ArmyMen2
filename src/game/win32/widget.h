@@ -747,7 +747,23 @@ struct AM2_MpOptionsScreen : AM2_ScreenBase {
 };
 struct AM2_MpPanelScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_MP_PANEL_SIZE - sizeof(AM2_ScreenBase)];
+    char          playerNames[AM2_COMM_SLOTS][0x20]; /* 0x0064 the rows' edit text */
+    char          chatText[0x100];          /* 0x00E4 the chat edit's buffer */
+    char          scoreText[0x20];          /* 0x01E4 MP_PANEL_OFF_SCORE_TEXT */
+    AM2_ListBox  *typeBox;                  /* 0x0204 MP_PANEL_OFF_TYPE_BOX */
+    AM2_ListBox  *gameBox;                  /* 0x0208 MP_PANEL_OFF_GAME_BOX */
+    AM2_Widget   *gameBar;                  /* 0x020C MP_PANEL_OFF_GAME_BAR */
+    AM2_ListBox  *mapBox;                   /* 0x0210 MP_PANEL_OFF_MAP_BOX */
+    AM2_Widget   *mapBar;                   /* 0x0214 MP_PANEL_OFF_MAP_BAR */
+    AM2_Widget   *preview;                  /* 0x0218 MP_PANEL_OFF_PREVIEW */
+    AM2_Widget   *chatBox;                  /* 0x021C MP_PANEL_OFF_CHATBOX */
+    AM2_Widget   *names[AM2_COMM_SLOTS];    /* 0x0220 MP_PANEL_OFF_NAMES */
+    AM2_Widget   *colours[AM2_COMM_SLOTS];  /* 0x0230 MP_PANEL_OFF_COLOURS */
+    AM2_Widget   *teams[AM2_COMM_SLOTS];    /* 0x0240 MP_PANEL_OFF_TEAMS */
+    AM2_Widget   *blinker0;                 /* 0x0250 MP_PANEL_OFF_BLINKER_0 */
+    AM2_Widget   *blinker1;                 /* 0x0254 MP_PANEL_OFF_BLINKER_1 */
+    AM2_Widget   *armyRows[AM2_COMM_SLOTS]; /* 0x0258 MP_PANEL_OFF_ARMY_ROWS */
+    int32_t       colourSel[AM2_COMM_SLOTS]; /* 0x0268 MP_PANEL_OFF_COLOUR_SEL */
     AM2_MpPanelScreen(const char *bmp);
     ~AM2_MpPanelScreen();
 };

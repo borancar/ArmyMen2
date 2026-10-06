@@ -215,6 +215,13 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The multiplayer panel screen typed** (2026-10-06), no count change.
+    AM2_MpPanelScreen has its name, chat and score buffers, its list boxes
+    and bars, and the four per-player widget arrays with the colour
+    selections. In the constructor, index loops over the two sprite arrays,
+    an unsigned slot test, and a name rect built before the `new` take it
+    from 461 to 422. The image walks the player arrays from one pointer at
+    +0x230, and `this->` members made it worse (586).
   - **The squad panel and the list box typed** (2026-10-06), no count
     change. AM2_HudSquad has its icon sprite, its two sprite arrays and twelve
     AM2_SquadRec slots. AM2_ListBox has all sixteen fields. HudSquadUpdate

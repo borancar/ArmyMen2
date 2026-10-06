@@ -759,6 +759,9 @@ static_assert(offsetof(AM2_ListBox, blinker) == LIST_OFF_BLINKER,   "list blinke
 static_assert(sizeof(AM2_ListBox)            == AM2_LISTBOX_SIZE,   "list box size");
 static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
 static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
+static_assert(offsetof(AM2_MpPanelScreen, names) == MP_PANEL_OFF_NAMES, "mp panel names");
+static_assert(offsetof(AM2_MpPanelScreen, colourSel) == MP_PANEL_OFF_COLOUR_SEL, "mp panel colour sel");
+static_assert(sizeof(AM2_MpPanelScreen)      == AM2_MP_PANEL_SIZE,  "mp panel size");
 #pragma GCC diagnostic pop
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
@@ -9334,24 +9337,19 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* The four player-colour swatches.  The loop's bound is the address of
      * the NEXT global, so the array's length is written nowhere. */
     {
-        AM2_Sprite **slot = g_mpPanelSpritesA;
-        char         name[0x20];
+        char name[0x20];
 
-        for (i = 0; slot < (AM2_Sprite * *)&g_menuMsgList;
-             slot++, i++) {
+        /* Index loops, which VC6 walks with a pointer it compares SIGNED
+         * against the next global's address. */
+        for (i = 0; i < 5; i++) {
             am2_sprintf(name, "03_013_0%i_color.bmp", i);
-            *slot = PreloadSpriteName(name, 1, 1);
+            g_mpPanelSpritesA[i] = PreloadSpriteName(name, 1, 1);
         }
     }
 
     /* And the thirteen panel sprites, by set and index rather than by name. */
-    {
-        AM2_Sprite **slot = g_mpPanelSpritesB;
-
-        for (i = 0; slot < g_mpPanelSpritesBEnd;
-             slot++, i++)
-            *slot = PreloadSprite(3, 0x17, i, 1, 1);
-    }
+    for (i = 0; i < 13; i++)
+        g_mpPanelSpritesB[i] = PreloadSprite(3, 0x17, i, 1, 1);
     /* FOUR PLAYER ROWS, three widgets each, into three PARALLEL arrays.  The
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
@@ -9362,6 +9360,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget **teams   = (AM2_Widget **)(p + MP_PANEL_OFF_TEAMS);
         AM2_Widget **rows    = (AM2_Widget **)(p + MP_PANEL_OFF_ARMY_ROWS);
         AM2_Widget  *child;
+        AM2_Rect     box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
 
         name[0] = '\0';
 
@@ -9385,8 +9384,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         {
             const uint8_t *comm = g_commObject;
 
-            if (*(const int32_t *)(comm + COMM_OFF_PLAYER_SLOTS
-                                   + (size_t)i * AM2_COMM_SLOT_STRIDE) != 0)
+            if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS
+                                    + (size_t)i * AM2_COMM_SLOT_STRIDE) > 0)
                 am2_sprintf(name, "%s",
                             comm + COMM_OFF_SLOT_NAME
                             + (size_t)i * AM2_COMM_SLOT_STRIDE);
@@ -9395,7 +9394,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         }
 
         names[i] = new AM2_MpName(name,
-                                  *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12),
+                                  box,
                                   1,
                                   g_hudColour,
                                   g_backgroundColour,
