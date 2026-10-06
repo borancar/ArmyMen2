@@ -1876,15 +1876,14 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
 #define type ((int32_t)*(const int32_t *)(r + MAPREC_OFF_TYPE))
 #define kind (*(const int32_t *)(r + MAPREC_OFF_KIND))  /* re-read at each use */
-            uint8_t   trig  = r[MAPREC_OFF_TRIG];
             int32_t   army;
             int32_t   flags = 0;
             void     *obj = 0;
             AM2_Point at;
 
-            if (trig & 0x20)
+            if (r[MAPREC_OFF_TRIG] & 0x20)
                 flags = 4;
-            if (trig & 0x08)
+            if (r[MAPREC_OFF_TRIG] & 0x08)
                 flags |= 0x810;
             army  = r[MAPREC_OFF_OWNER] == 0 ? 4 : (int32_t)r[MAPREC_OFF_OWNER] - 1;
 
