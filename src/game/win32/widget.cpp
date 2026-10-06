@@ -765,6 +765,8 @@ static_assert(sizeof(AM2_MpPanelScreen)      == AM2_MP_PANEL_SIZE,  "mp panel si
 static_assert(offsetof(AM2_MoviesScreen, sprites) == MOVIES_OFF_SPRITES, "movies sprites");
 static_assert(offsetof(AM2_MoviesScreen, buttons) == MOVIES_OFF_BUTTONS, "movies buttons");
 static_assert(sizeof(AM2_MoviesScreen)       == AM2_MOVIES_SIZE,    "movies size");
+static_assert(offsetof(AM2_ControlsDialogScreen, rows) == KEYROW_PARENT_ROWS, "controls rows");
+static_assert(sizeof(AM2_ControlsDialogScreen) == AM2_CONTROLS_SIZE,  "controls size");
 #pragma GCC diagnostic pop
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
@@ -12951,32 +12953,26 @@ AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
 {
     AM2_Widget *w = this;
 
-    const uint8_t *binding = g_keyBindings;
-    const int16_t *place   = g_keyrowPositions;
     const uint8_t *names   = (const uint8_t *)g_keyNameTable;
-    AM2_Widget   **rows;
     AM2_Widget    *first;
     AM2_Widget    *ok;
+    int32_t        i;
     AM2_CTOR_VTABLE(w, VTABLE_CONTROLS_DIALOG);
-    rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
-    while (binding < g_keyBindings
-                     + KEYROW_ROW_COUNT * 2) {
-        int32_t     index = KeyNameIndexOf(*binding);
+    for (i = 0; i < KEYROW_ROW_COUNT; i++) {
+        int32_t     index = KeyNameIndexOf(g_keyBindings[i * 2]);
         AM2_Widget *row   = new AM2_KeyRow(index,
                                            *(const char *const *)(names + index * 8 + 4),
-                                           *RectSet(AM2_TEMP(AM2_Rect), place[0], place[1],
+                                           *RectSet(AM2_TEMP(AM2_Rect), g_keyrowPositions[i * 2], g_keyrowPositions[i * 2 + 1],
                                                     AM2_KEYROW_WIDTH, AM2_KEYROW_HEIGHT),
                                            1, g_whiteInk, g_hiliteColour,
                                            g_backgroundColour, g_backgroundColour);
 
         ::WidgetAddChild(w, row);
-        *rows++ = row;
-        binding += 2;
-        place += 2;
+        this->rows[i] = row;
     }
 
-    first = *(AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
+    first = this->rows[0];
     WidgetVFocus(first, 0);
 
     /* Same shape as the confirm dialogs' buttons, in a column at x 0x218:

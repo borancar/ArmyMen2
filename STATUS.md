@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1523 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1524 of
   1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,20 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ControlsDialogScreen matched: a typed array in an index loop**
+    (2026-10-07), 1523 -> 1524. The key-row loop counts i from 0 to 21 over
+    the bindings and positions globals and stores `this->rows[i]` into the
+    now-typed screen (21 row pointers at 0x64, the whole object). The image
+    closes the loop with a signed `jl`, which marks an index loop. The
+    pointer walk it replaced compared unsigned. With a cast pointer instead
+    of the typed member, VC6 folded the row store into the position pointer
+    (35), and a separate `*rows++` stopped at 2.
+    - FindPath went from 384 to 381. A neighbour is a signed int
+      range-checked with `<= 0` and `>= 0x10000`, then masked to a 16-bit
+      tile for every later use.
+    - LoadShadowBmp went from 50 to 49: an unsigned image size (the image
+      tests it with `ja`), and the headers as the SDK's BITMAPFILEHEADER and
+      BITMAPINFOHEADER.
   - **Three more distance reductions, and a classifier** (2026-10-06), no
     count change.
     - AddToItemList went from 29 to 25: the given uid is masked in place

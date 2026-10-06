@@ -704,8 +704,8 @@ typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
  */
 int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 {
-    uint8_t   fileHdr[AM2_BMPFILE_HDR_BYTES];
-    uint8_t   infoHdr[AM2_BMPINFO_HDR_BYTES];
+    BITMAPFILEHEADER fileHdr;
+    BITMAPINFOHEADER infoHdr;
     uint8_t   palette[0x400];
     uint8_t   stream[0x7D00];
     am2_FILE *fp;
@@ -713,7 +713,8 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     uint8_t  *pixels;
     uint8_t  *out;
     uint8_t  *rowTable;
-    int32_t   width, height, stride, bytes;
+    int32_t   width, height, stride;
+    uint32_t  bytes;
     int32_t   row, x, len;
 
     if (!spr)
@@ -726,20 +727,19 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
         return 0;
 
     base = (int32_t)orig_ftell(fp);
-    orig_fread(fileHdr, AM2_BMPFILE_HDR_BYTES, 1, fp);
-    orig_fread(infoHdr, AM2_BMPINFO_HDR_BYTES, 1, fp);
+    orig_fread(&fileHdr, AM2_BMPFILE_HDR_BYTES, 1, fp);
+    orig_fread(&infoHdr, AM2_BMPINFO_HDR_BYTES, 1, fp);
 
-    if (*(const int16_t *)(infoHdr + BMPINFO_OFF_BITCOUNT) != 1) {
+    if (infoHdr.biBitCount != 1) {
         orig_fclose(fp);
         orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_NOT_1BIT)), path);
         return 0;
     }
 
-    orig_fread(palette, (size_t)*(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT)
-                        * 4, 1, fp);
-    orig_fseek(fp, *(const int32_t *)(fileHdr + BMPFILE_OFF_BITS) + base, 0);
+    orig_fread(palette, (size_t)infoHdr.biHeight * 4, 1, fp);
+    orig_fseek(fp, (int32_t)fileHdr.bfOffBits + base, 0);
 
-    bytes = *(const int32_t *)(infoHdr + BMPINFO_OFF_SIZEIMAGE);
+    bytes = infoHdr.biSizeImage;
     if (bytes <= 0) {
         orig_fclose(fp);
         orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_BAD_SIZE)), path);
@@ -750,9 +750,9 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     orig_fread(pixels, (size_t)bytes, 1, fp);
     orig_fclose(fp);
 
-    height = *(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT);
-    stride = (int32_t)((uint32_t)bytes / (uint32_t)height);
-    width  = *(const int32_t *)(infoHdr + BMPINFO_OFF_WIDTH);
+    height = infoHdr.biHeight;
+    stride = (int32_t)(bytes / (uint32_t)height);
+    width  = infoHdr.biWidth;
 
     *(int16_t *)(stream + 0) = (int16_t)width;
     *(int16_t *)(stream + 2) = (int16_t)height;
@@ -794,8 +794,8 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     spr->palette = g_defaultPalette;
 
     if (!spr->image.surface) {
-        int16_t hx = *(const int16_t *)(infoHdr + BMPINFO_OFF_XPELS);
-        int16_t hy = *(const int16_t *)(infoHdr + BMPINFO_OFF_YPELS);
+        int16_t hx = (int16_t)infoHdr.biXPelsPerMeter;
+        int16_t hy = (int16_t)infoHdr.biYPelsPerMeter;
 
         spr->bounds.top    = 0;
         spr->bounds.left   = 0;

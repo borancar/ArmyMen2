@@ -677,7 +677,7 @@ struct AM2_CommPanelScreen : AM2_ScreenBase {
 };
 struct AM2_ControlsDialogScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_CONTROLS_SIZE - sizeof(AM2_ScreenBase)];
+    AM2_Widget *rows[21];           /* 0x0064 KEYROW_PARENT_ROWS, one per binding */
     AM2_ControlsDialogScreen(const char *bmp);
     ~AM2_ControlsDialogScreen();
 };

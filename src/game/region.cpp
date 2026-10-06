@@ -1345,7 +1345,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         considered += AM2_TILE_STEP8_COUNT;
 
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
-            uint32_t nb = curTile + step[i];
+            int32_t  nb = curTile + step[i];
+            uint32_t t;
             int32_t  nbRegion, g, h, prev, next, fNew;
             uint16_t walk, before;
 
@@ -1353,7 +1354,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 continue;
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
-            nbRegion = region[nb];
+            t = nb & 0xFFFF;
+            nbRegion = region[t];
             if (nbRegion != 0 && nbRegion != startRegion
                 && nbRegion != goalRegion)
                 continue;
@@ -1362,19 +1364,19 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * The accumulation into `g` is sixteen bits wide and the penalties
              * are not -- the original does `add di, [g]` and then `add edi,3`
              * on the full register. */
-            g = PathDistXY(curTile, nb) * 2;
+            g = PathDistXY(curTile, t) * 2;
             g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
                           | (uint16_t)((uint32_t)g + g_pathNodes[curTile].g));
             {
-                uint8_t f = (g_tileFlags)[nb];
+                uint8_t f = (g_tileFlags)[t];
                 if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
                     g += 3;
                 if (!(f & AM2_TILE_LITTLE_COVER_NEAR))
                     g += 1;
             }
-            h = PathHeuristic(nb, goalTile);
+            h = PathHeuristic(t, goalTile);
 
-#define b g_pathNodes[nb]
+#define b g_pathNodes[t]
             if (b.stamp != g_pathGeneration) {
                 /* Never seen this search: claim it and fall through to the
                  * insert with the current head. */
@@ -1415,7 +1417,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             before = 0;
             if (!from) {
                 b.next = 0;
-                from = (uint16_t)nb;
+                from = (uint16_t)t;
                 b.prev = 0;
                 continue;
             }
@@ -1442,15 +1444,15 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 /* Cheapest so far: in front of the head. */
                 b.next = from;
                 b.prev = 0;
-                g_pathNodes[b.next & 0xFFFF].prev = (uint16_t)nb;
-                from = (uint16_t)nb;
+                g_pathNodes[b.next & 0xFFFF].prev = (uint16_t)t;
+                from = (uint16_t)t;
             } else {
                 uint16_t after = g_pathNodes[before & 0xFFFF].next;
 
                 b.next = after;
                 if (after > 0)
-                    g_pathNodes[after & 0xFFFF].prev = (uint16_t)nb;
-                g_pathNodes[before & 0xFFFF].next = (uint16_t)nb;
+                    g_pathNodes[after & 0xFFFF].prev = (uint16_t)t;
+                g_pathNodes[before & 0xFFFF].next = (uint16_t)t;
                 b.prev = before;
             }
         }
