@@ -4367,7 +4367,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
     *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row);
     i = 1;
-    RowUpdate(row, i, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row, i, g_mapDesc);
 
     /* THE LOOP NEVER ADVANCES. Every pass re-reads OBJ_OFF_ROWS -- row 0 --
      * and takes the attach offset from row 0's sprite, so the first row is
@@ -4381,7 +4381,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
             *(int16_t *)(row + ROW_OFF_X) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_X);
             *(int16_t *)(row + ROW_OFF_Y) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_Y);
             ObjFlagSet0(row);
-            RowUpdate(row, 0, g_mapDesc);
+            RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
         } while (++i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT));
     }
 
@@ -7372,7 +7372,7 @@ void __cdecl StepRowAnim(AM2_MapRow *r)
         void *want = kSpriteList[CELLP->sprite];
 
         if (r->sprite != want)
-            RowSetSprite(r, want, g_mapDesc);
+            RowSetSprite(r, (AM2_Sprite *)want, g_mapDesc);
     }
 
     hold = CELLP->hold;
@@ -10669,7 +10669,7 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
                   *(void *const *)(o + OBJ_OFF_TABLE_REC_KIND));
 
-    RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 1,
+    RowUpdate((AM2_MapRow *)(*(void **)(o + OBJ_OFF_ROWS)), 1,
               g_mapDesc);
 }
 
@@ -11083,7 +11083,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row0);
-    RowUpdate(row0, 0, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row0, 0, g_mapDesc);
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         g_zeroPoint;
@@ -11100,7 +11100,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
 #undef SPR0
         ObjFlagSet0(r);
-        RowUpdate(r, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)r, 0, g_mapDesc);
     }
 
     ResetType2Fields(o);
@@ -11194,7 +11194,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row0);
-    RowUpdate(row0, 1, g_mapDesc);   /* force 1 here */
+    RowUpdate((AM2_MapRow *)row0, 1, g_mapDesc);   /* force 1 here */
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         g_zeroPoint;
@@ -12264,7 +12264,7 @@ no_weapon:
         ObjConceal(o, 0);
 
     SetKindFrames(o, 1);
-    RowUpdate(ROWS, 1, g_mapDesc);
+    RowUpdate((AM2_MapRow *)ROWS, 1, g_mapDesc);
 
     /* Every row past the first is placed at the object's position plus the
      * FIRST row's sprite attachment point -- rows[0]'s sprite, not its own. */
@@ -12275,7 +12275,7 @@ no_weapon:
         *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
         *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
         *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
-        RowUpdate(r, 1, g_mapDesc);
+        RowUpdate((AM2_MapRow *)r, 1, g_mapDesc);
     }
 #undef ROWS
 
@@ -12433,8 +12433,8 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
         }
 
         for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-            RowUpdate(*(uint8_t **)(o + OBJ_OFF_ROWS)
-                          + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
+            RowUpdate((AM2_MapRow *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                          + (uint32_t)i * AM2_OBJ_ROW_STRIDE),
                       0, g_mapDesc);
 
         if (orFlags & OBJ_FLAG_CONCEALED) {
@@ -12590,8 +12590,8 @@ have:
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;              \
         if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {                \
             ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));                    \
-            RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,                      \
-                      g_mapDesc);                    \
+            RowUpdate(*(AM2_MapRow **)(o + OBJ_OFF_ROWS), 0,                \
+                      g_mapDesc);                                           \
         }                                                                   \
         ItemPreDestroyAlias(obj, (int32_t)((uintptr_t)g_objMapDesc))
 
@@ -12925,7 +12925,7 @@ after_flight:
     *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
         (int16_t)(*(const int16_t *)(o + MISSILE_OFF_HEIGHT)
                   - *(const int16_t *)(o + MISSILE_OFF_GROUND));
-    RowUpdate(rows, 0, g_mapDesc);
+    RowUpdate((AM2_MapRow *)rows, 0, g_mapDesc);
     ObjTileChanged(o, *(const int16_t *)(o + MISSILE_OFF_HEIGHT), 0);
 
     /* Crossed from open ground onto blocked: clamp the flight DOWN to just

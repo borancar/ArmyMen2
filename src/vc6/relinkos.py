@@ -80,8 +80,9 @@ def _aggregated(va):
 # more, and the sprite list's alone settles it; the object-script fields
 # tipped it again, and the aim sprites' and the menu row's declarations
 # beside the sprite list's settled it; with the object table typed the aim
-# sprites' alone does. Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004FC8C8, 0x004FC994),)
+# sprites' alone did, and with the map descriptor typed the sprite list's
+# rejoins it. Search the subsets (empty first) when it flips.
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC), (0x004FC8C8, 0x004FC994))
 
 
 def _kept(va):

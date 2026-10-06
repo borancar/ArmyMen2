@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "maprow.h"
+#include "spritetype.h" /* AM2_Sprite: the hot spot and bounds */
 #include "trig.h"     /* Cos8, Sin8 -- reconstructed */
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "objtable.h"
@@ -375,7 +376,7 @@ static inline void RowPoolInit(int32_t *count, int32_t *tail,
         row = am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         slots[i].row = row;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(dim, dim, row, g_mapDesc);
+        RowAlloc(dim, dim, (AM2_MapRow *)row, g_mapDesc);
     }
 }
 
@@ -459,7 +460,7 @@ static inline int32_t RowPoolRelease(int32_t *count, int32_t *tail,
 
     if ((*(uint32_t *)row & 1) != 0) {
         *(uint32_t *)row &= ~1u;
-        RowUpdate(row, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
     }
 
     /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
@@ -662,15 +663,12 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * Every object that reaches the screen has had its own palette written in by
  * then -- which is what MAPOBJ_OFF_PALETTE's note in orig.h already says
  * happens immediately before a draw. Warm code, undiscriminated line. */
-void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
+void __cdecl RowInit(AM2_MapRow *r, AM2_Sprite *sprite, int32_t x, int32_t y)
 {
-    uint8_t *r = (uint8_t *)row;
-
     memset(r, 0, AM2_OBJ_ROW_STRIDE);
-    *(void **)(r + ROW_OFF_SPRITE) = sprite;
-    *(uint32_t *)(r + ROW_OFF_X)   = MakePoint((uint32_t)x, (uint32_t)y);
-    *(void **)(r + MAPOBJ_OFF_PALETTE) =
-        g_defaultPalette;
+    r->sprite = sprite;
+    *(uint32_t *)&r->pos = MakePoint((uint32_t)x, (uint32_t)y);
+    r->palette = g_defaultPalette;
 }
 
 /* RowAnimField4 -- original 0x0040A130, two callers.
@@ -843,9 +841,9 @@ found:
 
     dir = RoundTo8(heading, row->animPlaying->directionBits);
     RowSetSprite(row,
-                 (g_spriteList)
+                 (AM2_Sprite *)((g_spriteList)
                      [row->animPlaying->cells[dir * row->animPlaying->frames
-                                              + row->cell].sprite],
+                                              + row->cell].sprite]),
                  g_mapDesc);
 
     v = row->animPlaying->field4;
@@ -942,51 +940,43 @@ void __cdecl MapDescFree(void *desc)
  * went 1,587 to 0 with it, this having been its only caller. That is the fifth
  * member of this family to fall silent for the same reason, and the file now
  * has exactly two counters that can move: this one and RowUpdate. */
-int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc)
+int32_t __cdecl RowAlloc(int32_t w, int32_t h, AM2_MapRow *r, AM2_MapDesc *desc)
 {
-    uint8_t *r = (uint8_t *)row;
-    uint8_t *spr;
-    int32_t  bytes;
-    int32_t  i;
+    AM2_Sprite *spr;
+    int32_t     bytes;
+    int32_t     i;
 
     if (w > 2)
         w -= 2;
     if (h > 2)
         h -= 2;
 
-    r[ROW_OFF_OWNS] = (uint8_t)(int8_t)((int8_t)((w >> 8) + 2)
-                                        * (int8_t)((h >> 8) + 2));
+    r->owns = (uint8_t)(int8_t)((int8_t)((w >> 8) + 2) * (int8_t)((h >> 8) + 2));
 
-    bytes = (int32_t)r[ROW_OFF_OWNS] * (int32_t)ROW_ENTRY_BYTES;
-    ROW_FLD(r, ROW_OFF_BUFFER, void *) = am2_malloc((uint32_t)bytes);
+    bytes = (int32_t)r->owns * (int32_t)ROW_ENTRY_BYTES;
+    r->buffer = (AM2_RowEntry *)am2_malloc((uint32_t)bytes);
 
     /* The buffer pointer is re-read for every field, as the image does. */
-#define ENTRY (ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *) + (uint32_t)i * ROW_ENTRY_BYTES)
-    for (i = 0; i < (int32_t)r[ROW_OFF_OWNS]; i++) {
-        ROW_FLD(ENTRY, DEPTH_OFF_OBJ, void *)       = r;
-        ROW_FLD(ENTRY, DEPTH_OFF_NEXT, uint32_t)    = 0;
-        ROW_FLD(ENTRY, DEPTH_OFF_PREV, uint32_t)    = 0;
-        ROW_FLD(ENTRY, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+    for (i = 0; i < (int32_t)r->owns; i++) {
+        r->buffer[i].obj  = r;
+        r->buffer[i].next = 0;
+        r->buffer[i].prev = 0;
+        r->buffer[i].cell = -1;
     }
-#undef ENTRY
 
-    spr = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
+    spr = r->sprite;
     if (!spr) {
-        ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) = 0;
-        ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) = 0;
-        ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) = 0;
-        ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) = 0;
+        r->rect.left   = 0;
+        r->rect.top    = 0;
+        r->rect.right  = 0;
+        r->rect.bottom = 0;
         return bytes;
     }
 
-    ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) =
-        ROW_FLD(r, ROW_OFF_X, int16_t) - ROW_FLD(spr, SPR_OFF_HOTX, int16_t);
-    ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) =
-        ROW_FLD(r, ROW_OFF_Y, int16_t) - ROW_FLD(spr, SPR_OFF_HOTY, int16_t);
-    ROW_FLD(r, ROW_OFF_RECT + 8, int32_t) =
-        ROW_FLD(spr, SPR_OFF_W, int32_t) + ROW_FLD(r, ROW_OFF_RECT + 0, int32_t);
-    ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) =
-        ROW_FLD(spr, SPR_OFF_H, int32_t) + ROW_FLD(r, ROW_OFF_RECT + 4, int32_t);
+    r->rect.left   = r->pos.x - spr->hotX;
+    r->rect.top    = r->pos.y - spr->hotY;
+    r->rect.right  = spr->bounds.right + r->rect.left;
+    r->rect.bottom = spr->bounds.bottom + r->rect.top;
 
     if (ObjFlagBit0(r))
         RowRegisterAll(r, desc);
@@ -1015,44 +1005,40 @@ int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc)
  * RowUpdate compares against, and both end in a RowUpdate. A null sprite
  * returns having touched nothing.
  */
-void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
+void __cdecl RowSetSprite(AM2_MapRow *r, AM2_Sprite *spr, AM2_MapDesc *desc)
 {
-    uint8_t *r = (uint8_t *)row;
-    uint8_t *spr = (uint8_t *)sprite;
     int32_t  w, h, need;
 
     if (!spr)
         return;
 
-    w = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 8);
-    h = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 12);
+    w = spr->bounds.right;
+    h = spr->bounds.bottom;
     if (w > 2)
         w -= 2;
     if (h > 2)
         h -= 2;
     need = ((h >> 8) + 2) * ((w >> 8) + 2);
 
-    if (need > (int32_t)r[ROW_OFF_OWNS]) {
-        uint8_t *now;
+    if (need > (int32_t)r->owns) {
+        AM2_Sprite *now;
 
         ObjFlagClear0(r);
         RowUpdate(r, 0, desc);
         RowRelease(r, desc);
 
-        ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
-            ROW_FLD(r, ROW_OFF_SPRITE, void *);
-        ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+        r->prevSprite = r->sprite;
+        r->sprite     = spr;
         ObjFlagSet0(r);
 
-        now = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
-        RowAlloc(*(const int32_t *)(now + SPRITE_OFF_BOUNDS + 8),
-                 *(const int32_t *)(now + SPRITE_OFF_BOUNDS + 12), r, desc);
+        now = r->sprite;
+        RowAlloc(now->bounds.right, now->bounds.bottom, r, desc);
         RowUpdate(r, 0, desc);
         return;
     }
 
-    ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) = ROW_FLD(r, ROW_OFF_SPRITE, void *);
-    ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+    r->prevSprite = r->sprite;
+    r->sprite     = spr;
     RowUpdate(r, 0, desc);
 }
 
@@ -1101,12 +1087,11 @@ void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
  * RowUnregisterAll from 74, DepthResort from 3,914, and DepthCompare which was
  * already blind. Each is a callee this now reaches by name. DepthLink still
  * reads 2,758 because it has a second caller that is still the original's. */
-void __cdecl RowUpdate(void *row, int32_t force, void *desc)
+void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
 {
-#define r ((uint8_t *)row)
-    uint8_t *spr;
-    int32_t  cl, ct, cr, cb;
-    int32_t  cell, stride, used;
+    AM2_Sprite *spr;
+    int32_t     cl, ct, cr, cb;
+    int32_t     cell, stride, used;
 
     if (!ObjFlagBit0(r)) {
         RowUnregisterAll(r, desc);
@@ -1114,46 +1099,39 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     }
 
     if (force == 0
-        && ROW_FLD(r, ROW_OFF_X, int16_t) == ROW_FLD(r, ROW_OFF_PREV_X, int16_t)
-        && ROW_FLD(r, ROW_OFF_Y, int16_t) == ROW_FLD(r, ROW_OFF_PREV_Y, int16_t)
+        && r->pos.x == r->prevX
+        && r->pos.y == r->prevY
         /* Both clear, spelled as the image compares them: each bit masked
          * out and the two results compared. */
-        && (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
-           == (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED_DONE)
-        && ROW_FLD(r, ROW_OFF_SPRITE, void *)
-           == ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *))
+        && (r->flags & ROW_FLAG_REMOVED) == (r->flags & ROW_FLAG_REMOVED_DONE)
+        && r->sprite == r->prevSprite)
         return;
 
-    if (!ROW_FLD(r, ROW_OFF_SPRITE, void *))
+    if (!r->sprite)
         return;
 
-    DirtyCollect((const AM2_Rect *)(r + ROW_OFF_RECT));
+    DirtyCollect(&r->rect);
 
-    if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED) {
+    if (r->flags & ROW_FLAG_REMOVED) {
         RowUnregisterAll(r, desc);
-        ROW_FLD(r, 0, uint32_t) |= ROW_FLAG_REMOVED_DONE;
+        r->flags |= ROW_FLAG_REMOVED_DONE;
         return;
     }
-    ROW_FLD(r, 0, uint32_t) &= ~(uint32_t)ROW_FLAG_REMOVED_DONE;
+    r->flags &= ~(uint32_t)ROW_FLAG_REMOVED_DONE;
 
-    spr = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
-    ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) =
-        ROW_FLD(r, ROW_OFF_X, int16_t) - ROW_FLD(spr, SPR_OFF_HOTX, int16_t);
-    ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) =
-        ROW_FLD(r, ROW_OFF_Y, int16_t) - ROW_FLD(spr, SPR_OFF_HOTY, int16_t)
-        - ROW_FLD(r, ROW_OFF_Y_ADJUST, int16_t);
-    ROW_FLD(r, ROW_OFF_RECT + 8, int32_t) =
-        ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) + ROW_FLD(spr, SPR_OFF_W, int32_t);
-    ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) =
-        ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) + ROW_FLD(spr, SPR_OFF_H, int32_t);
+    spr = r->sprite;
+    r->rect.left   = r->pos.x - spr->hotX;
+    r->rect.top    = r->pos.y - spr->hotY - r->yAdjust;
+    r->rect.right  = r->rect.left + spr->bounds.right;
+    r->rect.bottom = r->rect.top + spr->bounds.bottom;
 
-    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
-    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
-    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
-    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+    cl = r->rect.left   >> 8;
+    ct = r->rect.top    >> 8;
+    cr = r->rect.right  >> 8;
+    cb = r->rect.bottom >> 8;
 
 
-    if (cb < 0 || ct > ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t) - 1 || cr < 0 || cl > ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1) {
+    if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
         RowUnregisterAll(r, desc);
         return;
     }
@@ -1164,64 +1142,60 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     cl = cl <= 0 ? 0 : cl;
     if (ct <= 0)
         ct = 0;
-    if (cr >= ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1)
-        cr = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1;
-    if (cb >= ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1)          /* COLS, not ROWS -- see above */
-        cb = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - 1;
+    if (cr >= desc->cols - 1)
+        cr = desc->cols - 1;
+    if (cb >= desc->cols - 1)          /* COLS, not ROWS -- see above */
+        cb = desc->cols - 1;
 
     used   = 0;
-    cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
-    stride = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t) - cr + cl - 1;
+    cell   = (ct << desc->shift) + cl;
+    stride = desc->cols - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;
 
         for (x = cl; x <= cr; x++, cell++, used++) {
-            uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                             + (uint32_t)used * ROW_ENTRY_BYTES;
-            int32_t  was   = ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t);
+            AM2_RowEntry *entry = &r->buffer[used];
+            int32_t       was   = entry->cell;
 
             if (was == cell) {
-                DepthResort(entry, MAPDESC_CELL(desc, cell));
+                DepthResort(entry, (void **)&desc->cells[cell]);
                 continue;
             }
             if (was >= 0)
-                ListUnlink(entry, MAPDESC_CELL(desc, was));
+                ListUnlink(entry, (void **)&desc->cells[was]);
 
-            ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = cell;
-            DepthLink(entry, MAPDESC_CELL(desc, cell));
+            entry->cell = cell;
+            DepthLink(entry, (void **)&desc->cells[cell]);
         }
     }
 
-    while (used < (int32_t)r[ROW_OFF_OWNS]) {
-        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                         + (uint32_t)used * ROW_ENTRY_BYTES;
-        int32_t  was   = ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t);
+    while (used < (int32_t)r->owns) {
+        AM2_RowEntry *entry = &r->buffer[used];
+        int32_t       was   = entry->cell;
 
         if (was < 0)
             break;
 
-        ListUnlink(entry, MAPDESC_CELL(desc, was));
-        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+        ListUnlink(entry, (void **)&desc->cells[was]);
+        entry->cell = -1;
         used++;
     }
 
     {
         /* A copy, because the collector intersects its argument in place. */
-        int32_t box[4];
+        AM2_Rect box;
 
-        box[1] = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t);
-        box[2] = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t);
-        box[0] = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t);
-        box[3] = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t);
-        DirtyCollect((const AM2_Rect *)box);
+        box.top    = r->rect.top;
+        box.right  = r->rect.right;
+        box.left   = r->rect.left;
+        box.bottom = r->rect.bottom;
+        DirtyCollect(&box);
     }
 
     /* One dword, which is what pairs X with PREV_X and Y with PREV_Y. */
-    ROW_FLD(r, ROW_OFF_PREV_X, uint32_t) = ROW_FLD(r, ROW_OFF_X, uint32_t);
-    ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
-        ROW_FLD(r, ROW_OFF_SPRITE, void *);
-#undef r
+    *(uint32_t *)&r->prevX = *(const uint32_t *)&r->pos;
+    r->prevSprite = r->sprite;
 }
 
 #if !defined(AM2_RELINK)   /* the harness's trace wrapper */
@@ -1324,27 +1298,24 @@ void __cdecl DepthLink(void *node, void **head)
  * the counters, and it is indistinguishable from a broken one unless the
  * numbers before it are on record -- which is why they are, here and in the
  * commit. */
-void __cdecl RowRegisterAll(void *row, void *desc)
+void __cdecl RowRegisterAll(AM2_MapRow *r, AM2_MapDesc *desc)
 {
-    uint8_t *r = (uint8_t *)row;
     /* Each store indexes the buffer afresh; the original holds no entry. */
-#define ENTRY(k) (ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *) \
-                  + (uint32_t)(k) * ROW_ENTRY_BYTES)
     int32_t  cl, ct, cr, cb;
     int32_t  cols, cell, stride, used;
 
-    if (ROW_FLD(r, 0, uint8_t) & ROW_FLAG_REMOVED)
+    if ((uint8_t)r->flags & ROW_FLAG_REMOVED)
         return;
 
-    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
-    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
-    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
-    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+    cl = r->rect.left   >> 8;
+    ct = r->rect.top    >> 8;
+    cr = r->rect.right  >> 8;
+    cb = r->rect.bottom >> 8;
 
     /* The grid size is read where it is compared, rows first. */
-    if (cb < 0 || ct > ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t) - 1 || cr < 0)
+    if (cb < 0 || ct > desc->rows - 1 || cr < 0)
         return;
-    cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
+    cols = desc->cols;
     if (cl > cols - 1)
         return;
 
@@ -1356,24 +1327,23 @@ void __cdecl RowRegisterAll(void *row, void *desc)
         cb = cols - 1;
 
     used   = 0;
-    cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
+    cell   = (ct << desc->shift) + cl;
     stride = cols - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;
 
         for (x = cl; x <= cr; x++, used++, cell++) {
-            ROW_FLD(ENTRY(used), ROW_ENTRY_OFF_CELL, int32_t) = cell;
-            DepthLink(ENTRY(used), MAPDESC_CELL(desc, cell));
+            r->buffer[used].cell = cell;
+            DepthLink(&r->buffer[used], (void **)&desc->cells[cell]);
         }
     }
 
-    for (; used < (int32_t)r[ROW_OFF_OWNS]; used++) {
-        ROW_FLD(ENTRY(used), ROW_ENTRY_OFF_CELL, int32_t) = -1;
-        ROW_FLD(ENTRY(used), DEPTH_OFF_NEXT, uint32_t)    = 0;
-        ROW_FLD(ENTRY(used), DEPTH_OFF_PREV, uint32_t)    = 0;
+    for (; used < (int32_t)r->owns; used++) {
+        r->buffer[used].cell = -1;
+        r->buffer[used].next = 0;
+        r->buffer[used].prev = 0;
     }
-#undef ENTRY
 }
 
 /* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
@@ -1543,7 +1513,7 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
         row = *(uint8_t **)(out + ROWSET_OFF_ROWS)
               + (size_t)i * AM2_OBJ_ROW_STRIDE;
 
-        RowInit(row, *(void *const *)(SPEC(i) + DEFSPEC_OFF_SPRITE),
+        RowInit((AM2_MapRow *)row, *(AM2_Sprite *const *)(SPEC(i) + DEFSPEC_OFF_SPRITE),
                 (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DX) + x,
                 (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DY) + y);
 
@@ -1558,7 +1528,7 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
         spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
         RowAlloc(*(const int32_t *)(spr + SPR_OFF_W),
                  *(const int32_t *)(spr + SPR_OFF_H),
-                 row, g_mapDesc);
+                 (AM2_MapRow *)row, g_mapDesc);
     }
 #undef SPEC
 
@@ -1619,9 +1589,9 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
             (const int32_t *)((const uint8_t *)specs
                               + (size_t)i * AM2_ROW_SPEC_BYTES);
 
-        RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
+        RowInit((AM2_MapRow *)row, (AM2_Sprite *)0, spec[0] + dx, spec[1] + dy);
         ObjFlagSet0(row);
-        RowAlloc(spec[2], spec[3], row, g_mapDesc);
+        RowAlloc(spec[2], spec[3], (AM2_MapRow *)row, g_mapDesc);
     }
 
     *(int32_t *)(h + 0x0C) = 0;
@@ -1820,7 +1790,7 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
         ROW = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         row = ROW;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(w, h, row, g_mapDesc);
+        RowAlloc(w, h, (AM2_MapRow *)row, g_mapDesc);
     }
 #undef REC
 #undef ROW
@@ -1900,7 +1870,7 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
 #define COUNT   (*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT))
     if ((*(uint32_t *)row & 1) != 0) {
         *(uint32_t *)row &= ~1u;
-        RowUpdate(row, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
     }
 
     next = NEXT(rec);
@@ -2116,7 +2086,7 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(DECAL + 0x34u);
     *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
 
-    RowUpdate(row, 0, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
 #undef FLAGS
 #undef DECAL
 }
@@ -2363,7 +2333,7 @@ void __cdecl LeaveRemainsRow(const void *src)
         *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
     *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
 
-    RowUpdate(r, 0, g_mapDesc);
+    RowUpdate((AM2_MapRow *)r, 0, g_mapDesc);
 }
 
 /* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.

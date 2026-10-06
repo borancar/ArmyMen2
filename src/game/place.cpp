@@ -790,7 +790,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             *(int16_t *)(row + ROW_OFF_Y) +=
                 *(const int16_t *)(spr + SPR_OFF_OVY);
 
-            RowUpdate(row, 0, g_mapDesc);
+            RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
             n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
             i++;
         }

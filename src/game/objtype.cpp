@@ -1378,7 +1378,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
 
         ApplyObjHeight(obj,
                        (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
-        RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,
+        RowUpdate((AM2_MapRow *)(*(void **)(o + OBJ_OFF_ROWS)), 0,
                   g_mapDesc);
     }
 

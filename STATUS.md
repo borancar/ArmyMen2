@@ -215,6 +215,18 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The map row's cell entries and the map descriptor typed** (2026-10-06),
+    no count change. AM2_RowEntry is a row's 16-byte cell entry (the row,
+    the depth-list links and the cell). AM2_MapDesc is the cell grid (cols,
+    rows, shift, cells). g_mapDesc and g_objMapDesc are typed. RowInit,
+    RowAlloc, RowSetSprite, RowRegisterAll and RowUpdate take AM2_MapRow and
+    AM2_MapDesc. The untyped callers cast at the call, leaving their address
+    arithmetic as it was. All of them still match except RowUpdate, which
+    stays NORM 166. The image keeps `left` in a register for `right` but
+    re-reads `top`, has a 0x1C frame against our 0x20, and clamps the top
+    edge branchlessly too. Spelling the clamps and the held `cols` as
+    RowRegisterAll does gives 172. A local for `left` gives 319, and RectSet
+    gives 377.
   - **ShotHitsObj, narrowed** (2026-10-06), still raw 7. Putting the
     `refuse:` label on the FIRST arm's `return 0` makes all seven refusals
     target one shared block, as in the image. But VC6 then cross-jumps that

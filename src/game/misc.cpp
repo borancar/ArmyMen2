@@ -2193,7 +2193,7 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
     if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate(row, 1, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2211,7 +2211,7 @@ static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
     if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate(row, 1, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2404,7 +2404,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
                          (const AM2_Point *)(row + ROW_OFF_X)))
             return SeqRetire(ctx, rec);
 
-        RowUpdate(row, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
     }
 
     *(int32_t *)(row + ROW_OFF_STAMP_54) +=
@@ -2978,7 +2978,7 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 
         *(uint32_t *)(row + ROW_OFF_SPRITE) =
             (*(uint32_t *const *)&g_seqSprites7)[variant];
-        RowUpdate(row, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
 
         *(uint32_t *)(r + SEQ_OFF_GATE) -= ADVANCE;
     }
@@ -3201,7 +3201,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
                 *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
                     *(const uint32_t *)(old + ROW_OFF_FIELD_2C);
                 *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
-                RowUpdate(rest, 0, g_mapDesc);
+                RowUpdate((AM2_MapRow *)rest, 0, g_mapDesc);
                 return SeqRetire(ctx, rec);
             }
         } else {
@@ -3210,7 +3210,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         }
     }
 
-    RowUpdate(row, 0, g_mapDesc);
+    RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 #undef KIND
 #undef LIFE

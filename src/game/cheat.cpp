@@ -211,7 +211,7 @@ again:
             SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
             SetFieldInAll(u + OBJ_OFF_SUBRECORD,
                           g_flameRecord);
-            RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
+            RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
                       g_mapDesc);
             return;
         }
@@ -224,7 +224,7 @@ again:
         (*(int32_t *)&g_flameNextMs) = 0;
         SetFieldInAll(u + OBJ_OFF_SUBRECORD,
                       *(void **)(u + OBJ_OFF_TABLE_REC_KIND));
-        RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
+        RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
                   g_mapDesc);
         old = (uint8_t *)WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
         fresh = CHEAT_NEW_WEAPON(9);
@@ -312,7 +312,7 @@ again:
         HudMessage("Stealth mode on!", kColour(((uintptr_t)g_colourDarkBlue)));
         SetFieldInAll(u + OBJ_OFF_SUBRECORD,
                       g_rowLutDoubles);
-        RowUpdate(*(void **)(u + OBJ_OFF_ROWS), 1,
+        RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
                   g_mapDesc);
         return;
     case 34:                                    /* suicide kings */

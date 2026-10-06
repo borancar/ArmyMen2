@@ -16,6 +16,27 @@ struct AM2_AnimTable;
 struct AM2_Anim;
 struct AM2_Sprite;
 
+struct AM2_MapRow;
+
+/* One of a row's cell entries, ROW_ENTRY_BYTES each in its buffer: the row
+ * it belongs to, its links in a cell's depth-sorted list, and which cell
+ * that is (-1 for none). */
+typedef struct AM2_RowEntry {
+    struct AM2_MapRow   *obj;           /* +0x00 DEPTH_OFF_OBJ */
+    struct AM2_RowEntry *prev;          /* +0x04 DEPTH_OFF_PREV */
+    struct AM2_RowEntry *next;          /* +0x08 DEPTH_OFF_NEXT */
+    int32_t              cell;          /* +0x0C ROW_ENTRY_OFF_CELL */
+} AM2_RowEntry;
+
+/* A map descriptor: the cell grid the rows register in. g_mapDesc is the
+ * drawable one and g_objMapDesc the one objects are found through. */
+typedef struct AM2_MapDesc {
+    int32_t        cols;                /* +0x00 MAPDESC_OFF_COLS */
+    int32_t        rows;                /* +0x04 MAPDESC_OFF_ROWS */
+    int32_t        shift;               /* +0x08 MAPDESC_OFF_SHIFT, log2 of cols */
+    AM2_RowEntry **cells;               /* +0x0C MAPDESC_OFF_CELLS, one list head each */
+} AM2_MapDesc;
+
 /* A map row: the drawable node every map object carries, linked into the
  * cell grid and the depth list. Transcribed as the struct the original
  * accessed by member; only the named fields are claimed. */
@@ -34,7 +55,7 @@ typedef struct AM2_MapRow {
     void                 *palette;      /* +0x30  MAPOBJ_OFF_PALETTE */
     uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
     uint8_t               _pad35[3];    /* +0x35 */
-    void                 *buffer;       /* +0x38  ROW_OFF_BUFFER */
+    AM2_RowEntry         *buffer;       /* +0x38  ROW_OFF_BUFFER, `owns` entries */
     int16_t               field3C;      /* +0x3C  ROW_OFF_FIELD_3C */
     uint8_t               _pad3e[2];    /* +0x3E */
     struct AM2_AnimTable *animCur;      /* +0x40  ROW_OFF_ANIM_CUR */
@@ -81,15 +102,15 @@ void __cdecl DepthResort(void *node, void **head);
 /* Original: 0x0041D2B0, six callers. Give a row its entry buffer, sized from a
  * width and height in world units, and put it on the map. Returns the buffer's
  * size in bytes. */
-int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc);
+int32_t __cdecl RowAlloc(int32_t w, int32_t h, AM2_MapRow *row, AM2_MapDesc *desc);
 
 /* Original: 0x0041D980. Link every cell the row's current rectangle covers,
  * from entries assumed not to be in any list yet. */
-void __cdecl RowRegisterAll(void *row, void *desc);
+void __cdecl RowRegisterAll(AM2_MapRow *row, AM2_MapDesc *desc);
 
 /* Original: 0x0041D480, thirty-seven callers. Bring one row's membership of
  * the map's cell grid up to date with where it now is. */
-void __cdecl RowUpdate(void *row, int32_t force, void *desc);
+void __cdecl RowUpdate(AM2_MapRow *row, int32_t force, AM2_MapDesc *desc);
 
 /* Original: 0x0041D270 and 0x0041D210. The map descriptor's grid, freed and
  * rebuilt. Both are called on both descriptors when a map loads. */
@@ -98,7 +119,7 @@ void __cdecl MapDescInit(void *desc, int32_t w, int32_t h);
 
 /* Original: 0x0040A050. Clear a map object and give it a sprite, a position
  * and the default palette. See maprow.cpp for why it is filed here. */
-void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y);
+void __cdecl RowInit(AM2_MapRow *row, struct AM2_Sprite *sprite, int32_t x, int32_t y);
 
 /* 0x00434DA0. One block of `count` rows, each placed at its spec's (x, y)
  * offset from (dx, dy) and given a buffer sized by the spec's (w, h), with a
@@ -108,7 +129,7 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
 
 /* Original: 0x0041D3D0, three callers. Put a new sprite on a row, rebuilding
  * its cell buffer only when the new one needs more cells. */
-void __cdecl RowSetSprite(void *row, void *sprite, void *desc);
+void __cdecl RowSetSprite(AM2_MapRow *row, struct AM2_Sprite *sprite, AM2_MapDesc *desc);
 
 /* 0x0040A1A0. Put a row on an animation frame. -2 does nothing, -1 means the
  * frame it is already on, 0 clears bit 0 of the row and returns; anything else

@@ -387,7 +387,7 @@ void __cdecl ObjConceal(void *obj, int32_t force)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row |= (uint32_t)ROW_FLAG_REMOVED;
-        RowUpdate(row, 0, g_mapDesc);
+        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
     }
 }
 
@@ -455,7 +455,7 @@ void __cdecl SetFogOfWar(int32_t fogOn)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
             *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
-            RowUpdate(row, 0, g_mapDesc);
+            RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
         }
     }
 }

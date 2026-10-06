@@ -371,7 +371,7 @@
 #define g_mapBoundsRight         (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT)  /* 0x00514E00 */
 #define g_mapBoundsTop           (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP)  /* 0x00514DFC */
 #define g_mapChecksum            (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)  /* 0x00511CCC */
-#define g_mapDesc                ((void *)(uintptr_t)ADDR_MAP_DESC)  /* 0x00514F20 */
+#define g_mapDesc                ((struct AM2_MapDesc *)(uintptr_t)ADDR_MAP_DESC)  /* 0x00514F20 */
 #define g_mapExtentShift         (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_SHIFT)  /* 0x00514DD8 */
 #define g_mapExtentX             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)  /* 0x00514DD0 */
 #define g_mapExtentY             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)  /* 0x00514DD4 */
@@ -502,7 +502,7 @@
 #define g_objCtxVal              (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL)  /* 0x00511E28 */
 #define g_objCtxValA             (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A)  /* 0x00511E24 */
 #define g_objCtxValPrev          (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV)  /* 0x00511E2C */
-#define g_objMapDesc             ((void *)(uintptr_t)ADDR_OBJ_MAP_DESC)  /* 0x00514F10 */
+#define g_objMapDesc             ((struct AM2_MapDesc *)(uintptr_t)ADDR_OBJ_MAP_DESC)  /* 0x00514F10 */
 #define g_objMark                ((uint16_t *)(uintptr_t)ADDR_OBJ_MARK)  /* 0x00661E20 */
 #define g_objMarkStamp           (*(uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP)  /* 0x00662020 */
 #define g_objScriptCap           (*(int32_t *)(uintptr_t)ADDR_OBJ_SCRIPT_CAP)  /* 0x00516190 */

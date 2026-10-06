@@ -438,7 +438,7 @@ void __cdecl RowFaceSprite(void *row)
     sprite  = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[cell].sprite];
 
     if (*(AM2_Sprite *const *)(r + ROW_OFF_SPRITE) != sprite)
-        RowSetSprite(r, sprite, g_mapDesc);
+        RowSetSprite((AM2_MapRow *)r, sprite, g_mapDesc);
 }
 
 int anim_install(void)
