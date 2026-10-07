@@ -100,9 +100,10 @@ def _aggregated(va):
 # typed vehicle/roach records bring the sprite list's back beside it; the
 # item.cpp parameter typing settles on the 0x00515FD8 block alone; the
 # typed g_objCtxObjA and save-index aliases settle it with none kept; the
-# vehicle's last-sent fields bring back the 0x00515FD8 block.
+# vehicle's last-sent fields bring back the 0x00515FD8 block; the typed
+# object and tile masks settle on the 0x004F96C0 block alone.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00515FD8, 0x00516078),)
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC),)
 
 
 def _kept(va):

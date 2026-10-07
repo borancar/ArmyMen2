@@ -282,17 +282,17 @@ void __cdecl BuildRegionGraph(void);
  * mask: clamp each edge into the map, pad by two tiles, and fill the padded
  * rectangle with 2 and the box itself with 3. `out` is a TILEMASK record.
  * Always answers 1. */
-int32_t __cdecl BoxAction(AM2_Rect area, void *out);
+int32_t __cdecl BoxAction(AM2_Rect area, struct AM2_TileMask *out);
 
 /* 0x00438F80, two callers. Offset the object's box by its position and hand it
  * to BoxAction, when the first row's sprite has a software image. `out` is the
  * same record, and was declared `int32_t arg` here until BoxAction was read. */
-int32_t __cdecl ObjBoxAction(struct AM2_Object *obj, void *out);
+int32_t __cdecl ObjBoxAction(struct AM2_Object *obj, struct AM2_TileMask *out);
 
 /* 0x004389D0, the same job from the object's per-pixel OBJ_OFF_HIT_MASK rather
  * than from its box. This is the arm that runs; ObjBoxAction is the fallback
  * for an object with no mask, which nothing on a drivable map is. */
-int32_t __cdecl ObjHitMaskAction(struct AM2_Object *obj, void *out);
+int32_t __cdecl ObjHitMaskAction(struct AM2_Object *obj, struct AM2_TileMask *out);
 
 /* 0x00437E70. A* over the region graph: an open list sorted by g+h, a
  * generation stamp in place of a visited set, the answer written backwards
@@ -356,12 +356,12 @@ void __cdecl ObjAfterMove(struct AM2_Object *obj, int32_t unused, int32_t damage
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an
  * argument rather than a field. */
-int32_t __cdecl ListBoxAction(AM2_Point at, void *list, void *out);
+int32_t __cdecl ListBoxAction(AM2_Point at, void *list, struct AM2_TileMask *out);
 
 /* 0x004385A0, the bitmask twin of the above -- and ObjHitMaskAction's twin in
  * the other direction, which is the one to read for how the walk works. The
  * mask record is embedded in the header at LISTHDR_OFF_MASK. */
-int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out);
+int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, struct AM2_TileMask *out);
 
 /* 0x0043A6D0, six callers. Could the thing described by key-table slot `slot`
  * stand at world point `at`? Build its tile mask there and answer 0 the moment

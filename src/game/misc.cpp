@@ -700,22 +700,22 @@ int32_t __cdecl ObjMaskBitAt(const AM2_Object *obj, const AM2_Point *at)
     /* The bit for each column within its byte, built on the stack. */
     uint8_t        bit[8] = { 0x80, 0x40, 0x20, 0x10, 8, 4, 2, 1 };
     const AM2_Object *o = obj;
-    const uint8_t *m;
+    const AM2_ObjMask *m;
     int32_t        x, y, w;
 
     if (o) {
         m = o->rowSet.hitMask;
         if (m) {
-            x = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X)
+            x = m->originX
                 - (&o->hit)->left + at->x;
-            y = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y)
+            y = m->originY
                 - (&o->hit)->top + at->y;
 
             /* Each bound is loaded only once its coordinate has passed the
              * zero test. */
-            if (x >= 0 && x < (w = *(const int16_t *)(m + OBJMASK_OFF_WIDTH))
-                && y >= 0 && y < *(const int16_t *)(m + OBJMASK_OFF_HEIGHT))
-                return (*(const uint8_t *const *)(m + OBJMASK_OFF_BITS))
+            if (x >= 0 && x < (w = m->width)
+                && y >= 0 && y < m->height)
+                return m->bits
                            [(((w + 31) >> 3) & ~3) * y + (x >> 3)]
                        & bit[x & 7];
         }

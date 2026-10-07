@@ -1818,11 +1818,9 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
  * the no-mask fallback, and everything on this map has a mask. BoxAction's
  * other caller, 0x00438F10, does not run here either. So this is verified by
  * READING, and the clean A/B says only that nothing regressed. */
-int32_t __cdecl BoxAction(AM2_Rect area, void *out)
+int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
 {
     /* The output record is addressed from `out` at every use. */
-#define box   ((int32_t *)((uint8_t *)out + TILEMASK_OFF_RECT))
-#define cells ((uint8_t *)out + TILEMASK_OFF_CELLS)
     AM2_Rect c;
     int32_t  stride;
     int32_t  y;
@@ -1841,23 +1839,21 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
               g_mapTilesH
                   - AM2_TILEMASK_MARGIN);
 
-    box[3] = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then left, then right */
-    box[0] = c.left - AM2_TILEMASK_MARGIN;
-    box[2] = c.right + AM2_TILEMASK_MARGIN;
-    box[1] = c.top - AM2_TILEMASK_MARGIN;
+    out->box.bottom = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then left, then right */
+    out->box.left = c.left - AM2_TILEMASK_MARGIN;
+    out->box.right = c.right + AM2_TILEMASK_MARGIN;
+    out->box.top = c.top - AM2_TILEMASK_MARGIN;
 
-    memset(cells, AM2_TILEMASK_PAD_CELL,
-           (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
+    memset(out->cells, AM2_TILEMASK_PAD_CELL,
+           (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
 
-    stride = box[2] - box[0] + 1;
+    stride = out->box.right - out->box.left + 1;
     for (y = c.top; c.bottom >= y; y++) {
         if (c.right < c.left)
             continue;
-        memset(cells + (y - box[1]) * stride - box[0] + c.left,
+        memset(out->cells + (y - out->box.top) * stride - out->box.left + c.left,
                AM2_TILEMASK_BOX_CELL, (size_t)(c.right - c.left + 1));
     }
-#undef box
-#undef cells
     return 1;
 }
 
@@ -1887,7 +1883,7 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
  * is the FLAT half and that structure names LPDIRECTDRAWSURFACE. The same
  * reason item.cpp reads the sprite list as void **.
  */
-int32_t __cdecl ObjBoxAction(AM2_Object *obj, void *out)
+int32_t __cdecl ObjBoxAction(AM2_Object *obj, AM2_TileMask *out)
 {
     const AM2_Object *o = obj;
     const uint8_t *spr;
@@ -2047,21 +2043,16 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
  * regressed. It also means this function cannot be behind a difference in any
  * configuration -- worth knowing when `mission`'s frame gate fails, which it
  * does on this machine for reasons of its own. */
-int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
+int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 {
     /* No locals for the record's parts: the box is the record itself, the
-     * cells follow it, the hit rect is re-read from the object and the grid
+     * out->cells follow it, the hit rect is re-read from the object and the grid
      * width from the box at every use -- the original keeps only the record
      * pointer in a register and these few on the frame. */
-#define o     ((const uint8_t *)obj)
-#define rec   ((uint8_t *)out)
-#define box   ((int32_t *)(rec + TILEMASK_OFF_RECT))
-#define cells (rec + TILEMASK_OFF_CELLS)
-#define HIT   ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))
-#define GRIDW (box[2] - box[0] + 1)
+#define GRIDW (out->box.right - out->box.left + 1)
 #define ring  g_tilemaskNeighbours
 #define tab   ((const uint8_t *)(uintptr_t)(g_bitFromN))
-    const uint8_t  *m;
+    const AM2_ObjMask *m;
     const uint8_t  *bits;
     AM2_Rect        world;          /* the clamped world box */
     AM2_Rect        tile;           /* and in tiles */
@@ -2075,25 +2066,25 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
     int32_t         y;
     int32_t         marked = 0;
 
-    m = *(const uint8_t *const *)(o + OBJ_OFF_HIT_MASK);
+    m = obj->rowSet.hitMask;
     if (!m)
         return 0;
-    bits = *(const uint8_t *const *)(m + OBJMASK_OFF_BITS);
+    bits = m->bits;
     if (!bits)
         return 0;
 
     /* The world clamp, x pair then y pair, with a margin of one tile. */
-    world.left = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left, 1 << AM2_TILE_SHIFT,
+    world.left = Clamp(m->originX + obj->hit.left, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.right = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + HIT->left - 1,
+    world.right = Clamp(m->width + m->originX + obj->hit.left - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.top = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top, 1 << AM2_TILE_SHIFT,
+    world.top = Clamp(m->originY + obj->hit.top, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    world.bottom = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + HIT->top - 1,
+    world.bottom = Clamp(m->height + m->originY + obj->hit.top - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
@@ -2108,12 +2099,12 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    box[3] = tile.bottom + AM2_TILEMASK_MARGIN;
-    box[2] = tile.right + AM2_TILEMASK_MARGIN;
-    box[1] = tile.top - AM2_TILEMASK_MARGIN;
-    box[0] = tile.left - AM2_TILEMASK_MARGIN;
+    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
+    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
+    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
+    out->box.left = tile.left - AM2_TILEMASK_MARGIN;
 
-    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
+    memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
     w = GRIDW;
 
     /* The original stores these in register-scheduling order rather than in
@@ -2159,10 +2150,10 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
     }
 
     for (y = world.top; y < world.bottom; y += 8) {
-        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - HIT->top) * rowbytes;
+        int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c  = cells + ((y >> AM2_TILE_SHIFT) - box[1]) * GRIDW
+        uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * GRIDW
                             + AM2_TILEMASK_MARGIN;
 
         /* No entry test: a row is never empty once rowbits is not 0. */
@@ -2171,7 +2162,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, (int32_t)(c - cells));
+                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
                 }
 
                 col++;
@@ -2182,22 +2173,17 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, (int32_t)(c - cells));
+                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(cells, ring, (int32_t)(c - cells));
+                MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
             }
         } while (++off < end);
     }
 
     return marked;
-#undef o
-#undef rec
-#undef box
-#undef cells
-#undef HIT
 #undef GRIDW
 #undef ring
 #undef tab
@@ -2332,9 +2318,7 @@ static inline void ShiftTileCoverUp(uint16_t cell)
 void __cdecl ItemTeardown(AM2_Object *obj)
 {
     AM2_Object       *o = obj;
-    uint8_t        mask[AM2_TILEMASK_BYTES];
-    const int32_t *rect = (const int32_t *)(mask + TILEMASK_OFF_RECT);
-    const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
+    AM2_TileMask   mask;
     int32_t        height;
     int32_t        idx;
     int32_t        row;
@@ -2382,24 +2366,24 @@ void __cdecl ItemTeardown(AM2_Object *obj)
         return;
 
     if (o->rowSet.hitMask)
-        ObjHitMaskAction(obj, mask);
+        ObjHitMaskAction(obj, &mask);
     else
-        ObjBoxAction(obj, mask);
+        ObjBoxAction(obj, &mask);
 
     idx = 0;            /* the zero slot, not the top -- see above */
 
-    for (row = rect[1]; row <= rect[3]; row++) {
+    for (row = mask.box.top; row <= mask.box.bottom; row++) {
         int32_t cell = g_mapTilesW * row
-                       + rect[0];
+                       + mask.box.left;
 
-        for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
+        for (x = mask.box.left; x <= mask.box.right; idx++, cell++, x++) {
 #define weights (*(uint8_t *const *)&g_cellWeights)
             uint16_t tile;
             int8_t   h;
             int8_t   nh;
 
             /* Tested twice: non-zero, then bit 0. */
-            if (!cells[idx] || !(cells[idx] & 1))
+            if (!mask.cells[idx] || !(mask.cells[idx] & 1))
                 continue;
 
             tile = (uint16_t)cell;
@@ -2475,11 +2459,8 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
 {
     AM2_Object       *o = obj;
     (void)unused;
-    uint8_t        mask[AM2_TILEMASK_BYTES];
-    /* The rectangle is read out of the mask at each use: no local. */
-#define rect ((const int32_t *)(mask + TILEMASK_OFF_RECT))
-/* The cell flags and the tile are re-derived at each use. */
-#define cells (mask + TILEMASK_OFF_CELLS)
+    /* The rectangle and the mask.cells are read out of the mask at each use. */
+    AM2_TileMask   mask;
     /* A byte, unlike ItemTeardown's int32: it is then a stack variable, as
      * the image keeps it (stored at +0x1C, its low byte re-read for the add),
      * where an int32 takes ebx from the row loop's scratch. */
@@ -2536,27 +2517,27 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
         return;
 
     if (o->rowSet.hitMask)
-        ObjHitMaskAction(obj, mask);
+        ObjHitMaskAction(obj, &mask);
     else
-        ObjBoxAction(obj, mask);
+        ObjBoxAction(obj, &mask);
 
     idx = 0;            /* the zero slot at 0x00439109, as ItemTeardown's
                          * comment explains: the same push-shifted read */
 
-    for (row = rect[1]; row <= rect[3]; row++) {
+    for (row = mask.box.top; row <= mask.box.bottom; row++) {
         /* A SHIFT here where ItemTeardown MULTIPLIES by the width. The two
          * agree only for a power-of-two width, which ShiftTileCover's own
          * comment already records as the reason that shift is stored beside
          * the width. Each is written as its own function has it. */
         int32_t cell = (row << g_mapRowShift32)
-                       + rect[0];
+                       + mask.box.left;
 
-        for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
+        for (x = mask.box.left; x <= mask.box.right; idx++, cell++, x++) {
 #define weights (*(uint8_t *const *)&g_cellWeights)
             int8_t   h;
             int8_t   nh;
 
-            if (!cells[idx] || !(cells[idx] & 1))
+            if (!mask.cells[idx] || !(mask.cells[idx] & 1))
                 continue;
 
 #define tile ((uint16_t)cell)
@@ -2594,8 +2575,6 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
     }
 
     o->flags |= OBJ_FLAG_FOOTPRINT_ON;
-#undef rect
-#undef cells
 }
 
 /* ListBoxAction -- original 0x00438F10, one caller.
@@ -2619,7 +2598,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
  *
  * Not exercised, for the same reason BoxAction is not -- see the note there.
  */
-int32_t __cdecl ListBoxAction(AM2_Point at, void *list, void *out)
+int32_t __cdecl ListBoxAction(AM2_Point at, void *list, AM2_TileMask *out)
 {
     const uint8_t *h = (const uint8_t *)list;
     const uint8_t *spr;
@@ -2697,16 +2676,13 @@ int32_t __cdecl ListBoxAction(AM2_Point at, void *list, void *out)
  * one arm being taken, and both were nearly written up from blind counters.
  * The rule is the one CLAUDE.md already states and the addition is the
  * control: a probe whose control cannot fire is a test that cannot fail. */
-int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
+int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, AM2_TileMask *out)
 {
     const uint8_t  *h     = (const uint8_t *)hdr;
-    uint8_t        *rec   = (uint8_t *)out;
-    int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
-#define cells (rec + TILEMASK_OFF_CELLS)
 #define ring (g_tilemaskNeighbours)
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
-    const uint8_t  *m;
+    const AM2_ObjMask *m;
     const uint8_t  *bits;
     const uint8_t  *spr;
     int32_t         ox;
@@ -2724,10 +2700,10 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
     int32_t         marked = 0;
 
     /* The address-of that cannot be null -- see above. */
-    m = h + LISTHDR_OFF_MASK;
+    m = (const AM2_ObjMask *)(h + LISTHDR_OFF_MASK);
     if (!m)
         return 0;
-    bits = *(const uint8_t *const *)(m + OBJMASK_OFF_BITS);
+    bits = m->bits;
     if (!bits)
         return 0;
 
@@ -2741,17 +2717,17 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
          - *(const int16_t *)(spr + SPR_OFF_HOTY);
 
 
-    world.left = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox, 1 << AM2_TILE_SHIFT,
+    world.left = Clamp(m->originX + ox, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.right = Clamp(*(const int16_t *)(m + OBJMASK_OFF_WIDTH) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X) + ox - 1,
+    world.right = Clamp(m->width + m->originX + ox - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.top = Clamp(*(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy, 1 << AM2_TILE_SHIFT,
+    world.top = Clamp(m->originY + oy, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    world.bottom = Clamp(*(const int16_t *)(m + OBJMASK_OFF_HEIGHT) + *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) + oy - 1,
+    world.bottom = Clamp(m->height + m->originY + oy - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
@@ -2764,13 +2740,13 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    box[3] = tile.bottom + AM2_TILEMASK_MARGIN;
-    box[2] = tile.right + AM2_TILEMASK_MARGIN;
-    box[1] = tile.top - AM2_TILEMASK_MARGIN;
-    box[0] = tile.left - AM2_TILEMASK_MARGIN;
+    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
+    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
+    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
+    out->box.left = tile.left - AM2_TILEMASK_MARGIN;
 
-    w = box[2] - box[0] + 1;
-    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
+    w = out->box.right - out->box.left + 1;
+    memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * w));
 
     ring[1]  = -2 * w;
     ring[0]  = -2 * w - 1;
@@ -2810,10 +2786,10 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
     }
 
     for (y = world.top; y < world.bottom; y += 8) {
-        int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rowbytes;
+        int32_t off = (y - m->originY - oy) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = cells + ((y >> AM2_TILE_SHIFT) - box[1]) * w
+        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * w
                              + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
@@ -2821,7 +2797,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, (int32_t)(c - cells));
+                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
                 }
 
                 col++;
@@ -2832,18 +2808,17 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(cells, ring, (int32_t)(c - cells));
+                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(cells, ring, (int32_t)(c - cells));
+                MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
             }
         }
     }
 
     return marked;
-#undef cells
 #undef ring
 }
 
@@ -2965,10 +2940,7 @@ void __cdecl UnitWeaponInfo(const AM2_Object *u, AM2_SightCtx *c)
  */
 int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
 {
-    struct {
-        AM2_Rect r;
-        uint8_t  cells[AM2_TILEMASK_CELLS];
-    } mask;
+    AM2_TileMask   mask;
 
     const uint8_t *rec;
     void          *hdr;
@@ -2989,11 +2961,11 @@ int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
         ListBoxAction(at, hdr, &mask);
 
     n = 0;
-    for (y = mask.r.top; y <= mask.r.bottom; y++) {
+    for (y = mask.box.top; y <= mask.box.bottom; y++) {
         int32_t tile = (y << *(const int32_t *)&g_mapRowShift)
-                       + mask.r.left;
+                       + mask.box.left;
 
-        for (x = mask.r.left; x <= mask.r.right; n++, tile++, x++) {
+        for (x = mask.box.left; x <= mask.box.right; n++, tile++, x++) {
             AM2_Point pt;
 
             if (!mask.cells[n] || !(mask.cells[n] & 1))

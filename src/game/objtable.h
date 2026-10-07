@@ -35,6 +35,26 @@ typedef struct {
  * `owner` is the army byte (OBJ_OFF_ARMY). */
 struct AM2_MapRow;
 
+/* The per-object hit bitmask OBJ_OFF_HIT_MASK points at, and the one a
+ * record-list header embeds at LISTHDR_OFF_MASK. The rows run TOP-DOWN and
+ * the row stride is the width in bits rounded up to a dword; see orig.h for
+ * the two readers that disagree about the origin's sign. */
+typedef struct AM2_ObjMask {
+    int16_t        originX;       /* +0x00 OBJMASK_OFF_ORIGIN_X */
+    int16_t        originY;       /* +0x02 OBJMASK_OFF_ORIGIN_Y */
+    int16_t        width;         /* +0x04 OBJMASK_OFF_WIDTH, in bits */
+    int16_t        height;        /* +0x06 OBJMASK_OFF_HEIGHT, in rows */
+    uint8_t        _pad08[4];     /* +0x08 */
+    const uint8_t *bits;          /* +0x0C OBJMASK_OFF_BITS, null means none */
+} AM2_ObjMask;
+
+/* The scratch tile mask BoxAction and its siblings fill: a rectangle in
+ * TILES, padded by AM2_TILEMASK_MARGIN, and its cells row-major over it. */
+typedef struct AM2_TileMask {
+    AM2_Rect       box;                       /* +0x00 TILEMASK_OFF_RECT */
+    uint8_t        cells[AM2_TILEMASK_CELLS]; /* +0x10 TILEMASK_OFF_CELLS */
+} AM2_TileMask;
+
 /* The sub-list header an object carries at OBJ_OFF_SUBRECORD: the record list
  * its rows were built from, the row count (OBJ_OFF_ROW_COUNT) and the rows
  * themselves (OBJ_OFF_ROWS), AM2_OBJ_ROW_STRIDE apart. */
@@ -44,7 +64,7 @@ typedef struct {
     struct AM2_MapRow *rows;      /* +0x08 */
     union {                       /* +0x0C */
         int32_t        capacity;
-        const uint8_t *hitMask;   /*   OBJ_OFF_HIT_MASK on an object: non-null
+        const AM2_ObjMask *hitMask; /* OBJ_OFF_HIT_MASK on an object: non-null
                                    *   means test the bitmask too */
     };
 } AM2_RowSet;
