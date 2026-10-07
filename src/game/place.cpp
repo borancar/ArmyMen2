@@ -753,8 +753,11 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         int32_t n;
         int32_t i;
 
+        /* The caller's NAME, as the trooper arm passes it -- not the
+         * directory scratch the weapon calls take. The image pushes the
+         * seventh argument here (0x0043AE12). */
         made = (uint8_t *)CreateVehicle(
-                   kind, g_dirScratch,
+                   kind, (char *)name,
                    ((const AM2_Point *)&where)->x,
                    ((const AM2_Point *)&where)->y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
@@ -773,26 +776,25 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
 
         n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
-        rows = (n > 0) ? *(uint8_t **)(made + OBJ_OFF_ROWS) : (uint8_t *)0;
+        rows = 0;
+        if (n > 0)
+            rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
 
-        i = 1;
-        while (1) {
-            if (i >= n)
-                break;
-            uint8_t       *row = *(uint8_t **)(made + OBJ_OFF_ROWS)
-                                 + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
-            const uint8_t *spr = *(const uint8_t *const *)(rows + 4);
+        for (i = 1; i < n; i++) {
+            uint8_t *row = *(uint8_t **)(made + OBJ_OFF_ROWS)
+                           + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
 
             *(uint32_t *)(row + ROW_OFF_X) =
                 *(const uint32_t *)(made + OBJ_OFF_POS);
             *(int16_t *)(row + ROW_OFF_X) +=
-                *(const int16_t *)(spr + SPR_OFF_OVX);
+                *(const int16_t *)(*(const uint8_t *const *)(rows + 4)
+                                   + SPR_OFF_OVX);
             *(int16_t *)(row + ROW_OFF_Y) +=
-                *(const int16_t *)(spr + SPR_OFF_OVY);
+                *(const int16_t *)(*(const uint8_t *const *)(rows + 4)
+                                   + SPR_OFF_OVY);
 
             RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
             n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
-            i++;
         }
 
         ObjSetFieldA(made, (uint32_t)group);
@@ -804,9 +806,10 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
         int32_t key  = SpriteKeyForKind(kind, army);
-        int32_t flag = (kind >= AM2_PILLBOX_KIND_FIRST
-                        && kind <= AM2_PILLBOX_KIND_LAST)
-                       ? (int32_t)OBJ_FLAG_SHOT_PROOF : 0;
+        int32_t flag = 0;
+
+        if (kind >= AM2_PILLBOX_KIND_FIRST && kind <= AM2_PILLBOX_KIND_LAST)
+            flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
         made = (uint8_t *)CreateItem((char *)name, slot, key,
                                      *(AM2_Point *)&where, flag,
@@ -836,8 +839,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             if (kind == 0)
                 wkind = AM2_PILLBOX_WEAPON_RIFLE;
             else
-                wkind = (kind == 2) ? AM2_PILLBOX_WEAPON_MG
-                                    : AM2_PILLBOX_WEAPON_BAZOOKA;
+                wkind = (kind == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
+                                    : AM2_PILLBOX_WEAPON_MG;
 
             occupant = (uint8_t *)CreateTrooper(
                            g_dirScratch,

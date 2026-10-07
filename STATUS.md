@@ -215,6 +215,32 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **MakePlacedUnit passes the caller's name to CreateVehicle: 84 -> 5**
+    (2026-10-07), no count change.
+    - A real argument bug: the vehicle arm handed CreateVehicle the
+      directory scratch where the image pushes MakePlacedUnit's own
+      `name` argument (0x0043AE12), as the trooper arm does.
+    - The row loop is the image's plain `for` with the sprite re-read at
+      each use. Both `rows` and the shot-proof flag are zeroed and then
+      conditionally set, which is the image's `xor; test; jle; mov`
+      rather than a ternary's `mov; jmp; xor`.
+    - The pillbox weapon is `kind == 1 ? BAZOOKA : MG`. It was the same
+      choice spelled from the other end; for kinds 0..2 the two agree.
+    - What is left is one register for the occupant's height.
+  - **ScriptParseActionRecon 518 -> 501; ParseScenarioPart 52 -> 24**
+    (2026-10-07), no count change.
+    - activateregion/inactivateregion store the subject before n0. The
+      image loads the token's value before the constant store, and VC6
+      reorders stores but does not hoist loads over them. (/Oa and /Ow
+      were tried for script.cpp and make every function in it far worse.)
+    - ParseScenarioPart clears the part with memset, which is VC6's
+      inline three dword stores through a copy of the pointer. It reads
+      the header count through a cursor it then advances, takes the two
+      counts as `a` and then `b` with a 4-byte step after each, and sets
+      `took` before stepping `cur` in the first arm.
+    - ScrollMapCache was looked at: the image saves ebp only after its
+      early exits and keeps dy in ebx, and three ways of initialising
+      dx/dy did not get ours there.
   - **FindPath 381 -> 378** (2026-10-07), no count change.
     - `cur` is a uint16_t: the image copies it unmasked and compares it
       with `cmp ax`, masking only curTile.

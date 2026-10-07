@@ -760,7 +760,7 @@ int32_t __cdecl LevelCount(void)
  */
 int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
 {
-    const uint8_t *cur  = (const uint8_t *)at + 8;
+    const uint8_t *cur;
     int32_t        took;
     int32_t        n;
     int32_t        a;
@@ -769,22 +769,23 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
     AM2_ScenRow   *rows;
     int32_t        i;
 
-    /* Three dword stores over the part, the count's padding included. */
-    p->field0 = 0;
-    *(int32_t *)&p->count = 0;
-    p->rows = (AM2_ScenRow *)0;
+    /* VC6's inline memset: three dword stores through a copy of p. */
+    memset(p, 0, sizeof *p);
 
-    n = *(const int32_t *)at;
+    cur = (const uint8_t *)at;
+    n = *(const int32_t *)cur;
+    cur += 8;
     if (n > 0) {
-        cur  += (uint32_t)n * 4;
         took  = n * 4 + 8;
+        cur  += (uint32_t)n * 4;
     } else
         took  = 8;
 
-    b     = *(const int32_t *)(cur + 4);
     a     = *(const int32_t *)cur;
-    cur  += 8;
+    cur  += 4;
     took += 8;
+    b     = *(const int32_t *)cur;
+    cur  += 4;
     if (a > 0) {
         cur  += (uint32_t)a * 4;
         took += a * 4;
