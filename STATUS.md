@@ -215,6 +215,36 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Five functions closer, none matched** (2026-10-07), still 1528. Each
+    change follows something the image shows directly.
+    - ObjAfterMove (66 -> 30) shifts the row by the whole dword at
+      0x00514DE4 (`mov ecx, dword`). It reads it through
+      `am2_rl_map_row_shift32`, declared beside the function. relink.py
+      now maps an `am2_rl_*` declared in any game source, not only in
+      globals.h. Declaring it in globals.h instead changed codegen in
+      other files: it flipped CheatLine.
+    - ObjAfterMove's height is an `int8_t`, so VC6 keeps it on the stack
+      as the image does. An int32 takes ebx. The image still stores it as
+      a dword, so the true form is not found yet.
+    - RegionFindPath (36 -> 35) bumps the generation before setting the
+      goal and head: the image loads it ahead of those stores.
+    - ViewUpdate (81 -> 79): the eye's stepped y lands in `vpt.y`. The
+      image stores it at frame +0x16, half of a point, not in its own
+      slot.
+    - ObjCollidesWith takes `from` first in the height difference and in
+      both owner compares, which is the image's load order. The remaining
+      diff is which of esi/edi holds which argument.
+    - Type2PlayerInput takes the cursor x before the view's left edge.
+    - Tried without a gain:
+      - ScriptIf: the allof/inorder step and the event-append store order.
+      - LoadOptions: the last migration's epilogue merge, under
+        if/else, goto and return layouts.
+      - MovieStart's delete, UpdateObjectScript, BoatExitPoint,
+        DirtyCollect, StepRowAnim, ChangeObjectFrame (including a
+        bitfield key), PointActionC's `&rows->sprite` pointer.
+      - SelectBestWeapon (the same tie as SelectRankedWeapon), ObjTileHook
+        (`i = 0` hoisted: the image's zero register), AppendTroopState
+        (spill slots), GenerateObjScriptFromTokens.
   - **TrooperBuildContext and PointerActionMode4 matched** (2026-10-07),
     1526 -> 1528.
     - TrooperBuildContext reads the context's leader at each use instead

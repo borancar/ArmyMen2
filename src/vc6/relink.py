@@ -21,7 +21,7 @@ function; leave the rest wildcarded.  Re-verifies the piecewise matches with
 their call targets pinned, and reports how many diffs are now purely the
 still-unresolved (un-reconstructed / global) references the later phases close.
 """
-import os, sys, struct, tempfile, collections
+import glob, os, sys, struct, tempfile, collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bytematch as BM
@@ -318,13 +318,16 @@ def main():
             placed[m.group(2)] = addr[m.group(1)]
             sym_va["_" + m.group(2)] = addr[m.group(1)]
     sym_va["_am2_origstate"] = 0x0048E000
-    # Relink-only scalars (globals.h, am2_rl_*): globals the original kept as
-    # their own symbols but the other builds reach as a view into a larger
-    # table. VC6 loads a lone short with a word load and a table element
-    # with a dword one, so the symbol's shape is part of the match.
-    for m in re.finditer(r"\b(am2_rl_\w+);\s*/\*\s*(0x[0-9A-Fa-f]+)",
-                         open(os.path.join(BM.REPO, "src/game/globals.h")).read()):
-        sym_va["_" + m.group(1)] = int(m.group(2), 16)
+    # Relink-only scalars (am2_rl_*, in globals.h or beside the one function
+    # that reads them): globals the original kept as their own symbols, or
+    # read at a width of their own, that the other builds reach as a view into
+    # a larger table. VC6 loads a lone short with a word load and a table
+    # element with a dword one, so the symbol's shape is part of the match.
+    for src in sorted(glob.glob(os.path.join(BM.REPO, "src/game/**/*.[ch]*"),
+                                recursive=True)):
+        for m in re.finditer(r"\b(am2_rl_\w+);\s*/\*\s*(0x[0-9A-Fa-f]+)",
+                             open(src, errors="replace").read()):
+            sym_va["_" + m.group(1)] = int(m.group(2), 16)
     # The relink build's per-global view of am2_origstate (src/vc6/relinkos.py):
     # am2_os_<member> is that member's own VA. Regenerated here so it cannot lag
     # standalone.h's redirects.

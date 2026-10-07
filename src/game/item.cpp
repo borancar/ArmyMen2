@@ -3708,13 +3708,13 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
 int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
 {
     /* Every "no" falls to the one return at the end, as the image has it. */
-    if (abs(obj->heightSet - from->heightSet) <= AM2_BLOCK_HEIGHT_STEP) {
+    if (abs(from->heightSet - obj->heightSet) <= AM2_BLOCK_HEIGHT_STEP) {
         if ((obj->flags & OBJ_FLAG_BIT24)
             && (from->vehicleKind == 1 || from->vehicleKind == 2))
             return 1;
 
         if (ObjIsTypeIn238(obj)) {
-            if (!ObjIsType3(obj) || obj->owner != from->owner) {
+            if (!ObjIsType3(obj) || from->owner != obj->owner) {
                 if (!ObjsAreAllied(from, obj, 0)
                     || (((AM2_Object *)LookupOwnerObj(g_defaultOwner))->riding
                             == from->uid
@@ -3722,7 +3722,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
                     return 1;
             }
         } else if (ObjIsWatchedKind(obj)) {
-            if (obj->owner != from->owner
+            if (from->owner != obj->owner
                 || g_gameClockMs - obj->deadline58 > AM2_COLLIDE_OWN_DELAY)
                 return 1;
         }

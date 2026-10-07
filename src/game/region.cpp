@@ -2436,6 +2436,18 @@ void __cdecl ItemTeardown(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 }
 
+/* The row shift read as the whole dword it is stored in, where ObjAfterMove
+ * shifts by it straight from memory (`mov ecx, dword [0x00514DE4]`) rather
+ * than through g_mapRowShift's byte. A symbol of its own in the relink build,
+ * as g_pillboxTrooperHealth's: relink.py maps am2_rl_* by the address in the
+ * comment. */
+#if defined(AM2_RELINK)
+extern "C" const int32_t am2_rl_map_row_shift32;  /* 0x00514DE4 */
+#define g_mapRowShift32          am2_rl_map_row_shift32
+#else
+#define g_mapRowShift32          (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)  /* 0x00514DE4 */
+#endif
+
 /* ObjAfterMove -- original 0x00439000, four callers. ItemTeardown's MIRROR,
  * one function earlier in the image: same gate, same three-way type switch,
  * same mask walk, ADDING the height where that one subtracts it, and SETTING
@@ -2483,7 +2495,10 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     uint8_t        mask[AM2_TILEMASK_BYTES];
     const int32_t *rect  = (const int32_t *)(mask + TILEMASK_OFF_RECT);
     const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
-    int32_t        height;
+    /* A byte, unlike ItemTeardown's int32: it is then a stack variable, as
+     * the image keeps it (stored at +0x1C, its low byte re-read for the add),
+     * where an int32 takes ebx from the row loop's scratch. */
+    int8_t         height;
     int32_t        idx;
     int32_t        row;
     int32_t        x;
@@ -2548,7 +2563,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
          * agree only for a power-of-two width, which ShiftTileCover's own
          * comment already records as the reason that shift is stored beside
          * the width. Each is written as its own function has it. */
-        int32_t cell = (row << g_mapRowShift)
+        int32_t cell = (row << g_mapRowShift32)
                        + rect[0];
 
         for (x = rect[0]; x <= rect[2]; cell++, idx++, x++) {
@@ -6458,9 +6473,9 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
         return 0;
 
     if (g_regionSearchState == -1) {
+        GEN += 1;
         GOAL = RegionAt(to);
         HEAD = RegionAt(from);
-        GEN += 1;
 
         I32(HEAD, REGION_OFF_G) = 0;
         /* _ftol in the original; a C cast truncates toward zero the same
@@ -9564,7 +9579,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     /* The image adds the packed dwords and keeps the low half for x, then the
      * two high words for y -- the same idiom the cheat console's jumpjets arm
      * uses, and written as halves here for the same reason. */
-    at.x  = (int16_t)(g_viewRect->left + g_cursorPoint);
+    at.x  = (int16_t)(*(const int16_t *)&g_cursorPoint + g_viewRect->left);
     at.y  = (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                       + *(const int16_t *)&g_viewRect->top);
     dist  = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);

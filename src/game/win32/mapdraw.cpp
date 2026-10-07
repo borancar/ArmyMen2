@@ -1857,7 +1857,7 @@ void __cdecl ViewUpdate(void)
 #define BOUND_R (g_mapBoundsRight)
 #define BOUND_B (g_mapBoundsBottom)
     int32_t dist, step, dx, dy;
-    int16_t tx, ty;                 /* where the eye goes this frame */
+    int16_t tx;                     /* where the eye goes this frame */
     AM2_Point vpt;
     void   *obj;
 
@@ -1876,7 +1876,7 @@ void __cdecl ViewUpdate(void)
             g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
             g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
             tx = g_viewTarget.x;
-            ty = g_viewTarget.y;
+            vpt.y = g_viewTarget.y;
             g_viewSnap = 0;
             goto clamp_eye;
         }
@@ -1909,12 +1909,12 @@ void __cdecl ViewUpdate(void)
     } else {
         g_viewHold = 0;
     }
-    ty = (int16_t)(dy + VIEW_EYE->y);
+    vpt.y = (int16_t)(dy + VIEW_EYE->y);
     tx = (int16_t)(dx + VIEW_EYE->x);
 
 clamp_eye:
     vpt.x = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
-    vpt.y = (int16_t)Clamp(ty, halfH + BOUND_T, BOUND_B - halfH - 1);
+    vpt.y = (int16_t)Clamp(vpt.y, halfH + BOUND_T, BOUND_B - halfH - 1);
 
     {
         int32_t *world  = g_secondRect;
