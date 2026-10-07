@@ -667,7 +667,7 @@ AM2_AaiRec *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
                                   AM2_Rect box)
 {
     AM2_AaiRec *rec = (AM2_AaiRec *)am2_malloc(AM2_AAI_RECORD_BYTES);
-    uint8_t *def;
+    AM2_DefObjRec *def;
 
     memset(rec, 0, AM2_AAI_RECORD_BYTES);
 
@@ -686,20 +686,20 @@ AM2_AaiRec *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
     /* One return for every path; the negative type skips the definition
      * and the list. */
     if (type >= 0) {
-        def = (uint8_t *)DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
+        def = DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
         if (def) {
             rec->defType        = rec->type;
-            rec->orFlags        = *(const int32_t *)(def + 0x10);
-            rec->health         = *(const int16_t *)(def + 0x14);
-            rec->heightAdj      = *(const int8_t *)(def + 0x18);
-            rec->rank           = *(const int8_t *)(def + 0x1C);
-            rec->depth          = *(const int16_t *)(def + 0x20);
-            rec->depthSlopeBits = *(const int32_t *)(def + 0x24);
+            rec->orFlags        = (int32_t)def->flags;
+            rec->health         = def->health;
+            rec->heightAdj      = def->heightAdj;
+            rec->rank           = def->rank;
+            rec->depth          = def->depth;
+            rec->depthSlopeBits = def->depthSlopeBits;
             /* Out of order, and deliberately: +0x38 takes +0x30, +0x3A takes
                +0x28. */
-            rec->crushDamage    = *(const int16_t *)(def + 0x30);
-            rec->armour         = *(const int16_t *)(def + 0x28);
-            rec->field3C        = *(const uint8_t *)(def + 0x34);
+            rec->crushDamage    = def->crushDamage;
+            rec->armour         = def->armour;
+            rec->field3C        = def->field34;
         }
 
         if (slot > 0) {
@@ -930,7 +930,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     /* PackKey written out, as the image has it. */
     uint32_t  key = (uint32_t)((((set << 12) + index) << 7) + frame);
     int32_t   slot = KeyLookup(key);
-    void     *rec;
+    AM2_DefObjRec *rec;
     AM2_Sprite *spr;
     AM2_RecordList *list;
     /* Room for twenty list records, one used: the image's frame is sized
@@ -983,7 +983,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     entry[0].sprite = spr;
     entry[0].dx     = 0;
     entry[0].dy     = 0;
-    entry[0].depth  = *(const int32_t *)((const uint8_t *)rec + 0x20);
+    entry[0].depth  = rec->depthDword;
 
     list = MakeRecordList(1, entry, key);
     LoadMask(&list->mask, set, index, frame);
@@ -1238,7 +1238,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
 {
     AM2_Object  *o = obj;
     uint32_t  key;
-    uint8_t  *rec;
+    AM2_DefObjRec *rec;
     uint8_t  *sub;
     int32_t   slot;
     int32_t   loadFlags;
@@ -1256,7 +1256,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
             return 1;
     }
 
-    rec = (uint8_t *)DefFindObjRec(set, index, frame);
+    rec = DefFindObjRec(set, index, frame);
     if (!rec)
         return 0;
 
@@ -1282,7 +1282,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
         /* The DWORD at DEF_OBJ_REC_OFF_DEPTH, not the int16 that name means --
          * see orig.h. */
         entry[0].depth  =
-            *(const int32_t *)(rec + DEF_OBJ_REC_OFF_DEPTH);
+            rec->depthDword;
 
         list = MakeRecordList(1, entry, key);
         LoadMask(&list->mask, set, index, frame);
@@ -1307,21 +1307,21 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
 
     for (i = 0; i < o->rowSet.count; i++)
         o->rowSet.rows[i].depthSlope =
-            *(const float *)(rec + DEF_OBJ_REC_OFF_ROW_FIELD28);
+            rec->depthSlope;
 
     /* ASSIGNED, not OR'd -- see the note above. */
     o->flags =
-        *(const uint32_t *)(rec + DEF_OBJ_REC_OFF_FLAGS);
+        rec->flags;
 
     if (!flag)
         o->health =
             o->maxHealth =
-                *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
+                rec->health;
 
     o->heightAdj =
-        *(const int8_t *)(rec + DEF_OBJ_REC_OFF_HEIGHT_ADJ);
+        rec->heightAdj;
     o->itemFlag =
-        *(const uint8_t *)(rec + DEF_OBJ_REC_OFF_RANK);
+        (uint8_t)rec->rank;
 
     /* The original's own null test, kept -- it is scheduled AFTER the store
      * above and cannot fire. */
@@ -1368,7 +1368,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
     }
 
     ObjAfterMove(obj, 1,
-                        *(const int32_t *)(rec + DEF_OBJ_REC_OFF_FIELD_30));
+                        rec->crushDamageDword);
     return 1;
 }
 

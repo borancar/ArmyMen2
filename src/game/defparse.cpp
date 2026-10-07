@@ -497,7 +497,7 @@ void *__cdecl DefFindTrooperRec(int32_t level)
  * as in the original. The comparator is passed by ADDRESS rather than as our
  * own symbol, which is what the original does and what keeps CompareTriple's
  * counter meaningful. */
-void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
+AM2_DefObjRec *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
 {
     int32_t key[AM2_DEF_OBJ_REC_SIZE / 4];
     void   *hit;
@@ -510,7 +510,7 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
                        AM2_DEF_OBJ_REC_SIZE,
                        (const void *)CompareTriple);
     if (hit != (void *)0)
-        return hit;
+        return (AM2_DefObjRec *)hit;
 
     /* Each retry writes the fields it relies on, `b` again included. */
     key[1] = 0;
@@ -519,11 +519,11 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
                        AM2_DEF_OBJ_REC_SIZE,
                        (const void *)CompareTriple);
     if (hit != (void *)0)
-        return hit;
+        return (AM2_DefObjRec *)hit;
 
     key[1] = 0;
     key[2] = 0;
-    return orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+    return (AM2_DefObjRec *)orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
                         AM2_DEF_OBJ_REC_SIZE,
                         (const void *)CompareTriple);
 }
@@ -576,7 +576,7 @@ void __cdecl DefCheckLinks(void)
 {
     uint32_t last;
     int32_t  i;
-    uint8_t *rec;
+    AM2_DefObjRec *rec;
 
     orig_qsort(kDefLinks, (uint32_t)kDefLinkCount, sizeof(AM2_DefLink),
                (const void *)ComparePair);
@@ -587,13 +587,13 @@ void __cdecl DefCheckLinks(void)
     for (i = 0; i < kDefLinkCount; i++) {
         if ((uint32_t)kDefLinks[i].parent > last) {
             last = (uint32_t)kDefLinks[i].parent;
-            rec = (uint8_t *)DefFindObjRec((int32_t)KeyFieldA(last),
+            rec = DefFindObjRec((int32_t)KeyFieldA(last),
                                            (int32_t)KeyFieldB(last), 0);
             if (!rec)
                 orig_log("Object AAI record not found for link %02d-%-3d\n",
                          KeyFieldA(last), KeyFieldB(last));
             else
-                *(int32_t *)(rec + DEF_OBJ_REC_OFF_LINKS) = DefCountLinks((int32_t)last);
+                rec->links = DefCountLinks((int32_t)last);
         }
     }
 }

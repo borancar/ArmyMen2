@@ -168,6 +168,40 @@ typedef struct AM2_AaiRec {
     uint8_t  _pad3D[3];
 } AM2_AaiRec;
 
+/* One object.aai OBJ line (AM2_DEF_OBJ_REC_SIZE), sorted by its first
+ * three dwords for DefFindObjRec. MakeAaiRecord copies most of it into an
+ * AM2_AaiRec -- not in order -- and ApplyObjFrame straight onto an object. */
+typedef struct AM2_DefObjRec {
+    int32_t  type;                  /* +0x00 the key triple: type, */
+    int32_t  index;                 /* +0x04   index */
+    int32_t  frame;                 /* +0x08   and frame */
+    int32_t  links;                 /* +0x0C DEF_OBJ_REC_OFF_LINKS, the count */
+    uint32_t flags;                 /* +0x10 DEF_OBJ_REC_OFF_FLAGS, assigned */
+    int16_t  health;                /* +0x14 DEF_OBJ_REC_OFF_HEALTH */
+    uint8_t  _pad16[2];
+    int8_t   heightAdj;             /* +0x18 DEF_OBJ_REC_OFF_HEIGHT_ADJ */
+    uint8_t  _pad19[3];
+    int8_t   rank;                  /* +0x1C DEF_OBJ_REC_OFF_RANK */
+    uint8_t  _pad1D[3];
+    union {                         /* +0x20 DEF_OBJ_REC_OFF_DEPTH: */
+        int16_t depth;              /*   added to the row's depth key */
+        int32_t depthDword;         /*   and copied whole into a list record */
+    };
+    union {                         /* +0x24 DEF_OBJ_REC_OFF_ROW_FIELD28 */
+        float   depthSlope;
+        int32_t depthSlopeBits;
+    };
+    int16_t  armour;                /* +0x28 -> the AAI record's armour */
+    uint8_t  _pad2A[2];
+    int32_t  field2C;               /* +0x2C */
+    union {                         /* +0x30 DEF_OBJ_REC_OFF_FIELD_30: */
+        int16_t crushDamage;        /*   MakeAaiRecord's int16 copy */
+        int32_t crushDamageDword;   /*   and ApplyObjFrame's dword argument */
+    };
+    uint8_t  field34;               /* +0x34 -> the AAI record's +0x3C */
+    uint8_t  _pad35[3];
+} AM2_DefObjRec;
+
 /* One of ADDR_UNIT_TYPES' AM2_UNIT_TYPE_COUNT records: what the placement
  * screen offers -- a trooper, a vehicle or a building of `kind`, its name in
  * the placement file, its cost and the game types it is offered in. */
@@ -641,6 +675,7 @@ static_assert(offsetof(AM2_SightOut, weaponUid)   == 0x20,  "sight weaponUid");
 static_assert(offsetof(AM2_ItemType, range)       == 0x10,  "itemType range");
 static_assert(sizeof(AM2_ItemType)                == AM2_MISSILE_DEF_BYTES, "item type");
 static_assert(sizeof(AM2_AaiRec)                  == AM2_AAI_RECORD_BYTES, "aai rec");
+static_assert(sizeof(AM2_DefObjRec)               == AM2_DEF_OBJ_REC_SIZE, "def obj rec");
 static_assert(sizeof(AM2_MissileDefRec)           == AM2_MISSILE_DEF_REC_SIZE, "missile def rec");
 static_assert(offsetof(AM2_SightCtx, dest)        == 0x0E,  "ctx dest");
 static_assert(offsetof(AM2_SightCtx, ready)       == 0x54,  "ctx ready");

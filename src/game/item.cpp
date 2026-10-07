@@ -1321,7 +1321,7 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
 {
     uint32_t key;
     int32_t  third;
-    void    *rec;
+    AM2_DefObjRec *rec;
     uint32_t uid;
 
     if (!o)
@@ -1347,11 +1347,11 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
 
     if (rec)
         o->rowSet.rows->depthLayer +=
-            *(const int16_t *)((const uint8_t *)rec + DEF_OBJ_REC_OFF_DEPTH);
+            rec->depth;
 
     for (uid = o->chainUid; uid; ) {
         AM2_Object *link = LookupByUID(uid);
-        void       *lrec;
+        AM2_DefObjRec *lrec;
 
         if (!link)
             return;
@@ -1370,8 +1370,7 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
                              (int32_t)(key & AM2_OBJREC_MASK_B));
         if (lrec)
             link->rowSet.rows->depthLayer +=
-                *(const int16_t *)((const uint8_t *)lrec
-                                   + DEF_OBJ_REC_OFF_DEPTH);
+                lrec->depth;
 
         uid = link->chainNextUid;
     }
@@ -12424,14 +12423,14 @@ have:
     /* ---- out of health ---- */
     {
         uint32_t       key  = rec->key;
-        const uint8_t *next;
+        const AM2_DefObjRec *next;
         int32_t        index, frame;
 
         set   = (int32_t)((key >> AM2_OBJREC_SHIFT_B) & AM2_OBJREC_MASK_B);
         index = (int32_t)((key >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
         frame = o->repairFrame + 1;
 
-        next = (const uint8_t *)DefFindObjRec(set, index, frame);
+        next = DefFindObjRec(set, index, frame);
 
         /* The teardown is written out on both failures, as the image has
          * it: no next frame, and a next frame that would not apply. */
@@ -12447,7 +12446,7 @@ have:
 
         /* The answer's own key must BE the frame asked for: DefFindObjRec
          * falls back through three searches and can hand back a near miss. */
-        if (next && *(const int32_t *)(next + AAIREC_OFF_KEY) == frame) {
+        if (next && next->frame == frame) {
             if (!ApplyObjFrame(obj, set, index, frame, 0)) {
                 TEARDOWN();
             }
