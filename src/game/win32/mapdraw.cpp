@@ -2228,8 +2228,7 @@ void __cdecl AirFrameDraw(void)
 
         if (obj->health > 0) {
             if (g_gameClockMs
-                    - *(const uint32_t *)(((uint8_t *)obj->rowSet.rows)
-                                          + ROW_OFF_STAMP_54)
+                    - obj->rowSet.rows->stamp54
                     > AM2_AIR_CYCLE_STEP_MS) {
                 int32_t f = obj->formationSlot + 1;
 

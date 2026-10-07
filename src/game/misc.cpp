@@ -11,6 +11,7 @@
 #include "map.h"    /* TileOfPoint -- reconstructed */
 #include "item.h"   /* TileAttrAt -- reconstructed */
 #include "maprow.h" /* RowUpdate -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite, AM2_ParticleKind */
 #include "msgslot.h" /* CommMustBroadcast -- reconstructed */
 #include "objtype.h" /* ObjIsTypeIn238 -- reconstructed */
 #include "place.h"   /* LoadArmyPlacement */
@@ -2169,13 +2170,13 @@ void __cdecl MovieBuildName(char *dst, const char *name)
  */
 int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
 {
-    uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
 
     (void)at;
-    if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
+    if (++row->stamp54 > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate((AM2_MapRow *)row, 1, g_mapDesc);
+    RowUpdate(row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2187,13 +2188,13 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
  * its own. */
 static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
 {
-    uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
 
     (void)at;
-    if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
+    if (++row->stamp54 > 1)
         return SeqRetire(ctx, rec);
 
-    RowUpdate((AM2_MapRow *)row, 1, g_mapDesc);
+    RowUpdate(row, 1, g_mapDesc);
     return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
 }
 
@@ -2222,7 +2223,7 @@ static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
 void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
 {
     uint8_t *seq;
-    uint8_t *row;
+    AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
@@ -2237,17 +2238,17 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
     *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE6;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
-    *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
-    *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
-    *(int32_t *)(row + 0)                = 1;
-    *(void **)(row + ROW_OFF_SPRITE)     =
+    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
+    row->cell     = 0;
+    row->stamp54 = 0;
+    row->flags                = 1;
+    row->sprite     =
         (g_seqSprites7)
             [variant * *(const int32_t *)((void *)(uintptr_t)(AM2_SEQ_VARIANT_STRIDE))];
-    *(AM2_Point *)(row + ROW_OFF_X)      = *at;
-    *(int16_t *)(row + ROW_OFF_Y_ADJUST) = 0;
-    *(int32_t *)(row + ROW_OFF_FIELD_2C) = 0;
-    *(int16_t *)(row + ROW_OFF_FIELD_26) =
+    row->pos      = *at;
+    row->yAdjust = 0;
+    row->lut = 0;
+    row->depthLayer =
         (int16_t)(ScaleBy32Blocks(TileAttrAt(TileOfPoint(*at)))
                   + AM2_SEQ_DEPTH_BIAS);
 }
@@ -2285,7 +2286,7 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
 void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
 {
     uint8_t *seq;
-    uint8_t *row;
+    AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
@@ -2303,17 +2304,17 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
         g_seqK4StepMs;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);   /* taken after the seq fields */
-    *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
-    *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
-    *(int32_t *)(row + 0)                = 1;
-    *(void **)(row + ROW_OFF_SPRITE)     =
+    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);   /* taken after the seq fields */
+    row->cell     = 0;
+    row->stamp54 = 0;
+    row->flags                = 1;
+    row->sprite     =
         *g_seqSprites5;
-    *(AM2_Point *)(row + ROW_OFF_X)      = *at;
-    *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
-    *(void **)(row + ROW_OFF_FIELD_2C)   =
+    row->pos      = *at;
+    row->yAdjust = (int16_t)yAdjust;
+    row->lut   =
         g_remapShades[0];
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
+    row->depthLayer = AM2_SEQ_DEPTH_BIAS;
 }
 
 /* SeqStepKind4 -- original 0x004613E0, one caller.
@@ -2349,21 +2350,21 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
 int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 {
     uint8_t *r   = (uint8_t *)rec;
-    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
 
     (void)at;
 
-    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+    if (row->stamp54
             > *(const uint32_t *)(r + SEQ_OFF_LIFE)) {
 #define GATE (*(uint32_t *)(r + SEQ_OFF_GATE))
-#define CELL (*(uint8_t *)(row + ROW_OFF_CELL))
+#define CELL (row->cell)
         if (++GATE > (g_seqK4Hold)[CELL]) {
             if (++CELL >= AM2_SEQ_K4_CELLS)
                 return SeqRetire(ctx, rec);
 
-            *(void **)(row + ROW_OFF_SPRITE) =
+            row->sprite =
                 (g_seqSprites5)[CELL];
-            *(void **)(row + ROW_OFF_FIELD_2C) =
+            row->lut =
                 g_remapShades[CELL];
 
             GATE = 1;
@@ -2371,23 +2372,23 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 #undef GATE
 #undef CELL
 
-        *(int16_t *)(row + ROW_OFF_Y_ADJUST) +=
+        row->yAdjust +=
             g_seqK4Rise;
-        *(int16_t *)(row + ROW_OFF_X) +=
+        row->pos.x +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
-        *(int16_t *)(row + ROW_OFF_Y) +=
+        row->pos.y +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
 
-        *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
+        row->stamp54 = 0;
 
         if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                         (const AM2_Point *)(row + ROW_OFF_X)))
+                         &row->pos))
             return SeqRetire(ctx, rec);
 
-        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+        RowUpdate(row, 0, g_mapDesc);
     }
 
-    *(int32_t *)(row + ROW_OFF_STAMP_54) +=
+    row->stamp54 +=
         g_frameDeltaMs;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
@@ -2420,17 +2421,17 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
 {
     uint8_t *r    = (uint8_t *)rec;
-    uint8_t *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_MapRow *row  = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
 
     (void)at;
 
-    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+    if (row->stamp54
             > *(const uint32_t *)(r + SEQ_OFF_LIFE))
         return SeqRetire(ctx, rec);
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE)
             > g_seqEmitMs) {
-        AM2_Point pt = *(const AM2_Point *)(row + ROW_OFF_X);
+        AM2_Point pt = row->pos;
 
         pt.x = (int16_t)(pt.x + (orig_seq_rand() % 3) * 4 - 4);
         SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
@@ -2439,7 +2440,7 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
             *(const int32_t *)&g_seqEmitMs;
     }
 
-    *(int32_t *)(row + ROW_OFF_STAMP_54) += g_frameDeltaMs;
+    row->stamp54 += g_frameDeltaMs;
     *(int32_t *)(r + SEQ_OFF_GATE)       += g_frameDeltaMs;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
@@ -2550,7 +2551,7 @@ void __cdecl SeqRun(void *ctx)
 void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
 {
     uint8_t *seq;
-    uint8_t *row;
+    AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
@@ -2567,24 +2568,24 @@ void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
         *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
 
-    *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
-    *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
-    *(int32_t *)(row + 0)                 = 0;
-    *(void **)(row + ROW_OFF_SPRITE)      =
+    row->cell      = 0;
+    row->stamp54  = 0;
+    row->flags                 = 0;
+    row->sprite      =
         *g_seqSprites5;
-    *(AM2_Point *)(row + ROW_OFF_X)       = *at;
-    *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
-    *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
-    *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_5;
+    row->pos       = *at;
+    row->yAdjust  = 0;
+    row->lut  = 0;
+    row->depthLayer  = AM2_SEQ_ROW26_5;
 }
 
 void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
                          int32_t c, int32_t life)
 {
     uint8_t *seq;
-    uint8_t *row;
+    AM2_MapRow *row;
 
     (void)b;
     (void)c;
@@ -2604,17 +2605,17 @@ void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
         *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
 
-    *(int32_t *)(row + 0)                 = 0;
-    *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
-    *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
-    *(void **)(row + ROW_OFF_SPRITE)      =
+    row->flags                 = 0;
+    row->cell      = 0;
+    row->stamp54  = 0;
+    row->sprite      =
         *g_seqSprites7;
-    *(AM2_Point *)(row + ROW_OFF_X)       = *at;
-    *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
-    *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
-    *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_7;
+    row->pos       = *at;
+    row->yAdjust  = 0;
+    row->lut  = 0;
+    row->depthLayer  = AM2_SEQ_ROW26_7;
 
     SeqAddKind6(at, orig_seq_rand() % 3);
 }
@@ -2921,9 +2922,9 @@ int misc_install(void)
 int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 {
     uint8_t *r     = (uint8_t *)rec;
-    uint8_t *row   = *(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_MapRow *row   = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
     uint32_t life  = *(const uint32_t *)(r + SEQ_OFF_LIFE);
-    uint32_t stamp = *(const uint32_t *)(row + ROW_OFF_STAMP_54);
+    uint32_t stamp = row->stamp54;
 
     /* The tail count, the stride, the advance and the frame delta are
      * globals, read afresh at every use. */
@@ -2931,7 +2932,7 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 #define STRIDE  (*(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE)
 #define ADVANCE (g_seqAdvanceMs)
 #define DELTA   (*(const uint32_t *)&g_frameDeltaMs)
-#define PHASE   (*(uint8_t *)(row + 0x51u))
+#define PHASE   (row->cell)
 
     (void)at;
 
@@ -2954,14 +2955,14 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
             variant += PHASE;
         }
 
-        *(uint32_t *)(row + ROW_OFF_SPRITE) =
-            (*(uint32_t *const *)&g_seqSprites7)[variant];
-        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+        row->sprite =
+            g_seqSprites7[variant];
+        RowUpdate(row, 0, g_mapDesc);
 
         *(uint32_t *)(r + SEQ_OFF_GATE) -= ADVANCE;
     }
 
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) += DELTA;
+    row->stamp54 += DELTA;
     *(uint32_t *)(r + SEQ_OFF_GATE) += DELTA;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
@@ -3013,16 +3014,16 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
 {
     uint8_t *r   = (uint8_t *)rec;
-    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
 
     (void)at;
 
-    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+    if (row->stamp54
             > *(const uint32_t *)(r + SEQ_OFF_LIFE))
         return SeqRetire(ctx, rec);
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE) > 0x12Cu) {
-        AM2_Point pt = *(const AM2_Point *)(row + ROW_OFF_X);
+        AM2_Point pt = row->pos;
         int32_t   variant = orig_seq_rand() % 3;
         int32_t   skip = 0;
 
@@ -3041,10 +3042,10 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
             AM2_Rect box;
             uint8_t *obj;
 
-            box.left   = *(const int16_t *)(row + ROW_OFF_X) - 0x28;
-            box.right  = *(const int16_t *)(row + ROW_OFF_X) + 0x28;
-            box.top    = *(const int16_t *)(row + ROW_OFF_X + 2) - 0x40;
-            box.bottom = *(const int16_t *)(row + ROW_OFF_X + 2) + 0x10;
+            box.left   = row->pos.x - 0x28;
+            box.right  = row->pos.x + 0x28;
+            box.top    = row->pos.y - 0x40;
+            box.bottom = row->pos.y + 0x10;
 
             obj = (uint8_t *)AllObjectsInRect(
                       &box, g_objMapDesc);
@@ -3064,7 +3065,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
             *(int32_t *)(r + SEQ_OFF_FIELD_0C) = 0;
     }
 
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
+    row->stamp54 +=
         *(const uint32_t *)&g_frameDeltaMs;
     *(int32_t *)(r + SEQ_OFF_GATE) +=
         g_frameDeltaMs;
@@ -3105,18 +3106,17 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
  * comment there flagged this as undecided; a second toucher decided it. */
 int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
 {
-    uint32_t pt;
+    AM2_Point pt;
     /* The particle kind's record is re-indexed, and the fields re-read, at
      * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
-    typedef struct { int32_t frames; const uint32_t *sprites; uint8_t pad[16]; } Kind;
 #define KIND  ((g_particleKinds) \
                [*(const int32_t *)(r + SEQ_OFF_FLAG4)])
 #define LIFE  (*(int32_t *)(r + SEQ_OFF_LIFE))
-#define STAMP (*(uint32_t *)(row + ROW_OFF_STAMP_54))
-#define PHASE (*(uint8_t *)(row + 0x51u))
-#define Z     (*(int16_t *)(row + 0x20u))
+#define STAMP (row->stamp54)
+#define PHASE (row->cell)
+#define Z     (row->yAdjust)
     uint8_t *r   = (uint8_t *)rec;
-    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
 
     (void)at;
 
@@ -3129,32 +3129,32 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         if (LIFE != 0) {
             if (++PHASE >= KIND.frames)
                 PHASE = 0;
-            *(uint32_t *)(row + ROW_OFF_SPRITE) = KIND.sprites[PHASE];
+            row->sprite = KIND.sprites[PHASE];
         }
 
-        *(int16_t *)(row + ROW_OFF_X) +=
+        row->pos.x +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
-        *(int16_t *)(row + ROW_OFF_X + 2) +=
+        row->pos.y +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
         Z += (int16_t)LIFE;
 
         /* The bounds test is on the DRAWN point -- the row's position with
          * its height subtracted from z -- not on the ground position. */
-        pt = *(const uint32_t *)(row + ROW_OFF_X);
-        *((int16_t *)&pt + 1) -= Z;
+        pt = row->pos;
+        pt.y -= Z;
         if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                         (const AM2_Point *)&pt))
+                         &pt))
             return SeqRetire(ctx, rec);
 
-        tile = TileOfPoint(*(const AM2_Point *)(row + ROW_OFF_X)) & 0xFFFF;
+        tile = TileOfPoint(row->pos) & 0xFFFF;
         ground = (*(const char *const *)&g_tileAttrs)[tile];
 
         if (Z + *(const int32_t *)(r + 0x18u) <= ground) {
             Z = (int16_t)((int16_t)ground - *(const int16_t *)(r + 0x18u));
 
             if ((g_tileFlags)[tile] & 1) {
-                CreateExplosion(*(const int16_t *)(row + ROW_OFF_X),
-                                *(const int16_t *)(row + ROW_OFF_X + 2),
+                CreateExplosion(row->pos.x,
+                                row->pos.y,
                                 0x93, 4, 0, 0, 0, 0, 0, 0);
                 return SeqRetire(ctx, rec);
             }
@@ -3164,19 +3164,19 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
                 STAMP = 0;
             } else {
                 /* The row is read again for the copy. */
-                uint8_t *old  = *(uint8_t **)(r + SEQ_OFF_ROW);
-                uint8_t *rest = *(uint8_t **)RowPoolAAlloc();
+                AM2_MapRow *old  = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+                AM2_MapRow *rest = (AM2_MapRow *)*(uint8_t **)RowPoolAAlloc();
 
                 *(int32_t *)rest = 1;
-                *(uint32_t *)(rest + ROW_OFF_SPRITE) =
-                    *(const uint32_t *)(old + ROW_OFF_SPRITE);
-                *(int16_t *)(rest + ROW_OFF_X) = *(const int16_t *)(old + ROW_OFF_X);
-                *(int16_t *)(rest + ROW_OFF_X + 2) =
-                    *(const int16_t *)(old + ROW_OFF_X + 2);
-                *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
-                    *(const uint32_t *)(old + ROW_OFF_FIELD_2C);
-                *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
-                RowUpdate((AM2_MapRow *)rest, 0, g_mapDesc);
+                rest->sprite =
+                    old->sprite;
+                rest->pos.x = old->pos.x;
+                rest->pos.y =
+                    old->pos.y;
+                rest->lut =
+                    old->lut;
+                rest->depthLayer = 2;
+                RowUpdate(rest, 0, g_mapDesc);
                 return SeqRetire(ctx, rec);
             }
         } else {
@@ -3185,7 +3185,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         }
     }
 
-    RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+    RowUpdate(row, 0, g_mapDesc);
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 #undef KIND
 #undef LIFE

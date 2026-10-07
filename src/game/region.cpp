@@ -15,6 +15,7 @@
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "maprow.h"   /* RowAnimField4 -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite */
 #include "msgslot.h"  /* CommMustBroadcast -- the timeout kill's gate */
 #include "armymsg.h"  /* DamageBroadcast */
 #include "commmsg.h" /* TrooperFireSend -- reconstructed */
@@ -987,7 +988,7 @@ int32_t __cdecl MoveStepPoint(AM2_Object *obj, uint8_t heading, uint8_t turn,
 {
     AM2_Object         *o    = obj;
     AM2_Point       *out  = outPt;
-    uint8_t         *rows;
+    AM2_MapRow      *rows;
     AM2_Anim        *anim;
     uint8_t          head;
     float            step;
@@ -997,11 +998,11 @@ int32_t __cdecl MoveStepPoint(AM2_Object *obj, uint8_t heading, uint8_t turn,
     if (!g_frameDeltaMs)
         return 0;
 
-    rows = (uint8_t *)0;
+    rows = (AM2_MapRow *)0;
     if (o->rowSet.count > 0)
-        rows = ((uint8_t *)o->rowSet.rows);
+        rows = o->rowSet.rows;
 
-    anim = *(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING);
+    anim = rows->animPlaying;
     if (!anim)
         return 0;
 
@@ -1009,7 +1010,7 @@ int32_t __cdecl MoveStepPoint(AM2_Object *obj, uint8_t heading, uint8_t turn,
     head = heading;
     if ((o->flagsLo & OBJ_FLAG_SNAP_HEADING) && rows)
         head = (uint8_t)((uint8_t)RoundTo8(head, anim->directionBits)
-                         << (8 - (*(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING))->directionBits));
+                         << (8 - rows->animPlaying->directionBits));
 
     if (flip)
         head = (uint8_t)(head + 0x80);
@@ -1077,7 +1078,7 @@ int32_t __cdecl AnimStepPoint(AM2_Object *obj, uint8_t heading, int32_t pose,
     AM2_Point *out  = outPt;
     int32_t    animId =
         (g_weaponPoseFrames)[pose];
-    uint8_t   *rows = ((uint8_t *)o->rowSet.rows);
+    AM2_MapRow *rows = o->rowSet.rows;
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              speed;
@@ -1089,7 +1090,7 @@ int32_t __cdecl AnimStepPoint(AM2_Object *obj, uint8_t heading, int32_t pose,
     if (!animId)
         return 1;
 
-    table = *(const AM2_AnimTable *const *)(rows + ROW_OFF_ANIM_CUR);
+    table = rows->animCur;
     if (!table)
         return 0;
 
@@ -1113,8 +1114,7 @@ found:
         speed = table->entries[i].anim->field4;
     }
 
-    if (*(const uint32_t *)(rows + ROW_OFF_FIELD_2C)
-        == (uint32_t)((uintptr_t)g_rowLutDoubles))
+    if (rows->lut == g_rowLutDoubles)
         speed += speed;
 
     /* The bias is a byte local, pushed as the byte argument it is. */
@@ -1886,18 +1886,17 @@ int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
 int32_t __cdecl ObjBoxAction(AM2_Object *obj, AM2_TileMask *out)
 {
     const AM2_Object *o = obj;
-    const uint8_t *spr;
+    const AM2_Sprite *spr;
     int32_t        x;
     int32_t        y;
     AM2_Rect       area;
 
-    spr = *(const uint8_t *const *)
-              (((const uint8_t *)o->rowSet.rows) + ROW_OFF_SPRITE);
+    spr = o->rowSet.rows->sprite;
     if (!spr)
         return 0;
-    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+    if (!spr->image.rle16)
         return 0;
-    if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
+    if (spr->flags & SPR_FLAG_SOFTWARE_BITS) {
         x = o->pos.x;
         y = o->pos.y;
 
@@ -2344,8 +2343,7 @@ void __cdecl ItemTeardown(AM2_Object *obj)
 
     if (o->rowSet.count < 1)
         return;
-    if (!*(const void *const *)(((const uint8_t *)o->rowSet.rows)
-                                + ROW_OFF_SPRITE))
+    if (!o->rowSet.rows->sprite)
         return;
     if (!ObjIsItem((const AM2_Object *)obj))
         return;
@@ -2494,8 +2492,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
 
     if (o->rowSet.count < 1)
         return;
-    if (!*(const void *const *)(((const uint8_t *)o->rowSet.rows)
-                                + ROW_OFF_SPRITE))
+    if (!o->rowSet.rows->sprite)
         return;
     if (!ObjIsItem((const AM2_Object *)obj))
         return;
@@ -2602,17 +2599,17 @@ int32_t __cdecl ListBoxAction(AM2_Point at, const AM2_RecordList *list,
                               AM2_TileMask *out)
 {
     const AM2_RecordList *h = list;
-    const uint8_t *spr;
+    const AM2_Sprite *spr;
     int32_t        x;
     int32_t        y;
     AM2_Rect       area;
 
-    spr = (const uint8_t *)h->records->sprite;
+    spr = h->records->sprite;
     if (!spr)
         return 0;
-    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+    if (!spr->image.rle16)
         return 0;
-    if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
+    if (spr->flags & SPR_FLAG_SOFTWARE_BITS) {
         /* `at` is a packed point, read a half at a time from its slot. */
         x = at.x;
         y = at.y;
@@ -2684,7 +2681,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                                 (g_bitFromN);
     const AM2_ObjMask *m;
     const uint8_t  *bits;
-    const uint8_t  *spr;
+    const AM2_Sprite *spr;
     int32_t         ox;
     int32_t         oy;
     AM2_Rect        world;          /* the clamped world box */
@@ -2707,12 +2704,12 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     if (!bits)
         return 0;
 
-    spr = (const uint8_t *)h->records->sprite;
+    spr = h->records->sprite;
 
     ox = at.x
-         - *(const int16_t *)(spr + SPR_OFF_HOTX);
+         - spr->hotX;
     oy = at.y
-         - *(const int16_t *)(spr + SPR_OFF_HOTY);
+         - spr->hotY;
 
 
     world.left = Clamp(m->originX + ox, 1 << AM2_TILE_SHIFT,

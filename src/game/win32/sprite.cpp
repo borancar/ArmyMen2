@@ -1793,7 +1793,7 @@ static inline AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
 
 AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &((AM2_AnimTable *)g_soldierAnims)[kind];
+    const AM2_AnimTable *t = &g_soldierAnims[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_STAND);
 
     if (i >= t->count)
@@ -1803,7 +1803,7 @@ AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
 
 AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &((AM2_AnimTable *)g_vehicleAnims)[kind];
+    const AM2_AnimTable *t = &g_vehicleAnims[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
 
     if (i >= t->count)
@@ -1820,7 +1820,7 @@ AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading)
  * Reproduced for the bytes; it never fires. */
 AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading)
 {
-    const AM2_AnimTable *t = &((AM2_AnimTable *)g_turretAnims)[kind];
+    const AM2_AnimTable *t = &g_turretAnims[kind];
     int32_t              i;
 
     if (!t)
@@ -1856,7 +1856,7 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading)
 
 void __cdecl BuildRoachMask(void)
 {
-    const AM2_AnimTable *t = ((AM2_AnimTable *)g_roachAnims);
+    const AM2_AnimTable *t = g_roachAnims;
     AM2_Anim            *a;
     int32_t              i;
     int32_t              facing;
@@ -1936,7 +1936,7 @@ void __cdecl BuildRoachMask(void)
 
 void __cdecl BuildVehicleMask(int32_t kind)
 {
-    const AM2_AnimTable *t = &((AM2_AnimTable *)g_vehicleAnims)[kind];
+    const AM2_AnimTable *t = &g_vehicleAnims[kind];
     AM2_Anim            *a;
     int32_t              i;
     int32_t              dir;
@@ -2589,11 +2589,7 @@ void __cdecl FreeSpriteGroupsB(void)
  * downward, the natural move is to correct this one too -- and it would put
  * the table four bytes early. The absence of a negative displacement is the
  * evidence, and it is only visible in this body. */
-struct AM2_SpriteGroupC {
-    int32_t      count;      /* SPRITEGRP_C_OFF_COUNT */
-    AM2_Sprite **sprites;    /* SPRITEGRP_C_OFF_SPRITES */
-    uint8_t      rest[AM2_SPRITEGRP_C_BYTES - 8];
-};
+/* AM2_SpriteGroupC is in spritetype.h. */
 #define AM2_SPRITEGRP_C_COUNT \
     ((int32_t)((((uintptr_t)g_spriteGroupsCEnd) - ((uintptr_t)g_spriteGroupsC)) \
                / AM2_SPRITEGRP_C_BYTES))
@@ -2603,16 +2599,16 @@ void __cdecl LoadSpriteGroupsC(void)
     int32_t k, i;
 
     for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
-        if (((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites != 0)
+        if (g_spriteGroupsC[k].sprites != 0)
             continue;
 
-        ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites = (AM2_Sprite **)am2_malloc(
-            (size_t)((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count * sizeof(AM2_Sprite *));
-        memset(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites, 0,
-               (size_t)((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count * sizeof(AM2_Sprite *));
+        g_spriteGroupsC[k].sprites = (AM2_Sprite **)am2_malloc(
+            (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
+        memset(g_spriteGroupsC[k].sprites, 0,
+               (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
 
-        for (i = 0; i < ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count; i++)
-            ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites[i] =
+        for (i = 0; i < g_spriteGroupsC[k].count; i++)
+            g_spriteGroupsC[k].sprites[i] =
                 PreloadSprite(AM2_SPRITEGRP_SET, AM2_SPRITEGRP_C_BASE + k, i,
                               AM2_SPRITEGRP_C_FLAGS, 1);
     }
@@ -2627,14 +2623,14 @@ void __cdecl FreeSpriteGroupsC(void)
     int32_t k, n, i;
 
     for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
-        if (((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites == 0)
+        if (g_spriteGroupsC[k].sprites == 0)
             continue;
 
-        n = ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].count;
+        n = g_spriteGroupsC[k].count;
         for (i = 0; i < n; i++)
-            ReleaseSprite(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites[i]);
-        am2_free(((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites);
-        ((AM2_SpriteGroupC *)g_spriteGroupsC)[k].sprites = 0;
+            ReleaseSprite(g_spriteGroupsC[k].sprites[i]);
+        am2_free(g_spriteGroupsC[k].sprites);
+        g_spriteGroupsC[k].sprites = 0;
     }
 }
 
@@ -2705,19 +2701,19 @@ void __cdecl LoadDecalSprites(void)
 {
     int32_t i;
 
-    (*(AM2_Sprite ** *)&g_decalSprites) = (AM2_Sprite **)am2_malloc((size_t)g_decalSpriteCount
+    g_decalSprites = (AM2_Sprite **)am2_malloc((size_t)g_decalSpriteCount
                                                * sizeof(AM2_Sprite *));
-    memset((*(AM2_Sprite ** *)&g_decalSprites), 0, (size_t)g_decalSpriteCount * sizeof(AM2_Sprite *));
+    memset(g_decalSprites, 0, (size_t)g_decalSpriteCount * sizeof(AM2_Sprite *));
 
     for (i = 0; i < g_decalSpriteCount; i++) {
-        (*(AM2_Sprite ** *)&g_decalSprites)[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+        g_decalSprites[i] = PreloadSprite(AM2_SPRITEGRP_SET,
                                           AM2_DECAL_SPRITE_INDEX, i,
                                           AM2_SPRITE_FLAGS_FLAT, 1);
-        if ((*(AM2_Sprite ** *)&g_decalSprites)[i] != 0) {
-            (*(AM2_Sprite ** *)&g_decalSprites)[i]->hotX =
-                (int16_t)((*(AM2_Sprite ** *)&g_decalSprites)[i]->bounds.right / 2);
-            (*(AM2_Sprite ** *)&g_decalSprites)[i]->hotY =
-                (int16_t)((*(AM2_Sprite ** *)&g_decalSprites)[i]->bounds.right / 2);
+        if (g_decalSprites[i] != 0) {
+            g_decalSprites[i]->hotX =
+                (int16_t)(g_decalSprites[i]->bounds.right / 2);
+            g_decalSprites[i]->hotY =
+                (int16_t)(g_decalSprites[i]->bounds.right / 2);
         }
     }
 }
@@ -2726,13 +2722,13 @@ void __cdecl FreeDecalSprites(void)
 {
     int32_t i;
 
-    if ((*(AM2_Sprite ** *)&g_decalSprites) == 0)
+    if (g_decalSprites == 0)
         return;
 
     for (i = 0; i < g_decalSpriteCount; i++)
-        ReleaseSprite((*(AM2_Sprite ** *)&g_decalSprites)[i]);
-    am2_free((*(AM2_Sprite ** *)&g_decalSprites));
-    (*(AM2_Sprite ** *)&g_decalSprites) = 0;
+        ReleaseSprite(g_decalSprites[i]);
+    am2_free(g_decalSprites);
+    g_decalSprites = 0;
 }
 
 /* 0x00462EA0 and 0x00462F10. The seq kind-5 sprites, the same flat shape at
@@ -2748,12 +2744,12 @@ void __cdecl LoadSeqSprites5(void)
 {
     int32_t i;
 
-    (*(AM2_Sprite ** *)&g_seqSprites5) = (AM2_Sprite **)am2_malloc((size_t)g_seqSprite5Count
+    g_seqSprites5 = (AM2_Sprite **)am2_malloc((size_t)g_seqSprite5Count
                                               * sizeof(AM2_Sprite *));
-    memset((*(AM2_Sprite ** *)&g_seqSprites5), 0, (size_t)g_seqSprite5Count * sizeof(AM2_Sprite *));
+    memset(g_seqSprites5, 0, (size_t)g_seqSprite5Count * sizeof(AM2_Sprite *));
 
     for (i = 0; i < g_seqSprite5Count; i++)
-        (*(AM2_Sprite ** *)&g_seqSprites5)[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+        g_seqSprites5[i] = PreloadSprite(AM2_SPRITEGRP_SET,
                                          AM2_SEQ_SPRITE_5_INDEX, i,
                                          AM2_SPRITE_FLAGS_FLAT, 1);
 }
@@ -2762,13 +2758,13 @@ void __cdecl FreeSeqSprites5(void)
 {
     int32_t i;
 
-    if ((*(AM2_Sprite ** *)&g_seqSprites5) == 0)
+    if (g_seqSprites5 == 0)
         return;
 
     for (i = 0; i < 4; i++)          /* the original's literal, not the count */
-        ReleaseSprite((*(AM2_Sprite ** *)&g_seqSprites5)[i]);
-    am2_free((*(AM2_Sprite ** *)&g_seqSprites5));
-    (*(AM2_Sprite ** *)&g_seqSprites5) = 0;
+        ReleaseSprite(g_seqSprites5[i]);
+    am2_free(g_seqSprites5);
+    g_seqSprites5 = 0;
 }
 
 /* The two grid subsystems. Pair 7 diffs 1.000 against pair 4 on BOTH halves,
@@ -2780,27 +2776,27 @@ void __cdecl LoadSpriteGrid(void)
 {
     LoadGrid(&g_spriteGridCols,
              g_spriteGridRows,
-             (AM2_Sprite ** *)&g_spriteGrid,
+             &g_spriteGrid,
              AM2_SPRITE_GRID_BASE);
 }
 void __cdecl FreeSpriteGrid(void)
 {
     FreeGrid(g_spriteGridRows,
              &g_spriteGridCols,
-             (AM2_Sprite ** *)&g_spriteGrid);
+             &g_spriteGrid);
 }
 void __cdecl LoadSeqGrid(void)
 {
     LoadGrid((const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
              g_seqGridRows,
-             (AM2_Sprite ** *)&g_seqSprites7,
+             &g_seqSprites7,
              AM2_SEQ_GRID_BASE);
 }
 void __cdecl FreeSeqGrid(void)
 {
     FreeGrid(g_seqGridRows,
              (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
-             (AM2_Sprite ** *)&g_seqSprites7);
+             &g_seqSprites7);
 }
 
 /* 0x00463060 and 0x00463200. The mark sprites, and the largest pair in the

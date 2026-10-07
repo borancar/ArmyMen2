@@ -192,7 +192,7 @@
 #define g_debugBlastKind         (*(int32_t *)(uintptr_t)ADDR_DEBUG_BLAST_KIND)  /* 0x00476FB4 */
 #define g_debugItemList          (*(int32_t *)(uintptr_t)ADDR_DEBUG_ITEMLIST)  /* 0x004FD73C */
 #define g_decalSpriteCount       (*(int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT)  /* 0x0048CBA4 */
-#define g_decalSprites           (*(void ***)(uintptr_t)ADDR_DECAL_SPRITES)  /* 0x0048CBA0 */
+#define g_decalSprites           (*(struct AM2_Sprite ***)(uintptr_t)ADDR_DECAL_SPRITES)  /* 0x0048CBA0 */
 #define g_defaultOwner           (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)  /* 0x004F9FDC */
 #define g_defaultPalette         (*(void **)(uintptr_t)ADDR_DEFAULT_PALETTE)  /* 0x004FE084 */
 #define g_defaultPaletteBuf      ((uint8_t *)(uintptr_t)ADDR_DEFAULT_PALETTE_BUF)  /* 0x00502BDC */
@@ -242,7 +242,7 @@
 #define g_evtId15Flag            (*(int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG)  /* 0x00511E48 */
 #define g_evtId15Uid             (*(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID)  /* 0x00511E20 */
 #define g_exitGameFlag           (*(int32_t *)(uintptr_t)ADDR_EXIT_GAME_FLAG)  /* 0x004F8778 */
-#define g_explosionAnims         ((void *)(uintptr_t)ADDR_EXPLOSION_ANIMS)  /* 0x00510228 */
+#define g_explosionAnims         ((struct AM2_AnimTable *)(uintptr_t)ADDR_EXPLOSION_ANIMS)  /* 0x00510228 */
 #define g_explosionArea16        (*(AM2_Rect *)(uintptr_t)ADDR_EXPLOSION_AREA_16)  /* 0x004788F0 */
 #define g_explosionArea24        (*(AM2_Rect *)(uintptr_t)ADDR_EXPLOSION_AREA_24)  /* 0x00478900 */
 #define g_explosionArea32        (*(AM2_Rect *)(uintptr_t)ADDR_EXPLOSION_AREA_32)  /* 0x00478910 */
@@ -410,7 +410,7 @@
 #define g_menuSpritesEnd         (*(void **)(uintptr_t)ADDR_MENU_SPRITES_END)  /* 0x004FCDA4 */
 #define g_messageBmpName         ((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME)  /* 0x005122A4 */
 #define g_messageText            ((char *)(uintptr_t)ADDR_MESSAGE_TEXT)  /* 0x00511EA4 */
-#define g_missileAnims           ((void *)(uintptr_t)ADDR_MISSILE_ANIMS)  /* 0x00654C90 */
+#define g_missileAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)  /* 0x00654C90 */
 #define g_missileBox             ((const AM2_Rect *)(uintptr_t)ADDR_MISSILE_BOX)  /* 0x00487B78 */
 #define g_missileDefs            ((uint8_t *)(uintptr_t)ADDR_MISSILE_DEFS)  /* 0x00662030 */
 #define g_missileRowSpec         ((const struct AM2_RowSpec *)(uintptr_t)ADDR_MISSILE_ROW_SPEC)  /* 0x00487B88 */
@@ -545,7 +545,7 @@
 #define g_paletteCycleSeq        ((uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_SEQ)  /* 0x00486138 */
 #define g_paletteCycleStamp      (*(uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP)  /* 0x00514F70 */
 #define g_paletteGlyphs          ((uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS)  /* 0x004FC998 */
-#define g_particleKinds          ((Kind *)(uintptr_t)ADDR_PARTICLE_KINDS)  /* 0x0048C7E4 */
+#define g_particleKinds          ((struct AM2_ParticleKind *)(uintptr_t)ADDR_PARTICLE_KINDS)  /* 0x0048C7E4 */
 #define g_pathArg                (*(char **)(uintptr_t)ADDR_AUDIO_PATH_ARG)  /* 0x004852D4 */
 #define g_pathFrameMs            (*(int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS)  /* 0x00654C34 */
 #define g_pathFrameStamp         (*(int32_t *)(uintptr_t)ADDR_PATH_FRAME_STAMP)  /* 0x00654C38 */
@@ -644,7 +644,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_respawnKindCount       (*(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT)  /* 0x00662924 */
 #define g_respawnKindMask        ((uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)  /* 0x0048C530 */
 #define g_respawnKinds           (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)  /* 0x00662920 */
-#define g_roachAnims             ((void *)(uintptr_t)ADDR_ROACH_ANIMS)  /* 0x00654C98 */
+#define g_roachAnims             ((struct AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)  /* 0x00654C98 */
 #define g_roachArmour            (*(int32_t *)(uintptr_t)ADDR_ROACH_ARMOUR)  /* 0x00487BB0 */
 #define g_roachBiteBox           (*(AM2_Rect *)(uintptr_t)ADDR_ROACH_BITE_BOX)  /* 0x00487BD8 */
 #define g_roachBox               ((const AM2_Rect *)(uintptr_t)ADDR_ROACH_BOX)  /* 0x00487BC8 */
@@ -711,8 +711,8 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_seqK4Rise              (*(int16_t *)(uintptr_t)ADDR_SEQ_K4_RISE)  /* 0x0048CBE0 */
 #define g_seqK4StepMs            (*(int32_t *)(uintptr_t)ADDR_SEQ_K4_STEP_MS)  /* 0x0048CBC4 */
 #define g_seqSprite5Count        (*(int32_t *)(uintptr_t)ADDR_SEQ_SPRITE_5_COUNT)  /* 0x0048CBAC */
-#define g_seqSprites5            (*(void ***)(uintptr_t)ADDR_SEQ_SPRITES_5)  /* 0x0048CBA8 */
-#define g_seqSprites7            (*(void ***)(uintptr_t)ADDR_SEQ_SPRITES_7)  /* 0x0048CB98 */
+#define g_seqSprites5            (*(struct AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_5)  /* 0x0048CBA8 */
+#define g_seqSprites7            (*(struct AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7)  /* 0x0048CB98 */
 #define g_seqTailFrames          (*(int32_t *)(uintptr_t)ADDR_SEQ_TAIL_FRAMES)  /* 0x0048CB90 */
 #define g_sessionList            (*(void **)(uintptr_t)ADDR_SESSION_LIST)  /* 0x004FA908 */
 #define g_sessionObject          (*(void **)(uintptr_t)ADDR_SESSION_OBJECT)  /* 0x00516130 */
@@ -731,7 +731,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_slotPositions          ((AM2_Point *)(uintptr_t)ADDR_SLOT_POSITIONS)  /* 0x0065A0A8 */
 #define g_slotRecs               ((uint8_t *)(uintptr_t)ADDR_SLOT_RECS)  /* 0x0048BD90 */
 #define g_slowMachine            (*(int32_t *)(uintptr_t)ADDR_SLOW_MACHINE)  /* 0x005125C0 */
-#define g_soldierAnims           ((uint8_t *)(uintptr_t)ADDR_SOLDIER_ANIMS)  /* 0x00659F00 */
+#define g_soldierAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)  /* 0x00659F00 */
 #define g_soldierNames           ((uint8_t *)(uintptr_t)ADDR_SOLDIER_NAMES)  /* 0x00489BF8 */
 #define g_soundReady             (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)  /* 0x006598A8 */
 #define g_soundSlots             ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)  /* 0x004FA040 */
@@ -743,12 +743,12 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_spiralDy               ((int32_t *)(uintptr_t)ADDR_SPIRAL_DY)  /* 0x0048783C */
 #define g_spiralStep             ((uint8_t *)(uintptr_t)ADDR_SPIRAL_STEP)  /* 0x00485340 */
 #define g_spriteFile             (*(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE)  /* 0x006598B8 */
-#define g_spriteGrid             (*(uint32_t **)(uintptr_t)ADDR_SPRITE_GRID)  /* 0x0048CA40 */
+#define g_spriteGrid             (*(struct AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID)  /* 0x0048CA40 */
 #define g_spriteGridCols         (*(int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS)  /* 0x0048CA3C */
 #define g_spriteGridRows         ((int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS)  /* 0x0048CA38 */
 #define g_spriteGroups           ((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS)  /* 0x0048C7E0 */
 #define g_spriteGroupsBEnd       ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END)  /* 0x0048CA08 */
-#define g_spriteGroupsC          ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C)  /* 0x0048CA08 */
+#define g_spriteGroupsC          ((struct AM2_SpriteGroupC *)(uintptr_t)ADDR_SPRITE_GROUPS_C)  /* 0x0048CA08 */
 #define g_spriteGroupsCEnd       ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END)  /* 0x0048CA38 */
 #define g_spriteGroupsEnd        ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END)  /* 0x0048C8D0 */
 #define g_spriteList             (*(void ***)(uintptr_t)ADDR_SPRITE_LIST)  /* 0x004F96C8 */
@@ -838,7 +838,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_trooperClassValue      ((int32_t *)(uintptr_t)ADDR_TROOPER_CLASS_VALUE)  /* 0x00489840 */
 #define g_trooperRowSpec         ((const struct AM2_RowSpec *)(uintptr_t)ADDR_TROOPER_ROW_SPEC)  /* 0x00489860 */
 #define g_turnRepeatMs           (*(int32_t *)(uintptr_t)ADDR_TURN_REPEAT_MS)  /* 0x00659F48 */
-#define g_turretAnims            ((uint8_t *)(uintptr_t)ADDR_TURRET_ANIMS)  /* 0x0065A2A8 */
+#define g_turretAnims            ((struct AM2_AnimTable *)(uintptr_t)ADDR_TURRET_ANIMS)  /* 0x0065A2A8 */
 #define g_type2List              (*(AM2_PtrList **)(uintptr_t)ADDR_TYPE2_ACTION_LIST)  /* 0x004F9ED0 */
 #define g_uidCounter             ((uint32_t *)(uintptr_t)ADDR_UID_COUNTERS)  /* 0x00511DE0 */
 #define g_uidRemap               (*(uint32_t **)(uintptr_t)ADDR_UID_REMAP)  /* 0x00513088 */
@@ -853,7 +853,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_variationBlocks        ((uint8_t *)(uintptr_t)ADDR_VARIATION_BLOCKS)  /* 0x004FE2C0 */
 #define g_variationEnd           ((uint8_t *)(uintptr_t)ADDR_VARIATION_END)  /* 0x005022C0 */
 #define g_variationTable         ((uint8_t **)(uintptr_t)ADDR_VARIATION_TABLE)  /* 0x00507130 */
-#define g_vehicleAnims           ((uint8_t *)(uintptr_t)ADDR_VEHICLE_ANIMS)  /* 0x00661DF0 */
+#define g_vehicleAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_VEHICLE_ANIMS)  /* 0x00661DF0 */
 #define g_vehicleBox             ((const AM2_Rect *)(uintptr_t)ADDR_VEHICLE_BOX)  /* 0x0048BE10 */
 #define g_vehicleDefCap          (*(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP)  /* 0x0066202C */
 #define g_vehicleDefCount        (*(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT)  /* 0x00662028 */

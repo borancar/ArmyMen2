@@ -1377,14 +1377,14 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
         }
     }
 
-#define orows (((uint8_t *)o->rowSet.rows))
+#define orows (o->rowSet.rows)
 
     if (*((const int32_t *)o->field94) == 3) {
-        *(const void **)(orows + ROW_OFF_ANIM_CUR) = (const void *)0;
-        *(int16_t *)(orows + ROW_OFF_FIELD_26) =
+        orows->animCur = (AM2_AnimTable *)0;
+        orows->depthLayer =
             (int16_t)(ScaleBy32Blocks(o->row0YAdjust) + AM2_MISSILE_ROW26_BIAS);
-        *(uint8_t *)(orows + ROW_OFF_HEADING) = (uint8_t)heading;
-        *(uint32_t *)(orows + ROW_OFF_STAMP_54) =
+        orows->heading = (uint8_t)heading;
+        orows->stamp54 =
             g_gameClockMs;
         TimedDirFrame(orows, heading);
 
@@ -1393,9 +1393,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
 
             if (prev
                 && g_gameClockMs
-                   - *(const uint32_t *)
-                       (((const uint8_t *)prev->rowSet.rows)
-                        + ROW_OFF_STAMP_54) < AM2_FRAME_PERIOD_MS)
+                   - prev->rowSet.rows->stamp54 < AM2_FRAME_PERIOD_MS)
                 prev->scriptState =
                     (o)->uid;
         }
@@ -1403,12 +1401,12 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
         w->deadlineD0 =
             (o)->uid;
     } else {
-        *(const void **)(orows + ROW_OFF_ANIM_CUR) =
+        orows->animCur =
             g_missileAnims;
-        *(int16_t *)(orows + ROW_OFF_FIELD_26) =
+        orows->depthLayer =
             (int16_t)(ScaleBy32Blocks(o->row0YAdjust) + AM2_MISSILE_ROW26_BIAS);
-        *(uint8_t *)(orows + ROW_OFF_HEADING) = (uint8_t)heading;
-        SetAnimFrame((AM2_MapRow *)orows, (int16_t)frame, 1);
+        orows->heading = (uint8_t)heading;
+        SetAnimFrame(orows, (int16_t)frame, 1);
     }
     return o;
 #undef orows
@@ -1488,13 +1486,13 @@ void *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
                 g_zeroRect);
 
     /* The row pointer is re-read at every use. */
-#define ROWS (((uint8_t *)o->rowSet.rows))
-    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
+#define ROWS (o->rowSet.rows)
+    ROWS->animCur =
         g_missileAnims;
-    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint8_t *)(ROWS + ROW_OFF_HEADING) = o->facing;
+    ROWS->depthLayer = AM2_ROW_FIELD26_INIT;
+    ROWS->heading = o->facing;
 
-    SetAnimFrame((AM2_MapRow *)ROWS, (int16_t)frame, 1);
+    SetAnimFrame(ROWS, (int16_t)frame, 1);
 #undef ROWS
     return o;
 }

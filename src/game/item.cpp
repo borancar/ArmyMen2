@@ -1529,7 +1529,7 @@ void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
         height = *(const int8_t *)(g_tileAttrs + o->tile);
 
     /* The row pointer is re-read at every use. */
-#define ROWS (((uint8_t *)o->rowSet.rows))
+#define ROWS (o->rowSet.rows)
     switch (*(const int32_t *)o) {
     case 1:
     case 4:
@@ -1542,10 +1542,10 @@ void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
 
     case 3:
         o->heightSet = (uint8_t)height;
-        *(int16_t *)(ROWS + OBJ_OFF_DEPTH_LAYER) =
+        ROWS[0].depthLayer =
             (int16_t)ScaleBy32Blocks((int8_t)height);
         if (o->rowSet.count > 1)
-            *(int16_t *)(ROWS + AM2_OBJ_ROW_STRIDE + OBJ_OFF_DEPTH_LAYER) =
+            ROWS[1].depthLayer =
                 (int16_t)ScaleBy32Blocks(
                     o->heightSet);
         return;
@@ -1557,7 +1557,7 @@ void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
         break;
     }
 
-    *(int16_t *)(ROWS + OBJ_OFF_DEPTH_LAYER) =
+    ROWS[0].depthLayer =
         (int16_t)ScaleBy32Blocks((int8_t)height);
 #undef ROWS
 }
@@ -1911,7 +1911,7 @@ int32_t __cdecl ObjIsWatchedKind(const AM2_Object *obj)
 void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
 {
     AM2_Object       *o = obj;
-    const uint8_t *rows;
+    const AM2_MapRow *rows;
     int32_t        dir;
     int32_t        baseX, baseY;
     int32_t        i;
@@ -1921,16 +1921,16 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
 
     ++g_roachMarkStamp;
 
-    rows = ((const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
 
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
     baseY = (o->pos.y >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
-    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
+    dir = RoundTo8((rows->headingBias
+                    + rows->heading) & 0xFF,
+                   (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
     /* The count and the points re-indexed from the table, as RoachMaskWeight
      * reads them. */
@@ -2053,16 +2053,16 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                 (void *)(uintptr_t)o->uid);
 
     /* The rows pointer is re-read at every use, as the image does. */
-#define ROWS (((uint8_t *)o->rowSet.rows))
-    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
+#define ROWS (o->rowSet.rows)
+    ROWS->animCur =
         g_roachAnims;
-    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    ROWS->depthLayer = AM2_ROW_FIELD26_INIT;
     *(uint32_t *)ROWS |= ROW_FLAG_BIT8;
 
     o->seats = 1;
     o->roachCtl.heading   = 0;
 
-    SetAnimFrame((AM2_MapRow *)ROWS, g_roachStartFrame, 0);
+    SetAnimFrame(ROWS, g_roachStartFrame, 0);
 #undef ROWS
     SetObjField530(o, 1);
 
@@ -2119,7 +2119,7 @@ static_assert(sizeof(AM2_MaskRec) == AM2_MASK_STRIDE, "mask record size");
 static inline void ObjFootprint(void *obj, int32_t set)
 {
     AM2_Object        *o = (AM2_Object *)obj;
-    const uint8_t  *rows;
+    const AM2_MapRow  *rows;
     int32_t         dir, i;
     int32_t         baseX, baseY;
 
@@ -2133,15 +2133,15 @@ static inline void ObjFootprint(void *obj, int32_t set)
 
     ++g_objMarkStamp;
 
-    rows = ((const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
     baseY = (o->pos.y >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
-    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
+    dir = RoundTo8((rows->headingBias
+                    + rows->heading) & 0xFF,
+                   (((const AM2_Anim *)rows->animPlaying))
                        ->directionBits) & 0xFF;
 
     /* The record is indexed afresh each pass -- the kind and the count
@@ -2756,7 +2756,7 @@ void __cdecl RoachBite(AM2_Object *o)
 void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
 {
     AM2_Object       *o = obj;
-    const uint8_t *rows;
+    const AM2_MapRow *rows;
     int32_t        dir;
     int32_t        baseX, baseY;
     int32_t        i;
@@ -2766,16 +2766,16 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
 
     ++g_roachMarkStamp;
 
-    rows = ((const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
 
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
     baseY = (o->pos.y >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
-    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
+    dir = RoundTo8((rows->headingBias
+                    + rows->heading) & 0xFF,
+                   (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
     /* The count and the points re-indexed from the table, as RoachMaskWeight
      * reads them. */
@@ -4256,8 +4256,8 @@ typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
 void __cdecl PlaceObj(AM2_Object *obj, AM2_Point where)
 {
     AM2_Object *o = obj;
-    uint8_t *row;
-    const uint8_t *const *spr;
+    AM2_MapRow *row;
+    AM2_Sprite *const *spr;
     int32_t  i;
 
     if (!obj)
@@ -4280,25 +4280,25 @@ void __cdecl PlaceObj(AM2_Object *obj, AM2_Point where)
     o->pos.x     = where.x;
     o->pos.y = where.y;
 
-    row = ((uint8_t *)o->rowSet.rows);
-    *(AM2_Point *)(row + ROW_OFF_X) = o->pos;
-    ObjFlagSet0((AM2_MapRow *)row);
+    row = o->rowSet.rows;
+    row->pos = o->pos;
+    ObjFlagSet0(row);
     i = 1;
-    RowUpdate((AM2_MapRow *)row, i, g_mapDesc);
+    RowUpdate(row, i, g_mapDesc);
 
     /* THE LOOP NEVER ADVANCES. Every pass re-reads OBJ_OFF_ROWS -- row 0 --
      * and takes the attach offset from row 0's sprite, so the first row is
      * offset again once per extra row and rows 1 and up are not placed at
      * all. Reproduced; see the comment above. */
     if (i < o->rowSet.count) {
-        spr = (const uint8_t *const *)(row + ROW_OFF_SPRITE);
+        spr = &row->sprite;
         do {
-            row = ((uint8_t *)o->rowSet.rows);
-            *(AM2_Point *)(row + ROW_OFF_X) = o->pos;
-            *(int16_t *)(row + ROW_OFF_X) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_X);
-            *(int16_t *)(row + ROW_OFF_Y) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_Y);
-            ObjFlagSet0((AM2_MapRow *)row);
-            RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+            row = o->rowSet.rows;
+            row->pos = o->pos;
+            row->pos.x += (*spr)->attachX;
+            row->pos.y += (*spr)->attachY;
+            ObjFlagSet0(row);
+            RowUpdate(row, 0, g_mapDesc);
         } while (++i < o->rowSet.count);
     }
 
@@ -7335,14 +7335,13 @@ void __cdecl StepRowAnim(AM2_MapRow *r)
 void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
 {
     AM2_Object *o    = obj;
-    uint8_t *anim = g_soldierAnims
-                    + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    uint8_t *row  = ((uint8_t *)o->rowSet.rows);
+    AM2_AnimTable *anim = &g_soldierAnims[kind];
+    AM2_MapRow *row  = o->rowSet.rows;
 
     o->soldierKind = kind;
 
-    if (anim != *(uint8_t **)(row + ROW_OFF_ANIM_CUR)) {
-        *(uint8_t **)(row + ROW_OFF_ANIM_NEXT) = anim;
+    if (anim != row->animCur) {
+        row->animNext = anim;
 
         if (o->health > 0) {
             AM2_Object *w = WeaponByUid(o->inventory[o->inventorySel]);
@@ -7355,9 +7354,9 @@ void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
                 SetAnimFrame((AM2_MapRow *)((uint8_t *)o->rowSet.rows), 1, 1);
             }
         } else {
-            uint8_t *r = ((uint8_t *)o->rowSet.rows);
+            AM2_MapRow *r = o->rowSet.rows;
 
-            SetAnimFrame((AM2_MapRow *)r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
+            SetAnimFrame(r, r->frame, 1);
         }
     }
 
@@ -7784,7 +7783,7 @@ void __cdecl StepObjRows(AM2_Object *o)
 void __cdecl SetUnitPose(AM2_Object *obj, int32_t pose)
 {
     AM2_Object *o = obj;
-    uint8_t *row;
+    AM2_MapRow *row;
     int32_t  cur = o->pose;
     int32_t  interrupt;
     int32_t  pending;
@@ -7808,14 +7807,14 @@ void __cdecl SetUnitPose(AM2_Object *obj, int32_t pose)
         break;                          /* includes every pose above 0x24 */
     }
 
-    row = ((uint8_t *)o->rowSet.rows);
+    row = o->rowSet.rows;
 
     if (!interrupt) {
         const AM2_Anim *anim =
-            *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
+            ((const AM2_Anim *)row->animPlaying);
 
         if (anim
-            && *(const uint8_t *)(row + ROW_OFF_CELL) < anim->frames - 1)
+            && row->cell < anim->frames - 1)
             return;                     /* not on the last cell yet */
     }
 
@@ -7843,7 +7842,7 @@ void __cdecl SetUnitPose(AM2_Object *obj, int32_t pose)
         break;
     }
 
-    SetAnimFrame((AM2_MapRow *)row, (int16_t)FRAME, 0);
+    SetAnimFrame(row, (int16_t)FRAME, 0);
 #undef FRAME
 }
 
@@ -8386,7 +8385,7 @@ void __cdecl DamageItemChain(AM2_Object *o, int32_t amount, uint8_t d,
 int32_t __cdecl ObjOverlayY(const AM2_Object *obj)
 {
     const AM2_Object   *o = obj;
-    const uint8_t   *row;
+    const AM2_MapRow   *row;
     int32_t          dir;
 
     if (!o)
@@ -8395,8 +8394,8 @@ int32_t __cdecl ObjOverlayY(const AM2_Object *obj)
         return 0;
 
     /* The animation is re-read from the row after the call. */
-    row = ((const uint8_t *)o->rowSet.rows);
-#define ANIM (*(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING))
+    row = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
+#define ANIM (((const AM2_Anim *)row->animPlaying))
     if (!ANIM)
         return 0;
 
@@ -8554,7 +8553,7 @@ void __cdecl SetObjField530(AM2_Object *obj, int32_t state)
 {
     AM2_Object *o = obj;
     int32_t  cur = o->field530;
-    uint8_t *row;
+    AM2_MapRow *row;
     int32_t  mayInterrupt;
 
     if (cur == state)
@@ -8564,15 +8563,15 @@ void __cdecl SetObjField530(AM2_Object *obj, int32_t state)
     if (state >= 5 && state <= 6)
         mayInterrupt = 1;
 
-    row = ((uint8_t *)o->rowSet.rows);
+    row = o->rowSet.rows;
 
-    if (!(mayInterrupt && *(const int16_t *)(row + ROW_OFF_FIELD_3C) != 0)
+    if (!(mayInterrupt && row->field3C != 0)
         && !RowAnimFinished(row))
         return;
 
     o->field530 = state;
 
-    SetAnimFrame((AM2_MapRow *)row,
+    SetAnimFrame(row,
                  (int16_t)(g_field530Frames)[state],
                  0);
 
@@ -8637,14 +8636,14 @@ uint8_t __cdecl JitterFacing(AM2_Object *obj, uint8_t facing)
  * last. This is a helper of ours -- the original inlines it both times --
  * and it is one only because writing the conjunction twice is how a
  * polarity gets flipped in one copy. */
-static inline int32_t RowMidAnimation(const uint8_t *row)
+static inline int32_t RowMidAnimation(const AM2_MapRow *row)
 {
     const AM2_Anim *anim =
-        *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
+        ((const AM2_Anim *)row->animPlaying);
 
     return anim
-        && *(const int16_t *)(row + ROW_OFF_FIELD_3C) == 0
-        && (int32_t)*(const uint8_t *)(row + ROW_OFF_CELL)
+        && row->field3C == 0
+        && (int32_t)row->cell
                < (int32_t)anim->frames - 1;
 }
 
@@ -8751,7 +8750,7 @@ void __cdecl SetKindFrames(AM2_Object *obj, int32_t kind)
 
     row = ((uint8_t *)o->rowSet.rows);
 
-    if (!RowMidAnimation(row)) {
+    if (!RowMidAnimation((const AM2_MapRow *)row)) {
         o->soldierKind = kind;
         SetAnimFrame((AM2_MapRow *)row,
                      (int16_t)(g_kindFrames)[kind],
@@ -8763,7 +8762,7 @@ void __cdecl SetKindFrames(AM2_Object *obj, int32_t kind)
 
     row = ((uint8_t *)o->rowSet.rows) + AM2_OBJ_ROW_STRIDE;
 
-    if (!RowMidAnimation(row))
+    if (!RowMidAnimation((const AM2_MapRow *)row))
         SetAnimFrame((AM2_MapRow *)row, AM2_SECOND_ROW_FRAME, 0);
 }
 
@@ -9117,7 +9116,7 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
 {
     const AM2_Point *pt = (const AM2_Point *)ptv;
     AM2_Object       *o = (AM2_Object *)obj;
-    uint8_t       *row;
+    AM2_MapRow       *row;
     const uint8_t *spr;
     int32_t        x;
     int32_t        y;
@@ -9127,18 +9126,18 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
     if (o->rowSet.count < 1)
         return 0;
 
-    row = ((uint8_t *)o->rowSet.rows);
-    spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+    row = o->rowSet.rows;
+    spr = ((const uint8_t *)row->sprite);
     if (!spr)
         return 0;
     if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
         return 0;
 
-    if (!PointInRect((const AM2_Rect *)(row + ROW_OFF_RECT), pt))
+    if (!PointInRect(&row->rect, pt))
         return 0;
 
-    x = pt->x - *(const int32_t *)(row + ROW_OFF_RECT);
-    y = pt->y - *(const int32_t *)(row + ROW_OFF_RECT + 4);
+    x = pt->x - row->rect.left;
+    y = pt->y - row->rect.top;
 
     switch (*(const int32_t *)(spr + SPR_OFF_FORMAT)) {
     case 1:
@@ -10445,7 +10444,7 @@ void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
 int32_t __cdecl WeaponFrameReady(AM2_Object *obj, AM2_Object *weapon)
 {
     AM2_Object *o   = obj;
-    uint8_t *row;
+    AM2_MapRow *row;
     int32_t  kind;
     int32_t  frame;
 
@@ -10454,9 +10453,9 @@ int32_t __cdecl WeaponFrameReady(AM2_Object *obj, AM2_Object *weapon)
 
     (void)ClassifyByCode74(o);          /* answer discarded; see above */
 
-    row   = ((uint8_t *)o->rowSet.rows);
+    row   = o->rowSet.rows;
     kind  = *weapon->typeRec;
-    frame = *(const int16_t *)(row + ROW_OFF_FRAME);
+    frame = row->frame;
 
     /* Most rules break to the shared test; kinds 5, 11 and 12 make it
      * themselves, which is why VC6 keeps a second copy of the call -- and
@@ -10947,7 +10946,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
                            int32_t resurrect)
 {
 #define o (obj)
-    uint8_t  *row0;
+    AM2_MapRow  *row0;
     AM2_Point at;
     AM2_Point where;
     uint8_t   height;
@@ -10967,26 +10966,25 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
     o->heightSet = height;
     ObjTileChanged(o, (int32_t)(int8_t)height, 1);
 
-    row0 = ((uint8_t *)o->rowSet.rows);
-    *(AM2_Point *)(row0 + ROW_OFF_X) = o->pos;
-    ObjFlagSet0((AM2_MapRow *)row0);
-    RowUpdate((AM2_MapRow *)row0, 0, g_mapDesc);
+    row0 = o->rowSet.rows;
+    row0->pos = o->pos;
+    ObjFlagSet0(row0);
+    RowUpdate(row0, 0, g_mapDesc);
 
     o->dest = g_zeroXY;
 
     for (i = 1; i < o->rowSet.count; i++) {
-        uint8_t       *r = ((uint8_t *)o->rowSet.rows)
-                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+        AM2_MapRow       *r = &o->rowSet.rows[i];
 
         /* The sprite is read through the object's rows at each use. */
 #define SPR0 (*(const uint8_t *const *)(((uint8_t *)o->rowSet.rows) \
                                        + ROW_OFF_SPRITE))
-        *(AM2_Point *)(r + ROW_OFF_X) = o->pos;
-        *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
-        *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
+        r->pos = o->pos;
+        r->pos.x += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
+        r->pos.y += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
 #undef SPR0
-        ObjFlagSet0((AM2_MapRow *)r);
-        RowUpdate((AM2_MapRow *)r, 0, g_mapDesc);
+        ObjFlagSet0(r);
+        RowUpdate(r, 0, g_mapDesc);
     }
 
     ResetType2Fields(o);
@@ -11056,7 +11054,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
 void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurrect)
 {
     AM2_Object  *o = obj;
-    uint8_t  *row0;
+    AM2_MapRow  *row0;
     AM2_Point at;
     AM2_Point out;   /* NearestClearPoint's answer: its own slot in the image */
     uint8_t   height;
@@ -11077,10 +11075,10 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
     o->heightSet = height;
     ObjTileChanged((AM2_Object *)o, (int32_t)(int8_t)height, 1);
 
-    row0 = ((uint8_t *)o->rowSet.rows);
-    *(AM2_Point *)(row0 + ROW_OFF_X) = o->pos;
-    ObjFlagSet0((AM2_MapRow *)row0);
-    RowUpdate((AM2_MapRow *)row0, 1, g_mapDesc);   /* force 1 here */
+    row0 = o->rowSet.rows;
+    row0->pos = o->pos;
+    ObjFlagSet0(row0);
+    RowUpdate(row0, 1, g_mapDesc);   /* force 1 here */
 
     o->dest = g_zeroXY;
     ResetType2Fields(o);
@@ -11630,9 +11628,9 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                 g_zeroRect);
 
     /* The rows are read through the object at each store. */
-    *(const void **)(((uint8_t *)o->rowSet.rows) + ROW_OFF_ANIM_CUR) =
+    o->rowSet.rows->animCur =
         g_explosionAnims;
-    *(int16_t *)(((uint8_t *)o->rowSet.rows) + ROW_OFF_FIELD_26) = depth;
+    o->rowSet.rows->depthLayer = depth;
 
 
     if (delay > 0)
@@ -11692,7 +11690,7 @@ void __cdecl StepType6(AM2_Object *obj)
         o->scriptId = 0;
     }
 
-    if (*(const uint8_t *)(((uint8_t *)o->rowSet.rows) + ROW_OFF_CELL) >= 4
+    if (o->rowSet.rows->cell >= 4
         && o->rank > 0) {
 
         victim = (AM2_Object *)(uint8_t *)AllObjectsInRect(
@@ -11820,7 +11818,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                             uint32_t uid, int32_t settle, uint8_t facing)
 {
     AM2_Object  *o;
-    uint8_t  *rows;
+    AM2_MapRow  *rows;
     AM2_Point at;
     AM2_Point  where;
     AM2_Rect  r;
@@ -11910,11 +11908,11 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     ((AM2_Rec *)(g_armyObjLists)[army])->PtrListPush(
                 (void *)(uintptr_t)o->uid);
 
-    rows = ((uint8_t *)o->rowSet.rows);
+    rows = o->rowSet.rows;
     o->soldierKind = 0;
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
-        (const void *)g_soldierAnims;
-    *(int16_t *)(((uint8_t *)o->rowSet.rows) + ROW_OFF_FIELD_26) =
+    rows->animCur =
+        g_soldierAnims;
+    o->rowSet.rows->depthLayer =
         AM2_ROW_FIELD26_INIT;
 
     if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
@@ -11978,7 +11976,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 {
     AM2_Object       *o;
     const uint8_t *def;
-    const uint8_t *turret;
+    AM2_AnimTable *turret;
     AM2_Point      at;
     int32_t        weaponKind;
     int32_t        i;
@@ -12045,9 +12043,8 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         + (uint32_t)table * AM2_OBJ_TABLE_REC_SIZE;
 
     nrows = 1;
-    turret = g_turretAnims
-           + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    if (*(const int32_t *)turret > 0)
+    turret = &g_turretAnims[kind];
+    if (turret->count > 0)
         nrows = 2;
 
     BuildRowSet(&o->rowSet, nrows,
@@ -12115,37 +12112,36 @@ no_weapon:
         SendItemCreate(o);
 
     /* The rows are re-read from the object for every store. */
-#define ROWS (((uint8_t *)o->rowSet.rows))
-    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
-        g_vehicleAnims
-        + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint32_t *)ROWS |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
-    *(AM2_Point *)(ROWS + ROW_OFF_X) = o->pos;
+#define ROWS (o->rowSet.rows)
+    ROWS->animCur =
+        &g_vehicleAnims[kind];
+    ROWS->depthLayer = AM2_ROW_FIELD26_INIT;
+    ROWS->flags |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
+    ROWS->pos = o->pos;
 
     if (nrows > 1) {
-        *(const void **)(ROWS + AM2_OBJ_ROW_STRIDE + ROW_OFF_ANIM_CUR) = turret;
-        *(int16_t *)(ROWS + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26) =
-            *(const int16_t *)(ROWS + ROW_OFF_FIELD_26);
-        *(uint32_t *)(ROWS + AM2_OBJ_ROW_STRIDE) |= ROW_FLAG_BIT5;
+        ROWS[1].animCur = turret;
+        ROWS[1].depthLayer =
+            ROWS->depthLayer;
+        ROWS[1].flags |= ROW_FLAG_BIT5;
     }
 
     if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
         ObjConceal(o, 0);
 
     SetKindFrames(o, 1);
-    RowUpdate((AM2_MapRow *)ROWS, 1, g_mapDesc);
+    RowUpdate(ROWS, 1, g_mapDesc);
 
     /* Every row past the first is placed at the object's position plus the
      * FIRST row's sprite attachment point -- rows[0]'s sprite, not its own. */
     for (i = 1; i < o->rowSet.count; i++) {
-        uint8_t *r = ROWS + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-#define spr (*(const uint8_t *const *)(ROWS + ROW_OFF_SPRITE))
+        AM2_MapRow *r = &ROWS[i];
+#define spr (ROWS->sprite)
 
-        *(AM2_Point *)(r + ROW_OFF_X) = o->pos;
-        *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
-        *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
-        RowUpdate((AM2_MapRow *)r, 1, g_mapDesc);
+        r->pos = o->pos;
+        r->pos.x += spr->attachX;
+        r->pos.y += spr->attachY;
+        RowUpdate(r, 1, g_mapDesc);
     }
 #undef ROWS
 
@@ -12585,7 +12581,7 @@ void __cdecl StepType5(AM2_Object *obj)
 {
 #define o (obj)
     const uint8_t *def;
-    uint8_t *rows;
+    AM2_MapRow *rows;
     int32_t  outcome = 6;
     int32_t  speed;
     int32_t  strike;
@@ -12709,7 +12705,7 @@ void __cdecl StepType5(AM2_Object *obj)
 
 after_flight:
     def  = o->field94;
-    rows = ((uint8_t *)o->rowSet.rows);
+    rows = o->rowSet.rows;
 
     switch (*(const int32_t *)def) {
     case 3:
@@ -12790,11 +12786,11 @@ after_flight:
     }
 
     /* The row rides MISSILE_OFF_GROUND, not the ground under it. */
-    *(AM2_Point *)(rows + ROW_OFF_X) = o->pos;
-    *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
+    rows->pos = o->pos;
+    rows->yAdjust =
         (int16_t)(o->row0YAdjust
                   - o->ground);
-    RowUpdate((AM2_MapRow *)rows, 0, g_mapDesc);
+    RowUpdate(rows, 0, g_mapDesc);
     ObjTileChanged(o, o->row0YAdjust, 0);
 
     /* Crossed from open ground onto blocked: clamp the flight DOWN to just
@@ -13162,7 +13158,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
 
     AM2_Object  *u   = unit;
     int16_t  *pt  = (int16_t *)&spot.at;
-    uint8_t  *spr;
+    AM2_Sprite *spr;
     AM2_Point  from;         /* the packed spot.at the shot leaves from */
     int16_t  *fromP = (int16_t *)&from;
     int32_t   dir;
@@ -13191,15 +13187,15 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
      * 0x60 + ROW_OFF_SPRITE, 0x60 + ROW_OFF_X and 0x60 + ROW_OFF_FIELD_26,
      * which is what identifies them as row 1 rather than as fields of their
      * own. Nothing new had to be named for this function. */
-#define rows (((uint8_t *)u->rowSet.rows))
+#define rows (u->rowSet.rows)
     if (u->rowSet.count > 1) {
-        from = *(const AM2_Point *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
-        spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
-        dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
+        from = rows[1].pos;
+        spr  = rows[1].sprite;
+        dir  = rows[1].depthLayer;
     } else {
         from = u->pos;
-        spr  = *(uint8_t **)(rows + ROW_OFF_SPRITE);
-        dir  = *(const int16_t *)(rows + ROW_OFF_FIELD_26);
+        spr  = rows->sprite;
+        dir  = rows->depthLayer;
     }
 #undef rows
 
@@ -13225,9 +13221,9 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
     do {                                                                      \
         if (spr) {                                                            \
             fromP[0] = (int16_t)(fromP[0]                                     \
-                     + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));        \
+                     + spr->attachX);                                         \
             fromP[1] = (int16_t)(fromP[1]                                     \
-                     + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));        \
+                     + spr->attachY);                                         \
         }                                                                     \
     } while (0)
 

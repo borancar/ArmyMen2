@@ -17,6 +17,7 @@
 #include "armymsg.h"   /* SendTrooperSetWeapon -- reconstructed */
 #include "defparse.h"  /* AM2_DefLink, DefFindLink -- reconstructed */
 #include "maprow.h"    /* RowUpdate -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite: the attach point */
 #include "army.h"      /* AllyFlag -- reconstructed */
 #include "air.h"       /* ObjConceal -- reconstructed */
 #include "../inject/orig.h"
@@ -714,7 +715,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
 #define kind (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
     AM2_Object       *made;
     AM2_Object       *weapon;
-    uint8_t       *rows;
+    AM2_MapRow       *rows;
 
     *points -= *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
 
@@ -740,8 +741,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             SendTrooperSetWeapon(made, weapon->uid, 0);
         }
 
-        rows = ((uint8_t *)made->rowSet.rows);
-        *(uint8_t *)(rows + ROW_OFF_HEADING) =
+        rows = made->rowSet.rows;
+        rows->heading =
             made->facing;
         StepObjRows(made);
         ObjTileChanged(made, made->heightSet, 1);
@@ -762,8 +763,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, facing);
 
-        rows = ((uint8_t *)made->rowSet.rows);
-        *(uint8_t *)(rows + ROW_OFF_HEADING) =
+        rows = made->rowSet.rows;
+        rows->heading =
             made->facing;
 
         if (made->rowSet.count > 1)
@@ -777,22 +778,19 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         n = made->rowSet.count;
         rows = 0;
         if (n > 0)
-            rows = ((uint8_t *)made->rowSet.rows);
+            rows = made->rowSet.rows;
 
         for (i = 1; i < n; i++) {
-            uint8_t *row = ((uint8_t *)made->rowSet.rows)
-                           + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
+            AM2_MapRow *row = &made->rowSet.rows[i];
 
-            *(AM2_Point *)(row + ROW_OFF_X) =
+            row->pos =
                 made->pos;
-            *(int16_t *)(row + ROW_OFF_X) +=
-                *(const int16_t *)(*(const uint8_t *const *)(rows + 4)
-                                   + SPR_OFF_OVX);
-            *(int16_t *)(row + ROW_OFF_Y) +=
-                *(const int16_t *)(*(const uint8_t *const *)(rows + 4)
-                                   + SPR_OFF_OVY);
+            row->pos.x +=
+                rows->sprite->attachX;
+            row->pos.y +=
+                rows->sprite->attachY;
 
-            RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+            RowUpdate(row, 0, g_mapDesc);
             n = made->rowSet.count;
         }
 
@@ -865,8 +863,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                                      weapon->uid, 0);
             }
 
-            rows = ((uint8_t *)occupant->rowSet.rows);
-            *(uint8_t *)(rows + ROW_OFF_HEADING) =
+            rows = occupant->rowSet.rows;
+            rows->heading =
                 occupant->facing;
             StepObjRows(occupant);
 

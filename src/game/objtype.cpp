@@ -883,9 +883,8 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
                      o->flags);
 
     for (i = 0; i < o->rowSet.count; i++)
-        *(int32_t *)(((uint8_t *)o->rowSet.rows)
-                     + (size_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
-            *(const int32_t *)(rec + AAI_OFF_ROW_FIELD28);
+        o->rowSet.rows[i].depthSlope =
+            *(const float *)(rec + AAI_OFF_ROW_FIELD28);
 
     ObjAfterMove(o, 0, 0);
     return 1;
@@ -1001,10 +1000,10 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
 
     {
         int32_t s = AddRecordList(list);
-        int32_t hx = *(const int16_t *)((const uint8_t *)spr + SPR_OFF_HOTX);
-        int32_t hy = *(const int16_t *)((const uint8_t *)spr + SPR_OFF_HOTY);
-        int32_t w  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_W);
-        int32_t h  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_H);
+        int32_t hx = spr->hotX;
+        int32_t hy = spr->hotY;
+        int32_t w  = spr->bounds.right;     /* SPR_OFF_W */
+        int32_t h  = spr->bounds.bottom;    /* SPR_OFF_H */
 
         AM2_Rect r;
 
@@ -1308,9 +1307,8 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
                      o->flags);
 
     for (i = 0; i < o->rowSet.count; i++)
-        *(int32_t *)(((uint8_t *)o->rowSet.rows)
-                     + (uint32_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
-            *(const int32_t *)(rec + DEF_OBJ_REC_OFF_ROW_FIELD28);
+        o->rowSet.rows[i].depthSlope =
+            *(const float *)(rec + DEF_OBJ_REC_OFF_ROW_FIELD28);
 
     /* ASSIGNED, not OR'd -- see the note above. */
     o->flags =
@@ -1342,15 +1340,13 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
     }
 
     if (o->rowSet.count > 0) {
-        const uint8_t *spr =
-            *(const uint8_t *const *)(((uint8_t *)o->rowSet.rows)
-                                      + ROW_OFF_SPRITE);
+        const AM2_Sprite *spr = o->rowSet.rows->sprite;
 
         if (spr) {
-            int32_t l = -(int32_t)*(const int16_t *)(spr + SPR_OFF_HOTX);
-            int32_t t = -(int32_t)*(const int16_t *)(spr + SPR_OFF_HOTY);
-            int32_t r = *(const int32_t *)(spr + SPR_OFF_W) + l;
-            int32_t b = *(const int32_t *)(spr + SPR_OFF_H) + t;
+            int32_t l = -(int32_t)spr->hotX;
+            int32_t t = -(int32_t)spr->hotY;
+            int32_t r = spr->bounds.right + l;      /* SPR_OFF_W */
+            int32_t b = spr->bounds.bottom + t;     /* SPR_OFF_H */
 
             if (l != o->box.left
                 || t != o->box.top

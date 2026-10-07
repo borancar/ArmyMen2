@@ -698,18 +698,18 @@ void __cdecl RowInit(AM2_MapRow *r, AM2_Sprite *sprite, int32_t x, int32_t y)
  */
 int32_t __cdecl RowAnimField4(const void *row, uint16_t id)
 {
-    const uint8_t       *r = (const uint8_t *)row;
+    const AM2_MapRow       *r = (const AM2_MapRow *)row;
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              value;
 
-    if ((int16_t)id == *(const int16_t *)(r + ROW_OFF_FRAME))
-        return *(const int16_t *)(r + ROW_OFF_FIELD_3C);
+    if ((int16_t)id == r->frame)
+        return r->field3C;
 
     if (!id)
         return 0;
 
-    table = *(const AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    table = ((const AM2_AnimTable *)r->animCur);
     if (!table)
         return 0;
 
@@ -727,7 +727,7 @@ found:
 
     value = (int16_t)table->entries[i].anim->field4;
 
-    if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
+    if (r->lut
         == g_rowLutDoubles)
         value += value;
 
@@ -1207,13 +1207,13 @@ int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b)
     if (trace < 0)
         trace = getenv("AM2_TRACE_DEPTH") != 0;
     if (trace && a && b && AM2_TRACE_ON()) {
-        const uint8_t *pa = (const uint8_t *)a, *pb = (const uint8_t *)b;
+        const AM2_MapRow *pa = (const AM2_MapRow *)a, *pb = (const AM2_MapRow *)(const uint8_t *)b;
         fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
-                *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE),
-                *(const int16_t *)(pa + ROW_OFF_X), *(const int16_t *)(pa + ROW_OFF_Y),
-                *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE),
-                *(const int16_t *)(pb + ROW_OFF_X), *(const int16_t *)(pb + ROW_OFF_Y), r);
+                pa->depthLayer, (double)pa->depthSlope,
+                pa->pos.x, pa->pos.y,
+                pb->depthLayer, (double)pb->depthSlope,
+                pb->pos.x, pb->pos.y, r);
     }
     return r;
 }
@@ -2037,12 +2037,12 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 {
     /* The tile flags and the decal sprites are read at each use. */
 #define FLAGS (g_tileFlags)
-#define DECAL ((const uint8_t *)(g_decalSprites)[variant])
+#define DECAL ((g_decalSprites)[variant])
     const int32_t *step = g_tileStep8;
     AM2_Point      point;
     const uint8_t *flags;
     uint16_t       tile;
-    uint8_t       *row;
+    AM2_MapRow       *row;
     int32_t        n;
 
     /* The arguments arrive as dwords and only their low words are used --
@@ -2060,16 +2060,16 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
             return;
     }
 
-    row = *(uint8_t **)RowPoolAAlloc();
+    row = (AM2_MapRow *)*(uint8_t **)RowPoolAAlloc();
 
-    *(int32_t *)row = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) = (uint32_t)(uintptr_t)DECAL;
-    *(int16_t *)(row + ROW_OFF_X)      = (int16_t)x;
-    *(int16_t *)(row + ROW_OFF_X + 2)  = (int16_t)z;
-    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(DECAL + 0x34u);
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
+    row->flags = 1;
+    row->sprite = DECAL;
+    row->pos.x      = (int16_t)x;
+    row->pos.y  = (int16_t)z;
+    row->lut = DECAL->lut;
+    row->depthLayer = 2;
 
-    RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+    RowUpdate(row, 0, g_mapDesc);
 #undef FLAGS
 #undef DECAL
 }
@@ -2112,12 +2112,9 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
 {
     uint8_t       *ctx;
     /* The kind's record, indexed in place. */
-    typedef struct {
-        int32_t frames; const uint32_t *sprites; int32_t x, y, z, pad;
-    } Kind;
 #define KIND ((g_particleKinds)[kind])
     int32_t        half;
-    uint8_t       *row;
+    AM2_MapRow       *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                      at))
@@ -2126,11 +2123,11 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
     ctx = (uint8_t *)SeqAlloc(g_seqCtxA);
 
     /* The row is read through the record at every use. */
-#define ROW (*(uint8_t **)(ctx + 0x1C))
+#define ROW (*(AM2_MapRow **)(ctx + 0x1C))
     *(int32_t *)ctx       = 0;
     *(int32_t *)(ctx + 4) = kind;
-    *(uint8_t *)(ROW + 0x51) = 0;
-    *(uint32_t *)(ROW + ROW_OFF_STAMP_54) = 0;
+    ROW->cell = 0;
+    ROW->stamp54 = 0;
 
     half = speed >> 1;
     if (angle < 0) {
@@ -2156,17 +2153,17 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
 
     /* The row read once more, for the rest. */
     row = ROW;
-    *(int32_t *)row = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) =
+    row->flags = 1;
+    row->sprite =
         *KIND.sprites;
-    *(int16_t *)(row + ROW_OFF_X) =
+    row->pos.x =
         (int16_t)(*(const int16_t *)&KIND.x + *(const int16_t *)at);
-    *(int16_t *)(row + ROW_OFF_X + 2) =
+    row->pos.y =
         (int16_t)(*(const int16_t *)&KIND.y
                   + *(const int16_t *)((const uint8_t *)at + 2));
-    *(int16_t *)(row + 0x20)             = *(const int16_t *)&KIND.z;
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = 0;
-    *(int32_t *)(row + ROW_OFF_FIELD_2C) = rowField2C;
+    row->yAdjust             = *(const int16_t *)&KIND.z;
+    row->depthLayer = 0;
+    row->lut = (const void *)(uintptr_t)rowField2C;
 #undef ROW
 #undef KIND
 }
@@ -2306,17 +2303,17 @@ void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
  * the game down on its first run. */
 void __cdecl LeaveRemainsRow(const void *src)
 {
-    const uint8_t *s = (const uint8_t *)src;
-    uint8_t       *r = *(uint8_t **)RowPoolBAlloc();
+    const AM2_MapRow *s = (const AM2_MapRow *)src;
+    AM2_MapRow       *r = (AM2_MapRow *)*(uint8_t **)RowPoolBAlloc();
 
     *(int32_t *)r = 1;
-    *(uint32_t *)(r + ROW_OFF_SPRITE) = *(const uint32_t *)(s + ROW_OFF_SPRITE);
-    *(uint32_t *)(r + ROW_OFF_X)      = *(const uint32_t *)(s + ROW_OFF_X);
-    *(uint32_t *)(r + ROW_OFF_FIELD_2C) =
-        *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
-    *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
+    r->sprite = s->sprite;
+    r->pos      = s->pos;
+    r->lut =
+        s->lut;
+    r->depthLayer = 3;
 
-    RowUpdate((AM2_MapRow *)r, 0, g_mapDesc);
+    RowUpdate(r, 0, g_mapDesc);
 }
 
 /* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.
@@ -2352,12 +2349,11 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
                                int32_t field26)
 {
     /* The group's record, indexed afresh at each use as the image does. */
-#define GRP (g_spriteGroupsC \
-             + (uint32_t)group * AM2_SPRITEGRP_C_BYTES)
+#define GRP (g_spriteGroupsC[group])
     uint8_t *ctx = (uint8_t *)SeqAlloc(g_seqCtxB);
     int32_t  step;
     int32_t  frame;
-    uint8_t *row;
+    AM2_MapRow *row;
 
     *(uint8_t *)(ctx + 4)     = (uint8_t)group;
     *(uint32_t *)(ctx + 0x24) = ownerUid;
@@ -2365,24 +2361,24 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
     *(int32_t *)(ctx + 0x0C)  = 0;
     *(int32_t *)(ctx + 0x10)  = 0;
 
-    step  = 0x100 / *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT);
+    step  = 0x100 / GRP.count;
     frame = ((step >> 1) + angle) / step;
-    if (frame >= *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT))
-        frame -= *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT);
+    if (frame >= GRP.count)
+        frame -= GRP.count;
     *(int32_t *)(ctx + 0x14) = frame;
-    *(int32_t *)(ctx + 8)    = *(const int32_t *)(GRP + 8);
+    *(int32_t *)(ctx + 8)    = GRP.field8;
 
-    row = *(uint8_t **)(ctx + 0x1C);
-    *(uint8_t *)(row + 0x51)  = 0;
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
-    *(int32_t *)row           = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) =
-        ((uint32_t *const *)(GRP + SPRITEGRP_C_OFF_SPRITES))[0][frame];
-    *(int16_t *)(row + ROW_OFF_X)        = (int16_t)x;
-    *(int16_t *)(row + ROW_OFF_X + 2)    = (int16_t)(z + 1);
-    *(int16_t *)(row + 0x20)             = 0;
-    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
+    row = *(AM2_MapRow **)(ctx + 0x1C);
+    row->cell  = 0;
+    row->stamp54 = 0;
+    row->flags           = 1;
+    row->sprite =
+        GRP.sprites[frame];
+    row->pos.x        = (int16_t)x;
+    row->pos.y    = (int16_t)(z + 1);
+    row->yAdjust             = 0;
+    row->lut = 0;
+    row->depthLayer = (int16_t)field26;
 #undef GRP
 }
 
@@ -2414,18 +2410,18 @@ int32_t __cdecl TimedDirFrame(void *rows, uint8_t dir)
 {
     /* The grid's width is re-read at each use, as the image does. */
 #define COLS (g_spriteGridCols)
-    uint8_t *r = (uint8_t *)rows;
+    AM2_MapRow *r = (AM2_MapRow *)rows;
     int32_t  elapsed;
     int32_t  col;
 
     elapsed = (int32_t)((g_gameClockMs
-                         - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u);
+                         - r->stamp54) / 200u);
 
     col = COLS - 1;
     if (elapsed < col)
         col = elapsed;
 
-    *(uint32_t *)(r + ROW_OFF_SPRITE) =
+    r->sprite =
         (g_spriteGrid)
             [(RoundTo8(dir, 3) & 0xFF) * COLS + col];
 

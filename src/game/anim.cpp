@@ -200,24 +200,24 @@ void __cdecl LoadExplosionAnims(void)
      * than tidied: a chdir is a side effect, so which side of the test it
      * falls on is behaviour. */
     SetGameDir(AM2_ANI_DIR);
-    if (((AM2_AnimTable *)g_explosionAnims)->count <= 0)
-        LoadSpriteFile("explosions.ani", ((AM2_AnimTable *)g_explosionAnims), 0, 0,
+    if (g_explosionAnims->count <= 0)
+        LoadSpriteFile("explosions.ani", g_explosionAnims, 0, 0,
                        AM2_ANI_FLAGS_FX);
 }
 
 void __cdecl LoadMissileAnims(void)
 {
     SetGameDir(AM2_ANI_DIR);
-    if (((AM2_AnimTable *)g_missileAnims)->count <= 0)
-        LoadSpriteFile("missile.ani", ((AM2_AnimTable *)g_missileAnims), 0, 0, AM2_ANI_FLAGS_FX);
+    if (g_missileAnims->count <= 0)
+        LoadSpriteFile("missile.ani", g_missileAnims, 0, 0, AM2_ANI_FLAGS_FX);
 }
 
 void __cdecl LoadRoachAnims(void)
 {
-    if (((AM2_AnimTable *)g_roachAnims)->count > 0)
+    if (g_roachAnims->count > 0)
         return;
     SetGameDir(AM2_ANI_DIR);
-    LoadSpriteFile("roach.ani", ((AM2_AnimTable *)g_roachAnims), 0, 0, AM2_ANI_FLAGS_FX);
+    LoadSpriteFile("roach.ani", g_roachAnims, 0, 0, AM2_ANI_FLAGS_FX);
     /* A tail jump in the original, so the mask is built only on the load
      * path -- a second call does nothing at all. */
     BuildRoachMask();
@@ -230,9 +230,9 @@ void __cdecl LoadSoldierAnims(void)
      * 0x3C palette entries where everyone else reserves 10. */
     /* Written out per table, as the image has them -- not a loop. */
 #define LOAD_MEN(i, path, from)                                             \
-    if (((AM2_AnimTable *)g_soldierAnims)[i].count <= 0)                                       \
-        LoadSpriteFile(path, &((AM2_AnimTable *)g_soldierAnims)[i],                            \
-                       (i) ? &((AM2_AnimTable *)g_soldierAnims)[0] : 0, from, AM2_ANI_FLAGS_MEN);
+    if (g_soldierAnims[i].count <= 0)                                       \
+        LoadSpriteFile(path, &g_soldierAnims[i],                            \
+                       (i) ? &g_soldierAnims[0] : 0, from, AM2_ANI_FLAGS_MEN);
     int32_t i;
 
     SetGameDir(AM2_ANI_DIR);
@@ -251,9 +251,9 @@ void __cdecl LoadSoldierAnims(void)
      * table gets `next` = -1, where LoadAnimTable would have left whatever the
      * file said. Nothing is done if the table has no such entry, or none at
      * all. */
-    for (i = 0; i < ((AM2_AnimTable *)g_soldierAnims)[0].count; i++)
-        if (((AM2_AnimTable *)g_soldierAnims)[0].entries[i].id == AM2_ANIM_ID_LINK_BREAK) {
-            ((AM2_AnimTable *)g_soldierAnims)[0].entries[i].next = -1;
+    for (i = 0; i < g_soldierAnims[0].count; i++)
+        if (g_soldierAnims[0].entries[i].id == AM2_ANIM_ID_LINK_BREAK) {
+            g_soldierAnims[0].entries[i].next = -1;
             return;
         }
 }
@@ -284,13 +284,13 @@ void __cdecl LoadVehicleAnims(void)
 
     SetGameDir(AM2_ANI_DIR);
     for (i = 0; i < AM2_VEHICLE_ANIM_TABLES; i++) {
-        if (kPaths[i][0][0] && ((AM2_AnimTable *)g_vehicleAnims)[i].count <= 0) {
-            LoadSpriteFile(kPaths[i][0], &((AM2_AnimTable *)g_vehicleAnims)[i], 0, 0x0A,
+        if (kPaths[i][0][0] && g_vehicleAnims[i].count <= 0) {
+            LoadSpriteFile(kPaths[i][0], &g_vehicleAnims[i], 0, 0x0A,
                            AM2_ANI_FLAGS_MEN);
             BuildVehicleMask(i);
         }
-        if (kPaths[i][1][0] && ((AM2_AnimTable *)g_turretAnims)[i].count <= 0)
-            LoadSpriteFile(kPaths[i][1], &((AM2_AnimTable *)g_turretAnims)[i], 0, 0x0A,
+        if (kPaths[i][1][0] && g_turretAnims[i].count <= 0)
+            LoadSpriteFile(kPaths[i][1], &g_turretAnims[i], 0, 0x0A,
                            AM2_ANI_FLAGS_MEN);
     }
 }
@@ -317,17 +317,17 @@ void __cdecl FreeAnimTable(AM2_AnimTable *table)
 
 void __cdecl FreeExplosionAnims(void)
 {
-    FreeAnimTable(((AM2_AnimTable *)g_explosionAnims));
+    FreeAnimTable(g_explosionAnims);
 }
 
 void __cdecl FreeMissileAnims(void)
 {
-    FreeAnimTable(((AM2_AnimTable *)g_missileAnims));
+    FreeAnimTable(g_missileAnims);
 }
 
 void __cdecl FreeRoachAnims(void)
 {
-    FreeAnimTable(((AM2_AnimTable *)g_roachAnims));
+    FreeAnimTable(g_roachAnims);
 }
 
 void __cdecl FreeSoldierAnims(void)
@@ -335,15 +335,15 @@ void __cdecl FreeSoldierAnims(void)
     /* Nine calls written out in the original, one per table. rifleman is
      * first, so it is freed BEFORE the eight that borrow from it -- which is
      * safe only because a borrowed entry is skipped. */
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[0]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[1]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[2]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[3]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[4]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[5]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[6]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[7]);
-    FreeAnimTable(&((AM2_AnimTable *)g_soldierAnims)[8]);
+    FreeAnimTable(&g_soldierAnims[0]);
+    FreeAnimTable(&g_soldierAnims[1]);
+    FreeAnimTable(&g_soldierAnims[2]);
+    FreeAnimTable(&g_soldierAnims[3]);
+    FreeAnimTable(&g_soldierAnims[4]);
+    FreeAnimTable(&g_soldierAnims[5]);
+    FreeAnimTable(&g_soldierAnims[6]);
+    FreeAnimTable(&g_soldierAnims[7]);
+    FreeAnimTable(&g_soldierAnims[8]);
 }
 
 void __cdecl FreeVehicleAnims(void)
@@ -351,8 +351,8 @@ void __cdecl FreeVehicleAnims(void)
     int32_t i;
 
     for (i = 0; i < AM2_VEHICLE_ANIM_TABLES; i++) {
-        FreeAnimTable(&((AM2_AnimTable *)g_vehicleAnims)[i]);
-        FreeAnimTable(&((AM2_AnimTable *)g_turretAnims)[i]);
+        FreeAnimTable(&g_vehicleAnims[i]);
+        FreeAnimTable(&g_turretAnims[i]);
     }
 }
 
@@ -375,17 +375,17 @@ void __cdecl FreeVehicleAnims(void)
  */
 int32_t __cdecl RowAnimFinished(const void *row)
 {
-    const uint8_t  *r = (const uint8_t *)row;
+    const AM2_MapRow  *r = (const AM2_MapRow *)row;
     const AM2_Anim *a;
 
     /* One conjunction onto one `return 1`, every failure sharing the
      * `return 0` -- which is how the image lays it out. */
     if ((*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE)
-        && (a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING)) != 0
-        && (int32_t)*(const uint8_t *)(r + ROW_OFF_CELL) >= (int32_t)a->frames - 1
+        && (a = ((AM2_Anim *)r->animPlaying)) != 0
+        && (int32_t)r->cell >= (int32_t)a->frames - 1
         && g_gameClockMs
-           >= (uint32_t)(a->cells[*(const uint8_t *)(r + ROW_OFF_CELL)].hold
-                         + *(const int32_t *)(r + ROW_OFF_STAMP_54)))
+           >= (uint32_t)(a->cells[r->cell].hold
+                         + (int32_t)r->stamp54))
         return 1;
     return 0;
 }
@@ -422,7 +422,7 @@ int32_t __cdecl RowAnimFinished(const void *row)
  * sprite per unit per frame is the most visible thing reconstructed lately. */
 void __cdecl RowFaceSprite(void *row)
 {
-    uint8_t         *r = (uint8_t *)row;
+    AM2_MapRow         *r = (AM2_MapRow *)row;
     const AM2_Anim  *a;
     uint8_t          heading;
     int16_t          dir;
@@ -432,18 +432,18 @@ void __cdecl RowFaceSprite(void *row)
     if (!(*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE))
         return;
 
-    a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    a = ((AM2_Anim *)r->animPlaying);
     if (!a)
         return;
 
-    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
-                        + *(const uint8_t *)(r + ROW_OFF_HEADING));
+    heading = (uint8_t)(r->headingBias
+                        + r->heading);
     dir     = RoundTo8(heading, a->directionBits);
     cell    = (dir + 1) * a->frames - 1;
     sprite  = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[cell].sprite];
 
-    if (*(AM2_Sprite *const *)(r + ROW_OFF_SPRITE) != sprite)
-        RowSetSprite((AM2_MapRow *)r, sprite, g_mapDesc);
+    if (((AM2_Sprite *)r->sprite) != sprite)
+        RowSetSprite(r, sprite, g_mapDesc);
 }
 
 int anim_install(void)
