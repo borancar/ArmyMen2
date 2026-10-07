@@ -215,6 +215,23 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **MpPanelScreen builds its children with `new`** (2026-10-07), 339 ->
+    260, still 1528.
+    - Every child the image constructs carries an EH state store around
+      its constructor call (`mov byte [esp+0x1BC], N`). That is VC6's
+      code for `new T(...)`. The placement form
+      `p = operator_new(n); p = p ? ::new (p) T(...) : 0` produces
+      different code.
+    - Converted to real `new`: the four ArrowBars, the three ListBoxes,
+      the TextList, the chat Edit, the MpSpin, and the four rows records
+      (`new AM2_Rec(0)` in place of RecordCtor).
+    - The rest of the diff is the per-player loop's induction variables.
+      The image keeps `&g_armyPoints[i]` in a frame slot and ends the loop
+      on it (`cmp eax, 0x515FF0`). Ours folds it into the `this + 0x230`
+      walk, and our frame is 0x1C bytes smaller. An explicit pointer walk
+      and a direct `am2_origstate` reference both scored worse or the same.
+    - ObjAfterMove (30 -> 26) increments `idx` before `cell`, as
+      ItemTeardown does.
   - **Five functions closer, none matched** (2026-10-07), still 1528. Each
     change follows something the image shows directly.
     - ObjAfterMove (66 -> 30) shifts the row by the whole dword at

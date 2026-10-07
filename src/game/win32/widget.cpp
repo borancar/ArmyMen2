@@ -9372,7 +9372,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * buffer pointer, which cancels to `base + slot * 32`. */
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         char       *name = this->playerNames[i];
-        AM2_Widget  *child;
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
         AM2_Rect     box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
@@ -9457,16 +9456,13 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * ::MpPanelUpdate prints back into each row, so the constructor seeds
          * what the update displays. */
         last = i == 3;
-        child = (AM2_Widget *)orig_operator_new(0x84);
-        spin = child
-                ? ::new (child) AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
-                                  (g_armyPoints)[i],
-                                  0, 0x1388, 0x64, w, MpCommitPoints,
-                                  g_hiliteColour,
-                                  g_colourBelowBg,
-                                  g_backgroundColour,
-                                  i)
-                : 0;
+        spin = new AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
+                              (g_armyPoints)[i],
+                              0, 0x1388, 0x64, w, MpCommitPoints,
+                              g_hiliteColour,
+                              g_colourBelowBg,
+                              g_backgroundColour,
+                              i);
         ::WidgetAddChild(w, spin);
         this->armyRows[i] = spin;
 
@@ -9525,13 +9521,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * `sel` starts at 0 and is only moved by a name match, which is why
          * the first map wins on a fresh panel: nothing matches an empty
          * ADDR_MAP_NAME, so the original comes up on alpine3_mp. */
-        rows = orig_operator_new(AM2_ROWS_SIZE);
-        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+        rows = new AM2_Rec(0);
 
-        child = (AM2_Widget *)orig_operator_new(0x98);
-        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x16, 0xC8, 0xFA, 0x5A),
-                                         rows, 0, 0, 1)
-                      : 0;
+        *slot = new AM2_ListBox(*RectSet(&r, 0x16, 0xC8, 0xFA, 0x5A),
+                                rows, 0, 0, 1);
         /* UNGUARDED, and that is the original: it stores the result -- null
          * or not -- and then writes three fields THROUGH it. On an
          * allocation failure this faults, which VC6 makes possible because
@@ -9542,9 +9535,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         *(int32_t *)((uint8_t *)*slot + 0x50) = 0;
         ::WidgetAddChild(w, *slot);
 
-        child = (AM2_Widget *)orig_operator_new(0x78);
-        if (child)
-            ::new (child) AM2_ArrowBar(*RectSet(&r, 0x121, 0xC2, 0x13, 0x68), w,
+        child = new AM2_ArrowBar(*RectSet(&r, 0x121, 0xC2, 0x13, 0x68), w,
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                               0x40, 1);
@@ -9585,16 +9576,13 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * directory scratch, and the edit writes into it in place. */
     strcpy((char *)(p + 0xE4), g_dirScratch);
     {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
-
-        if (child)
-            ::new (child) AM2_Edit((char *)(p + 0xE4), 0x3C,
-                          *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
-                          g_hiliteColour,
-                          g_colourBelowBg,
-                          g_backgroundColour,
-                          OnChatEnter,
-                          0, 0);
+        AM2_Widget *child = new AM2_Edit((char *)(p + 0xE4), 0x3C,
+                                         *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
+                                         g_hiliteColour,
+                                         g_colourBelowBg,
+                                         g_backgroundColour,
+                                         OnChatEnter,
+                                         0, 0);
         ::WidgetAddChild(w, child);
         *(AM2_Widget **)(p + 0x34) = child;
         *(AM2_Widget **)((uint8_t *)child + 0x70) =
@@ -9606,21 +9594,15 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * Every panel after the first reuses it, which is why the log survives
      * closing and reopening the lobby. */
     if (g_menuMsgList == 0) {
-        void *rows = orig_operator_new(0x0C);
-
-        g_menuMsgList = rows ? RecordCtor(rows, 0)
-                                                       : 0;
+        g_menuMsgList = new AM2_Rec(0);
     }
     {
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_CHATBOX);
-        AM2_Widget  *child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
-        *slot = child ? ::new (child) AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
-                                          g_menuMsgList,
-                                          (int32_t)ADDR_LOG, 0)
-                      : (AM2_Widget *)0;
+        *slot = new AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
+                                 g_menuMsgList,
+                                 (int32_t)ADDR_LOG, 0);
 
         /* THE STORE WAS MISSING and the widget was not. This block built the
          * chat list correctly and then dropped the pointer on the floor, so
@@ -9645,10 +9627,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * On an empty log that is -1, which is what "no row" is elsewhere in
          * this tree. */
         {
-            AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
-
-            if (bar)
-                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
+            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2C, 1);
@@ -9723,13 +9702,11 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * appended. */
     {
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_GAME_BOX);
-        AM2_Widget  *child;
         void        *rows;
         char         path[0x40];
         int32_t      sel = 0;
 
-        rows = orig_operator_new(AM2_ROWS_SIZE);
-        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+        rows = new AM2_Rec(0);
 
         for (i = 0;
              i < g_nameTableCount; i++) {
@@ -9755,11 +9732,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             FillListFromRules(path, w);
         }
 
-        child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
-                                         (int32_t)(uintptr_t)OnMpGameType,
-                                         0, 1)
-                      : (AM2_Widget *)0;
+        *slot = new AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
+                                (int32_t)(uintptr_t)OnMpGameType,
+                                0, 1);
         ::WidgetAddChild(w, *slot);
 
         /* AND ITS SCROLLBAR. Built here rather than later because the child
@@ -9767,10 +9742,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * immediately after the box, and a tree is ordered by when each child
          * was added. */
         {
-            AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
-
-            if (bar)
-                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
+            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2A, 1);
@@ -9827,12 +9799,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * on a fresh panel -- which is why the original comes up on alpine3_mp. */
     {
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_MAP_BOX);
-        AM2_Widget  *child;
         void        *rows;
         int32_t      sel = 0;
 
-        rows = orig_operator_new(AM2_ROWS_SIZE);
-        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+        rows = new AM2_Rec(0);
 
         {
             const uint8_t *maps = (const uint8_t *)ScriptListFind(
@@ -9866,10 +9836,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             }
         }
 
-        child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x154, 0xAD, 0xF6, 0x48), rows,
-                                         (int32_t)(uintptr_t)OnMpMapPick, 0, 1)
-                      : (AM2_Widget *)0;
+        *slot = new AM2_ListBox(*RectSet(&r, 0x154, 0xAD, 0xF6, 0x48), rows,
+                                (int32_t)(uintptr_t)OnMpMapPick, 0, 1);
         ::WidgetAddChild(w, *slot);
 
         /* AND ITS SCROLLBAR. Built here rather than later because the child
@@ -9877,10 +9845,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * immediately after the box, and a tree is ordered by when each child
          * was added. */
         {
-            AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
-
-            if (bar)
-                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
+            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2F, 1);

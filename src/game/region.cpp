@@ -2566,7 +2566,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
         int32_t cell = (row << g_mapRowShift32)
                        + rect[0];
 
-        for (x = rect[0]; x <= rect[2]; cell++, idx++, x++) {
+        for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
 #define weights (*(uint8_t *const *)&g_cellWeights)
             uint16_t tile;
             int8_t   h;
