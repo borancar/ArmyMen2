@@ -7478,24 +7478,28 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
                 *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
                 *(void **)(c + SIGHTC_OFF_LEADER)     = NULL;
             }
-        }
 
-        L = *(uint8_t **)(c + SIGHTC_OFF_LEADER);
-        if (L) {
-            if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)L, 1)
-                && ObjIsTypeIn238((const AM2_Object *)L)) {
-                ResolveFormationPoint(obj, L,
-                                      (AM2_Point *)(c + SIGHTC_OFF_DEST));
-            } else {
-                *(uint32_t *)(c + SIGHTC_OFF_DEST) =
-                    *(const uint32_t *)(L + OBJ_OFF_POS);
-                *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-                    *(const uint32_t *)(L + OBJ_OFF_OWNER);
+            /* Inside the else: a leader that never resolved jumps straight
+             * past this, as the image's `jmp` over it does. */
+#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+            /* Read from the context at every use, not held. */
+            if (LEAD) {
+                if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 1)
+                    && ObjIsTypeIn238((const AM2_Object *)LEAD)) {
+                    ResolveFormationPoint(obj, LEAD,
+                                          (AM2_Point *)(c + SIGHTC_OFF_DEST));
+                } else {
+                    *(uint32_t *)(c + SIGHTC_OFF_DEST) =
+                        *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+                    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+                        *(const uint32_t *)(LEAD + OBJ_OFF_OWNER);
+                }
+#undef LEAD
+                DistAndAngle((const AM2_Point *)&anchor,
+                             (const AM2_Point *)(c + SIGHTC_OFF_DEST),
+                             (int32_t *)(c + SIGHTC_OFF_LEAD_RANGE),
+                             c + SIGHTC_OFF_LEAD_BEARING);
             }
-            DistAndAngle((const AM2_Point *)&anchor,
-                         (const AM2_Point *)(c + SIGHTC_OFF_DEST),
-                         (int32_t *)(c + SIGHTC_OFF_LEAD_RANGE),
-                         c + SIGHTC_OFF_LEAD_BEARING);
         }
     }
 
@@ -7548,8 +7552,8 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
             *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
         else
             *(int32_t *)(c + SIGHTC_OFF_VEHICLE_DIST) =
-                ApproxDist((const AM2_Point *)(V + OBJ_OFF_POS),
-                           (const AM2_Point *)(o + OBJ_OFF_POS));
+                ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                           (const AM2_Point *)(V + OBJ_OFF_POS));
     }
 
     if (g_gameClockMs

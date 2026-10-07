@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1526 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1528 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,17 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **TrooperBuildContext and PointerActionMode4 matched** (2026-10-07),
+    1526 -> 1528.
+    - TrooperBuildContext reads the context's leader at each use instead
+      of holding it in a local.
+    - Its leader block sits inside the `else` of the lookup test. The
+      image's null-leader path jumps straight past the block, where ours
+      had been re-testing the null it had just stored.
+    - Its vehicle distance takes the object's position first (ApproxDist
+      is symmetric).
+    - PointerActionMode4 stores the follow uid before AI mode 3: the image
+      loads the uid ahead of the constant store.
   - **MakePlacedUnit matched: the pillbox HP is a scalar** (2026-10-07),
     1525 -> 1526.
     - The image loads the pillbox trooper's health with one 16-bit

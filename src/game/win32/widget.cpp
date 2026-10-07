@@ -16842,9 +16842,9 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
         if (tgt
             && !ArmyAlliedWithObjInline(
                    *(const int32_t *)&g_defaultOwner, (const AM2_Object *)tgt, 0)) {
-            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
             *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
                 *(const uint32_t *)(tgt + OBJ_OFF_UID);
+            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
         } else {
             PointActionA(o, slot);
         }
