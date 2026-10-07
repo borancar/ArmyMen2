@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1529 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1531 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,20 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **A value read into a local before the call** (2026-10-07), 1529 ->
+    1531.
+    - VC6 picks a different scratch register for a value read straight
+      into a call argument than for one read into a local first. A local
+      shifts every later register choice by one.
+    - ScriptSetObjBitmap matched with the name's uid in a local before
+      LookupByUID. UpdateObjectScript matched with `frame->b` in a local
+      before ChangeObjectFrame.
+    - RefundPlacedUnit (14 -> 7) takes the trooper's weapon uid into a
+      local before LookupByUID.
+    - Found with `hoist.py` in the session tmp directory. For every call
+      argument that reads memory, it tries the read in a local and scores
+      the result. A sweep over all unmatched functions found these
+      three, plus smaller gains not yet taken.
   - **ObjAttachTo matched: one shared tail** (2026-10-07), 1528 -> 1529.
     - Three arms each did `s->followUid = t->uid`. The image loads it
       into eax in two of them and edx in the third. Ours rotated

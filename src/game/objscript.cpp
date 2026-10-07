@@ -502,7 +502,11 @@ int32_t __cdecl UpdateObjectScript(AM2_Object *obj)
                 AM2_ObjFrame *frame =
                     &state->frames[o->scriptFrame];
 
-                if (!ChangeObjectFrame(o, frame->b, 1))
+                /* The bitmap index through a local, as the image's register
+                 * choice for the scheduling store below shows. */
+                int32_t fb = frame->b;
+
+                if (!ChangeObjectFrame(o, fb, 1))
                     orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
 
                 o->scriptNext = frame->a + (int32_t)kScriptTiming;

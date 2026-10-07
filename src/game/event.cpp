@@ -719,7 +719,13 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
         return;
     }
 
-    obj = LookupByUID((uint32_t)kScriptNames[nameidx].value);
+    /* The uid in a local of its own: the image then loads it into eax, the
+     * table base's register, where a read straight into the argument takes
+     * the next scratch register. */
+    {
+        uint32_t uid = (uint32_t)kScriptNames[nameidx].value;
+        obj = LookupByUID(uid);
+    }
 
     if (ObjIsItem(obj)) {
         if (!ChangeObjectFrame(obj, frame, 1))

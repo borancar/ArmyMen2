@@ -1042,8 +1042,11 @@ found:
                 }
             }
 
-            w = (uint8_t *)LookupByUID(
-                *(const uint32_t *)(inside + OBJ_OFF_WEAPON_UID));
+            {
+                uint32_t wuid = *(const uint32_t *)(inside + OBJ_OFF_WEAPON_UID);
+
+                w = (uint8_t *)LookupByUID(wuid);
+            }
             if (!w)
                 return;
             if (!ObjIsType4((const AM2_Object *)w))
