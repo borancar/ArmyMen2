@@ -9065,7 +9065,7 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     this->focusedChild = panel;
     panel->flag44 = 1;
 
-    edit = (AM2_Edit *)new AM2_Edit((char *)this + 0x64, AM2_EDIT_MAX_CHARS,
+    edit = (AM2_Edit *)new AM2_Edit(this->battle, AM2_EDIT_MAX_CHARS,
                         *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x39, 0xF4, 0x11), 1,
                         g_hiliteColour, g_colourBelowBg, g_backgroundColour,
                         (void (__cdecl *)(AM2_Widget *))kHostBattle, 0, 0);
@@ -9078,7 +9078,7 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     ::WidgetAddChild(panel, dot);
     edit->dot = dot;
 
-    edit = (AM2_Edit *)new AM2_Edit((char *)this + 0x84, AM2_EDIT_MAX_CHARS,
+    edit = (AM2_Edit *)new AM2_Edit(this->player, AM2_EDIT_MAX_CHARS,
                         *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x88, 0xF4, 0x11), 1,
                         g_hiliteColour, g_colourBelowBg, g_backgroundColour,
                         (void (__cdecl *)(AM2_Widget *))kHostBattle, 0, 0);

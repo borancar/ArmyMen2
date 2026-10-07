@@ -806,7 +806,8 @@ struct AM2_AudioDialogScreen : AM2_ScreenBase {
 };
 struct AM2_BattleNameScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_BATTLE_NAME_SIZE - sizeof(AM2_ScreenBase)];
+    char        battle[0x20];       /* 0x0064  DLG_OFF_BATTLE_NAME, the battle's edit */
+    char        player[AM2_BATTLE_NAME_SIZE - 0x84]; /* 0x0084  DLG_OFF_PLAYER_NAME */
     AM2_BattleNameScreen(const char *bmp);
 };
 struct AM2_CommPanelScreen : AM2_ScreenBase {

@@ -731,11 +731,19 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
  * depths; espmap collapses all four references to one slot. Read as two
  * buffers, the name would be appended to uninitialised stack and the row
  * would come out as two characters. */
+/* What EnumSessionsCb keeps per listed session, AM2_SESSION_REC_BYTES. */
+struct AM2_SessionRec {
+    GUID     guid;                  /* +0x00 SESSION_REC_OFF_GUID, guidInstance */
+    uint32_t cur;                   /* +0x10 SESSION_REC_OFF_CUR, dwCurrentPlayers */
+    uint32_t max;                   /* +0x14 SESSION_REC_OFF_MAX, dwMaxPlayers */
+};
+static_assert(sizeof(AM2_SessionRec) == AM2_SESSION_REC_BYTES, "session record");
+
 BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
                                DWORD dwFlags, LPVOID lpContext)
 {
     char     row[AM2_SESSION_ROW_BYTES];
-    uint8_t *rec;
+    AM2_SessionRec *rec;
 
     (void)lpdwTimeOut;
     (void)lpContext;
@@ -748,15 +756,15 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
         goto refuse;
     if (!lpThisSD)
         goto refuse;
-    rec = (uint8_t *)orig_malloc(AM2_SESSION_REC_BYTES);
+    rec = (AM2_SessionRec *)orig_malloc(AM2_SESSION_REC_BYTES);
     if (!rec) {
 refuse:
         return FALSE;
     }
 
-    *(GUID *)(rec + SESSION_REC_OFF_GUID)   = lpThisSD->guidInstance;
-    *(uint32_t *)(rec + SESSION_REC_OFF_CUR) = lpThisSD->dwCurrentPlayers;
-    *(uint32_t *)(rec + SESSION_REC_OFF_MAX) = lpThisSD->dwMaxPlayers;
+    rec->guid = lpThisSD->guidInstance;
+    rec->cur  = lpThisSD->dwCurrentPlayers;
+    rec->max  = lpThisSD->dwMaxPlayers;
 
     /* JOINDISABLED (0x20), which is what the host sets once the game has
      * started; ours tested NEWPLAYERSDISABLED (0x1) until the relink
@@ -2572,7 +2580,7 @@ void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
 
         desc = (void *)c->sessionDesc;
         if (desc) {
-            *(uint32_t *)((uint8_t *)desc + AM2_DPSESSION_OFF_FLAGS)
+            ((LPDPSESSIONDESC2)desc)->dwFlags
                 &= ~(uint32_t)AM2_SESSION_FLAGS_START;
 
             if (::CommSetSessionDesc(comm, desc, 0) < 0)

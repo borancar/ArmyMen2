@@ -860,7 +860,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
                                  int32_t frame, int32_t flags)
 {
     char    pattern[0x100];
-    uint8_t found[0x118];
+    AM2_FindData found;
     char    dir[0x100];
     int32_t handle;
 
@@ -878,22 +878,22 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
 
     orig_sprintf(pattern, "%02d_%03d_%02d_*.bmp",
                  set, index, frame);
-    handle = orig_findfirst(pattern, found);
+    handle = orig_findfirst(pattern, &found);
     if (handle == -1) {
         spr->image.rle16 = 0;
     } else {
-        SpriteReloadNamed(spr, (const char *)(found + AM2_FIND_OFF_NAME),
+        SpriteReloadNamed(spr, found.name,
                                  flags);
         orig_findclose(handle);
     }
 
     orig_sprintf(pattern, "%02d_%03d_%02d_*.sha",
                  set, index, frame);
-    handle = orig_findfirst(pattern, found);
+    handle = orig_findfirst(pattern, &found);
     if (handle == -1) {
         spr->overlay = 0;
     } else {
-        LoadShadowBmp((const char *)(found + AM2_FIND_OFF_NAME), spr);
+        LoadShadowBmp(found.name, spr);
         orig_findclose(handle);
     }
 
@@ -1449,7 +1449,7 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
 {
     char     dir[0x100];
     char     pattern[0x100];
-    uint8_t  found[0x118];
+    AM2_FindData  found;
     int32_t  handle;
     int32_t  rc;
     uint32_t id    = spr->id;
@@ -1468,13 +1468,13 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
 
     orig_sprintf(pattern, "%02d_%03d_%02d_*.bmp",
                  (int32_t)set, (int32_t)index, (int32_t)frame);
-    handle = orig_findfirst(pattern, found);
+    handle = orig_findfirst(pattern, &found);
     if (handle == -1) {
         spr->image.rle16 = 0;
         return 0;
     }
 
-    rc = SpriteReloadNamed(spr, (const char *)(found + AM2_FIND_OFF_NAME),
+    rc = SpriteReloadNamed(spr, found.name,
                            flags);
     orig_findclose(handle);
     return rc;

@@ -71,18 +71,28 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 #define REQUEST_JOINED    0x0A
 #define REQUEST_LOCAL     0x0B
 
+/* One row of the connection list, ROW_STRIDE bytes: the name it shows and
+ * the DirectPlay connection behind it, null for a local game. */
+struct AM2_ConnRow {
+    char  name[ROW_OFF_CONNECTION];  /* +0x000 */
+    void *connection;                /* +0x100 ROW_OFF_CONNECTION */
+};
+#if !defined(_MSC_VER)
+static_assert(sizeof(AM2_ConnRow) == ROW_STRIDE, "connection row");
+#endif
+
 void __cdecl StartSelectedGame(void)
 {
-    uint8_t *screen = *(uint8_t **)(g_paintObj + SCREEN_OFF);
-    int32_t *list   = *(int32_t **)(screen + SCREEN_OFF_LIST);
-    int32_t  index  = *(int32_t *)(screen + SCREEN_OFF_INDEX);
+    AM2_ListBox  *screen = ((AM2_CommPanelScreen *)g_paintObj)->list;
+    AM2_ListRows *list   = screen->rows;
+    int32_t       index  = screen->chosen;
     void    *connection;
     int32_t  i;
 
     /* No list, or nothing sensibly selected, and the button does nothing. */
     if (!list)
         return;
-    if (index < 0 || index >= list[0])
+    if (index < 0 || index >= list->count)
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -90,8 +100,7 @@ void __cdecl StartSelectedGame(void)
     /* { int32 count; Row *rows; } -- the pointer is the second dword. The comm
      * object is re-read at every use, as the image does. */
 #define COMM (g_commObject)
-    connection = *(void **)(*(uint8_t **)(list + 1) + index * ROW_STRIDE
-                            + ROW_OFF_CONNECTION);
+    connection = ((AM2_ConnRow *)list->text)[index].connection;
 
     if (!connection) {
         /* A local game. The CD check here is the disabled one -- the call
@@ -241,9 +250,9 @@ void __cdecl StartMultiplayerGame(void)
 
 void __cdecl HostBattle(void)
 {
-    uint8_t    *dlg    = (g_paintObject);
-    const char *battle = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
-#define player ((const char *)(dlg + DLG_OFF_PLAYER_NAME))
+    AM2_BattleNameScreen *dlg = (AM2_BattleNameScreen *)(g_paintObject);
+    const char *battle = dlg->battle;
+#define player (dlg->player)
 
     if (strlen(battle) < 1 || strlen(player) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
@@ -422,17 +431,17 @@ typedef int32_t (__cdecl *am2_mkdir_fn)(const char *);
  */
 void __cdecl OnEnterNameOk(void)
 {
-    uint8_t    *dlg;
+    AM2_BattleNameScreen *dlg;
     const char *name;
     char        path[0x100];
     uint8_t     find[0x118];            /* a _finddata_t */
     AM2_Level       *level;
     int32_t     handle;
 
-    if ((dlg = (g_paintObject)) == (uint8_t *)0)
+    if ((dlg = (AM2_BattleNameScreen *)(g_paintObject)) == (AM2_BattleNameScreen *)0)
         return;
 
-    name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
+    name = dlg->battle;
     level = strlen(name) < 1 ? (AM2_Level *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
     if (level == (void *)0) {
         PlaySoundAt(3, 0, 0, 0, 0);
