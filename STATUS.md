@@ -215,6 +215,20 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **FindPath 381 -> 378** (2026-10-07), no count change.
+    - `cur` is a uint16_t: the image copies it unmasked and compares it
+      with `cmp ax`, masking only curTile.
+    - A neighbour's region is tested `> 0`.
+    - What is left:
+      - The image's outer `while` is not rotated: its back-edge jumps to
+        the test at the top. Every loop spelling tried scored worse.
+      - The image holds the region byte in al where ours spills it.
+    - Also tried without gain:
+      - ScriptParseEvent: two tail layouts.
+      - Step3RouteAndBoard: the image rematerializes `&o->C0` where ours
+        keeps a pointer.
+      - AppendTroopState: the image spills `seq` into a dead argument
+        slot.
   - **AM2_Object's route fields typed** (2026-10-07), no count change.
     - routeGoal (+0x118), moveUntil, and the waypoint array at +0x120 (a
       union with moveFrom, moveTo and moveEnd), plus moveAt and moveCount

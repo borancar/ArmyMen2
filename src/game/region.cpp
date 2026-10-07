@@ -1256,7 +1256,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     int32_t  considered = 0;
     int32_t  fromTile, toTile, goal, goalTile;
     int32_t  startRegion, goalRegion;
-    int32_t  cur, curTile;
+    uint16_t cur;
+    int32_t  curTile;
     int32_t  i;
 
     (void)unused;
@@ -1356,7 +1357,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 continue;
             t = nb & 0xFFFF;
             nbRegion = region[t];
-            if (nbRegion != 0 && nbRegion != startRegion
+            if (nbRegion > 0 && nbRegion != startRegion
                 && nbRegion != goalRegion)
                 continue;
 
