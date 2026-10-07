@@ -100,7 +100,7 @@
 #define g_airPathTurnYIn         (*(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN)  /* 0x00473F6E */
 #define g_airPathTurnYOut        (*(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT)  /* 0x00473F72 */
 #define g_airRunMs               (*(int32_t *)(uintptr_t)ADDR_AIR_RUN_MS)  /* 0x00473F3C */
-#define g_airSaveBlock           ((void *)(uintptr_t)ADDR_AIR_SAVE_BLOCK)  /* 0x004F945C */
+#define g_airSaveBlock           ((struct AM2_AirBlock *)(uintptr_t)ADDR_AIR_SAVE_BLOCK)  /* 0x004F945C */
 #define g_airSprites2            (*(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2)  /* 0x004F93D8 */
 #define g_airSprites3            ((AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3)  /* 0x004F93DC */
 #define g_airSprites6            ((AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6)  /* 0x004F942C */

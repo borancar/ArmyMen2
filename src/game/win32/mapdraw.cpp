@@ -2208,7 +2208,7 @@ void __cdecl DrawSelection(void)
  */
 void __cdecl AirFrameDraw(void)
 {
-#define air ((uint8_t *)g_airSaveBlock)
+#define air (g_airSaveBlock)
 #define gauge (g_airSprites2)
 #define step (g_frameDeltaMs)
 
@@ -2223,9 +2223,9 @@ void __cdecl AirFrameDraw(void)
     AirPassesDraw();
 
     /* --- the caller's own animation, on AIR_OFF_FLAG_B ------------------ */
-    if (*(const int32_t *)(air + AIR_OFF_FLAG_B) > 0) {
+    if (air->flagB > 0) {
         AM2_Object *obj = LookupByUID(
-            *(const uint32_t *)(air + AIR_OFF_EXTRA));
+            (uint32_t)air->extra[0]);
 
         if (obj->health > 0) {
             if (g_gameClockMs
@@ -2248,19 +2248,19 @@ void __cdecl AirFrameDraw(void)
                                 obj->pos.y);
             }
 
-            *(int32_t *)(air + AIR_OFF_FLAG_B) += step;
+            air->flagB += step;
 
-            if (*(const int32_t *)(air + AIR_OFF_FLAG_B)
+            if (air->flagB
                     >= g_airCycleMs) {
-                *(int32_t *)(air + AIR_OFF_FLAG_B) = 0;
+                air->flagB = 0;
                 ChangeObjectFrame(obj, 0, 1);
             }
         }
     }
 
     /* --- the gauge, on AIR_OFF_ACTIVE ----------------------------------- */
-    if (*(const int32_t *)(air + AIR_OFF_ACTIVE) > 0) {
-#define t     (*(const int32_t *)(air + AIR_OFF_ACTIVE))
+    if (air->active > 0) {
+#define t     (air->active)
 #define track (g_airSpritesEdge)
 #define span  (g_airGaugeMs)
         int32_t x, y;
@@ -2274,28 +2274,28 @@ void __cdecl AirFrameDraw(void)
 
         DrawSprite(gauge, x, y, 0);
 
-        *(int32_t *)(air + AIR_OFF_ACTIVE) += step;
+        air->active += step;
 
         /* The reveal happens ONCE, halfway along, and only for the army that
          * asked -- AIR_OFF_PENDING is what says it has been done. Reading it
          * as "one is queued" survived because nothing else writes it here. */
-        if (UidArmy(*(const uint32_t *)(air + AIR_OFF_FROM))
+        if (UidArmy(air->from[0])
                 == g_defaultOwner
-            && *(const int32_t *)(air + AIR_OFF_EXTRA) == 0
-            && *(const int32_t *)(air + AIR_OFF_PENDING) == 0
-            && *(const int32_t *)(air + AIR_OFF_ACTIVE) >= (span >> 1)) {
+            && air->extra[0] == 0
+            && air->pending == 0
+            && air->active >= (span >> 1)) {
 
-            if (*(const int32_t *)(air + AIR_OFF_KIND) == 2)
-                RevealNearby(*(const AM2_Point *)(air + AIR_OFF_WHERE),
+            if (air->kind[0] == 2)
+                RevealNearby(air->where[0],
                              AM2_AIR_REVEAL_NEAR_2, AM2_AIR_REVEAL_FAR_2);
             else
-                RevealNearby(*(const AM2_Point *)(air + AIR_OFF_WHERE),
+                RevealNearby(air->where[0],
                              AM2_AIR_REVEAL_NEAR_3, AM2_AIR_REVEAL_FAR_3);
 
-            *(int32_t *)(air + AIR_OFF_PENDING) = 1;
+            air->pending = 1;
         }
 
-        if (*(const int32_t *)(air + AIR_OFF_ACTIVE) >= span) {
+        if (air->active >= span) {
             AirDeliver();
             AirSupportPop();
         }
@@ -2305,8 +2305,8 @@ void __cdecl AirFrameDraw(void)
 #undef span
 
     /* --- the aircraft, on AIR_OFF_FLAG_A -------------------------------- */
-    if (*(const int32_t *)(air + AIR_OFF_FLAG_A) > 0) {
-        int32_t t     = *(const int32_t *)(air + AIR_OFF_FLAG_A);
+    if (air->flagA > 0) {
+        int32_t t     = air->flagA;
         int32_t leg1  = g_airLeg1Ms;
 #define leg2 (g_airLeg2Ms)
         int32_t frame = 0;
@@ -2364,9 +2364,9 @@ void __cdecl AirFrameDraw(void)
                        0);
         }
 
-        *(int32_t *)(air + AIR_OFF_FLAG_A) += step;
+        air->flagA += step;
 
-        if (*(const int32_t *)(air + AIR_OFF_FLAG_A)
+        if (air->flagA
                 >= g_airRunMs)
             AirSupportPop();
     }

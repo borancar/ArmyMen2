@@ -20,6 +20,25 @@
 #include "../inject/orig.h"   /* am2_FILE */
 #include "objtable.h"         /* AM2_Object */
 
+/* The air-support state at ADDR_AIR_SAVE_BLOCK, saved whole
+ * (AM2_AIR_SAVE_SIZE): a queue of up to 30 requests, a second queue of up to
+ * AM2_AIR_PASS_SLOTS fly-overs, and two animation timers. */
+typedef struct AM2_AirBlock {
+    int32_t   active;               /* +0x000 AIR_OFF_ACTIVE, the gauge's timer */
+    int32_t   pending;              /* +0x004 AIR_OFF_PENDING */
+    int32_t   count;                /* +0x008 AIR_OFF_COUNT, at most 30 */
+    AM2_Point where[30];            /* +0x00C AIR_OFF_WHERE */
+    int32_t   kind[30];             /* +0x084 AIR_OFF_KIND, 2 or 3 */
+    uint32_t  from[30];             /* +0x0FC AIR_OFF_FROM, the uid asking */
+    int32_t   extra[30];            /* +0x174 AIR_OFF_EXTRA */
+    int32_t   passCount;            /* +0x1EC AIR_OFF_PASS_COUNT, at most 8 */
+    int32_t   passTimer[8];         /* +0x1F0 AIR_OFF_PASS_TIMER, ms */
+    AM2_Point passWhere[8];         /* +0x210 AIR_OFF_PASS_WHERE */
+    int16_t   passArmy[8];          /* +0x230 AIR_OFF_PASS_ARMY */
+    int32_t   flagA;                /* +0x240 AIR_OFF_FLAG_A, the run's timer */
+    int32_t   flagB;                /* +0x244 AIR_OFF_FLAG_B, the caller's frames */
+} AM2_AirBlock;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

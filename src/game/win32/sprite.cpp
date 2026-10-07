@@ -2261,8 +2261,8 @@ void __cdecl ResetAirSupport(void)
 
     FreeAirSpritesAlias();
 
-    *(int32_t *)(uintptr_t)(((uintptr_t)g_airSaveBlock) + AIR_OFF_COUNT) = 0;
-    *(int32_t *)(uintptr_t)(((uintptr_t)g_airSaveBlock) + AIR_OFF_PASS_COUNT) = 0;
+    g_airSaveBlock->count = 0;
+    g_airSaveBlock->passCount = 0;
 
     LoadAirSprites();
 
