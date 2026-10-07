@@ -402,12 +402,6 @@ extern uint8_t am2_os_game_over_saved[];  /* 0x00515F8C */
 extern uint8_t am2_os_state_movie[];  /* 0x00515F98 */
 extern uint8_t am2_os_mp_panel_sprites_b[];  /* 0x00515FA0 */
 extern uint8_t am2_os_mp_panel_sprites_b_end[];  /* 0x00515FD4 */
-extern uint8_t am2_os_game_over_flags[];  /* 0x00515FD8 */
-extern uint8_t am2_os_game_setting_22c[];  /* 0x00515FDC */
-extern uint8_t am2_os_army_points[];  /* 0x00515FE0 */
-extern uint8_t am2_os_score_limit[];  /* 0x00515FF0 */
-extern uint8_t am2_os_live_player_name[];  /* 0x00515FF4 */
-extern uint8_t am2_os_live_battle_name[];  /* 0x00516035 */
 extern uint8_t am2_os_host_mask_a[];  /* 0x00516078 */
 extern uint8_t am2_os_host_mask_b[];  /* 0x0051607C */
 extern uint8_t am2_os_host_value_3e8[];  /* 0x00516090 */

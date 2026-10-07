@@ -119,7 +119,20 @@ typedef struct AM2_Object {
     int32_t        aiMode;          /* +0xE4  OBJ_OFF_AI_MODE */
     uint8_t        _pade8[0x24];    /* +0xE8 */
     int32_t        field10C;        /* +0x10C OBJ_OFF_FIELD_10C */
-    uint8_t        _pad110[0x41C];  /* +0x110 */
+    uint8_t        _pad110[8];      /* +0x110 */
+    uint32_t       routeGoal;       /* +0x118 OBJ_OFF_ROUTE_GOAL, a packed point */
+    int32_t        moveUntil;       /* +0x11C OBJ_OFF_MOVE_UNTIL, game-clock ms */
+    union {                         /* +0x120, the route's packed waypoints */
+        uint32_t   waypoints[256];  /*   indexed by moveAt */
+        struct {
+            uint32_t moveFrom;      /*   OBJ_OFF_MOVE_FROM, waypoint 0 */
+            uint32_t moveTo;        /*   OBJ_OFF_MOVE_TO, waypoint 1 */
+            int16_t  moveEnd;       /*   OBJ_OFF_MOVE_END, the terminator when there are 2 */
+        };
+    };
+    uint16_t       moveAt;          /* +0x520 OBJ_OFF_MOVE_AT, the waypoint in hand */
+    uint16_t       moveCount;       /* +0x522 OBJ_OFF_MOVE_COUNT */
+    uint8_t        _pad524[8];      /* +0x524 */
     union {                         /* +0x52C, by object type: */
         int32_t        vehicleKind; /*   VEHICLE_OFF_KIND */
         const uint8_t *tableRec2;   /*   SAVED_OFF_TABLE_REC2, a type 2's record */
@@ -172,6 +185,10 @@ typedef struct AM2_Object {
 static_assert(offsetof(AM2_Object, flags)         == 0x08,  "flags");
 static_assert(offsetof(AM2_Object, owner)         == 0x10,  "owner");
 static_assert(offsetof(AM2_Object, facing)        == 0x40,  "facing");
+static_assert(offsetof(AM2_Object, routeGoal)     == 0x118, "route goal");
+static_assert(offsetof(AM2_Object, moveEnd)       == 0x128, "move end");
+static_assert(offsetof(AM2_Object, moveAt)        == 0x520, "move at");
+static_assert(offsetof(AM2_Object, moveCount)     == 0x522, "move count");
 static_assert(offsetof(AM2_Object, maxHealth)     == 0x60,  "maxHealth");
 static_assert(offsetof(AM2_Object, health)        == 0x62,  "health");
 static_assert(offsetof(AM2_Object, heightAdj)     == 0x64,  "heightAdj");

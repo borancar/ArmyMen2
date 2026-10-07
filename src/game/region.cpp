@@ -3403,6 +3403,7 @@ heading:
 void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
 {
     uint8_t  *o    = (uint8_t *)obj;
+    AM2_Object *ob = (AM2_Object *)obj;
     uint8_t  *w    = (uint8_t *)out;
     uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
     uint8_t  *pos;
@@ -3419,7 +3420,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
     pos = o + OBJ_OFF_POS;
     if (ApproxDist((const AM2_Point *)dest, (const AM2_Point *)pos)
         < AM2_AI_TROOPER_ARRIVED) {
-        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) = 0;
+        ob->moveUntil = 0;
         return;
     }
 
@@ -3432,21 +3433,21 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
 
     /* Still heading where we were told, and the cooldown has not run out:
      * keep the route and go straight to walking it. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+    if (PointsEqual(ob->routeGoal,
                     *(const uint32_t *)&pt)
         && (uint32_t)*(const int32_t *)&g_gameClockMs
-               < (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
+               < (uint32_t)ob->moveUntil)
         goto walk;
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+        ob->moveUntil =
             *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         *(uint32_t *)&pt                      = *(const uint32_t *)dest;
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
-        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+        ob->routeGoal = *(const uint32_t *)&pt;
+        ob->moveFrom  = *(const uint32_t *)pos;
+        ob->moveTo    = *(const uint32_t *)&pt;
+        ob->moveEnd    = 0;
         goto two_waypoints;
     }
 
@@ -3460,10 +3461,10 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
      * one step off from the original. Only the radar showed it -- an off-screen
      * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
     if (PointsEqual(*(const uint32_t *)&pt,
-                    *(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL))
-        && *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
-        && (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-           < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                    ob->routeGoal)
+        && ob->moveCount > 0
+        && (int32_t)ob->moveAt
+           < (int32_t)ob->moveCount - 1)
         goto after_region;
 
     fromTile   = TileOfPoint(*(const uint32_t *)pos);
@@ -3483,7 +3484,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
 
     /* The region hop, skipped when we are already routing to this goal from
      * the region we were last in, and when both ends are in one region. */
-    if ((PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+    if ((PointsEqual(ob->routeGoal,
                      *(const uint32_t *)&pt)
          && *(const int16_t *)(o + OBJ_OFF_PREV_REGION) == (int16_t)fromRegion)
         || toRegion == fromRegion)
@@ -3518,45 +3519,45 @@ after_region:
      * waypoints left or has run past its cooldown. Both arms of that second
      * test skip the re-plan; see the header. */
     if (PointsEqual(*(const uint32_t *)&pt,
-                    *(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL))) {
-        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
-            && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-                   < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT))
+                    ob->routeGoal)) {
+        if (ob->moveCount > 0
+            && ob->moveAt
+                   < ob->moveCount)
             goto walk;
         if ((uint32_t)*(const int32_t *)&g_gameClockMs
-            > (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
+            > (uint32_t)ob->moveUntil)
             goto walk;
     }
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+        ob->moveUntil =
             *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         /* The goal it was ASKED for, not the point it is walking to. */
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+        ob->routeGoal = *(const uint32_t *)dest;
+        ob->moveFrom  = *(const uint32_t *)pos;
         goto set_move_to;
     }
 
-    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
+    ob->routeGoal = *(const uint32_t *)&pt;
     if (!PlanPathTo(obj, (uint32_t *)&pt, AM2_AI_PLAN_BUDGET_LONG)) {
-        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+        ob->moveFrom  = *(const uint32_t *)pos;
+        ob->routeGoal = *(const uint32_t *)dest;
         goto set_move_to;
     }
     /* A route was found; PlanPathTo filled the waypoints itself. */
-    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+    ob->routeGoal = *(const uint32_t *)dest;
     goto walk;
 
 no_region:
-    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-    *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+    ob->routeGoal = *(const uint32_t *)&pt;
+    ob->moveFrom  = *(const uint32_t *)pos;
 set_move_to:
-    *(uint32_t *)(o + OBJ_OFF_MOVE_TO) = *(const uint32_t *)&pt;
-    *(int16_t *)(o + OBJ_OFF_MOVE_END) = 0;
+    ob->moveTo = *(const uint32_t *)&pt;
+    ob->moveEnd = 0;
 two_waypoints:
-    *(int16_t *)(o + OBJ_OFF_MOVE_AT)    = 1;
-    *(int16_t *)(o + OBJ_OFF_MOVE_COUNT) = 2;
+    ob->moveAt    = 1;
+    ob->moveCount = 2;
 
 walk:
     /* Advance past every waypoint already close enough to count as reached.
@@ -3569,34 +3570,34 @@ walk:
      * Written out because that is what the instructions say, and because the
      * two dead compares are the sort of thing a tidier reading silently drops
      * along with a live one. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+    if (PointsEqual(ob->routeGoal,
                     *(const uint32_t *)&pt)
-        && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-               < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
-        uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+        && ob->moveAt
+               < ob->moveCount) {
+        uint32_t at = ob->moveAt;
 
         *(uint32_t *)&pt =
-            *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+            ob->waypoints[at];
         d = ApproxDist((const AM2_Point *)pos, &pt);
 
         while (d < AM2_AI_WAYPOINT_DIST) {
-            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+            at = ob->moveAt;
             if ((int32_t)at
-                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+                >= (int32_t)ob->moveCount - 1) {
                 if (d >= AM2_AI_WAYPOINT_DIST)
                     break;
-                if ((int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-                    < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                if ((int32_t)ob->moveAt
+                    < (int32_t)ob->moveCount - 1)
                     break;
-                *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 0;
-                *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) =
+                ob->moveCount  = 0;
+                ob->routeGoal =
                     g_zeroPoint;
                 break;
             }
             at++;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
+            ob->moveAt = (int16_t)at;
             *(uint32_t *)&pt =
-                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+                ob->waypoints[at];
             d = ApproxDist((const AM2_Point *)pos, &pt);
         }
     }

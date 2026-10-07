@@ -215,6 +215,24 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **AM2_Object's route fields typed** (2026-10-07), no count change.
+    - routeGoal (+0x118), moveUntil, and the waypoint array at +0x120 (a
+      union with moveFrom, moveTo and moveEnd), plus moveAt and moveCount
+      (+0x520).
+    - AiTrooperStep uses them and stays at 130. What is left there is
+      which of the region hop's values spill: the image keeps toTile and
+      toRegion on the frame.
+    - The new members tipped the CheatLine/PlacementScreenClick coin.
+      KEEP_DECLS is now the sprite list's range alone.
+    - Also tried without gain:
+      - BlockWeightRoute: the height operands and the distance compare
+        swapped, and the typed waypoint read.
+      - PointActionC: a pointer to the head row's sprite slot.
+      - HudTopUpdate: one read of the grab, reused.
+      - LoadOptions: early-return and explicit-return shapes.
+      - Step3Drive: the gun heading through a byte prototype. The image
+        shifts in 8 bits and pushes unextended, yet FireWeapon's body masks
+        an int.
   - **The MpPanel constructor gets its joiner arm: 422 -> 339** (2026-10-07),
     no count change.
     - The per-row arm that greys the points spinner for a joiner is
