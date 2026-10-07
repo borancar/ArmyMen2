@@ -712,7 +712,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
 {
 #define rec (g_unitTypes \
              + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE)
-#define kind (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
+#define KIND (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
     AM2_Object       *made;
     AM2_Object       *weapon;
     AM2_MapRow       *rows;
@@ -729,7 +729,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
 
         weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
                      g_dirScratch, slot,
-                     KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
+                     KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)KIND, 0),
                      g_zeroXY,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
@@ -737,7 +737,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             made->field54C =
                 (int32_t)weapon->uid;
             SoldierKindForWeapon(made,
-                *((const uint32_t *)weapon->typeRec));
+                (uint32_t)weapon->typeRec->kind);
             SendTrooperSetWeapon(made, weapon->uid, 0);
         }
 
@@ -757,7 +757,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
          * directory scratch the weapon calls take. The image pushes the
          * seventh argument here (0x0043AE12). */
         made = (AM2_Object *)(uint8_t *)CreateVehicle(
-                   kind, (char *)name,
+                   KIND, (char *)name,
                    where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
@@ -801,10 +801,10 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
     {
         int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
-        int32_t key  = SpriteKeyForKind(kind, army);
+        int32_t key  = SpriteKeyForKind(KIND, army);
         int32_t flag = 0;
 
-        if (kind >= AM2_PILLBOX_KIND_FIRST && kind <= AM2_PILLBOX_KIND_LAST)
+        if (KIND >= AM2_PILLBOX_KIND_FIRST && KIND <= AM2_PILLBOX_KIND_LAST)
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
         made = (AM2_Object *)(uint8_t *)CreateItem((char *)name, slot, key,
@@ -815,8 +815,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             ApplyHeightItem(made,
                 (int8_t)(g_tileAttrs)[(made)->tile]);
 
-        if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
-            if (kind == AM2_PLACE_KIND_POST_CREATE) {
+        if (KIND < AM2_PILLBOX_KIND_FIRST || KIND > AM2_PILLBOX_KIND_LAST) {
+            if (KIND == AM2_PLACE_KIND_POST_CREATE) {
                 ItemPostCreate(slot, where);
                 if (!AllyFlag(g_defaultOwner,
                               (uint32_t)slot))
@@ -832,10 +832,10 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             int32_t wkind;
             AM2_Object *occupant;
 
-            if (kind == 0)
+            if (KIND == 0)
                 wkind = AM2_PILLBOX_WEAPON_RIFLE;
             else
-                wkind = (kind == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
+                wkind = (KIND == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
                                     : AM2_PILLBOX_WEAPON_MG;
 
             occupant = (AM2_Object *)(uint8_t *)CreateTrooper(
@@ -857,7 +857,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 occupant->field54C =
                     (int32_t)weapon->uid;
                 SoldierKindForWeapon(occupant,
-                    *((const uint32_t *)weapon->typeRec));
+                    (uint32_t)weapon->typeRec->kind);
                 SendTrooperSetWeapon(occupant,
                                      weapon->uid, 0);
             }
@@ -884,7 +884,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                            occupant->heightSet, 1);
         }
     }
-#undef kind
+#undef KIND
 #undef rec
 }
 
@@ -983,7 +983,7 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
             if (!*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER))
                 continue;
             if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND)
-                != *w->typeRec)
+                != w->typeRec->kind)
                 continue;
             cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
         }
@@ -1051,7 +1051,7 @@ found:
             /* Kind 9 has its own arm that sets the default again; it is
              * in the image (`dec eax; jne`) whatever it was for. */
             want = 0;
-            switch (*w->typeRec) {
+            switch (w->typeRec->kind) {
             case 4:  want = 1; break;
             case 8:  want = 2; break;
             case 9:  want = 0; break;

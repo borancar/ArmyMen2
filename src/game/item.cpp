@@ -270,7 +270,7 @@ int32_t __cdecl HeldWeaponCode(AM2_Object *unit)
     if (uid) {
         obj = LookupByUID(uid);
         if (ObjIsType4(obj))
-            return *obj->typeRec;
+            return obj->typeRec->kind;
     }
     return 0;
 }
@@ -318,7 +318,7 @@ const char *__cdecl UnitClassName(AM2_Object *unit)
     w = WeaponByUid(
             u->inventory[0]);
     if (w)
-        return names[*w->typeRec];
+        return names[w->typeRec->kind];
     return names[0];
 }
 
@@ -362,7 +362,7 @@ int32_t __cdecl CanPickUp(AM2_Object *obj)
 
     /* Three arms that each return 1, not one arm with three labels: that is
      * the `sub; je; dec; je; dec; je` chain rather than a range test. */
-    switch (*o->typeRec) {
+    switch (o->typeRec->kind) {
     case 0x1F:
         return 1;
     case 0x20:
@@ -2270,11 +2270,11 @@ void __cdecl WeaponRespawn(AM2_Object *obj)
     if (flags & OBJ_FLAG_RESPAWN_RANDOM) {
         kind = RandomRespawnKind(&quantity);
     } else {
-        const uint8_t *rec = ((const uint8_t *)o->typeRec);
+        const AM2_ItemType *rec = o->typeRec;
 
-        if (!*(const int32_t *)(rec + 0x28))
+        if (!rec->field28)
             return;
-        kind     = *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+        kind     = rec->kind;
         quantity = o->ammo;
     }
 
@@ -4468,7 +4468,7 @@ void __cdecl PortalSpawn(void)
             weapon->uid;
 
         SoldierKindForWeapon(
-            trooper, *weapon->typeRec);
+            trooper, weapon->typeRec->kind);
         SendTrooperSetWeapon(trooper, weapon->uid, 0);
 
         trooper->facing =
@@ -4751,9 +4751,8 @@ void __cdecl MedkitHealOne(AM2_Object *obj)
 
     /* Right to left: the leader is found before the definition. */
     HealObject(obj,
-               *(const int32_t *)((const uint8_t *)MissileDefFind(
-                                      AM2_ITEM_KIND_MEDKIT)
-                                  + MISSILEDEF_OFF_HEAL_PCT),
+               MissileDefFind(
+                                      AM2_ITEM_KIND_MEDKIT)->healPct,
                OurLeaderUnit());
 }
 
@@ -4932,7 +4931,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                          ? (a) : (b))
 #define STATE (out->state)
 
-        switch (*weapon->typeRec) {
+        switch (weapon->typeRec->kind) {
         case 3:                                                        /* FLAM */
             if (o->field44 > 0)
                 return 1;
@@ -5150,7 +5149,7 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
             AM2_Object *w = WeaponByUid((int32_t)UIDN);
 
             if (w != 0
-                && *w->typeRec
+                && w->typeRec->kind
                    == (int32_t)AM2_ITEM_TYPE_ARMOR) {
                 armour = w;
                 left   = w->ammo;
@@ -6106,7 +6105,7 @@ void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot)
     if (!w)
         return;
 
-    kind = *w->typeRec;
+    kind = w->typeRec->kind;
 
 #define REC (g_weaponHandlers)
     g_weaponFnSlot0 = REC[kind * 4 + 0];
@@ -6768,7 +6767,7 @@ void __cdecl UseInventoryItem(AM2_Object *unit, int32_t slot)
     if (!item)
         return;
 
-    if (!KindInSetA(*item->typeRec))
+    if (!KindInSetA(item->typeRec->kind))
         return;
 
     ammo = item->ammo;
@@ -7165,7 +7164,7 @@ int32_t __cdecl WeaponPoseIndex(AM2_Object *obj, AM2_Object *weapon)
 
 #define ARMED (o->field578)
     if (weapon) {
-        switch (*weapon->typeRec) {
+        switch (weapon->typeRec->kind) {
         case 1: case 4: case 7: case 8: case 9: case 10: case 29: case 30:
             switch (cls) {
             case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
@@ -7601,7 +7600,7 @@ void __cdecl RankPromote(AM2_Object *obj)
         (made)->uid;
 
     SoldierKindForWeapon(
-        o, *((const uint32_t *)made->typeRec));
+        o, (uint32_t)made->typeRec->kind);
 
     SendTrooperSetWeapon(o, (made)->uid, 0);
 }
@@ -8102,20 +8101,20 @@ void __cdecl ResetItemsAndUids(void)
 int32_t __cdecl ItemIsReady(const AM2_Object *item)
 {
     const AM2_Object *self = item;
-    const uint8_t *type;
+    const AM2_ItemType *type;
     uint32_t       elapsed;
 
     if (!self)
         return 0;
 
-    type = ((const uint8_t *)self->typeRec);
+    type = self->typeRec;
     if (!type)
         return 0;
 
     elapsed = g_gameClockMs
               - self->followUid;
 
-    return *(const uint32_t *)(type + ITEMTYPE_OFF_COOLDOWN) < elapsed;
+    return type->cooldown < elapsed;
 }
 
 /* 0x004600E0, three instructions and no bounds check at all: the caller is
@@ -8303,7 +8302,7 @@ int32_t __cdecl WeaponClassOf(uint32_t uid)
     if (!obj || !ObjIsType4(obj))
         return 0;
 
-    switch (*obj->typeRec) {
+    switch (obj->typeRec->kind) {
     case 4:  return 1;
     case 2:  return 2;
     case 3:  return 3;
@@ -8490,7 +8489,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
     int32_t bestSlot = 0;
     int32_t i;
 
-    best = MapCode(*WeaponByUid(u->inventory[0])->typeRec);
+    best = MapCode(WeaponByUid(u->inventory[0])->typeRec->kind);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
         uint32_t uid = u->inventory[i];
@@ -8499,7 +8498,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
         if (!uid)
             continue;
 
-        code = MapCode(*WeaponByUid(uid)->typeRec);
+        code = MapCode(WeaponByUid(uid)->typeRec->kind);
 
         if (code > best) {
             bestSlot = i;
@@ -8509,7 +8508,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
 
     u->inventorySel = bestSlot;
 
-    SoldierKindForWeapon(u, (uint32_t)*WeaponByUid(u->inventory[bestSlot])->typeRec);
+    SoldierKindForWeapon(u, (uint32_t)WeaponByUid(u->inventory[bestSlot])->typeRec->kind);
 }
 
 /* SetObjField530 -- original 0x0043CD40, two callers.
@@ -8611,7 +8610,7 @@ uint8_t __cdecl JitterFacing(AM2_Object *obj, uint8_t facing)
 
     /* Two arms with the precision as a constant, not one call with a
      * variable: the image has both pairs of calls, their tails merged. */
-    if (*obj->typeRec == 3) {
+    if (obj->typeRec->kind == 3) {
         first  = RoundTo8(facing, AM2_JITTER_BITS_3);
         second = RoundTo8(jitter, AM2_JITTER_BITS_3);
     } else {
@@ -9051,7 +9050,7 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
     int32_t bestSlot = 0;
     int32_t i;
 
-    best = MapCode18To28(*WeaponByUid(u->inventory[0])->typeRec);
+    best = MapCode18To28(WeaponByUid(u->inventory[0])->typeRec->kind);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
         int32_t rank;
@@ -9059,7 +9058,7 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
         if (!u->inventory[i])
             continue;
 
-        rank = MapCode18To28(*WeaponByUid(u->inventory[i])->typeRec);
+        rank = MapCode18To28(WeaponByUid(u->inventory[i])->typeRec->kind);
 
         if (rank > best) {
             bestSlot = i;
@@ -9592,7 +9591,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
         orig_log("TrooperHostApprovedPickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
-    kind = *w->typeRec;
+    kind = w->typeRec->kind;
 
     switch (kind) {
     case AM2_ITEM_KIND_HOT_TARGET:
@@ -9624,9 +9623,9 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
         held = WeaponByUid(
                    t->inventory[slot]);
 
-        if (KindInSetB(*held->typeRec)
-            && KindInSetB(*w->typeRec)) {
-            int32_t k = *w->typeRec;
+        if (KindInSetB(held->typeRec->kind)
+            && KindInSetB(w->typeRec->kind)) {
+            int32_t k = w->typeRec->kind;
 
             switch (k) {
             case 8:
@@ -9651,19 +9650,16 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
         /* Not a swap: take the ammo instead. The line is spoken only when there
          * is room for it, and the test is made BEFORE the transfer. */
         if (held->ammo
-            < (w->typeRec)
-                  [ITEMTYPE_OFF_CAPACITY / 4])
+            < w->typeRec->capacity)
             SpeakLine(AM2_SPEAK_MOREAMMO, t->owner);
 
         {
             /* Added in place, then read back against the capacity. */
             held->ammo += ammo;
             if (held->ammo
-                > (w->typeRec)
-                      [ITEMTYPE_OFF_CAPACITY / 4])
+                > w->typeRec->capacity)
                 held->ammo =
-                    (w->typeRec)
-                        [ITEMTYPE_OFF_CAPACITY / 4];
+                    w->typeRec->capacity;
         }
     } else {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -9676,7 +9672,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
         /* SpeakItemPickup, not SpeakLine: it takes the item KIND and maps it
          * through its own two tables. The swap arm above speaks GROUPS
          * directly instead, which is why the two look alike and are not. */
-        SpeakItemPickupLine(*w->typeRec,
+        SpeakItemPickupLine(w->typeRec->kind,
                         t->owner);
     }
 #undef comm
@@ -9760,7 +9756,7 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
         orig_log("TrooperRemotePickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
-    kind = *w->typeRec;
+    kind = w->typeRec->kind;
 
     /* Nested on `!=`, so the image lays the arms out in reverse: the
      * weapon paths first, then the medkit, then the hot target. */
@@ -9773,8 +9769,8 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
                 held = WeaponByUid(
                     t->inventory[slot]);
 
-                if (KindInSetB(*held->typeRec)
-                    && KindInSetB(*w->typeRec)) {
+                if (KindInSetB(held->typeRec->kind)
+                    && KindInSetB(w->typeRec->kind)) {
                     t->inventory[slot] =
                         ((const AM2_Object *)w)->uid;
                     w->owner = t->owner;
@@ -9783,8 +9779,7 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
                 }
 
                 /* Added, then capped against the new item's type. */
-#define CAP ((w->typeRec) \
-             [ITEMTYPE_OFF_CAPACITY / 4])
+#define CAP (w->typeRec->capacity)
                 held->ammo =
                     held->ammo + ammo;
                 if (held->ammo > CAP)
@@ -10446,7 +10441,7 @@ int32_t __cdecl WeaponFrameReady(AM2_Object *obj, AM2_Object *weapon)
     (void)ClassifyByCode74(o);          /* answer discarded; see above */
 
     row   = o->rowSet.rows;
-    kind  = *weapon->typeRec;
+    kind  = weapon->typeRec->kind;
     frame = row->frame;
 
     /* Most rules break to the shared test; kinds 5, 11 and 12 make it
@@ -10596,7 +10591,7 @@ int32_t __cdecl PickWeaponSlot(AM2_Object *cand, AM2_Object *unit, int32_t *slot
     AM2_Object *c = cand;
     AM2_Object *u = unit;
 
-    if (IsKind14Or22(*c->typeRec)) {
+    if (IsKind14Or22(c->typeRec->kind)) {
         *slot = AM2_SLOT_NONE_NEEDED;
         return 1;
     }
@@ -10616,11 +10611,11 @@ int32_t __cdecl PickWeaponSlot(AM2_Object *cand, AM2_Object *unit, int32_t *slot
             == c->field94)
             return c->ammo != -1;
 
-        if (KindInSetB(*w->typeRec)
-            && KindInSetB(*c->typeRec))
+        if (KindInSetB(w->typeRec->kind)
+            && KindInSetB(c->typeRec->kind))
             return TypesCompatible(
-                       *w->typeRec,
-                       *c->typeRec)
+                       w->typeRec->kind,
+                       c->typeRec->kind)
                    ? 1 : 0;
 
         if (++*slot >= AM2_INVENTORY_SLOTS) {
@@ -10685,7 +10680,7 @@ int32_t __cdecl TryTakeWeapon(AM2_Object *cand, AM2_Object *unit)
             const AM2_Object *held = WeaponByUid(uid);
 
             if (held->ammo
-                >= *(const int32_t *)(((const uint8_t *)c->typeRec) + ITEMTYPE_OFF_CAPACITY))
+                >= c->typeRec->capacity)
                 return 0;
         }
     }
@@ -11105,7 +11100,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
         weapon = WeaponByUid(o->inventory[0]);
         if (weapon != 0)
             SoldierKindForWeapon((AM2_Object *)o,
-                *((const uint32_t *)weapon->typeRec));
+                (uint32_t)weapon->typeRec->kind);
 
         o->inventorySel = 0;
         SetUnitPose((AM2_Object *)o, 1);
@@ -11435,7 +11430,7 @@ int32_t __cdecl CanPickUpWeapon(AM2_Object *weapon, AM2_Object *unit, int32_t *s
         > g_gameClockMs)
         return 0;
 
-    if (IsKind14Or22(*w->typeRec)) {
+    if (IsKind14Or22(w->typeRec->kind)) {
         *slot = -1;
         return 1;
     }
@@ -11462,10 +11457,10 @@ int32_t __cdecl CanPickUpWeapon(AM2_Object *weapon, AM2_Object *unit, int32_t *s
         }
 
         /* KindInSetB's switch, expanded here as the image has it. */
-        if (KindInSetBInline(*other->typeRec)
-            && KindInSetBInline(*w->typeRec))
-            return TypesCompatible(*other->typeRec,
-                                   *w->typeRec) != 0;
+        if (KindInSetBInline(other->typeRec->kind)
+            && KindInSetBInline(w->typeRec->kind))
+            return TypesCompatible(other->typeRec->kind,
+                                   w->typeRec->kind) != 0;
 
         if (++*slot >= AM2_WEAPON_SLOTS)
             return 0;
@@ -12571,7 +12566,7 @@ typedef int32_t (__cdecl *AM2_TimedDirFrame5Fn)(void *rows, int32_t dir);
 void __cdecl StepType5(AM2_Object *obj)
 {
 #define o (obj)
-    const uint8_t *def;
+    const AM2_ItemType *def;
     AM2_MapRow *rows;
     int32_t  outcome = 6;
     int32_t  speed;
@@ -12580,15 +12575,15 @@ void __cdecl StepType5(AM2_Object *obj)
 
     if (!o)
         return;
-    def = o->field94;
+    def = o->missileDef;
     if (!def)
         return;
     if (!g_frameDeltaMs)
         return;
 
-    speed = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+    speed = def->range;
 
-    if (*(const int32_t *)(def + MISSILEDEF_OFF_FIELD_0C)) {
+    if (def->field0C) {
         /* Arced: gravity, and the height floors without stopping the fall. */
         if (o->row0YAdjust <= 0) {
             o->row0YAdjust = 0;
@@ -12630,18 +12625,18 @@ void __cdecl StepType5(AM2_Object *obj)
         }
     }
 
-    if (!*(const int32_t *)(def + MISSILEDEF_OFF_LIFE))
+    if (!def->life)
         goto after_flight;
 
     strike = 1;
     {
         int32_t life = o->field44
-                       + *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
+                       + def->life;
 
         /* Past twenty, the speed is scaled by how far through its life it is.
          * The divisor is the def's, so a longer-lived missile slows less. */
         if (o->field44 > 0x14)
-            speed = speed * life / *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
+            speed = speed * life / def->life;
 
         if (o->repairFrame)
             travel = (float)life * o->speedScale
@@ -12695,10 +12690,10 @@ void __cdecl StepType5(AM2_Object *obj)
     }
 
 after_flight:
-    def  = o->field94;
+    def  = o->missileDef;
     rows = o->rowSet.rows;
 
-    switch (*(const int32_t *)def) {
+    switch (def->kind) {
     case 3:
         /* A def-3 trail chases the segment in front of it: TimedDirFrame
          * decides whether it still has a frame to show, and if the segment
@@ -12812,8 +12807,7 @@ after_flight:
     }
 
     if (outcome >= 5) {
-        if (!*(const int32_t *)(o->field94
-                                + MISSILEDEF_OFF_FIELD_0C)
+        if (!o->missileDef->field0C
             && o->flown > speed)
             goto expire;
         if (outcome != 5)
@@ -12844,7 +12838,7 @@ expire:
                         o->pos.y, 0x94,
                         (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
+                        o->missileDef->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -12856,7 +12850,7 @@ expire:
                         + o->followers.count,
                         0x8C, (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
+                        o->missileDef->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -12869,7 +12863,7 @@ expire:
                                   + o->followers.count),
                         0x81, (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
+                        o->missileDef->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -12942,7 +12936,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
 
     NotifyPickedUp((AM2_Object *)item, (AM2_Object *)trooper);
 
-    kind = *w->typeRec;
+    kind = w->typeRec->kind;
 
     if (kind == AM2_ITEM_KIND_MEDKIT) {
         ForEachArmyObject(t->owner,
@@ -12967,10 +12961,10 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
         if (!held)
             return;
 
-        if (KindInSetB(*held->typeRec)
-            && KindInSetB(*w->typeRec)) {
+        if (KindInSetB(held->typeRec->kind)
+            && KindInSetB(w->typeRec->kind)) {
             /* ---- swap ---- */
-            switch (*w->typeRec) {
+            switch (w->typeRec->kind) {
             case AM2_WEAPON_KIND_HEAVYMACGUN:
                 SpeakLine(AM2_SPEAK_HEAVYMACGUN,
                           t->owner);
@@ -13011,7 +13005,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
         /* ---- same kind: merge the ammo ---- */
         /* Each field re-read at each use. */
 #define AMMO(o) ((o)->ammo)
-#define CAP     (w->itemType->capacity)
+#define CAP     (w->typeRec->capacity)
         {
             if (AMMO(w) >= 0 && AMMO(w) + AMMO(held) > CAP) {
                 if (AMMO(held) >= CAP)
@@ -13061,7 +13055,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
             SendPairMessage(t, w, (int32_t)slot,
                             w->ammo);
 
-        kind = *w->typeRec;
+        kind = w->typeRec->kind;
 
         switch (kind) {
         case AM2_ITEM_KIND_HOT_TARGET:
@@ -13201,8 +13195,8 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
     }
 
     /* The def is re-read through the weapon at every use, as the image does. */
-#define def (((uint8_t *)weapon->typeRec))
-    kind = (uint32_t)(*(const int32_t *)def) - 1u;
+#define def (weapon->typeRec)
+    kind = (uint32_t)def->kind - 1u;
     if (kind > 0x2Au)
         return 0;
 
@@ -13329,13 +13323,13 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             to = *(const AM2_Point *)pt;
             d = ApproxDist(&a, &to);
         } else
-            d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+            d = def->range;
 
         clamped = d;
-        if (d < *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN))
-            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
-        else if (d > *(const int32_t *)(def + MISSILEDEF_OFF_RANGE))
-            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+        if (d < def->rangeMin)
+            clamped = def->rangeMin;
+        else if (d > def->range)
+            clamped = def->range;
 
         /* THE FIFTH ARGUMENT IS THE LAUNCH HEIGHT, NOT THE RANGE. At
          * 0x0045F9B7 the original loads `movsx ecx, word [esp+0x3c]`, and
@@ -13355,7 +13349,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
         CreateMissile(weapon, unit, from, facing,
                       height, spot.ground, 1,
                       (float)clamped
-                          / *(const int32_t *)(def + MISSILEDEF_OFF_RANGE),
+                          / def->range,
                       0, 0, seed);
         return 1;
     }
@@ -13383,19 +13377,19 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             b = *(const AM2_Point *)pt;
             d = ApproxDist(&a, &b);
         } else
-            d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+            d = def->range;
 
         clamped = d;
-        if (d < *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN))
-            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
-        else if (d > *(const int32_t *)(def + MISSILEDEF_OFF_RANGE))
-            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+        if (d < def->rangeMin)
+            clamped = def->rangeMin;
+        else if (d > def->range)
+            clamped = def->range;
 
         /* The fifth argument is the launch height; see case 2. */
         CreateMissile(weapon, unit, from, facing,
                       height, spot.ground, 1,
                       (float)clamped
-                          / *(const int32_t *)(def + MISSILEDEF_OFF_RANGE),
+                          / def->range,
                       0, 0, seed);
         return 1;
 
@@ -14149,9 +14143,8 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     kb = (int32_t)KeyFieldB(*(const uint32_t *)(
              (const uint8_t *)(g_aaiRecords)[key]
              + 8));
-    o->typeRec = (const int32_t *)(g_missileDefs
-          + (uint32_t)kb * AM2_MISSILE_DEF_REC_SIZE);
-#define def (((const uint8_t *)o->typeRec))
+    o->typeRec = &g_missileDefs[kb];
+#define def (o->typeRec)
 
     /* The ammo filter is a switch, compiled to a byte-indexed table at
      * 0x0045F270 over keys 1..29: fifteen keys take -1 and every other key
@@ -14166,7 +14159,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
         break;
     }
 
-    if (*(const int32_t *)(def + 0x18u) < 0)
+    if (def->capacity < 0)
         quantity = -1;
     ammo = quantity ? quantity : 3;
     o->ammo = ammo;
@@ -14184,9 +14177,9 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
 #endif
 
     if (g_mpSession != 0
-        && ammo > *(const int32_t *)(def + 0x18u)
-        && *(const int32_t *)(def + 0x18u) > 0)
-        o->ammo = *(const int32_t *)(def + 0x18u);
+        && ammo > def->capacity
+        && def->capacity > 0)
+        o->ammo = def->capacity;
 
     o->pickupAfter = 0;
 

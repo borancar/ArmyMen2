@@ -1130,9 +1130,9 @@ int32_t __cdecl MapCode18To28(int32_t code)
 int32_t __cdecl ObjCodeUnmapped(const AM2_Object *obj)
 {
     const AM2_Object  *o    = obj;
-    const uint32_t *link = ((const uint32_t *)o->typeRec);
+    const AM2_ItemType *link = o->typeRec;
 
-    switch (*link) {
+    switch ((uint32_t)link->kind) {
     case 0x18:
     case 0x19:
     case 0x1a:

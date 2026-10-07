@@ -412,7 +412,7 @@
 #define g_messageText            ((char *)(uintptr_t)ADDR_MESSAGE_TEXT)  /* 0x00511EA4 */
 #define g_missileAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)  /* 0x00654C90 */
 #define g_missileBox             ((const AM2_Rect *)(uintptr_t)ADDR_MISSILE_BOX)  /* 0x00487B78 */
-#define g_missileDefs            ((uint8_t *)(uintptr_t)ADDR_MISSILE_DEFS)  /* 0x00662030 */
+#define g_missileDefs            ((struct AM2_ItemType *)(uintptr_t)ADDR_MISSILE_DEFS)  /* 0x00662030 */
 #define g_missileRowSpec         ((const struct AM2_RowSpec *)(uintptr_t)ADDR_MISSILE_ROW_SPEC)  /* 0x00487B88 */
 #define g_missionRetry           (*(int32_t *)(uintptr_t)ADDR_MISSION_RETRY)  /* 0x0051232C */
 #define g_mouseAcquired          (*(int32_t *)(uintptr_t)ADDR_DI_MOUSE_ACQUIRED)  /* 0x00512FE0 */

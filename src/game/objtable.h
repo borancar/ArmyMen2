@@ -117,15 +117,47 @@ typedef struct AM2_RowSet {
 
 /* An item's type record, what OBJ_OFF_FIELD_C0 points at on a weapon. */
 typedef struct AM2_ItemType {
-    int32_t  kind;                  /* +0x00 ITEMTYPE_OFF_KIND */
+    int32_t  kind;                  /* +0x00 ITEMTYPE_OFF_KIND, the def's id */
     uint32_t cooldown;              /* +0x04 ITEMTYPE_OFF_COOLDOWN, milliseconds */
-    uint8_t  _pad08[8];             /* +0x08 */
-    int32_t  range;                 /* +0x10 ITEMTYPE_OFF_RANGE */
-    int32_t  damage;                /* +0x14 ITEMTYPE_OFF_DAMAGE */
+    int32_t  life;                  /* +0x08 MISSILEDEF_OFF_LIFE: StepType5's
+                                     * divisor, and 0 means it does not fly */
+    int32_t  field0C;               /* +0x0C MISSILEDEF_OFF_FIELD_0C: the arced
+                                     * arm when non-zero, a vertical speed */
+    int32_t  range;                 /* +0x10 ITEMTYPE_OFF_RANGE, MISSILEDEF_OFF_RANGE */
+    int32_t  rangeMin;              /* +0x14 MISSILEDEF_OFF_RANGE_MIN: FireWeapon's
+                                     * lob clamp, and what UnitWeaponInfo copies
+                                     * into the sight context (which calls it
+                                     * damage, but compares a range against it) */
     int32_t  capacity;              /* +0x18 ITEMTYPE_OFF_CAPACITY */
-    uint8_t  _pad1c[8];             /* +0x1C */
-    int32_t  automatic;             /* +0x24 non-zero: repeats while held */
+    int32_t  healPct;               /* +0x1C the parsed record's +0x20, which
+                                     * MedkitHeal reads as its heal percentage */
+    int32_t  blastDamage;           /* +0x20 what a missile hands CreateExplosion */
+    int32_t  automatic;             /* +0x24 MISSILEDEF_OFF_FIELD_24: non-zero
+                                     * repeats while held */
+    int32_t  field28;               /* +0x28 */
+    int32_t  weight;                /* +0x2C MISSILEDEF_OFF_WEIGHT, respawn weight */
+    int32_t  field30;               /* +0x30 MISSILEDEF_OFF_FIELD_30, RespawnKind's out */
 } AM2_ItemType;
+
+/* The PARSED missile definition, as MissileDefFind finds it in the def table
+ * (AM2_MISSILE_DEF_REC_SIZE). ADDR_MISSILE_DEFS is built from these with five
+ * fields permuted -- +0x10 and +0x14 swap, and +0x1C -> +0x24 -> +0x20 -> +0x1C
+ * -- so the same name sits at different offsets in the two. */
+typedef struct AM2_MissileDefRec {
+    int32_t  kind;                  /* +0x00 -> +0x00 */
+    uint32_t cooldown;              /* +0x04 -> +0x04 */
+    int32_t  life;                  /* +0x08 -> +0x08 */
+    int32_t  field0C;               /* +0x0C -> +0x0C */
+    int32_t  rangeMin;              /* +0x10 -> +0x14 */
+    int32_t  range;                 /* +0x14 -> +0x10 */
+    int32_t  capacity;              /* +0x18 -> +0x18 */
+    int32_t  automatic;             /* +0x1C -> +0x24 */
+    int32_t  healPct;               /* +0x20 -> +0x1C, MedkitHeal's */
+    int32_t  blastDamage;           /* +0x24 -> +0x20 */
+    int32_t  field28;               /* +0x28 -> +0x28 */
+    int32_t  weight;                /* +0x2C -> +0x2C */
+    int32_t  field30;               /* +0x30 -> +0x30 */
+} AM2_MissileDefRec;
 
 /* The sight record (SIGHTCOUT_OFF_*): what a trooper's sight scan saw and
  * where to fire. A trooper carries one at OBJ_OFF_SIGHT_OUT_T2. */
@@ -297,6 +329,7 @@ typedef struct AM2_Object {
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
     union {                         /* +0x94 OBJ_OFF_FIELD_94, by object type: */
         const uint8_t *field94;     /*   an item's type record */
+        const AM2_ItemType *missileDef; /* a missile's (type 5) def, its weapon's typeRec */
         int32_t    aiDriven;        /*   types 2 and 3: non-zero, the AI drives it */
     };
     union {                         /* +0x98, by object type: */
@@ -340,8 +373,8 @@ typedef struct AM2_Object {
         AM2_Point  detour;          /*   a trooper's: a detour walked before scriptPoint */
     };
     union {                         /* +0xC0, by object type: */
-        const int32_t *typeRec;     /*   OBJ_OFF_FIELD_C0, -> the type record; [0] is its kind */
-        const AM2_ItemType *itemType; /* the same pointer, typed, on an item */
+        const AM2_ItemType *typeRec; /*  OBJ_OFF_FIELD_C0, a weapon's or an item's
+                                     *   record in ADDR_MISSILE_DEFS */
         struct { int16_t fieldC0, fieldC2; };  /* types 2, 3, 8: two halves */
         AM2_Point  dest;            /*   a trooper's: where it was told to go */
     };
@@ -563,6 +596,8 @@ static_assert(offsetof(AM2_SightOut, spot)        == 0x14,  "sight spot");
 static_assert(offsetof(AM2_SightOut, uid)         == 0x1C,  "sight uid");
 static_assert(offsetof(AM2_SightOut, weaponUid)   == 0x20,  "sight weaponUid");
 static_assert(offsetof(AM2_ItemType, range)       == 0x10,  "itemType range");
+static_assert(sizeof(AM2_ItemType)                == AM2_MISSILE_DEF_BYTES, "item type");
+static_assert(sizeof(AM2_MissileDefRec)           == AM2_MISSILE_DEF_REC_SIZE, "missile def rec");
 static_assert(offsetof(AM2_SightCtx, dest)        == 0x0E,  "ctx dest");
 static_assert(offsetof(AM2_SightCtx, ready)       == 0x54,  "ctx ready");
 static_assert(offsetof(AM2_Object, tableRec2)     == 0x52C, "tableRec2");

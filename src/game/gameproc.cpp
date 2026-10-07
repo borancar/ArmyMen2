@@ -993,7 +993,7 @@ int32_t __cdecl PlaceScenario(void)
         row = part->rows;
         for (i = 0; i < n; row++, i++) {
             AM2_Object *unit;
-#define kind (row->kind)
+#define KIND (row->kind)
             int32_t  amount;
             int32_t  flags;
 
@@ -1021,7 +1021,7 @@ int32_t __cdecl PlaceScenario(void)
                 flags = 4;
             if (g_haveDefaultCof
                 && (uint32_t)army == g_defaultOwner) {
-                if (kind == AM2_SCEN_KIND_LEADER) {
+                if (KIND == AM2_SCEN_KIND_LEADER) {
                     uint8_t amt;
 
                     (void)LookupOwnerObj(g_defaultOwner);
@@ -1067,7 +1067,7 @@ int32_t __cdecl PlaceScenario(void)
                          ? 1 : row->amount;
             unit->facingCopy = (uint8_t)amount;
 
-            if (kind == AM2_SCEN_KIND_LEADER) {
+            if (KIND == AM2_SCEN_KIND_LEADER) {
                 AM2_Object *w = (AM2_Object *)CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, 9, 0),
@@ -1097,14 +1097,14 @@ int32_t __cdecl PlaceScenario(void)
             } else {
                 AM2_Object *w = (AM2_Object *)CreateWeapon(g_dirScratch,
                                        army,
-                                       KeyLookupTriple(0x2D, ScenRowWeapon(kind), 0),
+                                       KeyLookupTriple(0x2D, ScenRowWeapon(KIND), 0),
                                        g_zeroXY,
                                        4, -1, 1, 0);
 
                 unit->inventory[0] =
                     w->uid;
                 SoldierKindForWeapon(unit,
-                    *((const uint32_t *)w->typeRec));
+                    (uint32_t)w->typeRec->kind);
             }
         }
     }
@@ -1183,7 +1183,7 @@ done:
     return 1;
 #undef n
 #undef comm
-#undef kind
+#undef KIND
 }
 
 void __cdecl ResetLevelState(void)
@@ -1321,7 +1321,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
     o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
     memset(o, 0, AM2_MISSILE_BYTES);
 
-    o->field94 = (const uint8_t *)w->typeRec;
+    o->missileDef = w->typeRec;
     o->facing = (uint8_t)heading;
     o->repairFrame = repairFrame;
     o->speedScale = speedScale;
@@ -1360,9 +1360,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
     o->field44 = b->field44;
 
     {
-        int32_t n = *(const int32_t *)
-            (((const uint8_t *)w->typeRec)
-             + MISSILEDEF_OFF_FIELD_0C);
+        int32_t n = w->typeRec->field0C;
 
         if (n > 0) {
             o->velZ = (float)n;
@@ -1460,9 +1458,8 @@ AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
     memcpy(o, h, (size_t)g_itemHeaderSize);
 
     orig_fread(&def, 4, 1, fp);
-    o->field94 =
-        g_missileDefs
-        + def * AM2_MISSILE_DEF_BYTES;
+    o->missileDef =
+        &g_missileDefs[def];
 
     orig_fread(&o->shooterUid, 4, 1, fp);
     orig_fread(&o->repairFrame, 4, 1, fp);
@@ -2086,7 +2083,7 @@ int32_t __cdecl SaveType2(am2_FILE *fp, AM2_Object *obj)
     weapon = WeaponByUid(
                  o->inventory[0]);
     if (weapon)
-        WriteSaveTag(fp, *((const uint32_t *)weapon->typeRec));
+        WriteSaveTag(fp, (uint32_t)weapon->typeRec->kind);
     else
         WriteSaveTag(fp, 1u);
 

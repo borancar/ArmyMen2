@@ -1420,7 +1420,7 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
 
     SoldierKindForWeapon(
         trooper,
-        *((const uint32_t *)weapon->typeRec));
+        (uint32_t)weapon->typeRec->kind);
 
     trooper->inventorySel =
         *(const int32_t *)(m + MSG_SETWEAPON_OFF_SLOT);

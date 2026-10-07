@@ -3921,7 +3921,7 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
  * a case of its own that answers what the default does. */
 static inline int32_t HudSquadWeaponIcon(const AM2_Object *weapon)
 {
-    switch (*weapon->typeRec) {
+    switch (weapon->typeRec->kind) {
     case 1:  return 1;
     case 2:  return 3;
     case 3:  return 4;
@@ -4871,13 +4871,11 @@ void __cdecl HudPostUpdate(void)
         if (weapon) {
             /* obj -> type record -> kind, then the kind's own record. Three
              * loads, not two: OBJ_OFF_FIELD_C0 is a POINTER to the type. */
-            const uint8_t *type =
-                ((const uint8_t *)weapon->typeRec);
-            int32_t kind = *(const int32_t *)(type + ITEMTYPE_OFF_KIND);
+            const AM2_ItemType *type =
+                weapon->typeRec;
+            int32_t kind = type->kind;
 
-            repeat = *(const int32_t *)(g_missileDefs
-                                        + (uint32_t)kind * AM2_MISSILE_DEF_BYTES
-                                        + MISSILEDEF_OFF_FIELD_24);
+            repeat = g_missileDefs[kind].automatic;
         }
     }
 
@@ -5667,7 +5665,7 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
     if (u->inventorySel == slot) {
         g_viewSnap = 1;
 
-        kind = *w->typeRec;
+        kind = w->typeRec->kind;
         switch (kind) {
         case 0x17: {
             int16_t hp = u->health;
@@ -5844,7 +5842,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
                 strcpy((char *)((uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_CAPTION),
                        ItemTypeName(
-                           *((const uint32_t *)item->typeRec)));
+                           (uint32_t)item->typeRec->kind));
             }
         }
     }
@@ -5862,7 +5860,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (item) {
                 /* Which icon: a switch on the item kind, and the image's jump
                  * table at 0x004154F0 lists the arms in this order. */
-                switch (*((const uint32_t *)item->typeRec)) {
+                switch ((uint32_t)item->typeRec->kind) {
                 case 2: sprite = 2; break;
                 case 3: sprite = 3; break;
                 case 4: sprite = 1; break;
@@ -8521,7 +8519,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
             /* The caption: a switch over string literals, compiled to the
              * byte table at 0x00419A94 and the jump table before it. The
              * case order is the arms' order in the image. */
-            switch ((uint32_t)item->typeRec[0]) {
+            switch ((uint32_t)item->typeRec->kind) {
                 case 2: name = "GREN"; break;
                 case 3: name = "FLAM"; break;
                 case 4: name = "BAZ"; break;
@@ -8552,11 +8550,11 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
         }
 
         /* Falls through from the branch above, deliberately. */
-        if ((uint32_t)item->typeRec[0] == AM2_ITEM_TYPE_ARMOR) {
+        if ((uint32_t)item->typeRec->kind == AM2_ITEM_TYPE_ARMOR) {
             strcpy(e->captionA, "ARMOR");
             e->secondPct =
                 EdgeBar(item->ammo,
-                        item->typeRec[ITEMTYPE_OFF_CAPACITY / 4]);
+                        item->typeRec->capacity);
         }
     }
 
@@ -17226,8 +17224,7 @@ void __cdecl SetWeaponTargetMedic(AM2_Object *target, AM2_Point at)
         u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
-                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI)
+    if (weapon->typeRec->kind != AM2_ITEM_KIND_MEDI)
         return;
     RecordAimedFire(u, target, 1);
 }
@@ -17251,8 +17248,7 @@ void __cdecl SetWeaponTargetWrench(AM2_Object *target, AM2_Point at)
         u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
-                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
+    if (weapon->typeRec->kind != AM2_ITEM_KIND_WREN)
         return;
     RecordAimedFire(u, target, 1);
 }
@@ -17280,8 +17276,7 @@ void __cdecl SetWeaponTargetKind2A(AM2_Object *target, AM2_Point at)
         u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
-                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_2A)
+    if (weapon->typeRec->kind != AM2_ITEM_KIND_2A)
         return;
     RecordAimedFire(u, target, 1);
 }
@@ -17338,9 +17333,7 @@ void __cdecl SetWeaponTargetAimed(AM2_Object *target, AM2_Point at)
         return;
 
     {
-        int32_t kind = *(const int32_t *)
-            (((const uint8_t *)weapon->typeRec)
-             + ITEMTYPE_OFF_KIND);
+        int32_t kind = weapon->typeRec->kind;
 
         if (kind < AM2_ITEM_KIND_DISG_0 || kind > AM2_ITEM_KIND_DISG_3)
             return;
@@ -17371,8 +17364,7 @@ void __cdecl SetWeaponTargetSweeper(AM2_Object *target, AM2_Point at)
         u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
-                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MSWP)
+    if (weapon->typeRec->kind != AM2_ITEM_KIND_MSWP)
         return;
     RecordAimedFire(u, target, 0);
 }
@@ -17596,7 +17588,7 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
             if (!weapon)                                                    \
                 return 0;                                                   \
             if (ApproxDist(&leader->pos, &o->pos)                          \
-                > weapon->typeRec[ITEMTYPE_OFF_RANGE / 4]                   \
+                > weapon->typeRec->range                   \
                   * g_weaponRangeK3)                                        \
                 return 0;                                                   \
             OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);                        \

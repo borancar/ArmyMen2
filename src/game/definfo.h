@@ -96,6 +96,6 @@ void __cdecl AddMissileDef(const void *rec);
  * tables by id. Each is the FIRST function in a merged functions.tsv entry;
  * the rest of each entry is a keyword parser. */
 void *__cdecl VehicleDefFind(int32_t id);
-void *__cdecl MissileDefFind(int32_t id);
+struct AM2_MissileDefRec *__cdecl MissileDefFind(int32_t id);
 
 #endif /* AM2_DEFINFO_H */

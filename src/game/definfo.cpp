@@ -11,6 +11,7 @@
 #include "../inject/patch.h"
 #include "defparse.h"  /* DefFreeTables, DefFreeTrooperRecs -- reconstructed */
 #include "gameproc.h"  /* DefFinish, DefGameParse -- reconstructed */
+#include "objtable.h"   /* AM2_ItemType, AM2_MissileDefRec */
 #include "gamedir.h"   /* SetGameDir -- ADDR_SET_DATA_DIR is it */
 #include "place.h"     /* ParsePlaceLine -- reconstructed */
 #include "map.h"       /* DefMapLine, DefRulesLine, DefRuleMapLine -- reconstructed */
@@ -436,28 +437,27 @@ void __cdecl LoadDefTables(void)
      * 0x10 and 0x14 swap, and 0x1C -> 0x24 -> 0x20 -> 0x1C. */
     /* Indexed by id; VC6 walks it as a pointer and tests the pointer. */
     for (id = 0; id < AM2_MISSILE_DEF_COUNT; id++) {
-        const uint8_t *src;
-#define dst (g_missileDefs \
-             + id * AM2_MISSILE_DEF_BYTES)
+        const AM2_MissileDefRec *src;
+#define dst (&g_missileDefs[id])
 
         memset(dst, 0, AM2_MISSILE_DEF_BYTES);
-        src = (const uint8_t *)MissileDefFind(id);
+        src = MissileDefFind(id);
         if (src == 0)
             continue;
 
-        *(uint32_t *)(dst + 0x00) = *(const uint32_t *)(src + 0x00);
-        *(uint32_t *)(dst + 0x04) = *(const uint32_t *)(src + 0x04);
-        *(uint32_t *)(dst + 0x08) = *(const uint32_t *)(src + 0x08);
-        *(uint32_t *)(dst + 0x0C) = *(const uint32_t *)(src + 0x0C);
-        *(uint32_t *)(dst + 0x10) = *(const uint32_t *)(src + 0x14);
-        *(uint32_t *)(dst + 0x14) = *(const uint32_t *)(src + 0x10);
-        *(uint32_t *)(dst + 0x18) = *(const uint32_t *)(src + 0x18);
-        *(uint32_t *)(dst + 0x1C) = *(const uint32_t *)(src + 0x20);
-        *(uint32_t *)(dst + 0x20) = *(const uint32_t *)(src + 0x24);
-        *(uint32_t *)(dst + 0x24) = *(const uint32_t *)(src + 0x1C);
-        *(uint32_t *)(dst + 0x28) = *(const uint32_t *)(src + 0x28);
-        *(uint32_t *)(dst + 0x2C) = *(const uint32_t *)(src + 0x2C);
-        *(uint32_t *)(dst + 0x30) = *(const uint32_t *)(src + 0x30);
+        dst->kind        = src->kind;
+        dst->cooldown    = src->cooldown;
+        dst->life        = src->life;
+        dst->field0C     = src->field0C;
+        dst->range       = src->range;
+        dst->rangeMin    = src->rangeMin;
+        dst->capacity    = src->capacity;
+        dst->healPct     = src->healPct;
+        dst->blastDamage = src->blastDamage;
+        dst->automatic   = src->automatic;
+        dst->field28     = src->field28;
+        dst->weight      = src->weight;
+        dst->field30     = src->field30;
 #undef dst
     }
 
@@ -722,7 +722,7 @@ void *__cdecl VehicleDefFind(int32_t id)
     uint8_t key[AM2_VEHICLE_DEF_REC_SIZE];
 
     *(int32_t *)key = id;
-    return orig_bsearch(key,
+    return (AM2_ItemType *)orig_bsearch(key,
                         *(void *const *)&g_vehicleDefs,
                         (size_t)g_vehicleDefCount,
                         AM2_VEHICLE_DEF_REC_SIZE,
@@ -736,13 +736,13 @@ void *__cdecl VehicleDefFind(int32_t id)
  * Identical to VehicleDefFind but for the three constants, which is what the
  * append pair already showed for these two tables -- the record size is the
  * only thing that ever differs between them. */
-void *__cdecl MissileDefFind(int32_t id)
+AM2_MissileDefRec *__cdecl MissileDefFind(int32_t id)
 {
     /* A whole record as the key, as VehicleDefFind (`sub esp, 0x34`). */
     uint8_t key[AM2_MISSILE_DEF_REC_SIZE];
 
     *(int32_t *)key = id;
-    return orig_bsearch(key,
+    return (AM2_MissileDefRec *)orig_bsearch(key,
                         *(void *const *)&g_defMissileRecs,
                         (size_t)g_defMissileCount,
                         AM2_MISSILE_DEF_REC_SIZE,

@@ -1670,9 +1670,7 @@ int32_t __cdecl RandomRespawnKind(int32_t *out)
                 % g_respawnKindCount;
     int32_t kind = (g_respawnKinds)[r];
 
-    *out = *(const int32_t *)(g_missileDefs
-                               + kind * AM2_MISSILE_DEF_BYTES
-                               + MISSILEDEF_OFF_FIELD_30);
+    *out = g_missileDefs[kind].field30;
     return kind;
 }
 

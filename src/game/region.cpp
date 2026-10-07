@@ -2672,6 +2672,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                                AM2_TileMask *out)
 {
     const AM2_RecordList *h = hdr;
+    AM2_Rect       *box   = &out->box;
 #define ring (g_tilemaskNeighbours)
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
@@ -2731,13 +2732,13 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
-    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
-    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
-    out->box.left = tile.left - AM2_TILEMASK_MARGIN;
+    box->bottom = tile.bottom + AM2_TILEMASK_MARGIN;
+    box->right = tile.right + AM2_TILEMASK_MARGIN;
+    box->top = tile.top - AM2_TILEMASK_MARGIN;
+    box->left = tile.left - AM2_TILEMASK_MARGIN;
 
-    w = out->box.right - out->box.left + 1;
-    memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * w));
+    w = box->right - box->left + 1;
+    memset(out->cells, 0, (size_t)((box->bottom - box->top + 1) * w));
 
     ring[1]  = -2 * w;
     ring[0]  = -2 * w - 1;
@@ -2780,7 +2781,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         int32_t off = (y - m->originY - oy) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * w
+        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - box->top) * w
                              + AM2_TILEMASK_MARGIN;
 
         for (; off < end; off++) {
@@ -2862,21 +2863,21 @@ void __cdecl UnitWeaponInfo(const AM2_Object *u, AM2_SightCtx *c)
     /* The type record is read through the weapon at every use. The kind is
      * stored and then read BACK out of the context for the tests below --
      * except the timed-range test, which asks the record again. */
-    c->kind   = w->itemType->kind;
-    c->damage = w->itemType->damage;
+    c->kind   = w->typeRec->kind;
+    c->damage = w->typeRec->rangeMin;
 
     if (c->kind == AM2_WEAPON_KIND_FIXED) {
-        c->wantRange = w->itemType->range - 4;
-        c->maxRange  = w->itemType->range + 2;
-    } else if (w->itemType->range == 0) {
+        c->wantRange = w->typeRec->range - 4;
+        c->maxRange  = w->typeRec->range + 2;
+    } else if (w->typeRec->range == 0) {
         c->wantRange = AM2_WEAPON_RANGE_NONE;
         c->maxRange  = AM2_WEAPON_RANGE_NONE;
     } else {
         /* A copy, which lives in memory for the fild; `range` itself stays
          * in a register above. */
-        int32_t r = w->itemType->range;
+        int32_t r = w->typeRec->range;
 
-        if (w->itemType->kind == AM2_WEAPON_KIND_TIMED)
+        if (w->typeRec->kind == AM2_WEAPON_KIND_TIMED)
             r = (int32_t)((double)r * 1.2);
 
         /* LITERALS, not the named doubles at ADDR_WEAPON_RANGE_K3/_LO/_HI
@@ -2888,12 +2889,12 @@ void __cdecl UnitWeaponInfo(const AM2_Object *u, AM2_SightCtx *c)
     }
 
     if (c->kind == AM2_WEAPON_KIND_TIMED) {
-        c->ready = (w->itemType->cooldown < g_gameClockMs - w->lastUse) ? 1 : 0;
+        c->ready = (w->typeRec->cooldown < g_gameClockMs - w->lastUse) ? 1 : 0;
     } else {
         const AM2_RankRec *rank = &g_rankRecords[u->rank];
         /* The cooldown widened to 64 bits (`fild qword`) and scaled by the
          * rank's float directly (`fmul dword`). */
-        uint32_t wait = (uint32_t)(w->itemType->cooldown * rank->fire_scale);
+        uint32_t wait = (uint32_t)(w->typeRec->cooldown * rank->fire_scale);
 
         c->ready = (wait < g_gameClockMs - w->lastUse) ? 1 : 0;
     }
@@ -6752,10 +6753,10 @@ void __cdecl AiBuildContext(AM2_Object *o, AM2_AiCtx *s)
     } else {
         /* The weapon's type record is re-read at every use, and so is the
          * range: no local holds either. */
-        s->kind      = w->itemType->kind;
-        s->wantRange = (int32_t)((double)w->itemType->range * kRangeWant);
-        s->maxRange  = (int32_t)((double)w->itemType->range * kRangeHi);
-        s->ready     = (g_gameClockMs - w->lastUse) > w->itemType->cooldown;
+        s->kind      = w->typeRec->kind;
+        s->wantRange = (int32_t)((double)w->typeRec->range * kRangeWant);
+        s->maxRange  = (int32_t)((double)w->typeRec->range * kRangeHi);
+        s->ready     = (g_gameClockMs - w->lastUse) > w->typeRec->cooldown;
     }
 
     s->seed = (uint8_t)orig_region_rand();
@@ -7522,7 +7523,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
     if (w == (AM2_Object *)0)
         return;
 
-    def  = w->itemType;
+    def  = w->typeRec;
     kind = def->kind;
 
     switch (kind) {
@@ -7556,7 +7557,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
         remote = 1;
 
     /* Unsigned, as the original's `cmp`/`sbb`/`neg` is. */
-    def   = w->itemType;
+    def   = w->typeRec;
     ready = (def->cooldown < (uint32_t)(g_gameClockMs - w->lastUse)) ? 1 : 0;
 
     SelectFirePose(o, w, out, ready);
@@ -7596,7 +7597,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
         o->sight.spot.ground = z;
         spot.ground = z;
 
-        def = w->itemType;
+        def = w->typeRec;
         /* One jitter after the optional turn: both kind tests branch to the
          * same JitterFacing at 0x0044A1C2. */
         if (def->kind != AM2_ITEM_KIND_MEDI && def->kind != AM2_ITEM_KIND_WREN)
@@ -7631,9 +7632,9 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
              * original's spelling and not a second value. */
             if (at->at.x == 0) {
                 o->sight.spot.at.x = (int16_t)(int32_t)
-                    (Cos8(heading) * w->itemType->range + o->pos.x);
+                    (Cos8(heading) * w->typeRec->range + o->pos.x);
                 o->sight.spot.at.y = (int16_t)(int32_t)
-                    (Sin8(heading) * w->itemType->range + o->pos.y);
+                    (Sin8(heading) * w->typeRec->range + o->pos.y);
             }
             fired = FireWeaponB(w, o, ObjHeight(o), heading, *at, 0);
         }
@@ -7983,7 +7984,7 @@ settle_facing:
                     cap = qty;
                 } else {
                     old = WeaponByUid(o->inventory[slot]);
-                    cap = at->itemType->capacity;
+                    cap = at->typeRec->capacity;
                     if (!cap)
                         cap = AM2_TROOPER_NO_CAPACITY;
                     if (!old) {
@@ -8002,7 +8003,7 @@ settle_facing:
                         (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                         (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
                                                     : AM2_STR_NO)),
-                        cap, at->itemType->capacity, had, qty,
+                        cap, at->typeRec->capacity, had, qty,
                         (int32_t)at->owner);
 
                 TrooperWantItemSend(o, at, 0, slot, qty);
@@ -8975,7 +8976,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         out->bearing = (uint8_t)o->field574;
 
     code = weapon != 0
-         ? weapon->itemType->kind
+         ? weapon->typeRec->kind
          : 0;
 
     /* The image adds the packed dwords and keeps the low half for x, then the
@@ -9101,11 +9102,11 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     /* AIM, held. Two weapon codes aim at the cursor; the rest aim at nothing. */
     if (ActionKeyDown(9)) {
         out->hit = 1;
-        if (weapon->itemType->automatic != 0)
+        if (weapon->typeRec->automatic != 0)
             out->seen = 1;
         out->spot.at.x = 0;
         {
-            int32_t k = weapon->itemType->kind;
+            int32_t k = weapon->typeRec->kind;
             if (k >= 0x27 && k <= 0x28) {
                 out->spot.at.x = (uint16_t)(g_viewRect->left + g_cursorX);
                 out->spot.at.y = (uint16_t)(g_viewRect->top + g_cursorY);
@@ -9120,7 +9121,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
         out->seen = 1;
         out->spot.at.x = 0;
-        k = weapon->itemType->kind;
+        k = weapon->typeRec->kind;
         if (k != 0xB) {
             if (k > 0x17 && k <= 0x1A) {
                 out->spot.at.x = (uint16_t)(g_viewRect->left + g_cursorX);
@@ -9179,7 +9180,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         if ((&g_mouseButton)[0] != 0) {
             (*(uint32_t *)&g_throttleDeadline) = g_gameClockMs + AM2_CLICK_THROTTLE_MS;
             out->hit = 1;
-            if (weapon->itemType->automatic != 0)
+            if (weapon->typeRec->automatic != 0)
                 out->seen = 1;
             out->spot.at.x = (uint16_t)aim.x;
             out->spot.at.y = (uint16_t)aim.y;
@@ -9239,7 +9240,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                  * spot dereferenced NULL and took the process down. The
                  * original shoots: its object count goes 1612, 1613, 1612.
                  * Fifth instance of the push-shifted slot in this project. */
-                switch (weapon->itemType->kind) {
+                switch (weapon->typeRec->kind) {
                 case 0x18: case 0x19: case 0x1A: case 0x27: case 0x28:
                     out->spot.at.x =
                         (uint16_t)(g_viewRect->left + g_cursorX);
@@ -10480,7 +10481,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
      * its definition's interval, and the same test is written three times
      * for the three ways to ask for a shot. --- */
     {
-#define def (weapon->itemType)
+#define def (weapon->typeRec)
         /* The time since the last shot is worked out at each test. */
 #define since (g_gameClockMs - weapon->lastUse)
 

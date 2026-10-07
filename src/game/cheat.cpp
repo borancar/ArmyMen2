@@ -207,7 +207,7 @@ again:
             old->flags |= 2;
             fresh->owner = u->owner;
             u->field54C = (int32_t)fresh->uid;
-            SoldierKindForWeapon(u, *fresh->typeRec);
+            SoldierKindForWeapon(u, fresh->typeRec->kind);
             SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
             SetFieldInAll(&u->rowSet,
                           g_flameRecord);
@@ -233,7 +233,7 @@ again:
             old->flags |= 2;
             fresh->owner = u->owner;
             u->field54C = (int32_t)fresh->uid;
-            SoldierKindForWeapon(u, *fresh->typeRec);
+            SoldierKindForWeapon(u, fresh->typeRec->kind);
             SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
             return;
         }

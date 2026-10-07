@@ -3616,7 +3616,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         unit->field54C =
             (int32_t)weapon->uid;
         SoldierKindForWeapon(unit,
-                             *weapon->typeRec);
+                             weapon->typeRec->kind);
         SendTrooperSetWeapon(unit,
                              (int32_t)weapon->uid, 0);
         return;

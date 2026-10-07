@@ -1208,7 +1208,7 @@ int32_t __cdecl ThingCode(const AM2_Object *who, const AM2_Object *owner)
 
     /* Cases in the image's layout order; the answer for an unlisted code is
      * the zero preset before the switch. */
-    switch (*w->typeRec) {
+    switch (w->typeRec->kind) {
     case 2:               result = 8; break;
     case 3: case 4: case 5:  result = 0x10; break;
     case 6: case 7:       result = 0x20; break;
@@ -1831,7 +1831,7 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
         *((uint8_t *)trooper + OBJ_OFF_FACING) = FACE[i];
 
         SoldierKindForWeapon(trooper,
-            *((const uint32_t *)weapon->typeRec));
+            (uint32_t)weapon->typeRec->kind);
         SendTrooperSetWeapon(trooper,
             weapon->uid, 0);
     }

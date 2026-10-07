@@ -1530,7 +1530,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
         at = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
         if (at != -1
             && t->inventory[at]
-            && !KindInSetB(*w->typeRec))
+            && !KindInSetB(w->typeRec->kind))
             w->ammo -= give;
 
         TrooperWantItemSend(t, w, AM2_DO_PICKUP,
