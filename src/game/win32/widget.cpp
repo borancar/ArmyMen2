@@ -2237,14 +2237,14 @@ static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
 {
-    AM2_Widget *bar  = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
-    AM2_Widget *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
+    AM2_ArrowBar *bar  = (AM2_ArrowBar *)*(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
+    AM2_ListBox *list = (AM2_ListBox *)bar->list;
 
     /* The list's fields and the bar's are read afresh at every use. */
-#define TOP     (*(int32_t *)((uint8_t *)list + LIST_OFF_TOP_ROW))
-#define VISIBLE (*(const int32_t *)((uint8_t *)list + LIST_OFF_VISIBLE))
-#define COUNT   (**(const int32_t *const *)((uint8_t *)list + LIST_OFF_ROWS))
-#define THUMB   (*(const AM2_Sprite *const *)((uint8_t *)bar + ARROWBAR_OFF_SPRITE0))
+#define TOP     (list->topRow)
+#define VISIBLE (list->visible)
+#define COUNT   (*(const int32_t *const)list->rows)
+#define THUMB   (bar->sprite0)
     if (!list)
         return;
     if (delta < 0 ? TOP <= 0 : TOP >= COUNT - VISIBLE)
@@ -2254,9 +2254,9 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
     TOP += delta;
     WidgetVPaint(list, list->rect);
 
-    *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
+    bar->shift =
         ThumbShift(TOP, COUNT - VISIBLE,
-                   *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN)
+                   bar->span
                    - THUMB->bounds.bottom);
     RepaintAncestor(bar, bar->rect);
 #undef TOP
@@ -2344,14 +2344,14 @@ typedef int32_t (__cdecl *AM2_RemoveFn)(const char *);
  * because the callback is free to move the focus. */
 static inline void EditNotifyAndRepaint(void)
 {
-    AM2_Widget *edit = g_focusedEdit;
+    AM2_Edit *edit = (AM2_Edit *)g_focusedEdit;
     void      (__cdecl *onChange)(AM2_Widget *) =
         *(void (__cdecl *const *)(AM2_Widget *))((uint8_t *)edit
                                                  + EDIT_OFF_ARG78);
 
     if (onChange)
         onChange(edit);
-    edit = g_focusedEdit;
+    edit = (AM2_Edit *)g_focusedEdit;
     WidgetVPaint(edit, edit->rect);
 }
 
@@ -5356,7 +5356,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarDelete(int32_t flags)
  * sprite at all. Two independent readings of the same field. */
 AM2_HudRadar::~AM2_HudRadar()
 {
-    AM2_Widget *w = this;
+    AM2_HudTop *w = (AM2_HudTop *)this;
 
     AM2_Sprite **slot = (AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0);
 
@@ -8192,10 +8192,10 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelDelete(int32_t flags)
  * builds the radar, Sarge, squad and commands children. One sprite. */
 AM2_HudPanel::~AM2_HudPanel()
 {
-    AM2_Widget *w = this;
+    AM2_HudTop *w = (AM2_HudTop *)this;
 
     AM2_CTOR_VTABLE(w, VTABLE_HUD_PANEL);
-    ReleaseSprite(*(AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0));
+    ReleaseSprite(w->sprite0);
 }
 
 /* 0x004193C0. The right-hand panel's per-frame update, and it does three
@@ -8808,7 +8808,7 @@ AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
 
     AM2_Widget *panel;
     AM2_Widget *list;
-    AM2_Widget *bar;
+    AM2_ArrowBar *bar;
     AM2_CTOR_VTABLE(w, VTABLE_COMM_PANEL);
     SetGameDir(g_dirScratch);
 
@@ -8825,12 +8825,12 @@ AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
     ::WidgetAddChild(panel, list);
     WidgetVFocus(*(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST), 0);
 
-    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x15E, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
+    bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x15E, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w
                                                  + COMMPANEL_OFF_LIST)
                      + LIST_OFF_ARROWBAR) = bar;
-    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) =
+    bar->list =
         *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_SELECT0, (const char *)(uintptr_t)AM2_BMP_SELECT1,
@@ -8965,7 +8965,7 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
 {
     AM2_Widget *panel;
     AM2_Widget *kid;
-    AM2_Widget *edit;
+    AM2_Edit *edit;
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_JOIN);
     SetGameDir(g_dirScratch);
     strcpy((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME),
@@ -8984,11 +8984,11 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
     ::WidgetAddChild(panel, kid);
     WidgetVFocus(kid, 0);
 
-    edit = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
+    edit = (AM2_Edit *)new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
     ::WidgetAddChild(panel, edit);
     /* Letters and digits only, as ENTER NAME's field -- the original sets
      * it (0x0042F6B5); ours left the permissive default. */
-    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+    edit->charset = g_editCharset;
 
     kid = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x14C, 0x37, 0x4E, 0x20), (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(panel, kid);
@@ -9099,7 +9099,7 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
 {
     AM2_Widget *panel;
     AM2_Widget *dot;
-    AM2_Widget *edit;
+    AM2_Edit *edit;
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_NAME_DLG);
 
     strcpy((char *)this + 0x64,
@@ -9114,25 +9114,25 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     this->focusedChild = panel;
     panel->flag44 = 1;
 
-    edit = new AM2_Edit((char *)this + 0x64, AM2_EDIT_MAX_CHARS,
+    edit = (AM2_Edit *)new AM2_Edit((char *)this + 0x64, AM2_EDIT_MAX_CHARS,
                         *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x39, 0xF4, 0x11), 1,
                         g_hiliteColour, g_colourBelowBg, g_backgroundColour,
                         (void (__cdecl *)(AM2_Widget *))kHostBattle, 0, 0);
     ::WidgetAddChild(panel, edit);
     WidgetVFocus(edit, 0);           /* the first field only (0x0042FC9C) */
-    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+    edit->charset = g_editCharset;
     dot = new AM2_Blinker((const char *)(uintptr_t)AM2_BMP_GREEN0,
                           (const char *)(uintptr_t)AM2_BMP_GREEN1, 1,
                           *RectSet(AM2_TEMP(AM2_Rect), 0xB3, 0x1B, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
     *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
 
-    edit = new AM2_Edit((char *)this + 0x84, AM2_EDIT_MAX_CHARS,
+    edit = (AM2_Edit *)new AM2_Edit((char *)this + 0x84, AM2_EDIT_MAX_CHARS,
                         *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x88, 0xF4, 0x11), 1,
                         g_hiliteColour, g_colourBelowBg, g_backgroundColour,
                         (void (__cdecl *)(AM2_Widget *))kHostBattle, 0, 0);
     ::WidgetAddChild(panel, edit);
-    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+    edit->charset = g_editCharset;
     dot = new AM2_Blinker((const char *)(uintptr_t)AM2_BMP_GREEN0,
                           (const char *)(uintptr_t)AM2_BMP_GREEN1, 1,
                           *RectSet(AM2_TEMP(AM2_Rect), 0xB3, 0x6A, 0x11, 0x10));
@@ -9140,7 +9140,7 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
     /* The second field's charset is stored TWICE -- here as well as before
      * the dot (0x0042FE32). Harmless, and the original's. */
-    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+    edit->charset = g_editCharset;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                                            (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -9644,14 +9644,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * On an empty log that is -1, which is what "no row" is elsewhere in
          * this tree. */
         {
-            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
+            AM2_ArrowBar *bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2C, 1);
             ::WidgetAddChild(w, bar);
 
             *(AM2_Widget **)((uint8_t *)*slot + LIST_OFF_ARROWBAR) = bar;
-            *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST)   = *slot;
+            bar->list   = *slot;
             *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_FLAG50)     = 0;
 
             {
@@ -9673,13 +9673,12 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             if (HOT >= TOP + VISIBLE)
                 TOP = HOT - VISIBLE + 1;
             {
-                int32_t span = *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN);
+                int32_t span = bar->span;
 
-                *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
+                bar->shift =
                     ThumbShift(TOP, COUNT - VISIBLE,
                                span
-                               - (*(const AM2_Sprite *const *)((uint8_t *)bar
-                                                               + ARROWBAR_OFF_SPRITE0))
+                               - (bar->sprite0)
                                      ->bounds.bottom);
             }
 #undef CB
@@ -9764,7 +9763,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * immediately after the box, and a tree is ordered by when each child
          * was added. */
         {
-            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
+            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2A, 1);
@@ -9772,7 +9771,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             ::WidgetAddChild(w, bar);
 
             *(AM2_Widget **)((uint8_t *)*slot + LIST_OFF_ARROWBAR) = bar;
-            *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST)   = *slot;
+            bar->list   = *slot;
         }
     }
 
@@ -9864,7 +9863,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * immediately after the box, and a tree is ordered by when each child
          * was added. */
         {
-            AM2_Widget *bar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
+            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2F, 1);
@@ -9872,7 +9871,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             ::WidgetAddChild(w, bar);
 
             *(AM2_Widget **)((uint8_t *)*slot + LIST_OFF_ARROWBAR) = bar;
-            *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST)   = *slot;
+            bar->list   = *slot;
         }
     }
 
@@ -10561,32 +10560,30 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 void __cdecl MpCommitScore(AM2_Widget *w)
 {
     const uint8_t *comm = (const uint8_t *)g_commObject;
-    const AM2_Widget *edit;
+    const AM2_Edit *edit;
 
     if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return;
 
-    edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
     g_scoreLimit =
-        orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                         + EDIT_OFF_TEXT));
+        orig_atoi(edit->text);
     SendPlayerMsg(0);
 }
 
 void __cdecl MpCommitPoints(AM2_Widget *w)
 {
     const uint8_t *comm = (const uint8_t *)g_commObject;
-    const AM2_Widget *edit;
+    const AM2_Edit *edit;
     int32_t           value;
 
     if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return;
 
-    edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
     /* The row is read AFTER the atoi, which matters not at all -- but the
      * original reads it there and nothing between the two touches it. */
-    value = orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                             + EDIT_OFF_TEXT));
+    value = orig_atoi(edit->text);
     (g_armyPoints)
         [*(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW)] = value;
     SendPlayerMsg(0);
@@ -11150,7 +11147,7 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
     self->row        = row;
     *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_LEFT)  = (uint32_t)(uintptr_t)OnMpTeamLeft;
     *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_RIGHT) = (uint32_t)(uintptr_t)OnMpTeamRight;
-    *(int32_t *)((uint8_t *)self + BUTTON_OFF_REPEATS)   = 1;
+    self->repeats   = 1;
 }
 
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
@@ -11556,8 +11553,8 @@ AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_Widget *panel;
-    AM2_Widget *list;
-    AM2_Widget *bar;
+    AM2_ListBox *list;
+    AM2_ArrowBar *bar;
     int32_t     i;
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_MAP);
     ReadCampaignLevels();
@@ -11581,14 +11578,14 @@ for (i = 0; i < LevelCount(); i++) {
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectMapRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectMapRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
-    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 1);
+    bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 1);
     ::WidgetAddChild(panel, bar);
-    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
-    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+    list->arrowBar = bar;
+    bar->list = list;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_CAN0, (const char *)(uintptr_t)AM2_BMP_CAN1,
                    (const char *)(uintptr_t)AM2_BMP_CAN2, 1,
@@ -11867,7 +11864,7 @@ void __cdecl OpenMovies(void)
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_Widget *w = this;
+    AM2_DlgSaveListScreen *w = (AM2_DlgSaveListScreen *)this;
 
     AM2_Widget *panel;
     AM2_Widget *list;
@@ -11888,13 +11885,13 @@ AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
 
-    WidgetVFocus(*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST), 0);
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) + LIST_OFF_CHOSEN)   = g_difficulty;
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) + LIST_OFF_SELECTED) = g_difficulty;
+    WidgetVFocus((AM2_Widget *)w->list, 0);
+    *(int32_t *)((uint8_t *)(AM2_Widget *)w->list + LIST_OFF_CHOSEN)   = g_difficulty;
+    *(int32_t *)((uint8_t *)(AM2_Widget *)w->list + LIST_OFF_SELECTED) = g_difficulty;
 
     dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)), (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1, *RectSet(AM2_TEMP(AM2_Rect), 0x23, 0x95, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
-    *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST)
+    *(AM2_Widget **)((uint8_t *)(AM2_Widget *)w->list
                      + LIST_OFF_BLINKER) = dot;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
@@ -13044,11 +13041,11 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
-        AM2_Widget *row = ((AM2_Widget *const *)(parent + KEYROW_PARENT_ROWS))[i];
+        AM2_KeyRow *row = (AM2_KeyRow *)((AM2_Widget *const *)(parent + KEYROW_PARENT_ROWS))[i];
         int32_t     k   = KeyNameIndexOf(defaults[i]);
 
-        *(int32_t *)((uint8_t *)row + KEYROW_OFF_KEY) = k;
-        *(const char **)((uint8_t *)row + LABEL_OFF_TEXT) = keys[k].name;
+        row->key = k;
+        row->text = keys[k].name;
         WidgetVPaint(row, row->rect);
     }
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -13125,8 +13122,8 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_Widget *panel;
-    AM2_Widget *list;
-    AM2_Widget *bar;
+    AM2_ListBox *list;
+    AM2_ArrowBar *bar;
     char        pattern[256];
     uint8_t     found[0x118];     /* a _finddata_t */
     int32_t     handle;
@@ -13156,7 +13153,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x29, 0x43, 0x96, 0xAB), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectPlayerRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x29, 0x43, 0x96, 0xAB), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectPlayerRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
@@ -13169,10 +13166,10 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
             strcpy(g_currentPlayer, *(const char *const *)(r + 1));
     }
 
-    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
+    bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
-    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
-    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+    list->arrowBar = bar;
+    bar->list = list;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_RECRUIT0, (const char *)(uintptr_t)AM2_BMP_RECRUIT1,
                    (const char *)(uintptr_t)AM2_BMP_RECRUIT2, 1,
@@ -13231,7 +13228,7 @@ AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_Widget *panel;
-    AM2_Widget *edit;
+    AM2_Edit *edit;
     AM2_Widget *dot;
     char       *text;
     AM2_CTOR_VTABLE(w, VTABLE_ENTER_NAME);
@@ -13244,10 +13241,10 @@ AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    edit = new AM2_Edit(text, AM2_ENTER_NAME_MAX, *RectSet(AM2_TEMP(AM2_Rect), 0x24, 0x39, 0xF7, 0x12), 1, g_hiliteColour, g_whiteInk, g_backgroundColour, kOnEnterNameOk, 0, 0);
+    edit = (AM2_Edit *)new AM2_Edit(text, AM2_ENTER_NAME_MAX, *RectSet(AM2_TEMP(AM2_Rect), 0x24, 0x39, 0xF7, 0x12), 1, g_hiliteColour, g_whiteInk, g_backgroundColour, kOnEnterNameOk, 0, 0);
     ::WidgetAddChild(panel, edit);
     WidgetVFocus(edit, 0);
-    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+    edit->charset = g_editCharset;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                    (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -13403,8 +13400,8 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     AM2_Widget *w = this;
 
     AM2_Widget *parent;
-    AM2_Widget *list;
-    AM2_Widget *bar;
+    AM2_ListBox *list;
+    AM2_ArrowBar *bar;
     char        path[256];
     char        pattern[256];
     uint8_t     found[0x118];     /* a _finddata_t */
@@ -13447,7 +13444,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
         parent = panel;
     }
 
-    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x2A, dy + 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)LoadGameRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x2A, dy + 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)LoadGameRow, 0, 1);
     ::WidgetAddChild(parent, list);
     if (g_gameState == 2)
         w->focusedChild = list;
@@ -13464,10 +13461,10 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     }
     list->flag44 = 1;
 
-    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), dx + 0xD5, dy + 0x3C, 0x13, 0xBA), parent, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x90, 0);
+    bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), dx + 0xD5, dy + 0x3C, 0x13, 0xBA), parent, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x90, 0);
     ::WidgetAddChild(parent, bar);
-    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
-    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+    list->arrowBar = bar;
+    bar->list = list;
 
     ::WidgetAddChild(parent, new AM2_Button((const char *)(uintptr_t)AM2_BMP_NEW0, (const char *)(uintptr_t)AM2_BMP_NEW1,
                    (const char *)(uintptr_t)AM2_BMP_NEW2, 1,
@@ -13536,7 +13533,7 @@ void __cdecl OpenLoadGame(void)
 AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
     : AM2_ScreenBase(bmp, flag)
 {
-    AM2_Widget *w = this;
+    AM2_HudTop *w = (AM2_HudTop *)this;
 
     const AM2_Sprite *back;
     AM2_Widget       *btn;
@@ -13547,7 +13544,7 @@ AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
     AM2_CTOR_VTABLE(w, VTABLE_DLG_MESSAGE);
     w->flag44 = 1;
 
-    back = *(const AM2_Sprite *const *)((uint8_t *)w + HUD_OFF_SPRITE0);
+    back = w->sprite0;
     ox = (g_bitmapAreaW
           - back->bounds.right) / 2;
     oy = (g_bitmapAreaH
@@ -13644,7 +13641,7 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
 AM2_DlgGameMenuScreen::AM2_DlgGameMenuScreen(const char *bmp, int32_t flag)
     : AM2_ScreenBase(bmp, flag)
 {
-    AM2_Widget *w = this;
+    AM2_DlgSaveListScreen *w = (AM2_DlgSaveListScreen *)this;
 
     AM2_Widget *btn;
     int32_t     y;
@@ -13971,10 +13968,10 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     AM2_Widget *w = this;
 
     AM2_DlgSaveListScreen    *self = (AM2_DlgSaveListScreen *)w;
-    AM2_Widget *edit;
+    AM2_Edit *edit;
     AM2_Widget *kid;
-    AM2_Widget *list;
-    AM2_Widget *bar;
+    AM2_ListBox *list;
+    AM2_ArrowBar *bar;
     char        dir[AM2_DLG_TEXT_BYTES];
     char        path[AM2_DLG_TEXT_BYTES];
     uint8_t     find[AM2_FINDDATA_BYTES];
@@ -14014,7 +14011,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     strcpy((char *)((uint8_t *)self + SAVELIST_OFF_NAME),
            &g_gameprocStrB);
 
-    edit = new AM2_Edit((char *)((uint8_t *)self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
+    edit = (AM2_Edit *)new AM2_Edit((char *)((uint8_t *)self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);
     WidgetVFocus(edit, 0);
     *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
@@ -14028,19 +14025,19 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
      * kind of little MultiSprite beside a text field. */
     *(void **)((uint8_t *)edit + EDIT_OFF_DOT) = kid;
 
-    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0xBD, 0x9A, 0xAA), (void *)self->list, (int32_t)(uintptr_t)SaveListOnPick, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0xBD, 0x9A, 0xAA), (void *)self->list, (int32_t)(uintptr_t)SaveListOnPick, 0, 1);
     ::WidgetAddChild(w, list);
 
     /* The scrollbar takes its rectangle as FOUR ints and the parent BEFORE
      * the sprites. The original still routes the four through RectSet and
      * copies the result back over the same pushes, so they appear twice. */
-    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0xB7, 0x13, 0xBA), w, "03_010_00_scrollbar.bmp", "03_010_01_scrollbar.bmp", 0x8C, 0);
+    bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0xB7, 0x13, 0xBA), w, "03_010_00_scrollbar.bmp", "03_010_01_scrollbar.bmp", 0x8C, 0);
     ::WidgetAddChild(w, bar);
     /* The list and its bar know each other -- the image stores both links
      * at 0x0045365D. Missing here, the save list's scroll bar was wired to
      * nothing. */
-    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
-    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+    list->arrowBar = bar;
+    bar->list = list;
 
     kid = new AM2_Button("03_127_00_save.bmp", "03_127_01_save.bmp", "03_127_02_save.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1A0, 0xBA, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, kid);
@@ -14669,18 +14666,18 @@ AM2_ButtonBase::AM2_ButtonBase()
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_ButtonBase *self = (AM2_ButtonBase *)w;
     AM2_CTOR_VTABLE(w, VTABLE_BUTTON_BASE);
-    *(int32_t *)(self + BUTTON_BASE_OFF_A) = 0;
-    *(int32_t *)(self + BUTTON_BASE_OFF_B) = 0;
-    *(int32_t *)(self + BUTTON_BASE_OFF_C) = 0;
+    self->repeats = 0;
+    self->deadline = 0;
+    *(int32_t *)((uint8_t *)self + BUTTON_BASE_OFF_C) = 0;
 }
 
 void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_ButtonBase *self = (AM2_ButtonBase *)w;
     int32_t  repeats;
 
     ::WidgetScreenRect(w);
@@ -14694,7 +14691,7 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
         if (orig_mouse_moved)
             WidgetVFocus(w, 1);
 
-        repeats = *(const int32_t *)(self + BUTTON_OFF_REPEATS);
+        repeats = self->repeats;
 
         /* Every arm that repaints ends with its OWN repaint, update and
          * return -- the original has a copy of that tail in each of them. */
@@ -15969,9 +15966,9 @@ void __attribute__((thiscall)) AM2_ArrowBarOps::ArrowBarFollowEnd()
  * fields afterwards rather than trusting the ones it already had. */
 void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
 {
-    AM2_Widget *bar = this;
+    AM2_ArrowBar *bar = (AM2_ArrowBar *)this;
 
-    AM2_Widget       *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
+    AM2_Widget       *list = bar->list;
     const AM2_Sprite *thumb;
     uint8_t          *l;
     AM2_ArrowBar          *b = (AM2_ArrowBar *)bar;
@@ -16277,33 +16274,31 @@ void __attribute__((thiscall)) AM2_Widget::MpSpinRepaint()
 
 void __cdecl SpinCommit(AM2_Widget *w)
 {
-    AM2_Widget *spin =
-        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_EDIT);
-    AM2_Widget *edit =
-        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
-    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                                     + EDIT_OFF_TEXT));
+    AM2_MpSpin *spin =
+        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_EDIT);
+    AM2_Edit *edit =
+        (AM2_Edit *)spin->edit;
+    int32_t     v = orig_atoi(edit->text);
 
-    if (v > *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX))
-        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
-    else if (v < *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN))
-        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
+    if (v > spin->max)
+        v = spin->max;
+    else if (v < spin->min)
+        v = spin->min;
 
     SpinApply(spin, edit, v);
 }
 
 void __cdecl SpinUp(AM2_Widget *w)
 {
-    AM2_Widget *spin =
-        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
-    AM2_Widget *edit =
-        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
-    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                                     + EDIT_OFF_TEXT))
-                  + *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
+    AM2_MpSpin *spin =
+        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+    AM2_Edit *edit =
+        (AM2_Edit *)spin->edit;
+    int32_t     v = orig_atoi(edit->text)
+                  + spin->step;
 
-    if (v > *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX))
-        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
+    if (v > spin->max)
+        v = spin->max;
 
     SpinApply(spin, edit, v);
     SpinRepaint(edit);
@@ -16311,16 +16306,15 @@ void __cdecl SpinUp(AM2_Widget *w)
 
 void __cdecl SpinDown(AM2_Widget *w)
 {
-    AM2_Widget *spin =
-        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
-    AM2_Widget *edit =
-        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
-    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                                     + EDIT_OFF_TEXT))
-                  - *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
+    AM2_MpSpin *spin =
+        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+    AM2_Edit *edit =
+        (AM2_Edit *)spin->edit;
+    int32_t     v = orig_atoi(edit->text)
+                  - spin->step;
 
-    if (v < *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN))
-        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
+    if (v < spin->min)
+        v = spin->min;
 
     SpinApply(spin, edit, v);
     SpinRepaint(edit);

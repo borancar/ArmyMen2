@@ -110,7 +110,7 @@ typedef struct AM2_Widget {
                                      * two focus walkers only, and nothing has
                                      * been seen to clear it yet */
     void   (__cdecl *activate)(struct AM2_Widget *w);
-                                    /* 0x0054  fired by SPACE or RETURN on the
+                                    /* 0x0054  BUTTON_OFF_ON_LEFT: fired by SPACE or RETURN on the
                                      * focused child. Constructed null. */
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
     AM2_Widget * __attribute__((thiscall)) WidgetDelete(int32_t flags);
@@ -357,7 +357,9 @@ struct AM2_KeyRow : AM2_Label {
 struct AM2_ButtonBase : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
     int32_t row;                    /* 0x0058  MPBTN_OFF_ROW, which player row */
-    uint8_t pad_AM2_ButtonBase[0x68 - 0x5C];
+    int32_t repeats;                /* 0x005C  BUTTON_OFF_REPEATS BUTTON_BASE_OFF_A, auto-repeat */
+    uint32_t deadline;              /* 0x0060  BUTTON_OFF_DEADLINE BUTTON_BASE_OFF_B, next repeat */
+    void (__cdecl *onRight)(AM2_Widget *); /* 0x0064  BUTTON_OFF_ON_RIGHT BUTTON_BASE_OFF_C */
     AM2_ButtonBase();
     explicit AM2_ButtonBase(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };
