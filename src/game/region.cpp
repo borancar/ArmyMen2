@@ -10707,8 +10707,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
             case 2: case 3:  ENGINE(0x19); break;
             case 5:          ENGINE(0x1A); break;
             }
-        }
-        if (kind == 1) {
+        } else if (kind == 1) {
             switch (*(const int32_t *)(o + 0x52Cu)) {
             case 1:          ENGINE(0x1B); break;
             case 0:          ENGINE(0x1C); break;
