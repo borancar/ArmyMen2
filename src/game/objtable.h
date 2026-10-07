@@ -330,7 +330,8 @@ typedef struct AM2_Object {
     };
     uint16_t       moveAt;          /* +0x520 OBJ_OFF_MOVE_AT, the waypoint in hand */
     uint16_t       moveCount;       /* +0x522 OBJ_OFF_MOVE_COUNT */
-    uint8_t        _pad524[5];      /* +0x524 */
+    AM2_Point      spawnAt;         /* +0x524 OBJ_OFF_SPAWN_AT, where it is redeployed */
+    uint8_t        spawnFacing;     /* +0x528 OBJ_OFF_SPAWN_FACING */
     uint8_t        fireFlag;        /* +0x529 TROOPER_OFF_FIRE_FLAG */
     uint8_t        _pad52a[2];      /* +0x52A */
     union {                         /* +0x52C, by object type: */

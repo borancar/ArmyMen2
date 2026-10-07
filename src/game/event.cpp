@@ -1132,20 +1132,20 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
 #define list (((uint8_t * *)g_armyObjLists)[army])
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (*(const uint32_t **)(list + LIST_OFF_UIDS))[i]);
 
-        if (obj == (uint8_t *)0) {
+        if (obj == 0) {
             ((AM2_Rec *)list)->ListRemoveAt(i);
             continue;                       /* the list shifted; do not ++ */
         }
 
-        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED) {
+        if (obj->flagsLo & OBJ_FLAG8_BLOCKED) {
             i++;
             continue;
         }
 
-        if (filter != -1 && filter != (int32_t)ObjFieldA((const AM2_Object *)obj)) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
             i++;
             continue;
         }
@@ -1153,11 +1153,11 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
         if (relative) {
             /* Cumulative across objects, as the original's: each adds into
              * the argument's halves. */
-            point.x = (int16_t)(point.x + *(const int16_t *)(obj + OBJ_OFF_X));
-            point.y = (int16_t)(point.y + *(const int16_t *)(obj + OBJ_OFF_Y));
+            point.x = (int16_t)(point.x + obj->pos.x);
+            point.y = (int16_t)(point.y + obj->pos.y);
         }
 
-        PointActionA((AM2_Object *)obj, point);
+        PointActionA(obj, point);
         i++;
     }
 #undef list
@@ -1183,38 +1183,38 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
  * a register-allocation detail with no observable side, so a local is used. */
 void __cdecl EvtAtPointA(uint32_t uid, AM2_Point point, int32_t relative)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == 0)
         return;
 
     if (relative) {
         /* Added into the argument's own halves. */
-        point.x = (int16_t)(point.x + *(const int16_t *)(obj + OBJ_OFF_X));
-        point.y = (int16_t)(point.y + *(const int16_t *)(obj + OBJ_OFF_Y));
+        point.x = (int16_t)(point.x + obj->pos.x);
+        point.y = (int16_t)(point.y + obj->pos.y);
     }
 
-    if (ObjIsType2((const AM2_Object *)obj))
-        *(int32_t *)(obj + OBJ_OFF_FIELD_540) = 0;
+    if (ObjIsType2(obj))
+        obj->field540 = 0;
 
-    PointActionA((AM2_Object *)obj, point);
+    PointActionA(obj, point);
 }
 
 void __cdecl EvtAtPointC(uint32_t uid, AM2_Point point, int32_t relative)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == 0)
         return;
 
     /* The point's halves read as words out of its argument slot; the
@@ -1223,17 +1223,17 @@ void __cdecl EvtAtPointC(uint32_t uid, AM2_Point point, int32_t relative)
     if (relative) {
         AM2_Point at;
 
-        at.x = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_X) + PT.x);
-        at.y = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_Y) + PT.y);
-        PointActionC((AM2_Object *)obj, at);
+        at.x = (int16_t)(obj->pos.x + PT.x);
+        at.y = (int16_t)(obj->pos.y + PT.y);
+        PointActionC(obj, at);
         return;
     }
 
-    if (*(const int16_t *)(obj + OBJ_OFF_X) == PT.x
-        && *(const int16_t *)(obj + OBJ_OFF_Y) == PT.y)
+    if (obj->pos.x == PT.x
+        && obj->pos.y == PT.y)
         return;
 
-    PointActionC((AM2_Object *)obj, PT);
+    PointActionC(obj, PT);
 #undef PT
 }
 
@@ -1284,23 +1284,23 @@ void __cdecl EvtByRefB(AM2_Point a, int32_t b)
  * trailing zero arguments go to a callee with nineteen callers. */
 void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == 0)
         return;
 
-    if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
+    if (obj->flagsLo & OBJ_FLAG8_BLOCKED)
         return;
 
-    if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) <= 0)
+    if (obj->health <= 0)
         return;
 
-    DamageObject((AM2_Object *)obj, a, b, 0, 0, 0);
+    DamageObject(obj, a, b, 0, 0, 0);
 }
 
 /* 0x0041F880 and 0x0041F970. Two more of the "On" shape.
@@ -1316,32 +1316,32 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
  * point sits in the twin's signature. */
 void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c)
 {
-    const uint8_t *obj;
+    const AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (const uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (const uint8_t *)0)
+    if (obj == 0)
         return;
 
-    EvtAtPointA(a, *(const AM2_Point *)(obj + OBJ_OFF_POS), c);
+    EvtAtPointA(a, obj->pos, c);
 }
 
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
 {
-    const uint8_t *obj;
+    const AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (const uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (const uint8_t *)0)
+    if (obj == 0)
         return;
 
-    EvtArmyAtPoint(a, b, *(const AM2_Point *)(obj + OBJ_OFF_POS), d);
+    EvtArmyAtPoint(a, b, obj->pos, d);
 }
 
 /* ------------------------------------------------------- reset ---- */
@@ -1497,16 +1497,16 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
         return;
 
     case 3: {
-        uint8_t       *obj;
+        AM2_Object       *obj;
         AM2_ObjScript *scr;
         int32_t        id;
 
-        obj = (uint8_t *)LookupByUID(ResolveUid(c->objstate, (uint32_t)(uintptr_t)arg));
+        obj = LookupByUID(ResolveUid(c->objstate, (uint32_t)(uintptr_t)arg));
 
-        if (!ObjIsItem((const AM2_Object *)obj))
+        if (!ObjIsItem(obj))
             return;
 
-        id = *(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID);
+        id = obj->scriptId;
         if (id <= 0 || id > kObjScriptCount)
             return;
 
@@ -1523,7 +1523,7 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
                 continue;
             }
 
-            if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) == E.value) {
+            if (obj->scriptState == E.value) {
                 CondRunAction(c, i, arg);
                 return;
             }
@@ -1787,15 +1787,15 @@ void __cdecl EvtTeamWins(int32_t a1, int32_t a2, int32_t a3, int32_t a4,
 void __cdecl EvtRuleC(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                       int32_t a5, int32_t a6, int32_t a7, int32_t a8)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
 
-    obj = (uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
     if (!obj)
         return;
 
-    DeployItem((AM2_Object *)obj, *(const AM2_Point *)(obj + OBJ_OFF_POS), 0, 0);
+    DeployItem(obj, obj->pos, 0, 0);
 }
 
 /* 0x00422270, 156 bytes -- put a unit back on the map where it fell.
@@ -1811,34 +1811,34 @@ void __cdecl EvtRuleC(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                       int32_t a5, int32_t a6, int32_t a7, int32_t a8)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
 
-    obj = (uint8_t *)LookupByUID(uid);
-    if (!obj || !ObjIsTypeIn238((const AM2_Object *)obj))
+    obj = LookupByUID(uid);
+    if (!obj || !ObjIsTypeIn238(obj))
         return;
 
-    if (ObjIsType2((const AM2_Object *)obj)
-        && *(const int32_t *)(obj + OBJ_OFF_FIELD_94)) {
+    if (ObjIsType2(obj)
+        && obj->aiDriven) {
         /* SIGNED: the original is `cmp eax,0xf; jge` at 0x004222C0, not jae.
          * Left unsigned, the int32_t promotes and a negative weight would
          * read as huge and take the opposite branch. */
         /* The reference point is a local copy, the start read in place:
          * one load, its copy pushed beside it, as the image has it. */
-        AM2_Point ref = *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT);
+        AM2_Point ref = obj->spawnAt;
 
         if (BlockWeightAt((AM2_Object *)(void *)0,
-                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), ref)
+                          obj->spawnAt, ref)
             >= (int32_t)AM2_CELL_WEIGHT_STEP)
             return;
     }
 
-    *(uint8_t *)(obj + OBJ_OFF_FACING) =
-        *(const uint8_t *)(obj + OBJ_OFF_SPAWN_FACING);
-    DeployItem((AM2_Object *)obj, *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
+    obj->facing =
+        obj->spawnFacing;
+    DeployItem(obj, obj->spawnAt, 1, 0);
 
-    if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
+    if (obj->owner
         == *(const int32_t *)&g_defaultOwner)
         PlayDynamicSound("mp_pop.wav",
                          0, 0, 0, 0, 3, 2, 0);
@@ -1864,33 +1864,33 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                       int32_t a5, int32_t a6, int32_t a7, int32_t a8)
 {
-    uint8_t *obj;
-    uint8_t *unit;
+    AM2_Object *obj;
+    AM2_Object *unit;
     int32_t  army;
 
     (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
 
-    obj = (uint8_t *)LookupByUID(uid);
-    if (!obj || !ObjIsType2((const AM2_Object *)obj))
+    obj = LookupByUID(uid);
+    if (!obj || !ObjIsType2(obj))
         return;
 
-    army = *(const int8_t *)(obj + OBJ_OFF_ARMY);
+    army = obj->owner;
 
-    unit = (uint8_t *)CreateTrooper(
+    unit = (AM2_Object *)(uint8_t *)CreateTrooper(
                g_dirScratch,
-               *(const int16_t *)(obj + OBJ_OFF_POS),
-               *(const int16_t *)(obj + OBJ_OFF_POS + 2),
+               obj->pos.x,
+               obj->pos.y,
                ((AM2_Comm *)kCommObject)->CommArmyOfSlot(army),
                army, 0, 0, 0, 1, 0);
     if (!unit)
         return;
 
-    Type2ActionA((AM2_Object *)unit);
-    *(int32_t *)(unit + OBJ_OFF_FIELD_94)   = 1;
-    *(int32_t *)(unit + OBJ_OFF_AI_MODE_PREV) =
-        *(const int32_t *)(unit + OBJ_OFF_AI_MODE);
-    *(int32_t *)(unit + OBJ_OFF_AI_MODE)    = AM2_AI_MODE_ATTACK;
-    ObjConceal((AM2_Object *)unit, 0);
+    Type2ActionA(unit);
+    unit->aiDriven   = 1;
+    unit->aiModePrev =
+        unit->aiMode;
+    unit->aiMode    = AM2_AI_MODE_ATTACK;
+    ObjConceal(unit, 0);
 }
 
 /* --------------------------------------------- immediate trigger ---- */
@@ -2056,39 +2056,39 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
  * two functions that make that global live at all. */
 void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (name == g_svarId15) {
         g_evtId15Flag = 1;
 
-        obj = (uint8_t *)LookupByUID(
+        obj = LookupByUID(
                   *(const uint32_t *)&g_evtId15Uid);
 
-        if (obj != (uint8_t *)0)
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
+        if (obj != 0)
+            obj->flags |= OBJ_FLAG8_BIT40;
 
         return;
     }
 
-    obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
+    obj = LookupByUID(ResolveUid(name, me));
 
-    if (obj != (uint8_t *)0)
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG8_BIT40;
+    if (obj != 0)
+        obj->flags &= ~(uint32_t)OBJ_FLAG8_BIT40;
 }
 
 void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (name == g_svarId15) {
         g_evtId15Flag = 0;
         return;
     }
 
-    obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
+    obj = LookupByUID(ResolveUid(name, me));
 
-    if (obj != (uint8_t *)0)
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
+    if (obj != 0)
+        obj->flags |= OBJ_FLAG8_BIT40;
 }
 
 /* 0x0041FA10. Set a field on every object of an army that passes the gates.
@@ -2114,32 +2114,32 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 
     /* The list pointer is re-read from the table at every use. */
     while (i < *(const int32_t *)(lists[slot] + LIST_OFF_COUNT)) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (*(const uint32_t **)(lists[slot] + LIST_OFF_UIDS))[i]);
 
-        if (obj == (uint8_t *)0) {
+        if (obj == 0) {
             ((AM2_Rec *)lists[slot])->ListRemoveAt(i);
             continue;
         }
 
-        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED) {
+        if (obj->flagsLo & OBJ_FLAG8_BLOCKED) {
             i++;
             continue;
         }
 
-        if (!ObjIsTypeIn238((const AM2_Object *)obj)) {
+        if (!ObjIsTypeIn238(obj)) {
             i++;
             continue;
         }
 
-        if (filter != -1 && filter != (int32_t)ObjFieldA((const AM2_Object *)obj)) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
             i++;
             continue;
         }
 
-        *(int32_t *)(obj + OBJ_OFF_AI_MODE_PREV) =
-            *(const int32_t *)(obj + OBJ_OFF_AI_MODE);
-        *(int32_t *)(obj + OBJ_OFF_AI_MODE) = value;
+        obj->aiModePrev =
+            obj->aiMode;
+        obj->aiMode = value;
 
         i++;
     }
@@ -2158,24 +2158,24 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
  * before giving an object something new to do, whatever it holds. */
 void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 {
-    uint8_t *a;
+    AM2_Object *a;
     uint8_t *b;
 
     if (uidA < AM2_UID_COUNTER_MIN || uidB < AM2_UID_COUNTER_MIN)
         return;
 
-    a = (uint8_t *)LookupByUID(uidA);
-    if (a == (uint8_t *)0)
+    a = LookupByUID(uidA);
+    if (a == 0)
         return;
 
     b = (uint8_t *)LookupByUID(uidB);
     if (b == (uint8_t *)0)
         return;
 
-    if (ObjIsType2((const AM2_Object *)a))
-        *(int32_t *)(a + OBJ_OFF_FIELD_540) = 0;
+    if (ObjIsType2(a))
+        a->field540 = 0;
 
-    ObjAttachTo((AM2_Object *)a, (AM2_Object *)b);
+    ObjAttachTo(a, (AM2_Object *)b);
 }
 
 /* --------------------------------------------------- bitmaps ---- */
@@ -2250,31 +2250,29 @@ void __cdecl EvtShowBitmapNoPause(const char *name)
  * 0x004F9ACC + index * 0x100 whatever `index` is. */
 void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
 {
-    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+    AM2_Object *obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == 0)
         return;
 
 #define REC (g_objTableRecords \
              + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE)
-#define SUB (obj + OBJ_OFF_SUBRECORD)
-    switch (*(const int32_t *)obj) {
+    switch ((int32_t)obj->type) {
     default:
         orig_log("Warning: check if this script command works with this "
                  "object type!\n");
         return;
     case 3:
-        *(void **)(SUB + SUBREC_OFF_TABLE_KIND3) = REC;
-        SetFieldInAll(SUB, REC);
+        obj->tableRec3 = REC;
+        SetFieldInAll(&obj->rowSet, REC);
         return;
     case 2:
-        *(void **)(SUB + SUBREC_OFF_TABLE_KIND2) = REC;
-        SetFieldInAll(SUB, REC);
+        obj->tableRec2 = REC;
+        SetFieldInAll(&obj->rowSet, REC);
         return;
 
     }
 #undef REC
-#undef SUB
 }
 
 /* ------------------------------------------------ cond tests ---- */
@@ -2571,14 +2569,14 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
 void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
                                int32_t heading, AM2_Point at)
 {
-    uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
-    uint8_t     *unit;
+    AM2_Object     *weapon = WeaponByUid((int32_t)weaponUid);
+    AM2_Object     *unit;
     AM2_FireSpot spot;
     int8_t       lent;
 
     if (!weapon)
         return;
-    unit = (uint8_t *)UnitByUid(unitUid);
+    unit = (AM2_Object *)(uint8_t *)UnitByUid(unitUid);
     if (!unit)
         return;
 
@@ -2587,15 +2585,15 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
     spot.at.y   = at.y;
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
-    lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
-    *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
+    lent = weapon->owner;
+    weapon->owner = unit->owner;
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
+        heading = AngleBetween(&unit->pos, &at);
 
-    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)(void *)0);
+    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (AM2_Object *)(void *)0);
 
-    *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
+    weapon->owner = lent;
 }
 
 /* 0x004201A0. A named weapon, fired by a named unit, at another object.
@@ -2612,47 +2610,47 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
 void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
                                 int32_t heading, uint32_t targetUid)
 {
-    uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
-    uint8_t     *unit;
-    uint8_t     *target;
+    AM2_Object     *weapon = WeaponByUid((int32_t)weaponUid);
+    AM2_Object     *unit;
+    AM2_Object     *target;
     AM2_FireSpot spot;
     int32_t      lent;   /* movsx into ebx: an int, restored as a byte */
 
     if (!weapon)
         return;
-    unit = (uint8_t *)UnitByUid(unitUid);
+    unit = (AM2_Object *)(uint8_t *)UnitByUid(unitUid);
     if (!unit)
         return;
-    target = (uint8_t *)LookupByUID(targetUid);
+    target = LookupByUID(targetUid);
     if (!target)
         return;
 
-    spot.at.x   = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
-    spot.at.y   = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
-    spot.ground = (int16_t)*(const int8_t *)(target + OBJ_OFF_HEIGHT_SET);
+    spot.at.x   = (&target->pos)->x;
+    spot.at.y   = (&target->pos)->y;
+    spot.ground = (int16_t)target->heightSet;
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
-                               (const AM2_Point *)(target + OBJ_OFF_POS));
+        heading = AngleBetween(&unit->pos,
+                               &target->pos);
 
-    lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
-    *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
+    lent = weapon->owner;
+    weapon->owner = unit->owner;
 
-    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjHeight((const AM2_Object *)unit), heading, spot, (AM2_Object *)target);
+    FireWeapon(weapon, unit, ObjHeight(unit), heading, spot, target);
 
-    *(int8_t *)(weapon + OBJ_OFF_ARMY) = (int8_t)lent;
+    weapon->owner = (int8_t)lent;
 }
 
 /* 0x00420260. The unit's own held weapon, at a point. */
 void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
 {
-    uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
+    AM2_Object     *unit = (AM2_Object *)UnitByUid(unitUid);
     void        *weapon;
     AM2_FireSpot spot;
 
     if (!unit)
         return;
-    weapon = HeldWeaponObj((const AM2_Object *)unit);
+    weapon = HeldWeaponObj(unit);
     if (!weapon)
         return;
 
@@ -2662,9 +2660,9 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
+        heading = AngleBetween(&unit->pos, &at);
 
-    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)(void *)0);
+    FireWeapon((AM2_Object *)weapon, unit, ObjFieldB(unit), heading, spot, (AM2_Object *)(void *)0);
 }
 
 /* 0x00420300. The unit's own held weapon, at another object.
@@ -2675,17 +2673,17 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
 void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
                               uint32_t targetUid)
 {
-    uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
+    AM2_Object     *unit = (AM2_Object *)UnitByUid(unitUid);
     void        *weapon;
-    uint8_t     *target;
+    AM2_Object     *target;
     AM2_FireSpot spot;
 
     if (!unit)
         return;
-    weapon = HeldWeaponObj((const AM2_Object *)unit);
+    weapon = HeldWeaponObj(unit);
     if (!weapon)
         return;
-    target = (uint8_t *)LookupByUID(targetUid);
+    target = LookupByUID(targetUid);
     if (!target)
         return;
 
@@ -2694,10 +2692,10 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
     spot.ground = 0;
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
-                               (const AM2_Point *)(target + OBJ_OFF_POS));
+        heading = AngleBetween(&unit->pos,
+                               &target->pos);
 
-    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)target);
+    FireWeapon((AM2_Object *)weapon, unit, ObjFieldB(unit), heading, spot, target);
 }
 
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.
@@ -2983,31 +2981,30 @@ void __cdecl ResetTimers(void)
  */
 void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, AM2_Point at)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
     int32_t  slot;
 
     if (uid < AM2_UID_COUNTER_START || weaponUid < AM2_UID_COUNTER_START)
         return;
 
-    obj = (uint8_t *)LookupByUID(uid);
-    if (!ObjIsType2((const AM2_Object *)obj))
+    obj = LookupByUID(uid);
+    if (!ObjIsType2(obj))
         return;
 
     if (*(void *const *)&g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(obj + OBJ_OFF_ARMY)))
+                              (int16_t)obj->owner))
         return;
 
-    if (!*(const int32_t *)(obj + OBJ_OFF_SARGE))
+    if (!obj->sarge)
         return;
 
     if (!at.x)
-        at = ((const AM2_Object *)obj)->pos;
+        at = (obj)->pos;
 
     for (slot = 1; slot < AM2_INVENTORY_SLOTS; slot++)
-        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY
-                                + (size_t)slot * 4) == weaponUid) {
-            TrooperDropItem((AM2_Object *)obj, slot, at);
+        if (obj->inventory[slot] == weaponUid) {
+            TrooperDropItem(obj, slot, at);
             return;
         }
 }
@@ -3062,7 +3059,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
 #define LIST (((uint8_t * *)g_armyObjLists)[slot])
     i = 0;
     while (i < *(const int32_t *)(LIST + LIST_OFF_COUNT)) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (*(const uint32_t *const *)(LIST + LIST_OFF_UIDS))[i]);
 
         if (!obj) {
@@ -3070,10 +3067,10 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
             continue;           /* no step: the shifted-down entry is next */
         }
 
-        if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
-            && ObjIsTypeIn238((const AM2_Object *)obj)
-            && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA((const AM2_Object *)obj)))
-            ObjAttachTo((AM2_Object *)obj, (AM2_Object *)target);
+        if (!(obj->flagsLo & OBJ_FLAG_DESTROYED)
+            && ObjIsTypeIn238(obj)
+            && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA(obj)))
+            ObjAttachTo(obj, (AM2_Object *)target);
         i++;
     }
 #undef LIST
@@ -3108,7 +3105,7 @@ typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
  */
 int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
 {
-    uint8_t *o;
+    AM2_Object *o;
 
     switch (kind) {
     case AM2_OPERAND_VARIABLE:
@@ -3117,37 +3114,37 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
                    + (uint32_t)a * AM2_NAME_TABLE_STRIDE))[2];
 
     case AM2_OPERAND_ITEM_FRAME:
-        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        o = LookupByUID(ResolveUid(a, 0));
         if (!o)
             return 0;
-        if (!ObjIsItem((const AM2_Object *)o))
+        if (!ObjIsItem(o))
             return 0;
-        return *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME);
+        return o->repairFrame;
 
     case AM2_OPERAND_HEALTH:
-        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        o = LookupByUID(ResolveUid(a, 0));
         if (!o)
             return 0;
-        return *(const int16_t *)(o + OBJ_OFF_HEALTH);
+        return o->health;
 
     case AM2_OPERAND_TROOP_STATE:
-        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        o = LookupByUID(ResolveUid(a, 0));
         if (!o)
             return 5;
-        if (!ObjIsType2((const AM2_Object *)o))
+        if (!ObjIsType2(o))
             return 5;
-        return *(const int32_t *)(o + OBJ_OFF_FIELD_530);
+        return o->field530;
 
     case AM2_OPERAND_HASITEM: {
         uint32_t want;
         int32_t  i;
 
-        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        o = LookupByUID(ResolveUid(a, 0));
         if (!o)
             return 0;
-        if (!ObjIsType2((const AM2_Object *)o))
+        if (!ObjIsType2(o))
             return 0;
-        if (!*(const int32_t *)(o + OBJ_OFF_SARGE))
+        if (!o->sarge)
             return 0;
 
         want = ResolveUid(b, 0);
@@ -3155,7 +3152,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
             return 0;
 
         for (i = 0; i < AM2_INVENTORY_SLOTS; i++)
-            if (((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i] == want)
+            if ((&o->inventory[0])[i] == want)
                 return 1;
         return 0;
     }
@@ -3590,13 +3587,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x0D: {                                /* createtrooper */
-        uint8_t *unit, *weapon;
+        AM2_Object *unit, *weapon;
 
         at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
 
-        unit = (uint8_t *)CreateTrooper(act->text, at.x,
+        unit = (AM2_Object *)(uint8_t *)CreateTrooper(act->text, at.x,
                                         at.y,
                                         ((AM2_Comm *)kCommObject)->CommArmyOfSlot(
                                                        act->army),
@@ -3607,7 +3604,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* Then the same weapon-attach the cheat console does, which is
          * worth saying because it is four calls in a fixed order and
          * getting one wrong leaves a trooper holding nothing. */
-        weapon = (uint8_t *)CreateWeapon(
+        weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
                      g_dirScratch, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
                      g_zeroXY,
@@ -3615,13 +3612,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (weapon == 0)
             return;
 
-        weapon[OBJ_OFF_ARMY] = (uint8_t)act->army;
-        *(int32_t *)(unit + OBJ_OFF_WEAPON_UID) =
-            *(const int32_t *)(weapon + OBJ_OFF_UID);
-        SoldierKindForWeapon((AM2_Object *)unit,
-                             **(int32_t **)(weapon + OBJ_OFF_FIELD_C0));
+        weapon->owner = (uint8_t)act->army;
+        unit->field54C =
+            (int32_t)weapon->uid;
+        SoldierKindForWeapon(unit,
+                             *weapon->typeRec);
         SendTrooperSetWeapon(unit,
-                             *(const int32_t *)(weapon + OBJ_OFF_UID), 0);
+                             (int32_t)weapon->uid, 0);
         return;
     }
 

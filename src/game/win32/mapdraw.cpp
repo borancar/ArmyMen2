@@ -1595,16 +1595,16 @@ void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
 int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
 {
     const AM2_Object *obj  = (const AM2_Object *)objv;
-    const uint8_t    *self = (const uint8_t *)objv;
+    const AM2_Object    *self = (const AM2_Object *)objv;
     int32_t        colour;
 
     colour = AM2_THE_COMM->CommArmyOfSlot(
-                            *(const int8_t *)(self + OBJ_OFF_ARMY));
+                            self->owner);
 
     /* Two four-way switches, and the key read again for the second test. */
-#define KEY (*(const uint32_t *)(*(const uint8_t *const *)(self + OBJ_OFF_FIELD_94) + 8))
+#define KEY (*(const uint32_t *)(self->field94 + 8))
     if (ObjIsType4(obj)) {
-        switch (**(const int32_t *const *)(self + OBJ_OFF_FIELD_C0)) {
+        switch (*self->typeRec) {
         case AM2_RADAR_KIND_FIRST + 0: colour = 0; break;
         case AM2_RADAR_KIND_FIRST + 1: colour = 1; break;
         case AM2_RADAR_KIND_FIRST + 2: colour = 2; break;
@@ -1627,13 +1627,13 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
     if (ObjIsType2(obj)) {
         if (g_mpSession
             && ObjIsType2(obj)
-            && *(const int32_t *)(self + OBJ_OFF_SOLDIER_KIND) == 7)
+            && self->soldierKind == 7)
             return AM2_RADAR_COLOUR_MP7;
 
-        if (*(const int32_t *)(self + OBJ_OFF_FIELD_530)
+        if (self->field530
             != AM2_RADAR_FIELD530_NONE) {
             *blink = 1;
-            return *(const int32_t *)(self + OBJ_OFF_FIELD_530);
+            return self->field530;
         }
     }
 
@@ -1871,20 +1871,20 @@ void __cdecl ViewUpdate(void)
 
     obj = g_objCtxObj;
     if (obj) {
-        const uint8_t *o = (const uint8_t *)obj;
+        const AM2_Object *o = (const AM2_Object *)obj;
 
         /* Both copies are a word at a time, as the image makes them. */
         if (g_viewSnap) {
-            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            g_viewTarget.x = (&o->pos)->x;
+            g_viewTarget.y = (&o->pos)->y;
             tx = g_viewTarget.x;
             vpt.y = g_viewTarget.y;
             g_viewSnap = 0;
             goto clamp_eye;
         }
         if (g_objCtxSet) {
-            g_viewTarget.x = ((const AM2_Point *)(o + OBJ_OFF_POS))->x;
-            g_viewTarget.y = ((const AM2_Point *)(o + OBJ_OFF_POS))->y;
+            g_viewTarget.x = (&o->pos)->x;
+            g_viewTarget.y = (&o->pos)->y;
         }
     }
 
@@ -2044,26 +2044,26 @@ void __cdecl DrawViewRect(void)
  * is ours, so it reads 0 by construction. */
 void __cdecl DrawSelection(void)
 {
-    const uint8_t *leader;
+    const AM2_Object *leader;
     int32_t        i;
 
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    leader = (const uint8_t *)LookupOwnerObj(
+    leader = (const AM2_Object *)(const uint8_t *)LookupOwnerObj(
                  g_defaultOwner);
 
     if (leader
-        && !(*(const uint32_t *)(leader + OBJ_OFF_FLAGS) & AM2_MARK_GONE)
-        && *(const int16_t *)(leader + OBJ_OFF_HEALTH) != 0) {
+        && !(leader->flags & AM2_MARK_GONE)
+        && leader->health != 0) {
         AM2_Sprite *spr =
             (g_markSprites)
                 [AM2_MARK_LEADER];
 
         DrawSprite(spr,
-                   *(const int16_t *)(leader + OBJ_OFF_POS)
+                   leader->pos.x
                        - g_viewX,
-                   *(const int16_t *)(leader + OBJ_OFF_POS + 2)
+                   leader->pos.y
                        - g_viewY
                        + AM2_LEADER_MARK_DY,
                    0);
@@ -2223,30 +2223,30 @@ void __cdecl AirFrameDraw(void)
 
     /* --- the caller's own animation, on AIR_OFF_FLAG_B ------------------ */
     if (*(const int32_t *)(air + AIR_OFF_FLAG_B) > 0) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             *(const uint32_t *)(air + AIR_OFF_EXTRA));
 
-        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
+        if (obj->health > 0) {
             if (g_gameClockMs
-                    - *(const uint32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
+                    - *(const uint32_t *)(((uint8_t *)obj->rowSet.rows)
                                           + ROW_OFF_STAMP_54)
                     > AM2_AIR_CYCLE_STEP_MS) {
-                int32_t f = *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) + 1;
+                int32_t f = obj->formationSlot + 1;
 
                 if (f == 1)
                     f++;
                 if (f > AM2_AIR_CYCLE_FRAMES)
                     f = 0;
 
-                ChangeObjectFrame((AM2_Object *)obj, f, 1);
-                *(int32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
+                ChangeObjectFrame(obj, f, 1);
+                *(int32_t *)(((uint8_t *)obj->rowSet.rows)
                              + ROW_OFF_STAMP_54) =
                     *(const int32_t *)&g_gameClockMs;
 
                 if (f == 2)
                     PlaySoundAt(AM2_AIR_CYCLE_SOUND, 0, 0,
-                                *(const int16_t *)(obj + OBJ_OFF_POS),
-                                *(const int16_t *)(obj + OBJ_OFF_POS + 2));
+                                obj->pos.x,
+                                obj->pos.y);
             }
 
             *(int32_t *)(air + AIR_OFF_FLAG_B) += step;
@@ -2254,7 +2254,7 @@ void __cdecl AirFrameDraw(void)
             if (*(const int32_t *)(air + AIR_OFF_FLAG_B)
                     >= g_airCycleMs) {
                 *(int32_t *)(air + AIR_OFF_FLAG_B) = 0;
-                ChangeObjectFrame((AM2_Object *)obj, 0, 1);
+                ChangeObjectFrame(obj, 0, 1);
             }
         }
     }
@@ -2727,7 +2727,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                             int32_t (__cdecl *keep)(AM2_Object *obj))
 {
     const uint8_t *d    = (const uint8_t *)desc;
-    uint8_t       *head = (uint8_t *)0;
+    AM2_Object    *head = (AM2_Object *)0;
     int32_t        cols;
     int32_t        x0, y0, x1, y1;
     int32_t        x, y;
@@ -2762,28 +2762,28 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                                  (d + MAPDESC_OFF_CELLS)))[cell];
 
             for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-                uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+                AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
                 int32_t  t;
 
-                if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                if (o->flagsLo & OBJ_FLAG_DESTROYED)
                     continue;
 
-                t = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)
+                t = o->hit.top
                     >> AM2_CELL_SHIFT;
                 if (t > y || (t < y && y > y0))
                     continue;
-                t = *(const int32_t *)(o + OBJ_OFF_HIT_RECT)
+                t = o->hit.left
                     >> AM2_CELL_SHIFT;
                 if (t > x || (t < x && x > x0))
                     continue;
 
-                if (!IntersectRect(&hit, (const RECT *)(o + OBJ_OFF_HIT_RECT),
+                if (!IntersectRect(&hit, (const RECT *)&o->hit,
                                    (const RECT *)r))
                     continue;
-                if (!keep((AM2_Object *)o))
+                if (!keep(o))
                     continue;
 
-                *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+                o->queryNext = head;
                 head = o;
             }
         }
@@ -2835,7 +2835,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
 void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
 {
     const uint8_t *d    = (const uint8_t *)desc;
-    uint8_t       *head = (uint8_t *)0;
+    AM2_Object    *head = (AM2_Object *)0;
     int32_t        cols;
     int32_t        x0, y0, x1, y1;
     int32_t        x, y;
@@ -2868,25 +2868,25 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
                                  (d + MAPDESC_OFF_CELLS)))[cell];
 
             for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-                uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+                AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
 
-                if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                if (o->flagsLo & OBJ_FLAG_DESTROYED)
                     continue;
 
-                if (*(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)
+                if (o->hit.top
                         >> AM2_CELL_SHIFT < y
                     && y > y0)
                     continue;
-                if (*(const int32_t *)(o + OBJ_OFF_HIT_RECT)
+                if (o->hit.left
                         >> AM2_CELL_SHIFT < x
                     && x > x0)
                     continue;
 
-                if (!IntersectRect(&hit, (const RECT *)(o + OBJ_OFF_HIT_RECT),
+                if (!IntersectRect(&hit, (const RECT *)&o->hit,
                                    (const RECT *)r))
                     continue;
 
-                *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+                o->queryNext = head;
                 head = o;
             }
         }
@@ -2922,14 +2922,14 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
  * re-reads it; it cannot change while this runs. */
 int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out)
 {
-    const uint8_t   *v = (const uint8_t *)vehicle;
-    const AM2_Point *pos = (const AM2_Point *)(v + OBJ_OFF_POS);
+    const AM2_Object   *v = (const AM2_Object *)vehicle;
+    const AM2_Point *pos = &v->pos;
     AM2_Rect  box;
     AM2_Rect  clipped;
     AM2_Point corner;
     AM2_Point here;
     int32_t   x = pos->x;
-    int32_t   y = *(const int16_t *)(v + OBJ_OFF_POS + 2);
+    int32_t   y = v->pos.y;
     int32_t   startTile, endTile, tile, best, d, col, row;
     uint32_t  first, last;
 
