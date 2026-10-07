@@ -1707,10 +1707,10 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
     msg.hdr.len  = 0x18;
     msg.hdr.kind = 0x1C;
     msg.hdr.uid  = UidOnWire(veh->uid);
-    msg.target   = UidOnWire(veh->sight.uid);
-    msg.x        = veh->sight.spot.at.x;
-    msg.y        = veh->sight.spot.at.y;
-    msg.z        = veh->sight.spot.ground;
+    msg.target   = UidOnWire(veh->ctl.uid);
+    msg.x        = veh->ctl.spot.at.x;
+    msg.y        = veh->ctl.spot.at.y;
+    msg.z        = veh->ctl.spot.ground;
     msg.gun      = veh->turretFacing;
     /* +0x529 is TROOPER_OFF_FIRE_FLAG for a type-2 record; on a vehicle
      * Step3Drive writes a fresh GameRand byte there before each shot, so it
@@ -1718,7 +1718,7 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
      * meaning this use contradicts. */
     msg.seed     = veh->fireFlag;
 
-    veh->sight.field00 = 0;
+    veh->ctl.hit = 0;
     ArmyMessageSend(&msg);
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))

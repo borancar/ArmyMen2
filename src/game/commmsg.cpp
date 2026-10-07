@@ -3743,11 +3743,11 @@ void __cdecl RecvVehicle1C(void *msg)
         return;
 
     veh->turretFacing    = *(const uint8_t *)(m + 0x12);
-    veh->sight.field00 = 1;
-    veh->sight.spot.at.x      = *(const int16_t *)(m + 0x0C);
-    veh->sight.spot.at.y      = *(const int16_t *)(m + 0x0E);
-    veh->sight.spot.ground      = *(const int16_t *)(m + 0x10);
-    veh->sight.uid   = targetUid;
+    veh->ctl.hit = 1;
+    veh->ctl.spot.at.x      = *(const int16_t *)(m + 0x0C);
+    veh->ctl.spot.at.y      = *(const int16_t *)(m + 0x0E);
+    veh->ctl.spot.ground      = *(const int16_t *)(m + 0x10);
+    veh->ctl.uid   = targetUid;
     /* +0x529 is the spread seed; see SendVehicleFire on why it stays raw. */
     veh->fireFlag               = *(const uint8_t *)(m + 0x14);
 

@@ -6418,10 +6418,10 @@ void __cdecl DamageRoach(AM2_Object *obj, int32_t amount, uint8_t dir, int32_t k
     switch (kind) {
     case 1:
     case 3:
-        o->seats = 5;
+        o->roachCtl.state = 5;
         break;
     default:
-        o->seats = 6;
+        o->roachCtl.state = 6;
         break;
     }
 
@@ -9982,11 +9982,11 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
                     if (!ObjIsType2(o)) {
                         if (abs(v->field44)
                             > AM2_BOAT_CRUSH_SPEED)
-                            hp = v->inventorySel / 3;
+                            hp = v->field568 / 3;
                         else
-                            hp = v->inventorySel / 6;
+                            hp = v->field568 / 6;
                     } else
-                        hp = v->inventorySel;
+                        hp = v->field568;
 
                     DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                  v->uid, 0, 0);
@@ -10036,11 +10036,11 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
 
                         if (!ObjIsType2(o)) {
                             if (abs(v->field44) > AM2_VEHICLE_CRUSH_SPEED)
-                                hp = v->inventorySel / 3;
+                                hp = v->field568 / 3;
                             else
-                                hp = v->inventorySel / 6;
+                                hp = v->field568 / 6;
                         } else
-                            hp = v->inventorySel;
+                            hp = v->field568;
 
                         DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                      v->uid,
