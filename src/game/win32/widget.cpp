@@ -4859,14 +4859,12 @@ void __cdecl HudPostUpdate(void)
         VehicleDismountAll((AM2_Object *)0, at);
 
     /* ---- what the leader is holding ----------------------------------- */
-    leader = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
+    leader = LookupOwnerObj(g_defaultOwner);
     if (leader) {
         int32_t sel = leader->inventorySel;
 
         {
-            uint32_t uid = *(const uint32_t *)((const uint8_t *)leader
-                                                 + UNIT_OFF_INVENTORY
-                                                 + (uint32_t)sel * 4);
+            uint32_t uid = leader->inventory[sel];
 
             weapon = WeaponByUid(uid);
         }

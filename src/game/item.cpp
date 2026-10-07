@@ -174,14 +174,14 @@ uint32_t __cdecl UidOnWire(uint32_t uid)
 
 uint32_t __cdecl ObjFieldA(const AM2_Object *obj)
 {
-    const uint32_t *flags = (const uint32_t *)((const uint8_t *)obj + OBJ_OFF_FLAGS);
+    const uint32_t *flags = &obj->flags;
 
     return (*flags >> OBJ_FIELDA_SHIFT) & OBJ_FIELDA_MASK;
 }
 
 void __cdecl ObjSetFieldA(AM2_Object *obj, uint32_t value)
 {
-    uint32_t *flags = (uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS);
+    uint32_t *flags = &obj->flags;
 
     *flags = (*flags & ~(OBJ_FIELDA_MASK << OBJ_FIELDA_SHIFT))
            | ((value & OBJ_FIELDA_MASK) << OBJ_FIELDA_SHIFT);
@@ -8057,7 +8057,7 @@ void __cdecl BoardVehicle(uint32_t uid, AM2_Object *vehicle)
     unit->riding =
         (vehicle)->uid;
 
-    ((AM2_Rec *)((uint8_t *)vehicle + VEHICLE_OFF_PTR_LIST))->PtrListPush(
+    ((AM2_Rec *)&vehicle->riders)->PtrListPush(
                 (void *)(uintptr_t)uid);
 }
 

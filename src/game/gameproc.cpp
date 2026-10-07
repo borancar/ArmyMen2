@@ -1440,7 +1440,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
  * The bounding rect handed to BuildRowSet is ADDR_ZERO_RECT, which no code in
  * the image writes; three call sites use it the same way.
  */
-void *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
+AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
 {
     AM2_Object       *o = (AM2_Object *)am2_malloc(AM2_MISSILE_BYTES);
     const AM2_Object *h = (const AM2_Object *)hdr;
@@ -1545,7 +1545,7 @@ struct AM2_Type8Obj {
     uint8_t     rest_[0x94 + AM2_TYPE8_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
+AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type8Obj   obj;
     uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
@@ -1641,7 +1641,7 @@ struct AM2_Type2Obj {
     uint8_t     rest_[0x94 + AM2_TYPE2_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
+AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
     AM2_Type2Obj obj;
     uint8_t *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
@@ -1846,7 +1846,7 @@ struct AM2_Type3Obj {
     uint8_t     rest_[0x94 + AM2_TYPE3_RECORD_SIZE - 0x538 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
+AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type3Obj   obj;
     uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
@@ -1972,7 +1972,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
  * that point -- the two freads have already happened, so the file position is
  * correct either way.
  */
-void *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
+AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
 {
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
@@ -1996,7 +1996,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
         (int32_t)hdr->flags, 1,
         hdr->uid);
     if (!obj)
-        return (void *)0;
+        return (AM2_Object *)(void *)(AM2_Object *)0;
 
     ownRec = obj->field94;
     memcpy(blockA, &obj->box, sizeof blockA);
@@ -2200,7 +2200,7 @@ int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
  * a null dereference. That is the original's, and SaveOneItem's careful
  * per-step checking has no counterpart on this side of the format.
  */
-void *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
+AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
 {
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
@@ -2242,7 +2242,7 @@ void *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
  * including the fields the creator was just given. A failed creation answers
  * 0 and copies nothing.
  */
-void *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
+AM2_Object *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
 {
     const AM2_Object *h = (const AM2_Object *)hdr;
     uint8_t       *made;
@@ -2255,10 +2255,10 @@ void *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
                                       1,
                                       (int32_t)h->uid);
     if (!made)
-        return (void *)0;
+        return (AM2_Object *)(void *)(AM2_Object *)0;
 
     memcpy(made, h, (size_t)kItemHeaderSize);
-    return made;
+    return (AM2_Object *)made;
 }
 
 /* 0x00428870, one caller -- SaveItems, once per registered object. Writes the
@@ -2343,10 +2343,10 @@ typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
  * neither does this: LoadItems only ever feeds it types it has just written.
  *
  * VERIFIED BY READING. Nothing in the suite loads a savegame. */
-void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
+AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
 {
     uint8_t  hdr[AM2_ITEM_HEADER_BYTES];
-    uint8_t *made = NULL;
+    AM2_Object *made = NULL;
     uint32_t footprint;
 
     if (!LoadItemHeader(fp, hdr))
@@ -2360,17 +2360,17 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
      * its flags through it -- the original's, and reproduced. */
     switch (*(const int32_t *)hdr) {
     case 1:
-        made = (uint8_t *)LoadType1(fp, (const AM2_Object *)hdr);
+        made = LoadType1(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 2:
-        made = (uint8_t *)LoadType2(fp, (AM2_Object *)(void *)hdr, arg);
+        made = LoadType2(fp, (AM2_Object *)(void *)hdr, arg);
         if (!made)
             return NULL;
         break;
     case 3:
-        made = (uint8_t *)LoadType3(fp, (const AM2_Object *)hdr);
+        made = LoadType3(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
@@ -2380,40 +2380,40 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
      * read whatever was on the stack for it. The call site settles it: it
      * pushes three and cleans 0xC. */
     case 4:
-        made = (uint8_t *)LoadType4(fp, (AM2_Object *)(void *)hdr, arg);
+        made = LoadType4(fp, (AM2_Object *)(void *)hdr, arg);
         if (!made)
             return NULL;
         break;
     case 5:
-        made = (uint8_t *)LoadType5(fp, (AM2_Object *)hdr);
+        made = LoadType5(fp, (AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 6:
-        made = (uint8_t *)LoadType6(fp, (const AM2_Object *)hdr);
+        made = LoadType6(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 7:
-        made = (uint8_t *)LoadType7(fp, (const AM2_Object *)hdr);
+        made = LoadType7(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 8:
-        made = (uint8_t *)LoadType8(fp, (const AM2_Object *)hdr);
+        made = LoadType8(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     }
 
     if (footprint)
-        *(uint32_t *)(made + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+        made->flags |= OBJ_FLAG_FOOTPRINT_ON;
     else
-        *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
-    *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
+        made->flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+    made->flags &= ~(uint32_t)OBJ_FLAG_SELECTED;
 
-    ApplyObjHeight((AM2_Object *)made,
-                          (int32_t)*(const int8_t *)(made + OBJ_OFF_HEIGHT_SET));
+    ApplyObjHeight(made,
+                          (int32_t)made->heightSet);
     return made;
 }
 
@@ -3089,7 +3089,7 @@ void gameproc_install(void)
  * THE RENUMBER FLAG IS READ TWICE. Once to choose the create, and again at
  * the end to set bit 0x4000000 in OBJ_OFF_FLAGS -- so a renumbered weapon is
  * marked as such, and the flag is not simply the create path's leftover. */
-void *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
+AM2_Object *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
     AM2_Object  *h = (AM2_Object *)hdr;
     /* The whole object on the stack, the record read in at +0x94, as the

@@ -810,7 +810,7 @@ void __cdecl State2Enter(void)
     AM2_Widget *screen = *(AM2_Widget * *)&g_paintObject;
     am2_FILE   *save   = (am2_FILE *)0;
     AM2_Sprite *splash;
-    void       *leader;
+    AM2_Object *leader;
 
     if (screen) {
         WidgetVDelete(screen, 1);
@@ -960,12 +960,12 @@ void __cdecl State2Enter(void)
     leader = LookupOwnerObj(
                  (int32_t)g_defaultOwner);
     if (leader) {
-        SelectInventorySlot((AM2_Object *)leader,
-            *(const int32_t *)((const uint8_t *)leader + UNIT_OFF_INVENTORY_SEL));
+        SelectInventorySlot(leader,
+            leader->inventorySel);
         DeselectAll();
-        if (*(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING))
+        if (leader->riding)
             SelectUnit(LookupType3ByUID(
-                *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING)));
+                leader->riding));
         else
             SelectUnit(leader);
         g_viewSnap = 1;

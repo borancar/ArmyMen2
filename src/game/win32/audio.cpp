@@ -1475,7 +1475,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
     int32_t          volume;
     int32_t          dist;
     int32_t          d2;
-    void            *owner;
+    AM2_Object      *owner;
     const AM2_Point *at;
 
     if (!g_audioEnabled)
@@ -1506,8 +1506,8 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
 
         /* An owner that can see gets a say, and only ever a shortening one.
          * PointsEqual takes both points BY VALUE. */
-        if (owner && *(const int16_t *)((uint8_t *)owner + 0x62) > 0) {
-            at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
+        if (owner && owner->health > 0) {
+            at = &owner->pos;
             if (PointsEqual(where, *at))
                 d2 = SOUND_NEAR_DISTANCE;
             else
@@ -1649,7 +1649,7 @@ void __cdecl Update3DAudioVolumes(void)
     AM2_Point   where;
     AM2_Point   ear;
     AM2_Point   at;
-    void       *obj;
+    AM2_Object *obj;
     int32_t     dist;
     int32_t     vol;
     LPDIRECTSOUNDBUFFER buf;
@@ -1680,7 +1680,7 @@ void __cdecl Update3DAudioVolumes(void)
                     *(uint32_t *)(REC + SOUND_REC_OFF_ACTIVE) = 0;
                     continue;
                 }
-                where = *(const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS);
+                where = obj->pos;
             } else if (((const AM2_Point *)(REC + SOUND_REC_OFF_POS))->x != 0) {
                 where = *(const AM2_Point *)(REC + SOUND_REC_OFF_POS);
             }

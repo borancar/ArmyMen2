@@ -113,7 +113,7 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, struct AM2_Object *obj);
 /* 0x004289E0. Reads a header and builds the object, RETURNING it -- not a
  * flag. The footprint bit round-trips around construction and the selected
  * bit is cleared unconditionally. */
-void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
+struct AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 
 /* The object header's two halves and three of the eight per-type savers, all
  * writing from OBJ_OFF_FIELD_94. See gameproc.cpp. */
@@ -139,7 +139,7 @@ int32_t __cdecl PlaceScenario(void);
 
 void __cdecl ResetLevelState(void);
 
-void *__cdecl LoadType5(am2_FILE *fp, struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType5(am2_FILE *fp, struct AM2_Object *hdr);
 
 /* 0x0043B9B0, nine callers. The runtime half of the missile pair: build a
  * type-5 object from a weapon and a firing position. Def 3 is a chained kind
@@ -155,7 +155,7 @@ void *__cdecl CreateMissile(struct AM2_Object *weapon, struct AM2_Object *source
  * the tag, build the item from the tag, then overwrite most of it from the
  * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
  * two 16-byte blocks at +0x20 and +0x30. See gameproc.cpp. */
-void *__cdecl LoadType1(am2_FILE *fp, const struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType1(am2_FILE *fp, const struct AM2_Object *hdr);
 int32_t __cdecl SaveType6(am2_FILE *fp, struct AM2_Object *obj);
 int32_t __cdecl SaveType8(am2_FILE *fp, struct AM2_Object *obj);
 int32_t __cdecl SaveType4(am2_FILE *fp, struct AM2_Object *obj);
@@ -164,10 +164,10 @@ int32_t __cdecl SaveType2(am2_FILE *fp, struct AM2_Object *obj);
 int32_t __cdecl SaveType3(am2_FILE *fp, struct AM2_Object *obj);
 
 /* 0x00435500. The type 7 loader, and the only one that reads no file. */
-void *__cdecl LoadType6(am2_FILE *fp, const struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType6(am2_FILE *fp, const struct AM2_Object *hdr);
 
 
-void *__cdecl LoadType7(am2_FILE *fp, const struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType7(am2_FILE *fp, const struct AM2_Object *hdr);
 
 void gameproc_install(void);
 
@@ -241,7 +241,7 @@ int32_t __cdecl SelListInit(void);
 /* 0x0045EF50. The LAST of the eight savegame readers: a type-4 weapon. Five
  * reads, one of them discarded, and a renumber flag that picks between two
  * CreateWeapon calls and then marks the object. */
-void *__cdecl LoadType4(am2_FILE *fp, struct AM2_Object *hdr, int32_t renumber);
+struct AM2_Object *__cdecl LoadType4(am2_FILE *fp, struct AM2_Object *hdr, int32_t renumber);
 
 
 /* 0x00424780. Parse one GAME line of an .aai file into the game constants.
@@ -261,14 +261,14 @@ void __cdecl InitArmyObjLists(void);
  * family: read the 0x4CC-byte record, build a roach from the header, paste the
  * record over OBJ_OFF_FIELD_94, and rescale the health across a possibly
  * different maximum. */
-void *__cdecl LoadType8(am2_FILE *fp, const struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType8(am2_FILE *fp, const struct AM2_Object *hdr);
 /* 0x0045A120, one caller. The VEHICLE loader: rebuild two pointer lists and
  * one table-record pointer out of counts and a comm slot the file carries,
  * then rescale the health against the vehicle definition. */
-void *__cdecl LoadType3(am2_FILE *fp, const struct AM2_Object *hdr);
+struct AM2_Object *__cdecl LoadType3(am2_FILE *fp, const struct AM2_Object *hdr);
 /* 0x004471D0, one caller. The TROOPER loader; its third argument is
  * "renumber", which decides whether the trooper keeps the uid the file gave it
  * or gets a fresh one recorded in the remap table. */
-void *__cdecl LoadType2(am2_FILE *fp, struct AM2_Object *hdr, int32_t renumber);
+struct AM2_Object *__cdecl LoadType2(am2_FILE *fp, struct AM2_Object *hdr, int32_t renumber);
 
 #endif /* AM2_GAMEPROC_H */

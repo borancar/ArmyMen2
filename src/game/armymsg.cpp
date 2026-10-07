@@ -916,7 +916,7 @@ void __cdecl RecvDamage(void *msg)
     from.x = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS);
     from.y = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS + 2);
     dir    = AngleBetween(&from,
-                          (const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS));
+                          &obj->pos);
 
     comm = kComm;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
