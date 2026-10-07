@@ -144,6 +144,14 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     return 1;
 }
 
+/* The packet append. An inline call rather than a bare memcpy: VC6 then
+ * keeps the length in the register the image uses (see CopyTypeRecord in
+ * gameproc.cpp). */
+static inline void PacketAppend(void *dst, const void *src, size_t n)
+{
+    memcpy(dst, src, n);
+}
+
 /* 0x004105F0. Append one message to the outgoing packet.
  *
  * The three gates are re-read each time round, which is why this is a loop
@@ -193,7 +201,7 @@ void __cdecl ArmyMessageSend(const void *msg)
             continue;
         }
 
-        memcpy(kPacket + kPacketLen, msg, len);
+        PacketAppend(kPacket + kPacketLen, msg, len);
         kPacketLen += len;
 
         /* Lookahead, not a bounds check: flush when ANOTHER message this
