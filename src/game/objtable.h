@@ -408,46 +408,59 @@ typedef struct AM2_Object {
         const AM2_ItemType *def;    /*   a shot's or a missile's def, its
                                      *   weapon's typeRec */
         int32_t    aiDriven;        /*   types 2 and 3: non-zero, the AI drives it */
+        int32_t    blastKind;       /*   an explosion's kind */
     };
-    union {                         /* +0x98, by object type: */
-        uint32_t   shooterUid;      /*   a shot's shooter uid */
-        int32_t    rank;            /*   OBJ_OFF_RANK, a unit's 0..7 */
-        int8_t     itemFlag;        /*   an item's: its low byte, signed; negative = step-up */
-    };
-    int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
-    int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
-    union {                         /* +0xA4, by object type: */
-        struct {                    /*   an item's frame chain */
-            uint32_t _chainA4;
-            uint32_t chainUid;      /*   +0xA8 OBJ_OFF_CHAIN_UID, the head */
-            uint32_t chainNextUid;  /*   +0xAC OBJ_OFF_CHAIN_NEXT_UID */
+    union {                         /* +0x98..+0xBC, by object type: */
+        struct {                    /*   everything but an explosion: */
+            union {                         /* +0x98, by object type: */
+                uint32_t   shooterUid;      /*   a shot's shooter uid */
+                int32_t    rank;            /*   OBJ_OFF_RANK, a unit's 0..7 */
+                int8_t     itemFlag;        /*   an item's: its low byte, signed; negative = step-up */
+            };
+            int32_t        repairFrame;     /* +0x9C  OBJ_OFF_REPAIR_FRAME */
+            int32_t        formationSlot;   /* +0xA0  OBJ_OFF_FORMATION_SLOT */
+            union {                         /* +0xA4, by object type: */
+                struct {                    /*   an item's frame chain */
+                    uint32_t _chainA4;
+                    uint32_t chainUid;      /*   +0xA8 OBJ_OFF_CHAIN_UID, the head */
+                    uint32_t chainNextUid;  /*   +0xAC OBJ_OFF_CHAIN_NEXT_UID */
+                };
+                struct {                    /*   a missile's (type 5): */
+                    float    speedScale;    /*   +0xA4 MISSILE_OFF_SPEED_SCALE, multiplies the step */
+                    int16_t  ground;        /*   +0xA8 MISSILE_OFF_GROUND */
+                    uint8_t  _padaa[2];
+                    int32_t  flown;         /*   +0xAC MISSILE_OFF_FLOWN, units travelled */
+                };
+                AM2_UidList followers;      /*   types 2, 3 and 8: who follows it,
+                                             *   OBJ_OFF_PTR_LIST */
+            };
+            union {                         /* +0xB0, by object type: */
+                int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
+                uint8_t    power;           /*   a shot's power byte */
+                struct { int16_t fieldB0, fieldB2; };  /* types 2, 3, 8: two halves */
+                AM2_Point  savedPoint;      /*   a trooper's: scriptPoint saved by the patrol */
+            };
+            union {                         /* +0xB4, by object type: */
+                int32_t    scriptState;     /*   OBJ_OFF_SCRIPT_STATE */
+                AM2_Point  scriptPoint;     /*   a trooper's: the point it was scripted to */
+            };
+            union {                         /* +0xB8, by object type: */
+                int32_t    scriptFrame;     /*   OBJ_OFF_SCRIPT_FRAME */
+                AM2_Point  goalPoint;       /*   a trooper's: the item it walks to pick up */
+            };
+            union {                         /* +0xBC, by object type: */
+                uint32_t   scriptNext;      /*   OBJ_OFF_SCRIPT_NEXT, a clock deadline */
+                AM2_Point  detour;          /*   a trooper's: a detour walked before scriptPoint */
+            };
         };
-        struct {                    /*   a missile's (type 5): */
-            float    speedScale;    /*   +0xA4 MISSILE_OFF_SPEED_SCALE, multiplies the step */
-            int16_t  ground;        /*   +0xA8 MISSILE_OFF_GROUND */
-            uint8_t  _padaa[2];
-            int32_t  flown;         /*   +0xAC MISSILE_OFF_FLOWN, units travelled */
+        struct {                    /*   an explosion's (BLAST_OFF_*): */
+            int32_t    blastDamage; /*   +0x98, halved for one trooper class */
+            AM2_Rect   blastRect;   /*   +0x9C, the area, in world units */
+            uint32_t   blastDue;    /*   +0xAC, fires when the clock passes it */
+            int32_t    blastSound;  /*   +0xB0, cleared after the one sound */
+            int32_t    blastMode;   /*   +0xB4, >= 5 takes the spawn path */
+            uint32_t   blastSource; /*   +0xB8, the attacker DamageObject gets */
         };
-        AM2_UidList followers;      /*   types 2, 3 and 8: who follows it,
-                                     *   OBJ_OFF_PTR_LIST */
-    };
-    union {                         /* +0xB0, by object type: */
-        int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
-        uint8_t    power;           /*   a shot's power byte */
-        struct { int16_t fieldB0, fieldB2; };  /* types 2, 3, 8: two halves */
-        AM2_Point  savedPoint;      /*   a trooper's: scriptPoint saved by the patrol */
-    };
-    union {                         /* +0xB4, by object type: */
-        int32_t    scriptState;     /*   OBJ_OFF_SCRIPT_STATE */
-        AM2_Point  scriptPoint;     /*   a trooper's: the point it was scripted to */
-    };
-    union {                         /* +0xB8, by object type: */
-        int32_t    scriptFrame;     /*   OBJ_OFF_SCRIPT_FRAME */
-        AM2_Point  goalPoint;       /*   a trooper's: the item it walks to pick up */
-    };
-    union {                         /* +0xBC, by object type: */
-        uint32_t   scriptNext;      /*   OBJ_OFF_SCRIPT_NEXT, a clock deadline */
-        AM2_Point  detour;          /*   a trooper's: a detour walked before scriptPoint */
     };
     union {                         /* +0xC0, by object type: */
         const AM2_ItemType *typeRec; /*  OBJ_OFF_FIELD_C0, a weapon's or an item's
@@ -612,6 +625,9 @@ static_assert(offsetof(AM2_Object, maxHealth)     == 0x60,  "maxHealth");
 static_assert(offsetof(AM2_Object, health)        == 0x62,  "health");
 static_assert(offsetof(AM2_Object, heightAdj)     == 0x64,  "heightAdj");
 static_assert(offsetof(AM2_Object, field94)       == 0x94,  "field94");
+static_assert(offsetof(AM2_Object, blastRect)     == 0x9C,  "blastRect");
+static_assert(offsetof(AM2_Object, blastSource)   == 0xB8,  "blastSource");
+static_assert(offsetof(AM2_Object, typeRec)       == 0xC0,  "typeRec after blast");
 static_assert(offsetof(AM2_Object, shooterUid)    == 0x98,  "shooterUid");
 static_assert(offsetof(AM2_Object, repairFrame)   == 0x9C,  "repairFrame");
 static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");

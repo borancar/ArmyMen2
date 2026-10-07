@@ -11541,57 +11541,57 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
         depth = AM2_EXPL_DEPTH_OVER;
     }
 
-    o->rank     = damage;
-    o->aiDriven     = kind;
-    memcpy((uint8_t *)o + BLAST_OFF_RECT, (const void *)&g_explosionArea16,
+    o->blastDamage     = damage;
+    o->blastKind     = kind;
+    memcpy(&o->blastRect, (const void *)&g_explosionArea16,
            sizeof(AM2_Rect));
-    o->scriptFrame = src;
+    o->blastSource = src;
 
     /* The army read below is the object's own field, which is still zero --
      * see the note above. */
     switch (kind) {
     case 0x78: case 0x82: case 0x8C: case 0x94:
-        o->scriptState = AM2_BLAST_MODE_16;
-        *(AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT) =
+        o->blastMode = AM2_BLAST_MODE_16;
+        o->blastRect =
             g_explosionArea16;
-        o->scriptId = 1;
+        o->blastSound = 1;
         MakeKind7(at, 4, o->owner, facing, 0, 0);
         break;
 
     case 0x81: case 0x95:
-        o->scriptState = AM2_BLAST_MODE_24;
-        *(AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT) =
+        o->blastMode = AM2_BLAST_MODE_24;
+        o->blastRect =
             g_explosionArea24;
-        o->scriptId = 1;
+        o->blastSound = 1;
         MakeKind7(at, 4, o->owner, facing, 0, 0);
         break;
 
     case 0x83: case 0x8A: case 0x8B:
-        o->scriptState = AM2_BLAST_MODE_32;
-        *(AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT) =
+        o->blastMode = AM2_BLAST_MODE_32;
+        o->blastRect =
             g_explosionArea32;
-        o->scriptId = 1;
+        o->blastSound = 1;
         MakeKind7(at, 4, o->owner, facing, 0, 0);
         break;
 
     case 0x7B:
         if (((uint8_t)x & AM2_EXPL_SCATTER_MASK) == AM2_EXPL_SCATTER_VALUE)
             MakeKind7(at, 1, o->owner, facing, 0, 0);
-        o->scriptState = AM2_BLAST_MODE_NONE;
+        o->blastMode = AM2_BLAST_MODE_NONE;
         break;
 
     default:
-        o->scriptState = AM2_BLAST_MODE_NONE;
+        o->blastMode = AM2_BLAST_MODE_NONE;
         break;
     }
 
-    ((AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT))->left   += x;
-    ((AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT))->right  += x;
-    ((AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT))->top    += y;
-    ((AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT))->bottom += y;
+    o->blastRect.left   += x;
+    o->blastRect.right  += x;
+    o->blastRect.top    += y;
+    o->blastRect.bottom += y;
 
     if (delay > 0)
-        o->flown =
+        o->blastDue =
             *(const int32_t *)&g_gameClockMs + delay;
 
     o->owner = (int8_t)army;
@@ -11658,52 +11658,52 @@ void __cdecl StepType6(AM2_Object *obj)
     AM2_Object   *o = obj;
     AM2_Object   *victim;
 
-    if (o->chainNextUid > 0) {
-        if (o->chainNextUid
+    if (o->blastDue > 0) {
+        if (o->blastDue
             > g_gameClockMs)
             return;
-        o->chainNextUid = 0;
+        o->blastDue = 0;
         ObjFlagSet0((AM2_MapRow *)(o->rowSet.rows));
     }
 
-    if (o->scriptId != 0) {
+    if (o->blastSound != 0) {
         PlaySoundAt(AM2_BLAST_SOUND, 0, 0,
                     o->pos.x,
                     o->pos.y);
-        o->scriptId = 0;
+        o->blastSound = 0;
     }
 
     if (o->rowSet.rows->cell >= 4
-        && o->rank > 0) {
+        && o->blastDamage > 0) {
 
         victim = AllObjectsInRect(
-                     (const AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT),
+                     &o->blastRect,
                      g_objMapDesc);
 
         for (; victim != 0;
              victim = ((AM2_Object *)(uint8_t *)victim->queryNext)) {
-            int32_t dmg = o->rank;
+            int32_t dmg = o->blastDamage;
 
             if (ObjIsType2(victim)
                 && ClassifyByCode74(victim) == 2)
-                dmg = o->rank >> 1;
+                dmg = o->blastDamage >> 1;
 
             /* One call per kind, as the image has them; the direction is a
              * byte. */
-            if (o->aiDriven != 0x89
+            if (o->blastKind != 0x89
                 && (orig_rand() & 0x255) >= 0x40)
                 DamageObject(victim, dmg, 3,
-                             (uint32_t)o->scriptFrame,
+                             o->blastSource,
                              (uint8_t)(orig_rand() % 0xFF + 1), 0);
             else
                 DamageObject(victim, dmg, 1,
-                             (uint32_t)o->scriptFrame,
+                             o->blastSource,
                              (uint8_t)(orig_rand() % 0xFF + 1), 0);
         }
 
-        o->rank = 0;
+        o->blastDamage = 0;
 
-        if (o->scriptState >= 5) {
+        if (o->blastMode >= 5) {
             /* x through the point, y straight off the object -- the image
              * reads them that way. */
             AM2_Point *pos = &o->pos;
@@ -11718,12 +11718,12 @@ void __cdecl StepType6(AM2_Object *obj)
                    >= AM2_BLOCK_CLEAR)     /* signed, as the image's `jl` */
                 orig_spawn_at(pos->x, o->pos.y, 0x90,
                               o->owner,
-                              (uint32_t)o->scriptFrame,
+                              o->blastSource,
                               0, 0xC8, 0, 0, 0);
 
-            ShakeAt(pos, o->scriptState);
+            ShakeAt(pos, o->blastMode);
             /* Once, not once a frame. */
-            o->scriptState = 0;
+            o->blastMode = 0;
         }
     }
 
