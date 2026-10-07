@@ -1307,7 +1307,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
         *(int32_t *)(item + ITEM_OFF_AMMO) =
             *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
 
-    TrooperDropItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+    TrooperDropItem((AM2_Object *)trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
                     *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
 }
 
@@ -1349,7 +1349,7 @@ void __cdecl RecvTroopPair(void *msg)
     if (!ObjIsType4((const AM2_Object *)b))
         return;
 
-    orig_trooper_pair_apply(a, b,
+    orig_trooper_pair_apply((AM2_Object *)a, (AM2_Object *)b,
                             *(const int32_t *)(m + MSG_PAIR_OFF_BYTE),
                             *(const int32_t *)(m + MSG_PAIR_OFF_ARG));
 }
@@ -1421,7 +1421,7 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
         weaponUid;
 
     SoldierKindForWeapon(
-        trooper,
+        (AM2_Object *)trooper,
         **(const uint32_t *const *)((const uint8_t *)weapon
                                     + OBJ_OFF_FIELD_C0));
 
@@ -3393,7 +3393,7 @@ void __cdecl RecvVehicle24(void *msg)
     /* The trooper's uid is decoded before the vehicle is pushed. */
     {
         uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
-        BoardVehicle(trooper, vehicle);
+        BoardVehicle(trooper, (AM2_Object *)vehicle);
     }
 }
 

@@ -167,7 +167,7 @@ typedef void (__cdecl *AM2_Type238ActionFn)(void *obj, int32_t arg);
 void __cdecl SetLeadsAndAct(void *obj)
 {
     *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS) = 1;
-    Type238Action(obj, AM2_LEADS_ACTION_ARG);
+    Type238Action((AM2_Object *)obj, AM2_LEADS_ACTION_ARG);
 }
 
 void *__cdecl ListFirstObj(const void *obj)
@@ -294,7 +294,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
             DeselectUnit(v);
             return 1;
         }
-        SetObjContext(v);
+        SetObjContext((AM2_Object *)v);
     }
 
     return 1;

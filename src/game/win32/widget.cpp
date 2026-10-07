@@ -3859,7 +3859,7 @@ int widget_install(void)
  * image's -- so it is the one seam this function needs.  Everything else it
  * calls is ours. */
 /* Reconstructed in item.cpp and declared there rather than in item.h. */
-void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot);
 
 /* strncmp, case-SENSITIVE: the original at 0x00465160 folds no case, and the
  * standalone had mapped this seam to _strnicmp for as long as it existed. */
@@ -5681,7 +5681,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
         case 0x17: {
             int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
             if (hp > 0 && hp < *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
-                SetWeaponTarget(u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         }
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
@@ -5689,31 +5689,31 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
          * own and jumps into 0x26's. */
         case 0x23:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
-                SetWeaponTarget(u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
 
         case 0x1A:
-            SetWeaponTarget(u, g_zeroXY);
+            SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
 
         case 0x24:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
-                SetWeaponTarget(u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x25:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 2)
-                SetWeaponTarget(u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x26:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 3)
-                SetWeaponTarget(u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x29: {
             uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
             if (riding) {
                 void *veh = LookupType3ByUID(riding);
                 if (veh)
-                    SetWeaponTarget(veh,
+                    SetWeaponTarget((AM2_Object *)veh,
                         g_zeroXY);
                 else
                     *(uint32_t *)(u + OBJ_OFF_RIDING) = 0;
@@ -5726,7 +5726,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
     }
 
     *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
-    SelectInventorySlot(u, slot);
+    SelectInventorySlot((AM2_Object *)u, slot);
 
     if (*(const uint32_t *)(u + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED)
         return;
@@ -5914,7 +5914,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
                 /* 1 or 2, never a boolean -- see the header comment. */
                 if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL))
                     *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) =
-                        (ItemIsReady(item) != 0) + 1;
+                        (ItemIsReady((const AM2_Object *)item) != 0) + 1;
                 else
                     *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) = 0;
             } else {
@@ -6501,7 +6501,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
             TitleCaseName(name);
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
         } else if (*(const int32_t *)(obj + OBJ_OFF_NAME_INDEX) >= 0) {
-            SoldierNameOf(obj, name);
+            SoldierNameOf((const AM2_Object *)obj, name);
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
         } else {
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName((AM2_Object *)obj));
@@ -16810,7 +16810,7 @@ void __cdecl PointerActionMode4(void *target, AM2_Point at)
     if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
         return;
 
-    if (SelectIfOwn(tgt))
+    if (SelectIfOwn((AM2_Object *)tgt))
         return;
 
     for (i = 0; i < g_selectedCount; ) {
@@ -17007,7 +17007,7 @@ void __cdecl PointerActionMode6(void *target, AM2_Point at)
     if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
         return;
 
-    if (SelectIfOwn(target))
+    if (SelectIfOwn((AM2_Object *)target))
         return;
 
     for (i = 0; i < g_selectedCount; ) {
@@ -17414,7 +17414,7 @@ void __cdecl SetWeaponTargetSweeper(void *target, AM2_Point at)
 void __cdecl PointerSelect(void *obj, AM2_Point at)
 {
     (void)at;
-    SelectIfOwn(obj);
+    SelectIfOwn((AM2_Object *)obj);
 }
 
 /* PointerPickMode4 and PointerPickMode5 -- originals 0x00458EE0 and 0x004590F0,

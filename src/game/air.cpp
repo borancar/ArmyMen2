@@ -1830,7 +1830,7 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
             *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID);
         *((uint8_t *)trooper + OBJ_OFF_FACING) = FACE[i];
 
-        SoldierKindForWeapon(trooper,
+        SoldierKindForWeapon((AM2_Object *)trooper,
             **(const uint32_t **)((const uint8_t *)weapon + OBJ_OFF_FIELD_C0));
         SendTrooperSetWeapon(trooper,
             *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID), 0);

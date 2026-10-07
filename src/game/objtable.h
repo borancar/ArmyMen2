@@ -228,7 +228,10 @@ typedef struct AM2_Object {
     uint8_t        cellCount;       /* +0x8C OBJ_OFF_CELL_COUNT */
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
-    const uint8_t *field94;         /* +0x94  OBJ_OFF_FIELD_94, the type record */
+    union {                         /* +0x94 OBJ_OFF_FIELD_94, by object type: */
+        const uint8_t *field94;     /*   an item's type record */
+        int32_t    aiDriven;        /*   types 2 and 3: non-zero, the AI drives it */
+    };
     union {                         /* +0x98, by object type: */
         uint32_t   shooterUid;      /*   a shot's shooter uid */
         int32_t    rank;            /*   OBJ_OFF_RANK, a unit's 0..7 */

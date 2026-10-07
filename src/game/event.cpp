@@ -1006,7 +1006,7 @@ void __cdecl EvtType2ActionA(uint32_t uid)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    Type2ActionA(obj);
+    Type2ActionA((AM2_Object *)obj);
 }
 
 void __cdecl EvtType2ActionB(uint32_t uid)
@@ -1021,7 +1021,7 @@ void __cdecl EvtType2ActionB(uint32_t uid)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    Type2ActionB(obj);
+    Type2ActionB((AM2_Object *)obj);
 }
 
 /* 0x0041FBA0. The third of the type-2 twins, and the only one that forwards an
@@ -1038,7 +1038,7 @@ void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    Type2ActionC(obj, arg);
+    Type2ActionC((AM2_Object *)obj, arg);
 }
 
 /* 0x0041F6E0. The one in this family that checks NEITHER the pointer nor the
@@ -1885,7 +1885,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     if (!unit)
         return;
 
-    Type2ActionA(unit);
+    Type2ActionA((AM2_Object *)unit);
     *(int32_t *)(unit + OBJ_OFF_FIELD_94)   = 1;
     *(int32_t *)(unit + OBJ_OFF_AI_MODE_PREV) =
         *(const int32_t *)(unit + OBJ_OFF_AI_MODE);
@@ -2007,7 +2007,7 @@ void __cdecl EvtType238Action(uint32_t uid, int32_t arg)
     if (!ObjIsTypeIn238((const AM2_Object *)obj))
         return;
 
-    Type238Action(obj, arg);
+    Type238Action((AM2_Object *)obj, arg);
 }
 
 /* 0x0041FFD0. Push a one-deep "current object" context.
@@ -2652,7 +2652,7 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
 
     if (!unit)
         return;
-    weapon = HeldWeaponObj(unit);
+    weapon = HeldWeaponObj((const AM2_Object *)unit);
     if (!weapon)
         return;
 
@@ -2682,7 +2682,7 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
 
     if (!unit)
         return;
-    weapon = HeldWeaponObj(unit);
+    weapon = HeldWeaponObj((const AM2_Object *)unit);
     if (!weapon)
         return;
     target = (uint8_t *)LookupByUID(targetUid);
@@ -3007,7 +3007,7 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, AM2_Point at)
     for (slot = 1; slot < AM2_INVENTORY_SLOTS; slot++)
         if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY
                                 + (size_t)slot * 4) == weaponUid) {
-            TrooperDropItem(obj, slot, at);
+            TrooperDropItem((AM2_Object *)obj, slot, at);
             return;
         }
 }
@@ -3618,7 +3618,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         weapon[OBJ_OFF_ARMY] = (uint8_t)act->army;
         *(int32_t *)(unit + OBJ_OFF_WEAPON_UID) =
             *(const int32_t *)(weapon + OBJ_OFF_UID);
-        SoldierKindForWeapon(unit,
+        SoldierKindForWeapon((AM2_Object *)unit,
                              **(int32_t **)(weapon + OBJ_OFF_FIELD_C0));
         SendTrooperSetWeapon(unit,
                              *(const int32_t *)(weapon + OBJ_OFF_UID), 0);

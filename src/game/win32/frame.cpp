@@ -27,7 +27,7 @@
 #include "../objtype.h"  /* LookupType3ByUID -- reconstructed */
 #include "../objtable.h" /* SelectUnit -- reconstructed */
 /* Reconstructed in item.cpp and declared there rather than in item.h. */
-void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot);
 #include "../army.h"     /* LookupOwnerObj -- reconstructed */
 #include "../gameproc.h" /* LoadDefTables, LoadGame, OpenSaveForLoad */      /* IsKeyDown, KeyChanged -- reconstructed */
 #include "../crt.h"      /* am2_sprintf -- the game's own */
@@ -960,7 +960,7 @@ void __cdecl State2Enter(void)
     leader = LookupOwnerObj(
                  (int32_t)g_defaultOwner);
     if (leader) {
-        SelectInventorySlot(leader,
+        SelectInventorySlot((AM2_Object *)leader,
             *(const int32_t *)((const uint8_t *)leader + UNIT_OFF_INVENTORY_SEL));
         DeselectAll();
         if (*(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING))

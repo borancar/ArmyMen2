@@ -422,7 +422,7 @@ int32_t __cdecl SaveDefaultCof(void)
         if (ObjIsType2Inline(obj)) {
             ObjDropAltRecord((AM2_Object *)obj);
 
-            Type238Action(obj, (g_levelId * 5 + 5) * 2);
+            Type238Action((AM2_Object *)obj, (g_levelId * 5 + 5) * 2);
             *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
                 *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
 
@@ -922,7 +922,7 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
  * allied with itself even when the comm object holds nothing.
  */
 /* Reconstructed in item.cpp, declared there rather than in item.h. */
-void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot);
 
 /* The kind a scenario row's KIND field selects, for the five it names. Read
  * out of the image's own jump table at 0x0043E130 rather than off the arms:
@@ -1094,7 +1094,7 @@ int32_t __cdecl PlaceScenario(void)
                     (*(uint32_t *)&g_viewTarget) =
                         g_leaderPos;
                 }
-                SelectInventorySlot(unit, 0);
+                SelectInventorySlot((AM2_Object *)unit, 0);
             } else {
                 void *w = CreateWeapon(g_dirScratch,
                                        army,
@@ -1104,7 +1104,7 @@ int32_t __cdecl PlaceScenario(void)
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
                     *(const uint32_t *)((const uint8_t *)w + OBJ_OFF_UID);
-                SoldierKindForWeapon(unit,
+                SoldierKindForWeapon((AM2_Object *)unit,
                     **(const uint32_t **)((const uint8_t *)w + OBJ_OFF_FIELD_C0));
             }
         }
@@ -1129,7 +1129,7 @@ int32_t __cdecl PlaceScenario(void)
         *(uint8_t *)(lead + OBJ_OFF_FACING) =
             g_leaderFacing;
         ObjTileChanged((AM2_Object *)lead, 0, 0);
-        SetUnitPose(lead, 1);
+        SetUnitPose((AM2_Object *)lead, 1);
         DeselectAll();
         SelectUnit(lead);
 
@@ -1170,7 +1170,7 @@ int32_t __cdecl PlaceScenario(void)
                         *(uint8_t *)(obj + OBJ_OFF_FACING) =
                             g_leaderFacing;
                         ObjTileChanged((AM2_Object *)obj, 0, 0);
-                        SetUnitPose(obj, 1);
+                        SetUnitPose((AM2_Object *)obj, 1);
                         formed++;
                     }
                     break;
@@ -1591,7 +1591,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
     /* The list the record carried is a stale pointer from the file: the
      * object's copy is zeroed before anything can free it. */
     memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
-    ResetObjOnCof(o);
+    ResetObjOnCof((AM2_Object *)o);
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
 
@@ -1743,7 +1743,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     switch (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)) {
     case AM2_SOLDIER_KIND_ACTION_C:
         *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
-        Type2ActionC(o, *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1);
+        Type2ActionC((AM2_Object *)o, *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1);
         break;
 
     case AM2_SOLDIER_KIND_ACTION_A:
@@ -1758,23 +1758,23 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
                 *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
             *(int16_t *)(keep + OBJ_OFF_HEALTH) =
                 *(const int16_t *)(o + OBJ_OFF_HEALTH);
-            Type2ActionA(o);
+            Type2ActionA((AM2_Object *)o);
             *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
                 *(const int16_t *)(keep + OBJ_OFF_MAX_HEALTH);
             *(int16_t *)(o + OBJ_OFF_HEALTH) =
                 *(const int16_t *)(keep + OBJ_OFF_HEALTH);
         } else {
-            Type2ActionA(o);
+            Type2ActionA((AM2_Object *)o);
         }
         break;
 
     case AM2_SOLDIER_KIND_ACTION_B:
         *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
-        Type2ActionB(o);
+        Type2ActionB((AM2_Object *)o);
         break;
 
     default:
-        SoldierKindForWeapon(o, (uint32_t)weaponCode);
+        SoldierKindForWeapon((AM2_Object *)o, (uint32_t)weaponCode);
         break;
     }
 
@@ -1783,7 +1783,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const int32_t *)(rec + TYPE2_REC_OFF_SCRIPT);
     *(int32_t *)(o + OBJ_OFF_POSE) = 1;
-    SetUnitPose(o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
+    SetUnitPose((AM2_Object *)o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
 
     memset((void *)&obj.list, 0, sizeof obj.list);
 
@@ -1791,7 +1791,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         g_ourLeaderUid =
             *(const uint32_t *)(o + 4);
 
-    ResetObjOnCof(o);
+    ResetObjOnCof((AM2_Object *)o);
     return o;
 }
 
@@ -1911,7 +1911,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     memset((void *)&obj.list, 0, sizeof obj.list);
     memset((void *)&obj.riders, 0, sizeof obj.riders);
 
-    ResetObjOnCof(o);
+    ResetObjOnCof((AM2_Object *)o);
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)
         || *(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {

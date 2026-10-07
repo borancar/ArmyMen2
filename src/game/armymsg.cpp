@@ -836,7 +836,7 @@ void __cdecl RecvDeath(void *msg)
     orig_log("Received Death Message: item->uid %x, army %d\n",
              ((const AM2_Object *)obj)->uid, UidArmy(by));
 
-    ObjDie(obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
+    ObjDie((AM2_Object *)obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
 }
 
 /* 0x0042AF30, the far end of SendItemDeploy above -- and the pair is what
@@ -1489,9 +1489,9 @@ void __cdecl RecvTrooperWantItem(void *msg)
         *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
             g_gameClockMs;
 
-        if (CanPickUpWeapon(w, t, &slot, &unused)) {
+        if (CanPickUpWeapon((AM2_Object *)w, (AM2_Object *)t, &slot, &unused)) {
             TrooperHostApprovedPickupItem(
-                t, w, slot, *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                (AM2_Object *)t, (AM2_Object *)w, slot, *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
             SendPairMessage(t, w, slot,
                             *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
         }
@@ -1513,7 +1513,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
                               (int16_t)*(const int8_t *)(t + OBJ_OFF_ARMY)))
             return;
 
-        TrooperDropItem(t, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+        TrooperDropItem((AM2_Object *)t, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
                         *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
         return;
     }

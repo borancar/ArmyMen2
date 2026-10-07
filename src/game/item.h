@@ -22,7 +22,7 @@ struct AM2_MapDesc;     /* maprow.h; named here so C sees one type */
 extern "C" {
 /* 0x004494A0, three callers. Which pose a unit takes for the weapon it holds
  * -- an index into ADDR_WEAPON_POSE_FRAMES. */
-int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon);
+int32_t __cdecl WeaponPoseIndex(struct AM2_Object *obj, struct AM2_Object *weapon);
 
 /* 0x00449AB0, one caller -- TrooperFire. WeaponPoseIndex's big brother, asking
  * the same question with more inputs: which pose should this trooper be in to
@@ -49,7 +49,7 @@ void __cdecl StepRowAnim(struct AM2_MapRow *r);
 /* 0x00457BC0, one caller. Bump an object's rank and, for a plain type 2 at
  * ranks 3, 5 and 7, hand it a new weapon. The promotion happens for every
  * type; only the weapon is a trooper's. */
-void __cdecl RankPromote(void *obj);
+void __cdecl RankPromote(struct AM2_Object *obj);
 
 /* 0x00417AB0, one caller. Walk a uid list, drop what no longer resolves, and
  * act on every live type 2. */
@@ -152,12 +152,12 @@ void __cdecl TrooperPickupItem(struct AM2_Object *trooper, struct AM2_Object *it
 
 void __cdecl StepType5(struct AM2_Object *obj);
 
-void __cdecl StepType6(void *obj);
+void __cdecl StepType6(struct AM2_Object *obj);
 
-int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
+int32_t __cdecl CanPickUpWeapon(struct AM2_Object *weapon, struct AM2_Object *unit, int32_t *slot,
                                 int32_t *already);
 
-void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
+void __cdecl DeployTrooper(struct AM2_Object *obj, int32_t x, int32_t y, int32_t resurrect);
 
 void __cdecl DeployVehicle(struct AM2_Object *obj, int32_t x, int32_t y,
                            int32_t resurrect);
@@ -221,13 +221,13 @@ void __cdecl RemoveInventoryItem(struct AM2_Object *unit, int32_t slot);
  * on the ground. THE SLOT RANGE IS 1..5, not 0..5 -- slot 0 can never be
  * dropped -- and the deploy is gated on ITEM_OFF_AMMO, so a spent weapon
  * disappears instead. See item.cpp. */
-void __cdecl TrooperDropItem(void *unit, int32_t slot, AM2_Point at);
+void __cdecl TrooperDropItem(struct AM2_Object *unit, int32_t slot, AM2_Point at);
 
 /* 0x00449760, one caller, and it names itself twice. Spend one charge of an
  * inventory slot; when the last one goes the slot is removed, the others are
  * told, and the item is FLAGGED rather than freed. Its slot is checked at one
  * end only -- `<= 0` and no upper bound. See item.cpp. */
-void __cdecl UseInventoryItem(void *unit, int32_t slot);
+void __cdecl UseInventoryItem(struct AM2_Object *unit, int32_t slot);
 
 /* A uid carries its owner in the top three bits, over a 29-bit per-owner
  * counter -- the layout objtable.h already describes and AddToItemList already
@@ -339,7 +339,7 @@ int32_t __cdecl BlockWeightChain(void *from, AM2_Point at, void *chain,
  * standing there. TWO nearly identical mask loops, one for the boat and one
  * for everything else, differing in five ways that a merged loop would lose;
  * see the note on the definition. */
-int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, AM2_Point at,
+int32_t __cdecl VehicleBlockWeight(struct AM2_Object *veh, uint8_t facing, AM2_Point at,
                                    int32_t apply);
 
 /* 0x0043CF70. The FOURTH variant, and the only one with a side effect: the
@@ -507,7 +507,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj);
 /* 0x004498F0, one caller. Move a trooper on to its next inventory slot,
  * wrapping to 0, on the weapon-switch action key or on the middle mouse button
  * being RELEASED. */
-void __cdecl NextInventorySlot(void *obj);
+void __cdecl NextInventorySlot(struct AM2_Object *obj);
 
 /* 0x00447A40, one caller -- DamageObject's type-2 arm, and it names itself in
  * "DamageTrooper: droping armor uid:%x". Take `amount` off a trooper, through
@@ -516,7 +516,7 @@ void __cdecl NextInventorySlot(void *obj);
 void __cdecl DamageTrooper(struct AM2_Object *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
-void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
+void __cdecl DamageVehicle(struct AM2_Object *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
 void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
@@ -681,21 +681,21 @@ void __cdecl ResetItemsAndUids(void);
 
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
-void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
+void __cdecl SoldierKindForWeapon(struct AM2_Object *unit, uint32_t code);
 
 /* 0x00446E70. A weapon handler: record a fire request on the current unit, at
  * a target object or at a bare point. Writes nothing if a menu row is up, or
  * if the unit does not resolve, is not a type 2, or holds no weapon. */
-void __cdecl SetWeaponTarget(void *target, AM2_Point at);
+void __cdecl SetWeaponTarget(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00447950. Set UNIT_OFF_FIRE_MODE to 0x25 when the unit has
  * OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
  * and to 1 otherwise. */
-void __cdecl PickFireMode(void *obj);
+void __cdecl PickFireMode(struct AM2_Object *obj);
 
 /* 0x0045AAC0. Put a unit aboard a vehicle: OBJ_OFF_RIDING takes the vehicle's
  * uid and the unit's uid goes onto the vehicle's VEHICLE_OFF_PTR_LIST. */
-void __cdecl BoardVehicle(uint32_t uid, void *vehicle);
+void __cdecl BoardVehicle(uint32_t uid, struct AM2_Object *vehicle);
 
 /* 0x0045AA00, three callers. Put a unit into a vehicle, all the way: the seat
  * check, the two fields BoardVehicle writes, Sarge's claim on seat zero, the
@@ -703,7 +703,7 @@ void __cdecl BoardVehicle(uint32_t uid, void *vehicle);
  * unit's own destruction. See item.cpp -- what rides in a vehicle is a uid in
  * a list and not a live object. */
 /* The UNIT is first -- see item.cpp; orig.h had the pair the other way. */
-void __cdecl EnterVehicle(void *unit, void *vehicle);
+void __cdecl EnterVehicle(struct AM2_Object *unit, struct AM2_Object *vehicle);
 
 /* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
  * object that still resolves, drop the ones that do not, empty the list and
@@ -712,27 +712,27 @@ void __cdecl DeselectAll(void);
 
 /* 0x0040D930. Put a unit into a pose. Idempotent; nine poses queue rather
  * than switch, and most wait for the current animation's last cell. */
-void __cdecl SetUnitPose(void *obj, int32_t pose);
+void __cdecl SetUnitPose(struct AM2_Object *obj, int32_t pose);
 
 /* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
  * weapon marked OBJ_FLAG_REPLACED before the uid is cleared -- in that order,
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */
-void __cdecl Type2ActionB(void *obj);
+void __cdecl Type2ActionB(struct AM2_Object *obj);
 
 /* 0x004480E0. Type2ActionB's sibling: soldier kind 6, and a SELECTION
  * handover -- deselect, and if that emptied the player's selection, select
  * the player's own object instead. `prev` is incremented before storing. */
-void __cdecl Type2ActionC(void *obj, int32_t prev);
+void __cdecl Type2ActionC(struct AM2_Object *obj, int32_t prev);
 
 /* 0x00448170. The third sibling: soldier kind 7, the old weapon abandoned as
  * OBJ_FLAG_REPLACED, and a NEW one created and handed over. Refuses when
  * ADDR_TYPE2_FIELD5A4_SET says so, which B and C do not check. */
-void __cdecl Type2ActionA(void *obj);
+void __cdecl Type2ActionA(struct AM2_Object *obj);
 
 /* 0x00428450. An object died: health zeroed FIRST, then a per-type handler
  * for types 2 and 3 only, then the common tail that always runs. A slot below
  * zero gives a NULL attacker rather than an error. */
-void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by);
+void __cdecl ObjDie(struct AM2_Object *obj, int32_t kind, uint32_t by);
 
 /* 0x004351C0. Changes an object's frame and every object chained to it.
  * Returns whether ANY changed -- but a broken chain returns 0 even when the
@@ -741,7 +741,7 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *obj, int32_t frame, int32_t flag);
 
 /* 0x00457CD0. Awards experience and promotes -- and LOOPS, so one award can
  * carry a unit through more than one rank. */
-void __cdecl Type238Action(void *obj, int32_t award);
+void __cdecl Type238Action(struct AM2_Object *obj, int32_t award);
 
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
@@ -826,7 +826,7 @@ void __cdecl DestroyKind7(AM2_Object *item, int32_t unlink);
  * weapon recharged? `clock - ITEM_OFF_LAST_USE` against the type record's
  * ITEMTYPE_OFF_COOLDOWN. It is what makes that panel's selected-slot flag 2
  * rather than 1. */
-int32_t __cdecl ItemIsReady(const void *item);
+int32_t __cdecl ItemIsReady(const struct AM2_Object *item);
 
 /* Original: 0x004600E0, three instructions: one bounds-free read of
  * ADDR_ITEM_TYPE_NAMES. The sarge panel's tooltip is its only caller. */
@@ -834,7 +834,7 @@ const char *__cdecl ItemTypeName(uint32_t kind);
 
 /* 0x004475C0, two callers, both in the HUD. Copy a type 2's personal name out
  * of the soldier-name table, or leave the buffer empty. */
-void __cdecl SoldierNameOf(const void *obj, char *out);
+void __cdecl SoldierNameOf(const struct AM2_Object *obj, char *out);
 
 /* 0x00417B10, one caller. Award 300 experience to every live type 2 the
  * player's own army owns, dropping stale uids on the way past. */
@@ -854,12 +854,12 @@ void __cdecl DamageItemChain(AM2_Object *obj, int32_t amount, uint8_t d,
  * or destruction and whatever the item leaves behind. The last argument is
  * DamageItemChain's recursion guard -- clear, a chain head delegates to it
  * and a chain child does nothing. */
-void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
+void __cdecl DamageItem(struct AM2_Object *obj, int32_t amount, uint8_t extra, int32_t kind,
                         uint32_t attacker, int32_t inChain);
 
 /* 0x0044A3C0, one caller. The negated overlay Y of the sprite the object's
  * first row is showing. */
-int32_t __cdecl ObjOverlayY(const void *obj);
+int32_t __cdecl ObjOverlayY(const struct AM2_Object *obj);
 
 /* 0x00456E20, one caller. Split a slot number into a band code, an index
  * within the band, and a heading byte. */
@@ -872,14 +872,14 @@ void __cdecl SelectBestWeapon(AM2_Object *u);
 
 /* 0x0043CD40, two callers. Move an object to a new field-530 state and put its
  * first row on the frame that goes with it, when the animation allows. */
-void __cdecl SetObjField530(void *obj, int32_t state);
+void __cdecl SetObjField530(struct AM2_Object *obj, int32_t state);
 
 /* 0x00449F40, three callers. Wobble a facing by -2..+2, keeping the wobble
  * only when it stays in the same direction bucket. */
-uint8_t __cdecl JitterFacing(void *obj, uint8_t facing);
+uint8_t __cdecl JitterFacing(struct AM2_Object *obj, uint8_t facing);
 
 /* 0x00459FE0, two callers. The weapon object a unit or vehicle is holding. */
-void *__cdecl HeldWeaponObj(const void *obj);
+void *__cdecl HeldWeaponObj(const struct AM2_Object *obj);
 
 /* 0x0045A030, reached by address from the army walker. Hand a unit to the
  * AI: stop it firing if alive, and give Sarge stance 6. */
@@ -887,7 +887,7 @@ void __cdecl ObjToAI(struct AM2_Object *obj);
 
 /* 0x0045B000, three callers. Set the soldier kind and put the first two rows
  * on the frames that go with it, skipping any row mid-animation. */
-void __cdecl SetKindFrames(void *obj, int32_t kind);
+void __cdecl SetKindFrames(struct AM2_Object *obj, int32_t kind);
 
 /* 0x00417890, one caller -- the "Duck and cover!" cheat. Two hundred spawns at
  * random points across the view, six kinds, each with a random delay. */
@@ -895,7 +895,7 @@ void __cdecl SpawnRandomBarrage(void);
 
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless CONTROL is held. */
-int32_t __cdecl SelectIfOwn(void *obj);
+int32_t __cdecl SelectIfOwn(struct AM2_Object *obj);
 
 /* 0x004137D0, one caller. The mouse-selection interface: let a rubber band
  * go and select what it covers, update one that is being dragged, or pick
@@ -906,28 +906,28 @@ void __cdecl SelectionClick(void);
  * with an item somebody else told us it picked up -- HotTarget is destroyed,
  * a Medkit heals the whole army, and a weapon either fills an empty slot,
  * replaces what is there, or hands over its ammo. */
-void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
+void __cdecl TrooperRemotePickupItem(struct AM2_Object *troop, struct AM2_Object *item, int32_t slot,
                                      int32_t ammo);
 
 /* 0x004488C0, one caller. The HOST half of the same pair: what happens on the
  * machine that approved the pickup. Same shape, but it destroys the item and
  * speaks a line on every arm where the remote respawns and stays quiet, and
  * it sets no pickup cooldown and plays no sound. */
-void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
+void __cdecl TrooperHostApprovedPickupItem(struct AM2_Object *troop, struct AM2_Object *item,
                                            int32_t slot, int32_t ammo);
 
 /* 0x00447EE0, two callers. TrooperDied's shared tail: pick the death
  * animation and the noise. Its argument is the death KIND, 1..5, dispatched
  * through a table whose order is NOT the arms' layout order. */
-void __cdecl TrooperDiedTail(void *obj, int32_t kind);
+void __cdecl TrooperDiedTail(struct AM2_Object *obj, int32_t kind);
 
 /* 0x004572A0, two callers. Clear a type 2's working block and stamp its
  * facing into the copy at +0xF8. */
-void __cdecl ResetType2Fields(void *obj);
+void __cdecl ResetType2Fields(struct AM2_Object *obj);
 
 /* 0x00457220, three callers. Reset an object's hit record and detach it -- all
  * of it behind a data file that does not ship, so it never runs here. */
-void __cdecl ResetObjOnCof(void *obj);
+void __cdecl ResetObjOnCof(struct AM2_Object *obj);
 
 /* 0x00406AB0, SelectBestWeapon's twin: scored by WeaponRank, and it writes the
  * slot only when the winner is not slot 0. */
@@ -946,7 +946,7 @@ void __cdecl RemapInventoryUids(void);
 
 /* 0x00413710, one caller. Add an object to the selection or take it out;
  * CONTROL adds rather than replaces, and the last one cannot be removed. */
-void __cdecl ToggleSelect(void *obj);
+void __cdecl ToggleSelect(struct AM2_Object *obj);
 
 /* 0x00457A60, three callers. Point the object-context globals at one object
  * and set the pointer mode from what it is. */
@@ -959,10 +959,10 @@ void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out);
 /* 0x0045B930, one caller. The same spiral asking a different question: walk out
  * until THAT VEHICLE fits at the point facing that way. It has no give-up
  * either. */
-void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing,
+void __cdecl NearestClearVehiclePoint(struct AM2_Object *veh, uint8_t facing,
                                       AM2_Point from, AM2_Point *out);
 
-void __cdecl SetObjContext(void *obj);
+void __cdecl SetObjContext(struct AM2_Object *obj);
 
 /* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied
  * predicate, which runs BETWEEN the rectangle test and the mask test. */
@@ -971,7 +971,7 @@ void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
 
 /* 0x004499A0, one caller. Is the object's first row on a frame from which its
  * weapon may act? Three answers -- see the definition. */
-int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
+int32_t __cdecl WeaponFrameReady(struct AM2_Object *obj, struct AM2_Object *weapon);
 
 /* 0x0044BA70, one caller -- FireWeapon's arm 17. Set an object's kind, both
  * table-record pointers -- one by kind, one by the owner's comm slot --
@@ -991,12 +991,12 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
  * may it be taken at all? The slot is an out-parameter carrying -1 for "no
  * slot needed" and -2 for "all six full"; the permission is the return. */
-int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot);
+int32_t __cdecl PickWeaponSlot(struct AM2_Object *cand, struct AM2_Object *unit, int32_t *slot);
 
 /* 0x00406720, two callers. Should this unit take this weapon, dropping its
  * least valuable one if the inventory is full? Answers the weapon's thing
  * code, or 0 for a refusal. */
-int32_t __cdecl TryTakeWeapon(void *cand, void *unit);
+int32_t __cdecl TryTakeWeapon(struct AM2_Object *cand, struct AM2_Object *unit);
 
 /* 0x004578A0, one caller. Call a function for every selected object, dropping
  * stale and destroyed entries as it goes. */
@@ -1006,9 +1006,9 @@ void __cdecl InitItemHeaderSize(void);
 /* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a
  * point. The first also runs ItemPostCreate and conceals what it drops from
  * a player not allied to the owner; the second does neither. */
-void __cdecl CreateWatchedItem(void *weapon, void *obj, AM2_Point at,
+void __cdecl CreateWatchedItem(struct AM2_Object *weapon, struct AM2_Object *obj, AM2_Point at,
                                uint8_t facing);
-void __cdecl CreateWatchedType(void *weapon, void *obj, AM2_Point at,
+void __cdecl CreateWatchedType(struct AM2_Object *weapon, struct AM2_Object *obj, AM2_Point at,
                                uint8_t facing);
 
 #endif

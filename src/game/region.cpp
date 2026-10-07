@@ -10292,7 +10292,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
  * naming a binding from one context, which is what ADDR_DRAG_ACTIVE cost. */
 /* Reconstructed in item.cpp, which region.cpp does not include -- declared
  * here the same way item.cpp declares its own forward uses. */
-void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot);
 
 void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
 {

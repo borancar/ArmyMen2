@@ -207,7 +207,7 @@ again:
             *(int32_t *)(old + OBJ_OFF_FLAGS) |= 2;
             fresh[OBJ_OFF_ARMY] = u[OBJ_OFF_ARMY];
             *(int32_t *)(u + OBJ_OFF_WEAPON_UID) = *(const int32_t *)(fresh + OBJ_OFF_UID);
-            SoldierKindForWeapon(u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
+            SoldierKindForWeapon((AM2_Object *)u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
             SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
             SetFieldInAll(u + OBJ_OFF_SUBRECORD,
                           g_flameRecord);
@@ -234,7 +234,7 @@ again:
             *(int32_t *)(old + OBJ_OFF_FLAGS) |= 2;
             fresh[OBJ_OFF_ARMY] = u[OBJ_OFF_ARMY];
             *(int32_t *)(u + OBJ_OFF_WEAPON_UID) = *(const int32_t *)(fresh + OBJ_OFF_UID);
-            SoldierKindForWeapon(u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
+            SoldierKindForWeapon((AM2_Object *)u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
             SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
             return;
         }
