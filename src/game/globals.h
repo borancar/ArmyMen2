@@ -228,7 +228,7 @@
 #define g_dragAnchor             (*(AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR)  /* 0x004FCF68 */
 #define g_drawTarget             (*(void **)(uintptr_t)ADDR_DRAW_TARGET)  /* 0x00507128 */
 #define g_dropRing               ((int16_t *)(uintptr_t)ADDR_DROP_RING)  /* 0x00489DE8 */
-#define g_dynamic                ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)  /* 0x004FA3C0 */
+#define g_dynamic                ((struct AM2_Sound **)(uintptr_t)ADDR_SOUND_DYNAMIC)  /* 0x004FA3C0 */
 #define g_editCharset            (*(char **)(uintptr_t)ADDR_EDIT_CHARSET_PTR)  /* 0x00485308 */
 #define g_editCharsetDefault     (*(char **)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT)  /* 0x00485304 */
 #define g_endState               (*(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE)  /* 0x00515F88 */
@@ -734,8 +734,8 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_soldierAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)  /* 0x00659F00 */
 #define g_soldierNames           ((uint8_t *)(uintptr_t)ADDR_SOLDIER_NAMES)  /* 0x00489BF8 */
 #define g_soundReady             (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)  /* 0x006598A8 */
-#define g_soundSlots             ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)  /* 0x004FA040 */
-#define g_soundSlotsEnd          ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS_END)  /* 0x004FA3C0 */
+#define g_soundSlots             ((struct AM2_SoundSlot *)(uintptr_t)ADDR_SOUND_SLOTS)  /* 0x004FA040 */
+#define g_soundSlotsEnd          ((struct AM2_SoundSlot *)(uintptr_t)ADDR_SOUND_SLOTS_END)  /* 0x004FA3C0 */
 #define g_spawnExtra6622bc       (*(int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC)  /* 0x006622BC */
 #define g_spawnExtra6628d4       (*(int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4)  /* 0x006628D4 */
 #define g_spawnKindTable         ((uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE)  /* 0x0066205C */

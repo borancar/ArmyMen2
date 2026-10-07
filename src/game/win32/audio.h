@@ -7,6 +7,30 @@
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
+/* A loaded sound: SOUND_RECORD_SIZE bytes, what a slot points at. The
+ * orig.h names are SOUND_REC_OFF_*; FreeSound's old SOUND_DATA at +4 was this
+ * same name copy, and SOUND_FLAG at +0x18 the active flag. */
+typedef struct AM2_Sound {
+    LPDIRECTSOUNDBUFFER buffer;     /* +0x00 SOUND_REC_OFF_BUFFER */
+    char               *name;       /* +0x04 SOUND_REC_OFF_NAME, a strdup */
+    LPDIRECTSOUND       ds;         /* +0x08 SOUND_REC_OFF_OWNER_DS */
+    int32_t             priority;   /* +0x0C SOUND_REC_OFF_PRIORITY */
+    AM2_Point           pos;        /* +0x10 SOUND_REC_OFF_POS */
+    uint32_t            owner;      /* +0x14 SOUND_REC_OFF_OWNER, a uid */
+    uint32_t            active;     /* +0x18 SOUND_REC_OFF_ACTIVE */
+    uint32_t            looping;    /* +0x1C SOUND_REC_OFF_LOOPING */
+} AM2_Sound;
+
+/* A fixed sound slot, SOUND_SLOT_STRIDE bytes at ADDR_SOUND_SLOTS. Its first
+ * dword is the RECORD, not a buffer, whatever SOUND_SLOT_OFF_BUFFER says:
+ * every reader dereferences it twice. */
+typedef struct AM2_SoundSlot {
+    AM2_Sound          *sound;      /* +0x00 */
+    uint32_t            bytes;      /* +0x04 SOUND_SLOT_OFF_BYTES, dwBufferBytes */
+    int32_t             volume;     /* +0x08 SOUND_SLOT_OFF_VOLUME */
+    uint32_t            started;    /* +0x0C SOUND_SLOT_OFF_STARTED, GetTickCount */
+} AM2_SoundSlot;
+
 #ifdef __cplusplus
 extern "C" {
 /* 0x0040C340, two callers. Slurp a .WAV whole and hand back its format, its
@@ -101,7 +125,7 @@ void __cdecl StopAllSounds(void);
  *
  * Both the sample data and the record itself come from the game's heap and go
  * back to it, not ours. */
-void __cdecl FreeSound(void *snd);
+void __cdecl FreeSound(AM2_Sound *snd);
 
 /* 0x0040C7A0. Free every fixed sound slot -- the same array StopAllSounds
  * merely stops -- and then the dynamic ones. */
@@ -126,7 +150,7 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
 /* Original: 0x0040C530. Load one wave: allocate a record, copy the name, read
  * the file, create the DirectSound buffer and fill it. `slot` receives the
  * record, whose first field is the buffer -- not the buffer itself. */
-int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name);
+int32_t __cdecl LoadWaveSound(AM2_Sound **slot, LPDIRECTSOUND ds, const char *name);
 
 /* Original: 0x0040BCF0. Once a frame, give every playing dynamic sound a
  * volume for where it is: silence past 800 units, otherwise the base volume

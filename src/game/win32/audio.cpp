@@ -280,10 +280,6 @@ void __cdecl SetStreamVolume(int32_t unused, int32_t pan)
 }
 
 /* A sound: its buffer, its sample data, and a flag at +0x18 the player uses. */
-#define SOUND_BUFFER 0x00u
-#define SOUND_DATA   0x04u
-#define SOUND_FLAG   0x18u
-#define sfld(s, off, type) (*(type *)((uint8_t *)(s) + (off)))
 
 
 static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
@@ -292,15 +288,15 @@ static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
  * on an idle buffer also rewinds it, and these are stopped in places that
  * do not want that. */
 
-void __cdecl FreeSound(void *snd)
+void __cdecl FreeSound(AM2_Sound *snd)
 {
     if (!snd)
         return;
 
-    if (sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER))
-        IDirectSoundBuffer_Release(sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER));
-    if (sfld(snd, SOUND_DATA, void *))
-        orig_free(sfld(snd, SOUND_DATA, void *));
+    if (snd->buffer)
+        IDirectSoundBuffer_Release(snd->buffer);
+    if (snd->name)
+        orig_free(snd->name);
     orig_free(snd);
 }
 
@@ -311,10 +307,9 @@ void __cdecl StopAllSounds(void)
      * the image -- a GetStatus that fails without writing leaves stack
      * garbage to test -- and that is reproduced for the VC6 build only; the
      * others keep StopIfPlaying's zero. */
-#define SLOTSND(i) (((uint8_t *(*)[SOUND_SLOT_STRIDE / 4]) \
-                     ((uintptr_t)g_soundSlots))[i][0])
+#define SLOTSND(i) (g_soundSlots[i].sound)
 #define DYN(i)     ((g_dynamic)[i])
-#define SBUF(p)    sfld(p, SOUND_BUFFER, LPDIRECTSOUNDBUFFER)
+#define SBUF(p)    ((p)->buffer)
 #if defined(_MSC_VER)
     DWORD   status;
 #else
@@ -338,7 +333,7 @@ void __cdecl StopAllSounds(void)
      * the same, and it also clears the flag at +0x18 on the way, which
      * FreeSound does not. */
     for (i = 0; i <= 16; i++) {
-        uint8_t *snd = DYN(i);
+        AM2_Sound *snd = DYN(i);
 
         if (!snd)
             continue;
@@ -347,13 +342,13 @@ void __cdecl StopAllSounds(void)
             IDirectSoundBuffer_GetStatus(SBUF(snd), &status);
             if (status & DSBSTATUS_PLAYING)
                 IDirectSoundBuffer_Stop(SBUF(snd));
-            sfld(snd, SOUND_FLAG, int32_t) = 0;
+            snd->active = 0;
             IDirectSoundBuffer_Release(SBUF(snd));
             SBUF(snd) = NULL;
         }
-        if (sfld(snd, SOUND_DATA, void *))
-            orig_free(sfld(snd, SOUND_DATA, void *));
-        sfld(snd, SOUND_DATA, void *) = NULL;
+        if (snd->name)
+            orig_free(snd->name);
+        snd->name = NULL;
         orig_free(snd);
         DYN(i) = NULL;
     }
@@ -394,15 +389,15 @@ void __cdecl StopAllSounds(void)
  */
 void __cdecl FreeWaveSounds(void)
 {
-    uint8_t **slot;
+    AM2_SoundSlot *slot;
 
     /* signed address compare, as the original walked it (`jl`, not `jb`) */
-    for (slot = (uint8_t * *)g_soundSlots;
+    for (slot = g_soundSlots;
          (int32_t)(uintptr_t)slot < (int32_t)((uintptr_t)g_soundSlotsEnd);
-         slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
-        if (*slot) {
-            FreeSound(*slot);
-            *slot = (uint8_t *)0;
+         slot++) {
+        if (slot->sound) {
+            FreeSound(slot->sound);
+            slot->sound = (AM2_Sound *)0;
         }
     }
 
@@ -1207,7 +1202,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
                               int16_t x, int16_t y, int32_t slot,
                               int32_t priority, uint32_t owner)
 {
-    uint8_t   *rec;
+    AM2_Sound   *rec;
     int32_t    volume;
     DWORD      status;
     DWORD      looping;
@@ -1256,7 +1251,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     rec = g_dynamic[slot];
 
     if (rec) {
-        LPDIRECTSOUNDBUFFER buf = *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER);
+        LPDIRECTSOUNDBUFFER buf = rec->buffer;
         const char         *held;
 
         IDirectSoundBuffer_GetStatus(buf, &status);
@@ -1265,50 +1260,50 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
             if (*name == '\0') {
                 /* Asked to stop, and it is playing. */
                 IDirectSoundBuffer_Stop(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
-                *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+                    rec->buffer);
+                rec->active = 0;
                 return;
             }
             /* Reproduced as written, including the direction of the test. */
-            if (*(int32_t *)(rec + SOUND_REC_OFF_PRIORITY) < priority)
+            if (rec->priority < priority)
                 return;
             if (priority == 3)
                 return;
         }
 
-        held = *(const char **)(rec + SOUND_REC_OFF_NAME);
+        held = rec->name;
         if (held && strcmp(name, held) == 0) {
             /* The same sound again: keep the buffer, start it over. */
-            if (*(void **)(rec + SOUND_REC_OFF_BUFFER)) {
+            if (rec->buffer) {
                 IDirectSoundBuffer_Stop(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
-                *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+                    rec->buffer);
+                rec->active = 0;
             }
             goto ready;
         }
 
         if (name && *name) {
             /* A different sound: the old one goes entirely. */
-            if (*(void **)(rec + SOUND_REC_OFF_BUFFER)) {
+            if (rec->buffer) {
                 IDirectSoundBuffer_Stop(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
-                *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+                    rec->buffer);
+                rec->active = 0;
                 IDirectSoundBuffer_Release(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
+                    rec->buffer);
             }
-            if (*(void **)(rec + SOUND_REC_OFF_NAME))
-                orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
+            if (rec->name)
+                orig_free(rec->name);
         } else {
-            if (*(void **)(rec + SOUND_REC_OFF_BUFFER))
+            if (rec->buffer)
                 IDirectSoundBuffer_Stop(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
-            *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+                    rec->buffer);
+            rec->active = 0;
             return;
         }
     } else {
         if (!name || *name == '\0')
             return;
-        rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
+        rec = (AM2_Sound *)orig_malloc(SOUND_RECORD_SIZE);
     }
 
     /* Probed and the answer discarded, as in InitWaveSounds. */
@@ -1322,17 +1317,17 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     {
         char         *copy;
 
-        *(void **)(rec + SOUND_REC_OFF_BUFFER)   = NULL;
-        *(void **)(rec + SOUND_REC_OFF_NAME)     = NULL;
-        *(void **)(rec + SOUND_REC_OFF_OWNER_DS) = NULL;
+        rec->buffer   = NULL;
+        rec->name     = NULL;
+        rec->ds = NULL;
 
         copy = (char *)orig_malloc(strlen(name) + 1);
-        *(void **)(rec + SOUND_REC_OFF_NAME) = copy;
+        rec->name = copy;
         if (!copy) {
             orig_log("Unable to allocate memory for wave name\n");
             goto drop_record;
         }
-        strcpy(*(char **)(rec + SOUND_REC_OFF_NAME), name);
+        strcpy(rec->name, name);
 
         if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw,
                             &desc.dwBufferBytes, &owned)) {
@@ -1347,7 +1342,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
 
         if (IDirectSound_CreateSoundBuffer(
                 g_dsound, &desc,
-                (LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+                &rec->buffer,
                 NULL) != DS_OK) {
             orig_log("Unable to create sound buffer for %s\n", name);
             goto drop_samples;
@@ -1356,22 +1351,22 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         sound_dump(name, (const uint8_t *)raw, desc.dwBufferBytes);
 
         if (!FillSoundBuffer(
-                *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+                rec->buffer,
                 (const uint8_t *)raw, desc.dwBufferBytes)) {
             orig_log("Unable to fill sound buffer data for %s\n", name);
             IDirectSoundBuffer_Release(
-                *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
+                rec->buffer);
             goto drop_samples;
         }
 
-        *(LPDIRECTSOUND *)(rec + SOUND_REC_OFF_OWNER_DS) = g_dsound;
+        rec->ds = g_dsound;
         orig_free(owned);
         goto ready;
 
     drop_samples:
         orig_free(owned);
     drop_name:
-        orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
+        orig_free(rec->name);
     drop_record:
         orig_free(rec);
         g_dynamic[slot] = NULL;
@@ -1391,30 +1386,30 @@ ready:
     }
 
     if (owner) {
-        *(uint32_t *)(rec + SOUND_REC_OFF_OWNER) = owner;
+        rec->owner = owner;
     } else {
-        ((AM2_Point *)(rec + SOUND_REC_OFF_POS))->x = (int16_t)x;
-        ((AM2_Point *)(rec + SOUND_REC_OFF_POS))->y = (int16_t)y;
-        *(uint32_t *)(rec + SOUND_REC_OFF_OWNER) = 0;
+        rec->pos.x = (int16_t)x;
+        rec->pos.y = (int16_t)y;
+        rec->owner = 0;
     }
 
     IDirectSoundBuffer_SetVolume(
-        *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER), volume);
+        rec->buffer, volume);
 
     IDirectSoundBuffer_GetStatus(
-        *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER), &status);
+        rec->buffer, &status);
     if (status & DSBSTATUS_PLAYING) {
         IDirectSoundBuffer_SetCurrentPosition(
-            *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER), 0);
-        *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 1;
+            rec->buffer, 0);
+        rec->active = 1;
     }
 
     looping = 0;
     if (loop == 1)
         looping = DSBPLAY_LOOPING;
-    *(uint32_t *)(rec + SOUND_REC_OFF_LOOPING) = looping;
+    rec->looping = looping;
     IDirectSoundBuffer_Play(
-        *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER), 0, 0, looping);
+        rec->buffer, 0, 0, looping);
 
     g_dynamic[slot] = rec;
 }
@@ -1484,9 +1479,9 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
         return;
 
     /* The slot, its record and the buffer are re-read at every use. */
-#define SLOT ((g_soundSlots) + index * SOUND_SLOT_STRIDE)
-#define REC  (*(uint8_t **)SLOT)
-#define BUF  (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
+#define SLOT (&(g_soundSlots)[index])
+#define REC  (SLOT->sound)
+#define BUF  (REC->buffer)
     if (!REC || !BUF)
         return;
 
@@ -1527,13 +1522,13 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
 
     /* Louder wins, and so does anything whose predecessor has finished. */
     if (!(status & DSBSTATUS_PLAYING) ||
-        GetTickCount() > *(uint32_t *)(SLOT + SOUND_SLOT_OFF_STARTED)
-                         + *(uint32_t *)(SLOT + SOUND_SLOT_OFF_BYTES)
+        GetTickCount() > SLOT->started
+                         + SLOT->bytes
                            / SOUND_BYTES_PER_MS ||
-        volume > *(int32_t *)(SLOT + SOUND_SLOT_OFF_VOLUME)) {
+        volume > SLOT->volume) {
         IDirectSoundBuffer_SetVolume(BUF, volume);
-        *(int32_t *)(SLOT + SOUND_SLOT_OFF_VOLUME)  = volume;
-        *(uint32_t *)(SLOT + SOUND_SLOT_OFF_STARTED) = GetTickCount();
+        SLOT->volume  = volume;
+        SLOT->started = GetTickCount();
     }
 
     if (status & DSBSTATUS_PLAYING) {
@@ -1541,7 +1536,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
             DWORD played;
 
             IDirectSoundBuffer_GetCurrentPosition(BUF, &played, NULL);
-            if (*(uint32_t *)(SLOT + SOUND_SLOT_OFF_BYTES) - played
+            if (SLOT->bytes - played
                     < SOUND_ALMOST_DONE)
                 IDirectSoundBuffer_SetCurrentPosition(BUF, 0);
         } else if (flags & SOUND_FLAG_NO_INTERRUPT) {
@@ -1578,7 +1573,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
  * Unexercised: no audio device. */
 void __cdecl StopNamedSound(const char *name, int32_t index)
 {
-    uint8_t *rec;
+    AM2_Sound *rec;
 
     if (!g_audioEnabled)
         return;
@@ -1590,9 +1585,9 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
         return;
 
     /* The buffer is re-read at each use, as the image does. */
-#define buf (*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER))
+#define buf (rec->buffer)
     if (*name != '\0') {
-        const char *held = *(const char **)(rec + SOUND_REC_OFF_NAME);
+        const char *held = rec->name;
 
         if (!held)
             return;
@@ -1601,7 +1596,7 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
 
         if (buf)
             IDirectSoundBuffer_Stop(buf);
-        *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+        rec->active = 0;
         return;
     }
 
@@ -1610,7 +1605,7 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
     if (!buf)
         return;
     IDirectSoundBuffer_Stop(buf);
-    *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+    rec->active = 0;
 #undef buf
 }
 
@@ -1659,7 +1654,7 @@ void __cdecl Update3DAudioVolumes(void)
 
     /* The record is re-read from its slot at every use, as the image does. */
 #define REC ((g_dynamic)[i])
-#define BUF (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
+#define BUF (REC->buffer)
     /* From the second slot, not the first -- 0x004FA3C4, not 0x004FA3C0. */
     for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
         if (!REC)
@@ -1671,18 +1666,18 @@ void __cdecl Update3DAudioVolumes(void)
         IDirectSoundBuffer_GetStatus(buf, &status);
         if (status & DSBSTATUS_PLAYING) {
             where = g_defaultPos;
-            if (*(uint32_t *)(REC + SOUND_REC_OFF_OWNER)) {
-                obj = LookupByUID(*(uint32_t *)(REC + SOUND_REC_OFF_OWNER));
+            if (REC->owner) {
+                obj = LookupByUID(REC->owner);
                 if (!obj) {
                     /* Whatever was making this noise is gone. */
-                    *(uint32_t *)(REC + SOUND_REC_OFF_OWNER) = 0;
+                    REC->owner = 0;
                     IDirectSoundBuffer_Stop(BUF);
-                    *(uint32_t *)(REC + SOUND_REC_OFF_ACTIVE) = 0;
+                    REC->active = 0;
                     continue;
                 }
                 where = obj->pos;
-            } else if (((const AM2_Point *)(REC + SOUND_REC_OFF_POS))->x != 0) {
-                where = *(const AM2_Point *)(REC + SOUND_REC_OFF_POS);
+            } else if (REC->pos.x != 0) {
+                where = REC->pos;
             }
 
             /* A zero x means nowhere, and nowhere gets left alone -- note this
@@ -1701,7 +1696,7 @@ void __cdecl Update3DAudioVolumes(void)
                 IDirectSoundBuffer_SetVolume(BUF, vol);
             }
         } else {
-            *(uint32_t *)(REC + SOUND_REC_OFF_ACTIVE) = 0;
+            REC->active = 0;
         }
     }
 #undef REC
@@ -1734,9 +1729,9 @@ static_assert((DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
                | DSBCAPS_GETCURRENTPOSITION2) == 0x100F2, "the buffer flags");
 
 
-int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
+int32_t __cdecl LoadWaveSound(AM2_Sound **slot, LPDIRECTSOUND ds, const char *name)
 {
-    uint8_t      *rec;
+    AM2_Sound      *rec;
     char         *nameCopy;
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -1749,24 +1744,24 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     void         *raw = NULL;      /* the samples, freed once uploaded */
     void         *owned = NULL;    /* the reader's own block, freed either way */
 
-    rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
+    rec = (AM2_Sound *)orig_malloc(SOUND_RECORD_SIZE);
     *slot = rec;
     if (!rec) {
         orig_log("Unable to allocate memory for wave data\n");
         return 0;
     }
 
-    *(void **)(rec + SOUND_REC_OFF_BUFFER) = NULL;
-    *(void **)(rec + SOUND_REC_OFF_NAME)   = NULL;
-    *(void **)(rec + SOUND_REC_OFF_OWNER_DS)  = NULL;
+    rec->buffer = NULL;
+    rec->name   = NULL;
+    rec->ds  = NULL;
 
     nameCopy = (char *)orig_malloc(strlen(name) + 1);
-    *(void **)(rec + SOUND_REC_OFF_NAME) = nameCopy;
+    rec->name = nameCopy;
     if (!nameCopy) {
         orig_log("Unable to allocate memory for wave name\n");
         goto drop_record;
     }
-    strcpy(*(char **)(rec + SOUND_REC_OFF_NAME), name);
+    strcpy(rec->name, name);
 
     /* Straight into the descriptor: the format and the length are the reader's
      * answers, not ours. */
@@ -1782,7 +1777,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
                  | DSBCAPS_GETCURRENTPOSITION2;
 
     if (IDirectSound_CreateSoundBuffer(
-            ds, &desc, (LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+            ds, &desc, &rec->buffer,
             NULL) != DS_OK) {
         orig_log("Unable to create sound buffer for %s\n", name);
         goto give_up;
@@ -1790,25 +1785,25 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
 
     sound_dump(name, (const uint8_t *)raw, desc.dwBufferBytes);
 
-    if (!FillSoundBuffer(*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+    if (!FillSoundBuffer(rec->buffer,
                          (const uint8_t *)raw, desc.dwBufferBytes)) {
         orig_log("Unable to fill sound buffer data for %s\n", name);
         IDirectSoundBuffer_Release(
-            *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
+            rec->buffer);
         goto give_up;
     }
 
     /* The device that made the buffer -- the original stores it here; this
      * once stored NULL. */
-    *(LPDIRECTSOUND *)(rec + SOUND_REC_OFF_OWNER_DS) = ds;
+    rec->ds = ds;
     orig_free(owned);
     return 1;
 
 give_up:
     if (owned)
         orig_free(owned);
-    if (*(void **)(rec + SOUND_REC_OFF_NAME))
-        orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
+    if (rec->name)
+        orig_free(rec->name);
 drop_record:
     orig_free(*slot);
     *slot = NULL;
@@ -1872,13 +1867,13 @@ int32_t __cdecl InitWaveSounds(void)
     SetGameDir(g_waveDir);
 
     /* The slot is indexed afresh at each use, as the image does. */
-#define slot (g_soundSlots + i * SOUND_SLOT_STRIDE)
+#define slot (&g_soundSlots[i])
     for (i = 0; i < (int32_t)WAVE_COUNT; i++) {
         DSBCAPS  caps;
 
-        if (!LoadWaveSound((void **)slot, g_dsound, g_waveNames[i])) {
+        if (!LoadWaveSound(&slot->sound, g_dsound, g_waveNames[i])) {
             orig_log("Unable to initialize wave %d\n", i);
-            *(void **)slot = NULL;
+            slot->sound = NULL;
             continue;
         }
 
@@ -1889,9 +1884,9 @@ int32_t __cdecl InitWaveSounds(void)
          * have shown it. See the note in CLAUDE.md about this exact shape. */
         caps.dwSize = sizeof caps;
         IDirectSoundBuffer_GetCaps(
-            *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_SLOT_OFF_BUFFER),
+            slot->sound->buffer,
             &caps);
-        *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) = caps.dwBufferBytes;
+        slot->bytes = caps.dwBufferBytes;
     }
 #undef slot
     return 1;
@@ -1920,11 +1915,11 @@ void __cdecl FreeDynamicSounds(void)
     for (i = 0; i <= AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
         if (!SLOT)
             continue;
-        if (*(void **)(SLOT + SOUND_DYN_OFF_BUFFER))
+        if (SLOT->buffer)
             IDirectSoundBuffer_Release(
-                *(LPDIRECTSOUNDBUFFER *)(SLOT + SOUND_DYN_OFF_BUFFER));
-        if (*(void **)(SLOT + SOUND_DYN_OFF_DATA))
-            orig_free(*(void **)(SLOT + SOUND_DYN_OFF_DATA));
+                SLOT->buffer);
+        if (SLOT->name)
+            orig_free(SLOT->name);
         orig_free(SLOT);
         SLOT = NULL;
     }
@@ -1959,19 +1954,19 @@ int32_t __cdecl SaveAudioSection(am2_FILE *fp)
 #define SND ((g_dynamic)[i])
     for (i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
         if (SND
-            && (name = *(const char **)(SND + SOUND_REC_OFF_NAME)) != NULL
-            && *(const void **)(SND + SOUND_REC_OFF_BUFFER) != (const void *)0
-            && *(const int32_t *)(SND + SOUND_REC_OFF_ACTIVE) != 0
-            && *(const int32_t *)(SND + SOUND_REC_OFF_LOOPING) != 0) {
+            && (name = SND->name) != NULL
+            && SND->buffer != (const void *)0
+            && (int32_t)SND->active != 0
+            && (int32_t)SND->looping != 0) {
             if (*name) {
                 len = (int32_t)strlen(name);
                 orig_fwrite(&len, 4, 1, fp);
-                orig_fwrite(*(const char **)(SND + SOUND_REC_OFF_NAME),
+                orig_fwrite(SND->name,
                             (size_t)len, 1, fp);
-                orig_fwrite(SND + SOUND_REC_OFF_LOOPING,  4, 1, fp);
-                orig_fwrite(SND + SOUND_REC_OFF_POS,      4, 1, fp);
-                orig_fwrite(SND + SOUND_REC_OFF_PRIORITY, 4, 1, fp);
-                orig_fwrite(SND + SOUND_REC_OFF_OWNER,    4, 1, fp);
+                orig_fwrite(&SND->looping,  4, 1, fp);
+                orig_fwrite(&SND->pos,      4, 1, fp);
+                orig_fwrite(&SND->priority, 4, 1, fp);
+                orig_fwrite(&SND->owner,    4, 1, fp);
             } else {
                 len = 0;
                 orig_fwrite(&len, 4, 1, fp);
