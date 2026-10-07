@@ -452,7 +452,7 @@ struct AM2_TextList : AM2_ListBox {
 
 struct AM2_ArrowBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    AM2_Widget *list;               /* 0x0058  ARROWBAR_OFF_LIST, the list it scrolls */
+    struct AM2_ListBox *list;       /* 0x0058  ARROWBAR_OFF_LIST, the list it scrolls */
     AM2_Widget *up;                 /* 0x005C  ARROWBAR_OFF_UP */
     AM2_Widget *down;               /* 0x0060  ARROWBAR_OFF_DOWN */
     AM2_Sprite *sprite0;            /* 0x0064  ARROWBAR_OFF_SPRITE0, the thumb */
@@ -719,7 +719,7 @@ struct AM2_HudTop : AM2_Widget {
  * address; the size is the class's allocation. */
 struct AM2_DifficultyDialog : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_DIFFICULTY_SIZE - sizeof(AM2_ScreenBase)];
+    struct AM2_ListBox *list;       /* 0x0064  DLG_OFF_LIST, the three levels */
     AM2_DifficultyDialog(const char *bmp);
     ~AM2_DifficultyDialog();
 };
@@ -835,7 +835,7 @@ struct AM2_MpPanelScreen : AM2_ScreenBase {
     AM2_ListBox  *mapBox;                   /* 0x0210 MP_PANEL_OFF_MAP_BOX */
     AM2_Widget   *mapBar;                   /* 0x0214 MP_PANEL_OFF_MAP_BAR */
     AM2_Widget   *preview;                  /* 0x0218 MP_PANEL_OFF_PREVIEW */
-    AM2_Widget   *chatBox;                  /* 0x021C MP_PANEL_OFF_CHATBOX */
+    AM2_ListBox  *chatBox;                  /* 0x021C MP_PANEL_OFF_CHATBOX */
     AM2_Widget   *names[AM2_COMM_SLOTS];    /* 0x0220 MP_PANEL_OFF_NAMES */
     AM2_Widget   *colours[AM2_COMM_SLOTS];  /* 0x0230 MP_PANEL_OFF_COLOURS */
     AM2_Widget   *teams[AM2_COMM_SLOTS];    /* 0x0240 MP_PANEL_OFF_TEAMS */
@@ -2643,7 +2643,7 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview);
 
 /* 0x00430140. Clear a list box's rows and refill them from a text file in
  * `rules/`, one row per line, newline and all. */
-void __cdecl FillListFromRules(const char *path, void *panel);
+void __cdecl FillListFromRules(const char *path, AM2_MpPanelScreen *panel);
 /* 0x00431A30 -- the MP panel's game-type list row-pick callback. */
 void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row);
 void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row);

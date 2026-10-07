@@ -9163,7 +9163,7 @@ void __cdecl OpenBattleName(void)
  *
  * The line keeps its newline: fgets is given the whole 0x100 buffer and
  * nothing trims. */
-void __cdecl FillListFromRules(const char *path, void *panel)
+void __cdecl FillListFromRules(const char *path, AM2_MpPanelScreen *panel)
 {
     char      line[0x100];
     am2_FILE *fp;
@@ -9175,8 +9175,7 @@ void __cdecl FillListFromRules(const char *path, void *panel)
     if (!fp)
         return;
 
-    rows = *(void **)(*(uint8_t **)((uint8_t *)panel + MP_PANEL_OFF_TYPE_BOX)
-                      + LISTBOX_OFF_ROWS);
+    rows = panel->typeBox->rows;
     RecordReset(rows);
 
     while (!(*(const uint8_t *)((const uint8_t *)fp + AM2_FILE_OFF_FLAG)
@@ -9222,7 +9221,7 @@ void __cdecl RefreshMapSelection(void)
     if ((g_paintObject) != (uint8_t *)0
         && g_gameState == AM2_STATE_MENU
         && g_subState == AM2_MENU_MP_HOST)
-        preview = ((AM2_Widget **)((g_paintObject) + MP_PANEL_OFF_PREVIEW))[0];
+        preview = ((AM2_MpPanelScreen *)g_paintObject)->preview;
 
     SetGameDir(g_tilesetPath);
     orig_sprintf(path, "%s.amm",
@@ -9492,7 +9491,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * pointer in its field and add it -- adding a null child is what the
      * original does when the allocation fails, not a guard we supply. */
     {
-        AM2_Widget **slot = (AM2_Widget **)((uint8_t *)p + MP_PANEL_OFF_TYPE_BOX);
+        AM2_ListBox **slot = &p->typeBox;
         AM2_Widget  *child;
         void        *rows;
 
@@ -9587,7 +9586,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         g_menuMsgList = new AM2_Rec(0);
     }
     {
-        AM2_Widget **slot = (AM2_Widget **)((uint8_t *)p + MP_PANEL_OFF_CHATBOX);
+        AM2_ListBox **slot = &p->chatBox;
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
         *slot = new AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
@@ -9638,11 +9637,11 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
              * where that leaves it -- ArrowBarShowRow's arithmetic without
              * its repaint, written out here. Without it a reopened lobby
              * showed the OLDEST chat lines and a thumb at the top. */
-#define CB      ((uint8_t *)*slot)
-#define HOT     (*(int32_t *)(CB + 0x58))
-#define TOP     (*(int32_t *)(CB + LIST_OFF_TOP_ROW))
-#define VISIBLE (*(const int32_t *)(CB + LIST_OFF_VISIBLE))
-#define COUNT   (**(const int32_t *const *)(CB + LIST_OFF_ROWS))
+#define CB      ((AM2_ListBox *)*slot)
+#define HOT     (CB->selected)
+#define TOP     (CB->topRow)
+#define VISIBLE (CB->visible)
+#define COUNT   (CB->rows->count)
             if (HOT >= TOP + VISIBLE)
                 TOP = HOT - VISIBLE + 1;
             {
@@ -9694,7 +9693,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * whose lines fill the OTHER box is the second name at +0x40 with ".txt"
      * appended. */
     {
-        AM2_Widget **slot = (AM2_Widget **)((uint8_t *)p + MP_PANEL_OFF_GAME_BOX);
+        AM2_ListBox **slot = &p->gameBox;
         void        *rows;
         int32_t      sel = 0;
 
@@ -9724,7 +9723,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * call): with no scripts listed, the rules are read from whatever
          * the path buffer holds. The native build starts it empty so that
          * is a harmless empty name rather than stack garbage. */
-        FillListFromRules(path, w);
+        FillListFromRules(path, p);
 
         *slot = new AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
                                 (int32_t)(uintptr_t)OnMpGameType,
@@ -9766,10 +9765,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                    g_backgroundColour,
                                    0);
         else {
-            am2_sprintf((char *)((uint8_t *)p + MP_PANEL_OFF_SCORE_TEXT),
+            am2_sprintf(p->scoreText,
                         "%i",
                         g_scoreLimit);
-            child = new AM2_Label((const char *)((uint8_t *)p + MP_PANEL_OFF_SCORE_TEXT),
+            child = new AM2_Label(p->scoreText,
                                   *RectSet(&r, 0x22B, 0x35, 0x21, 0x0E), 2,
                                   g_colourBelowBg,
                                   g_backgroundColour);
@@ -9791,7 +9790,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * `sel` starts at 0 and moves only on a name match, so the first map wins
      * on a fresh panel -- which is why the original comes up on alpine3_mp. */
     {
-        AM2_Widget **slot = (AM2_Widget **)((uint8_t *)p + MP_PANEL_OFF_MAP_BOX);
+        AM2_ListBox **slot = &p->mapBox;
         void        *rows;
         int32_t      sel = 0;
 
@@ -9967,7 +9966,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
         }
     }
 
-    orig_sprintf((char *)((uint8_t *)self + MP_PANEL_OFF_SCORE_TEXT),
+    orig_sprintf(self->scoreText,
                  "%i",
                  g_scoreLimit);
 
@@ -10161,9 +10160,9 @@ void __cdecl MpLeaveSession(void)
  * is meant to reach and STATUS.md records as broken. Verified by reading. */
 void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 {
-    uint8_t       *panel;
+    AM2_MpPanelScreen       *panel;
     const AM2_NameRec *rec;
-    uint8_t       *maps;
+    AM2_ListBox       *maps;
     char           path[AM2_MP_GAMETYPE_PATH];
     int32_t        i;
 
@@ -10172,7 +10171,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     if (!rows || row < 0 || row >= rows->count)
         return;
 
-    panel = (uint8_t *)w->parent;
+    panel = (AM2_MpPanelScreen *)w->parent;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
     rec = *(const AM2_NameRec *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
@@ -10190,18 +10189,15 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 
     {
         AM2_Widget *box =
-            *(AM2_Widget *const *)(panel + MP_PANEL_OFF_TYPE_BOX);
+            (AM2_Widget *const)panel->typeBox;
 
         WidgetVPaint(box, box->rect);
     }
 
     /* The map box is read from the panel for each of these. */
-    RecordReset(*(void **)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
-                           + LIST_OFF_ROWS));
-    *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
-                 + LIST_OFF_CHOSEN)  = 0;
-    *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
-                 + LIST_OFF_TOP_ROW) = 0;
+    RecordReset(panel->mapBox->rows);
+    panel->mapBox->chosen  = 0;
+    panel->mapBox->topRow = 0;
 
     row = 0;
     /* The name is recomputed from the record at each use. */
@@ -10212,8 +10208,8 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         if (!lvl)
             continue;
 
-        maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
-        ((AM2_Rec *)*(void **)(maps + LIST_OFF_ROWS))->ListAdd(
+        maps = panel->mapBox;
+        ((AM2_Rec *)maps->rows)->ListAdd(
                 lvl->name, lvl);
 
         if (strcmp(NM, &g_mapName_) == 0)
@@ -10230,9 +10226,8 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
          * where reading the instruction alone suggests the FindLevelByName
          * result that was computed two lines earlier. That result is kept in
          * esi and handed to SelectLevel instead. */
-        *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
-                     + LIST_OFF_CHOSEN) = row;
-        ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), row);
+        panel->mapBox->chosen = row;
+        ArrowBarShowRow(panel->mapBar, row);
         SelectLevel(lvl);
         RefreshMapSelection();
         SendPlayerMsg(1);
@@ -11029,7 +11024,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
          || (comm->isHost
              && row >= comm->playerCount))
         && row != 3) {
-        sel = (int32_t *)((uint8_t *)screen + MP_PANEL_OFF_COLOUR_SEL);
+        sel = screen->colourSel;
         if (sel[row] == -1)
             sel[row] = row;
 
@@ -11048,7 +11043,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
             SendPlayerMsg(0);
 
             for (i = 0; i < AM2_PLAYERS_MAX; i++) {
-                AM2_Widget *b = ((AM2_Widget **)((uint8_t *)screen + MP_PANEL_OFF_COLOURS))[i];
+                AM2_Widget *b = ((AM2_Widget * *)screen->colours)[i];
 
                 WidgetVPaint(b, b->rect);
             }
@@ -11817,10 +11812,10 @@ void __cdecl OpenMovies(void)
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_DlgSaveListScreen *w = (AM2_DlgSaveListScreen *)this;
+    AM2_DifficultyDialog *w = this;
 
     AM2_Widget *panel;
-    AM2_Widget *list;
+    AM2_ListBox *list;
     AM2_Widget *dot;
     void       *rows;
     AM2_CTOR_VTABLE(w, VTABLE_DIFFICULTY_DIALOG);
@@ -11835,17 +11830,16 @@ AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     ((AM2_Rec *)rows)->ListAdd("Hard",   (void *)2);
 
     list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x28, 0x3F, 0xF4, 0x3A), rows, 0, 0, 1);
-    *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
+    w->list = list;
     ::WidgetAddChild(panel, list);
 
-    WidgetVFocus((AM2_Widget *)w->list, 0);
-    *(int32_t *)((uint8_t *)(AM2_Widget *)w->list + LIST_OFF_CHOSEN)   = g_difficulty;
-    *(int32_t *)((uint8_t *)(AM2_Widget *)w->list + LIST_OFF_SELECTED) = g_difficulty;
+    WidgetVFocus(w->list, 0);
+    w->list->chosen   = g_difficulty;
+    w->list->selected = g_difficulty;
 
     dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)), (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1, *RectSet(AM2_TEMP(AM2_Rect), 0x23, 0x95, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
-    *(AM2_Widget **)((uint8_t *)(AM2_Widget *)w->list
-                     + LIST_OFF_BLINKER) = dot;
+    w->list->blinker = dot;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                                    (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -11870,12 +11864,11 @@ AM2_DifficultyDialog::~AM2_DifficultyDialog()
  * state -- it always asks for menu request 14. */
 void __cdecl OnDifficultyOk(AM2_Widget *w)
 {
-    const uint8_t *list;
+    const AM2_ListBox *list;
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    list = *(const uint8_t *const *)((const uint8_t *)w->parent->parent
-                                     + DLG_OFF_LIST);
-    g_difficulty     = *(const int32_t *)(list + LIST_OFF_CHOSEN);
+    list = ((const AM2_DifficultyDialog *)w->parent->parent)->list;
+    g_difficulty     = list->chosen;
     g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
     g_menuRequestSet = 1;
     SaveOptions();
@@ -15260,7 +15253,7 @@ AM2_ListBox::AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     AM2_CTOR_VTABLE(w, VTABLE_LISTBOX);
 
-    *(void **)((uint8_t *)self + LIST_OFF_ROWS)       = rows;
+    self->rows       = (AM2_ListRows *)rows;
     self->ownsRows = ownsRows;
     self->arg70     = 0;
     *(int32_t *)((uint8_t *)self + LIST_OFF_CALLBACK)  = callback;
@@ -15380,16 +15373,16 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
 #define SELECTED_HERE (idx == self->selected \
                        && self->flag44 != 0                                \
                        && self->disabled == 0)
-        ink = *(const uint8_t *)((uint8_t *)self + LIST_OFF_INK);
+        ink = (uint8_t)self->ink;
         if (idx == self->selected && w->flag44)
             ink = (&g_mouseButton)[0]
-                  ? *(const uint8_t *)((uint8_t *)self + LIST_OFF_INK_SEL_DOWN)
-                  : *(const uint8_t *)((uint8_t *)self + LIST_OFF_INK_SEL);
+                  ? (uint8_t)self->inkSelDown
+                  : (uint8_t)self->inkSel;
         if (idx == self->chosen) {
             if (idx == self->selected
-                && *(const int32_t *)((uint8_t *)self + 0x44) != 0
-                && *(const int32_t *)((uint8_t *)self + 0x4C) == 0)
-                ink = *(const uint8_t *)((uint8_t *)self + LIST_OFF_INK_HOT_SEL);
+                && self->flag44 != 0
+                && self->disabled == 0)
+                ink = (uint8_t)self->inkHotSel;
             else
                 ink = g_hiliteColour;
         }
@@ -15873,9 +15866,9 @@ void __attribute__((thiscall)) AM2_ArrowBarOps::ArrowBarFollowEnd()
     /* The list pointer is read at every use, and the store through it is
      * what makes VC6 load it again for the paint -- the image does too. */
 #define LIST    (b->list)
-#define TOP     (*(int32_t *)((uint8_t *)LIST + LIST_OFF_TOP_ROW))
-#define COUNT   (**(const int32_t *const *)((uint8_t *)LIST + LIST_OFF_ROWS))
-#define VISIBLE (*(const int32_t *)((uint8_t *)LIST + LIST_OFF_VISIBLE))
+#define TOP     (LIST->topRow)
+#define COUNT   (LIST->rows->count)
+#define VISIBLE (LIST->visible)
     if (!LIST)
         return;
     if (TOP >= COUNT - VISIBLE)
@@ -15920,7 +15913,7 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
 
     AM2_Widget       *list = bar->list;
     const AM2_Sprite *thumb;
-    uint8_t          *l;
+    AM2_ListBox          *l;
     AM2_ArrowBar          *b = (AM2_ArrowBar *)bar;
     int32_t           top;
     int32_t           visible;
@@ -15928,15 +15921,15 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
 
     if (!list)
         return;
-    l = (uint8_t *)list;
+    l = (AM2_ListBox *)list;
 
-    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
+    top     = l->topRow;
     if (top > row)
-        *(int32_t *)(l + LIST_OFF_TOP_ROW) = row;
+        l->topRow = row;
     else {
-        visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+        visible = l->visible;
         if (top + visible - 1 < row)
-            *(int32_t *)(l + LIST_OFF_TOP_ROW) = row - visible + 1;
+            l->topRow = row - visible + 1;
         /* already visible -- nothing stored, and still repainted */
     }
 
@@ -15944,10 +15937,10 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
     WidgetVPaint(list, list->rect);
 
     list    = b->list;
-    l       = (uint8_t *)list;
-    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
-    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
-    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
+    l       = (AM2_ListBox *)list;
+    top     = l->topRow;
+    visible = l->visible;
+    count   = *(const int32_t *const)l->rows;
 
     thumb = b->sprite0;
     b->shift =
