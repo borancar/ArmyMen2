@@ -215,6 +215,20 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Frame size as evidence, again: ListMaskAction 227 -> 211** (2026-10-07),
+    no count change. Twelve differing functions have a frame size that
+    differs from the image's:
+    - one dword short: AiTrooperStep, ListUpdate, HudEdgeUpdate,
+      UpdateTrooperAction, ObjHitMaskAction, MakeBitmap, CheckMapRules;
+    - one dword long: RowUpdate, ScrollMapCache, DiedEffectB;
+    - more: ListMaskAction (0x14 short) and the MpPanel constructor
+      (0x24 short).
+    ListMaskAction now has its sibling's shape: a `tile` rect clamped
+    before `box` is written (the image makes all eight Clamp calls first),
+    and separate `rowbytes` and `splitOdd` locals. These replace
+    `world.right` and `rowbits` reused for them, and `tilew` is computed
+    from `tile`. The frame is 0x40 as in the image. Its sibling's ring
+    order and a width re-read after the memset both made it worse.
   - **VehicleBlockWeight passes its sound point as two int16 fields**
     (2026-10-07), no count change. The image's dword loads at the point
     and at point+2 are VC6 pushing two int16 lvalues, since PlaySoundAt's
