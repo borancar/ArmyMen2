@@ -336,6 +336,7 @@ typedef struct AM2_Object {
     union {                         /* +0x52C, by object type: */
         int32_t        vehicleKind; /*   VEHICLE_OFF_KIND */
         const uint8_t *tableRec2;   /*   SAVED_OFF_TABLE_REC2, a type 2's record */
+        int32_t    tableRec2Index;  /*   the slot as a save file holds it: an index */
     };
     union {                         /* +0x530 OBJ_OFF_FIELD_530 */
         int32_t    field530;        /*   ObjConceal compares to 5 */
@@ -343,6 +344,7 @@ typedef struct AM2_Object {
     };
     union {                         /* +0x534, by object type: */
         const uint8_t *tableRec3;   /*   SAVED_OFF_TABLE_REC3, a type 3's record */
+        int32_t    tableRec3Index;  /*   the slot as a save file holds it: an index */
         uint32_t   roachStamp;      /*   ROACH_OFF_STAMP, a roach's: when its fan began */
     };
     union {                         /* +0x538..+0x5AC, by object type: */

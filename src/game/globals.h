@@ -496,7 +496,7 @@
 #define g_objCap                 (*(int32_t *)(uintptr_t)ADDR_OBJ_CAPACITY)  /* 0x00514F00 */
 #define g_objCount               (*(int32_t *)(uintptr_t)ADDR_OBJ_COUNT)  /* 0x00514F04 */
 #define g_objCtxObj              (*(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ)  /* 0x005122CC */
-#define g_objCtxObjA             (*(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A)  /* 0x005122C8 */
+#define g_objCtxObjA             (*(AM2_Object **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A)  /* 0x005122C8 */
 #define g_objCtxObjPrev          (*(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV)  /* 0x005122D0 */
 #define g_objCtxSet              (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)  /* 0x00511E3C */
 #define g_objCtxSetPrev          (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET_PREV)  /* 0x00511E40 */

@@ -495,7 +495,7 @@ int32_t __cdecl SaveItems(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVE_TAG_ITEMS);
 
     for (obj = FirstItem(); obj; obj = NextItem()) {
-        SaveOneItem(fp, obj);
+        SaveOneItem(fp, (AM2_Object *)obj);
         count++;
     }
 

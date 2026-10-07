@@ -247,7 +247,7 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
                            int32_t angle);
 
 /* 0x00461B20. The death spray: six particles of six kinds, then 6..10 more. */
-void __cdecl DiedEffectA(void *obj);
+void __cdecl DiedEffectA(struct AM2_Object *obj);
 
 /* 0x00461BA0. One to three particles where something was hit, the count from
  * a ten-entry weighted table. */

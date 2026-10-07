@@ -98,9 +98,10 @@ def _aggregated(va):
 # alone again; the typed AI records and AM2_Point parameters (2026-10-07)
 # move it to the 0x00511BC8 block's alone; the per-type object tail and
 # typed vehicle/roach records bring the sprite list's back beside it; the
-# item.cpp parameter typing settles on the 0x00515FD8 block alone.
+# item.cpp parameter typing settles on the 0x00515FD8 block alone; the
+# typed g_objCtxObjA and save-index aliases settle it with none kept.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00515FD8, 0x00516078),)
+KEEP_DECLS = ()
 
 
 def _kept(va):

@@ -2198,24 +2198,24 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
  * THE SECOND COUNT IS `rand % 5 + 6` and each of its particles draws its own
  * `rand % 3 + 7`, so the count and the kinds are independent draws. Folding
  * them into one would give every particle in a burst the same kind. */
-void __cdecl DiedEffectA(void *obj)
+void __cdecl DiedEffectA(AM2_Object *obj)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
     int32_t        i;
     int32_t        n;
 
     for (i = 0; i < 6; i++)
-        SpawnParticle((const AM2_Point *)(o + OBJ_OFF_POS),
-                      *(const int32_t *)(o + 0x52Cu), i, 9,
-                      *(const int8_t *)(o + 0x65u), -1);
+        SpawnParticle(&o->pos,
+                      o->vehicleKind, i, 9,
+                      o->heightSet, -1);
 
     n = (orig_game_rand() % 5) + 6;
     while (n > 0) {
         int32_t kind = (orig_game_rand() % 3) + 7;
 
-        SpawnParticle((const AM2_Point *)(o + OBJ_OFF_POS),
-                      *(const int32_t *)(o + 0x52Cu), kind, 9,
-                      *(const int8_t *)(o + 0x65u), -1);
+        SpawnParticle(&o->pos,
+                      o->vehicleKind, kind, 9,
+                      o->heightSet, -1);
         n--;
     }
 }

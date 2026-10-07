@@ -846,7 +846,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * PointerActionMode4.. -- so these agree with widget.h rather than restating
  * it loosely. */
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
-typedef void (__cdecl *AM2_PointerActionFn)(void *obj, AM2_Point at);
+typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -2575,7 +2575,7 @@ static inline void GameMenuGoto(int32_t mode)
 
 
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
-typedef void (__cdecl *AM2_PointerActionFn)(void *obj, AM2_Point at);
+typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
 
 /* Our leader, the way every pointer handler in this band gets it -- including
  * the fallback that cannot run. Promoted to item.cpp once the medkit heal
@@ -4941,7 +4941,7 @@ void __cdecl HudPostUpdate(void)
         if (CHANGED) {
             if (BUTTON || !SLOT1)
                 goto claim;
-            SLOT1((void *)0, at);
+            SLOT1((AM2_Object *)(void *)0, at);
             goto tail;
         }
         if (!repeat)
@@ -4949,13 +4949,13 @@ void __cdecl HudPostUpdate(void)
         if (!BUTTON)
             goto idle;
         if (SLOT1)
-            SLOT1((void *)0, at);
+            SLOT1((AM2_Object *)(void *)0, at);
         goto tail;
     }
     if (*(void *const *)&g_pointerF14 && !aiming && CHANGED) {
         if (BUTTON || !ACTION)
             goto claim;
-        ACTION((void *)0, at);      /* the walk ran out: no object */
+        ACTION((AM2_Object *)(void *)0, at);      /* the walk ran out: no object */
     }
     goto tail;
 
@@ -4963,7 +4963,7 @@ hit_ours:
     if (CHANGED) {
         if (BUTTON || !SLOT1)
             goto claim;
-        SLOT1(obj, at);
+        SLOT1((AM2_Object *)obj, at);
         goto tail;
     }
     /* The button did not change, so this is a hold. Only a weapon whose kind
@@ -4973,7 +4973,7 @@ hit_ours:
     if (!BUTTON)
         goto idle;
     if (SLOT1)
-        SLOT1(obj, at);
+        SLOT1((AM2_Object *)obj, at);
     goto tail;
 
 hit_generic:
@@ -4981,7 +4981,7 @@ hit_generic:
         goto tail;
     if (BUTTON || !ACTION)
         goto claim;
-    ACTION(obj, at);
+    ACTION((AM2_Object *)obj, at);
     goto tail;
 
 claim:
@@ -5130,7 +5130,7 @@ void __cdecl SetPointerMode(int32_t mode)
     g_pointerOverlay = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
 
     if (!PICK && !F14 && ACT) {
-        ACT((void *)0, g_zeroXY);
+        ACT((AM2_Object *)(void *)0, g_zeroXY);
         g_pointerMode = 0;
     }
 #undef REC
@@ -5660,27 +5660,27 @@ AM2_HudSarge::~AM2_HudSarge()
  *
  * PlaySoundAt(0,0,0,0,0) fires before any of it -- the same five-zero call
  * FireWeapon's arm 17 makes, and just as real. */
-void __cdecl SelectWeapon(void *unit, int32_t slot)
+void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
 {
-    uint8_t *u = (uint8_t *)unit;
+    AM2_Object *u = unit;
     uint8_t *w;
     int32_t  kind;
 
     w = (uint8_t *)WeaponByUid(
-            *(const uint32_t *)(u + OBJ_OFF_WEAPON_UID + (size_t)slot * 4));
+            u->inventory[slot]);
     if (!w)
         return;
 
     PlaySoundAt(0, 0, 0, 0, 0);
 
-    if (*(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL) == slot) {
+    if (u->inventorySel == slot) {
         g_viewSnap = 1;
 
         kind = **(const int32_t **)(w + OBJ_OFF_FIELD_C0);
         switch (kind) {
         case 0x17: {
-            int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
-            if (hp > 0 && hp < *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
+            int16_t hp = u->health;
+            if (hp > 0 && hp < u->maxHealth)
                 SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         }
@@ -5688,7 +5688,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
          * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
          * own and jumps into 0x26's. */
         case 0x23:
-            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
+            if (u->field530 != 0)
                 SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
 
@@ -5697,26 +5697,26 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
             break;
 
         case 0x24:
-            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
+            if (u->field530 != 1)
                 SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x25:
-            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 2)
+            if (u->field530 != 2)
                 SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x26:
-            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 3)
+            if (u->field530 != 3)
                 SetWeaponTarget((AM2_Object *)u, g_zeroXY);
             break;
         case 0x29: {
-            uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
+            uint32_t riding = u->riding;
             if (riding) {
                 void *veh = LookupType3ByUID(riding);
                 if (veh)
                     SetWeaponTarget((AM2_Object *)veh,
                         g_zeroXY);
                 else
-                    *(uint32_t *)(u + OBJ_OFF_RIDING) = 0;
+                    u->riding = 0;
             }
             break;
         }
@@ -5725,15 +5725,15 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
         }
     }
 
-    *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
+    u->inventorySel = slot;
     SelectInventorySlot((AM2_Object *)u, slot);
 
-    if (*(const uint32_t *)(u + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED)
+    if (u->flags & OBJ_FLAG_SELECTED)
         return;
 
     DeselectAll();
     {
-        uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
+        uint32_t riding = u->riding;
         if (riding)
             SelectUnit(LookupType3ByUID(riding));
         else
@@ -5785,17 +5785,17 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     /* Pass one: the six weapon keys, a ladder whose first match wins and
      * skips the mouse pass. Pass two: the mouse, while the panel is open. */
     if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 0))
-        SelectWeapon(obj, 0);
+        SelectWeapon((AM2_Object *)obj, 0);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 1))
-        SelectWeapon(obj, 1);
+        SelectWeapon((AM2_Object *)obj, 1);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 2))
-        SelectWeapon(obj, 2);
+        SelectWeapon((AM2_Object *)obj, 2);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 3))
-        SelectWeapon(obj, 3);
+        SelectWeapon((AM2_Object *)obj, 3);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 4))
-        SelectWeapon(obj, 4);
+        SelectWeapon((AM2_Object *)obj, 4);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 5))
-        SelectWeapon(obj, 5);
+        SelectWeapon((AM2_Object *)obj, 5);
     else if (*(const int32_t *)((const uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_OPEN)) {
 /* The row's record, indexed afresh at each use: a local pointer moves the
@@ -5831,7 +5831,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (!g_mouseButton
                 && g_mouseChanged
                 && *(AM2_Widget * *)&g_mouseGrab == w)
-                SelectWeapon(obj, i);
+                SelectWeapon((AM2_Object *)obj, i);
 
             /* The tooltip, and it is gated on STILLNESS rather than on the
              * click. ADDR_MOUSE_ACTIVITY is stamped from the clock on any
@@ -16682,7 +16682,7 @@ void __cdecl PointerInvokeFreezeSelected(void)
  * a driven Boot Camp mission reaching it exactly once, for mode 0 at mission
  * start. Verified by reading, and the two arms behind the folded compares
  * cannot run at all. */
-void __cdecl PointerActionFollow(void *obj, AM2_Point at)
+void __cdecl PointerActionFollow(AM2_Object *obj, AM2_Point at)
 {
     AM2_Object *leader;
     int32_t     i;
@@ -16792,10 +16792,10 @@ void __cdecl PointerActionFollow(void *obj, AM2_Point at)
  * trooper arm is gated on the same GetMenuRow() == 8.
  *
  * Not exercised: no drive here installs a pointer mode above 0. */
-void __cdecl PointerActionMode4(void *target, AM2_Point at)
+void __cdecl PointerActionMode4(AM2_Object *target, AM2_Point at)
 {
-    uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
-    uint8_t *tgt = (uint8_t *)target;
+    AM2_Object *ctx = g_objCtxObjA;
+    AM2_Object *tgt = target;
     int32_t  type;
     int32_t  i;
 
@@ -16841,7 +16841,7 @@ void __cdecl PointerActionMode4(void *target, AM2_Point at)
             && !ArmyAlliedWithObjInline(
                    *(const int32_t *)&g_defaultOwner, (const AM2_Object *)tgt, 0)) {
             *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-                *(const uint32_t *)(tgt + OBJ_OFF_UID);
+                tgt->uid;
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
         } else {
             PointActionA((AM2_Object *)o, slot);
@@ -16990,7 +16990,7 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
  * ADDR_SELECTED_UIDS and the index is NOT incremented.
  *
  * Not exercised: no drive here installs a pointer mode above 0. */
-void __cdecl PointerActionMode6(void *target, AM2_Point at)
+void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
 {
     uint8_t *ctx = *(uint8_t * *)&g_objCtxObjA;
     int32_t  type;
@@ -17184,7 +17184,7 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
  * mission reaches it exactly once, for mode 0 at mission start, and that every
  * mode above 0 needs the order-giving UI no drive here reaches. So this is
  * verified by reading. */
-void __cdecl PointerDropItem(void *obj, AM2_Point at)
+void __cdecl PointerDropItem(AM2_Object *obj, AM2_Point at)
 {
     AM2_Object *unit;
     int32_t     slot;
@@ -17216,7 +17216,7 @@ void __cdecl PointerDropItem(void *obj, AM2_Point at)
  * The kind test SHAPE differs too and is reproduced: 0x00458D70 takes a RANGE
  * (DISG_0..DISG_3, four disguises sharing one handler) and these four each take
  * a single equality. */
-void __cdecl SetWeaponTargetMedic(void *target, AM2_Point at)
+void __cdecl SetWeaponTargetMedic(AM2_Object *target, AM2_Point at)
 {
     uint8_t       *u;
     const uint8_t *weapon;
@@ -17242,7 +17242,7 @@ void __cdecl SetWeaponTargetMedic(void *target, AM2_Point at)
     RecordAimedFire(u, target, 1);
 }
 
-void __cdecl SetWeaponTargetWrench(void *target, AM2_Point at)
+void __cdecl SetWeaponTargetWrench(AM2_Object *target, AM2_Point at)
 {
     uint8_t       *u;
     const uint8_t *weapon;
@@ -17270,7 +17270,7 @@ void __cdecl SetWeaponTargetWrench(void *target, AM2_Point at)
 
 /* The only one with an extra refusal, and it sits between the type test and the
  * weapon lookup: the UNIT's own OBJ_OFF_SOLDIER_KIND must be under 6. */
-void __cdecl SetWeaponTargetKind2A(void *target, AM2_Point at)
+void __cdecl SetWeaponTargetKind2A(AM2_Object *target, AM2_Point at)
 {
     uint8_t       *u;
     const uint8_t *weapon;
@@ -17327,7 +17327,7 @@ void __cdecl SetWeaponTargetKind2A(void *target, AM2_Point at)
  * Not exercised. ADDR_SET_WEAPON_TARGET's own note records it measured at 0
  * because its call sites are the pointer-mode action paths and no drive here
  * installs a mode above 0; the same holds for this one. Verified by reading. */
-void __cdecl SetWeaponTargetAimed(void *target, AM2_Point at)
+void __cdecl SetWeaponTargetAimed(AM2_Object *target, AM2_Point at)
 {
     uint8_t       *u;
     const uint8_t *weapon;
@@ -17365,7 +17365,7 @@ void __cdecl SetWeaponTargetAimed(void *target, AM2_Point at)
 /* The minesweeper, and the one that does NOT write UNIT_OFF_FIRE_MODE -- the
  * two instructions the other four have are absent here, so whatever mode the
  * unit was in survives the order. */
-void __cdecl SetWeaponTargetSweeper(void *target, AM2_Point at)
+void __cdecl SetWeaponTargetSweeper(AM2_Object *target, AM2_Point at)
 {
     uint8_t       *u;
     const uint8_t *weapon;
@@ -17411,7 +17411,7 @@ void __cdecl SetWeaponTargetSweeper(void *target, AM2_Point at)
  *
  * The original is a thunk and is written as one. It pushes only the first
  * argument, which is what says the second is dropped rather than passed on. */
-void __cdecl PointerSelect(void *obj, AM2_Point at)
+void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
 {
     (void)at;
     SelectIfOwn((AM2_Object *)obj);

@@ -108,7 +108,7 @@ void __cdecl ShowInfoMp(void);
 
 /* 0x00428870. Header then one of eight per-type savers. An unknown type is
  * header-only and NOT an error; type 7 saves nothing type-specific. */
-int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveOneItem(am2_FILE *fp, struct AM2_Object *obj);
 
 /* 0x004289E0. Reads a header and builds the object, RETURNING it -- not a
  * flag. The footprint bit round-trips around construction and the selected
@@ -117,9 +117,9 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 
 /* The object header's two halves and three of the eight per-type savers, all
  * writing from OBJ_OFF_FIELD_94. See gameproc.cpp. */
-int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveItemHeader(am2_FILE *fp, struct AM2_Object *obj);
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
-int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType1(am2_FILE *fp, struct AM2_Object *obj);
 
 
 /* 0x0043B870, one caller -- the MISSILE member of the per-type savegame
@@ -145,7 +145,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
  * type-5 object from a weapon and a firing position. Def 3 is a chained kind
  * that links consecutive segments into a trail; every other def gets
  * missile.ani and an ordinary SetAnimFrame. */
-void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
+void *__cdecl CreateMissile(struct AM2_Object *weapon, struct AM2_Object *source, AM2_Point at,
                             int32_t heading, int32_t a5, int32_t a6,
                             int32_t repairFrame, float speedScale,
                             int32_t initUnused, uint32_t uid,
@@ -156,12 +156,12 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
  * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
  * two 16-byte blocks at +0x20 and +0x30. See gameproc.cpp. */
 void *__cdecl LoadType1(am2_FILE *fp, const void *hdr);
-int32_t __cdecl SaveType6(am2_FILE *fp, void *obj);
-int32_t __cdecl SaveType8(am2_FILE *fp, void *obj);
-int32_t __cdecl SaveType4(am2_FILE *fp, void *obj);
-int32_t __cdecl SaveType5(am2_FILE *fp, void *obj);
-int32_t __cdecl SaveType2(am2_FILE *fp, void *obj);
-int32_t __cdecl SaveType3(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType6(am2_FILE *fp, struct AM2_Object *obj);
+int32_t __cdecl SaveType8(am2_FILE *fp, struct AM2_Object *obj);
+int32_t __cdecl SaveType4(am2_FILE *fp, struct AM2_Object *obj);
+int32_t __cdecl SaveType5(am2_FILE *fp, struct AM2_Object *obj);
+int32_t __cdecl SaveType2(am2_FILE *fp, struct AM2_Object *obj);
+int32_t __cdecl SaveType3(am2_FILE *fp, struct AM2_Object *obj);
 
 /* 0x00435500. The type 7 loader, and the only one that reads no file. */
 void *__cdecl LoadType6(am2_FILE *fp, const void *hdr);

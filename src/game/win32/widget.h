@@ -1650,7 +1650,7 @@ static inline AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(AM2_Widget 
 
 /* 0x00414F20, seven callers. Pick a weapon slot; picking the one already
  * selected DESELECTS instead. */
-void __cdecl SelectWeapon(void *unit, int32_t slot);
+void __cdecl SelectWeapon(struct AM2_Object *unit, int32_t slot);
 
 /* 0x00416340, thiscall. The squad panel's detail slot: three arms on one
  * 2-column, 5-row grid. */
@@ -2745,13 +2745,13 @@ void __cdecl ObjFreeze(struct AM2_Object *o);
 
 /* 0x00458A20. The ACTION slot of pointer mode 3: drop what our leader holds.
  * Both arguments are ignored -- the shape is the slot's, not its own. */
-void __cdecl PointerDropItem(void *obj, AM2_Point at);
+void __cdecl PointerDropItem(struct AM2_Object *obj, AM2_Point at);
 /* 0x00457E50 -- pointer mode 1's action: the follow-me order. */
-void __cdecl PointerActionFollow(void *obj, AM2_Point at);
+void __cdecl PointerActionFollow(struct AM2_Object *obj, AM2_Point at);
 
 /* 0x00458ED0. The ACTION slot of pointer mode 0 -- the default mode, and the
  * one ordinary play reaches: hand the object to SelectIfOwn, drop the point. */
-void __cdecl PointerSelect(void *obj, AM2_Point at);
+void __cdecl PointerSelect(struct AM2_Object *obj, AM2_Point at);
 
 /* 0x00459DA0. The PICK half of four records in the second {pick, action, kind,
  * flags} table: can the pointer act on this object. A vehicle with a free seat
@@ -2802,11 +2802,11 @@ void __cdecl HudPostUpdate(void);
 
 /* 0x00458810. Mode 6's action: order the selection to move in formation with
  * AI mode `ignore`. Its first argument is IN-OUT -- see widget.cpp. */
-void __cdecl PointerActionMode6(void *target, AM2_Point at);
+void __cdecl PointerActionMode6(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00458400. Mode 4's action: an ENEMY target becomes AI mode 3 plus a follow
  * uid and no move order; anything else is a move to the formation slot. */
-void __cdecl PointerActionMode4(void *target, AM2_Point at);
+void __cdecl PointerActionMode4(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00458620. Mode 5's action: an enemy target is handed to mode 4's action,
  * everything else is a plain move with AI mode 1. */
@@ -2814,15 +2814,15 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at);
 
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
-void __cdecl SetWeaponTargetAimed(void *target, AM2_Point at);
+void __cdecl SetWeaponTargetAimed(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00458B50, 0x00458C00, 0x00458CB0 and 0x00458E30. The same handler for one
  * weapon kind each; the sweeper is the one that leaves UNIT_OFF_FIRE_MODE
  * alone, and 0x00458CB0 has an extra guard on the unit's soldier kind. */
-void __cdecl SetWeaponTargetMedic(void *target, AM2_Point at);
-void __cdecl SetWeaponTargetWrench(void *target, AM2_Point at);
-void __cdecl SetWeaponTargetKind2A(void *target, AM2_Point at);
-void __cdecl SetWeaponTargetSweeper(void *target, AM2_Point at);
+void __cdecl SetWeaponTargetMedic(struct AM2_Object *target, AM2_Point at);
+void __cdecl SetWeaponTargetWrench(struct AM2_Object *target, AM2_Point at);
+void __cdecl SetWeaponTargetKind2A(struct AM2_Object *target, AM2_Point at);
+void __cdecl SetWeaponTargetSweeper(struct AM2_Object *target, AM2_Point at);
 
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */

@@ -442,7 +442,7 @@ int32_t __cdecl SaveDefaultCof(void)
             case AM2_OBJ_TYPE_TROOPER: {
                 int32_t slot;
 
-                SaveOneItem(fp, obj);
+                SaveOneItem(fp, (AM2_Object *)obj);
                 SaveScriptName(fp, obj);
 
                 for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
@@ -450,7 +450,7 @@ int32_t __cdecl SaveDefaultCof(void)
                         ((const uint32_t *)(obj + UNIT_OFF_INVENTORY))[slot]);
 
                     if (w) {
-                        SaveOneItem(fp, w);
+                        SaveOneItem(fp, (AM2_Object *)w);
                         SaveScriptName(fp, w);
                     }
                 }
@@ -849,7 +849,7 @@ typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
  * truncated file reads as a successful load of whatever was in the buffer;
  * SaveOneItem's careful per-step checking has nothing to check here.
  */
-int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveItemHeader(am2_FILE *fp, AM2_Object *obj)
 {
     WriteSaveTag(fp, AM2_ITEM_HEADER_TAG);
     orig_fwrite(obj, (size_t)kItemHeaderSize, 1, fp);
@@ -882,7 +882,7 @@ int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr)
  * where the other two would fault. Reproduced; nothing says why it is the one
  * that guards.
  */
-int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType1(am2_FILE *fp, AM2_Object *obj)
 {
     uint8_t *rec = (uint8_t *)obj + OBJ_OFF_FIELD_94;
 
@@ -1304,14 +1304,14 @@ void __cdecl ResetLevelState(void)
  * and steps over it -- so with one toucher it gets a field-numbered name and
  * no claim. What IS evidenced is that the same argument also lands in
  * OBJ_OFF_ROW0_Y_ADJUST and goes through ScaleBy32Blocks into the row. */
-void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
+void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at,
                             int32_t heading, int32_t a5, int32_t a6,
                             int32_t repairFrame, float speedScale,
                             int32_t initUnused, uint32_t uid,
                             uint8_t scriptId)
 {
-    uint8_t *w = (uint8_t *)weapon;
-    uint8_t *b = (uint8_t *)source;
+    AM2_Object *w = weapon;
+    AM2_Object *b = source;
     uint8_t *o;
     int32_t  def;
     int32_t  frame;
@@ -1323,7 +1323,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
     memset(o, 0, AM2_MISSILE_BYTES);
 
     *(const void **)(o + OBJ_OFF_FIELD_94) =
-        *(const void *const *)(w + OBJ_OFF_FIELD_C0);
+        w->typeRec;
     *(uint8_t *)(o + OBJ_OFF_FACING) = (uint8_t)heading;
     *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = repairFrame;
     *(float *)(o + MISSILE_OFF_SPEED_SCALE) = speedScale;
@@ -1341,7 +1341,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
         break;
     }
 
-    *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
+    *(int8_t *)(o + OBJ_OFF_ARMY) = w->owner;
     ObjInitCommon((AM2_Object *)o, g_dirScratch,
                   AM2_OBJ_TYPE_MISSILE, at,
                   g_missileBox,
@@ -1359,11 +1359,11 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
         (int16_t)*(const int32_t *)(o + MISSILE_OFF_GROUND);
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
         g_gameClockMs;
-    *(int32_t *)(o + OBJ_OFF_FIELD_44) = *(const int32_t *)(b + OBJ_OFF_FIELD_44);
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = b->field44;
 
     {
         int32_t n = *(const int32_t *)
-            (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)
+            (((const uint8_t *)w->typeRec)
              + MISSILEDEF_OFF_FIELD_0C);
 
         if (n > 0) {
@@ -1391,10 +1391,9 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
             g_gameClockMs;
         TimedDirFrame(rows, heading);
 
-        if (*(const uint32_t *)(w + MISSILE_OFF_LAST_UID)) {
+        if (w->deadlineD0) {
             uint8_t *prev = (uint8_t *)
-                LookupByUID(*(const uint32_t *)
-                            (w + MISSILE_OFF_LAST_UID));
+                LookupByUID(w->deadlineD0);
 
             if (prev
                 && g_gameClockMs
@@ -1405,7 +1404,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
                     ((const AM2_Object *)o)->uid;
         }
 
-        *(uint32_t *)(w + MISSILE_OFF_LAST_UID) =
+        w->deadlineD0 =
             ((const AM2_Object *)o)->uid;
     } else {
         *(const void **)(rows + ROW_OFF_ANIM_CUR) =
@@ -2028,14 +2027,14 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
 }
 
 
-int32_t __cdecl SaveType6(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType6(am2_FILE *fp, AM2_Object *obj)
 {
     orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
                 AM2_TYPE6_RECORD_SIZE, 1, fp);
     return 1;
 }
 
-int32_t __cdecl SaveType8(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType8(am2_FILE *fp, AM2_Object *obj)
 {
     if (!obj)
         return 0;
@@ -2075,41 +2074,41 @@ typedef void (__cdecl *AM2_FootprintFn)(void *obj);
  * writes a second such list. Neither length goes through WriteSaveTag, unlike
  * every other length in this format.
  */
-int32_t __cdecl SaveType2(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType2(am2_FILE *fp, AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
     int32_t  rec, n;
     uint8_t *weapon;
 
     if (!o)
         return 0;
 
-    rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC2);
+    rec = o->tableRec2Index;
     if (rec)
-        *(int32_t *)(o + SAVED_OFF_TABLE_REC2) =
+        o->tableRec2Index =
             (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
-    orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE2_RECORD_SIZE, 1, fp);
+    orig_fwrite(&o->field94, AM2_TYPE2_RECORD_SIZE, 1, fp);
 
     weapon = (uint8_t *)WeaponByUid(
-                 *(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
+                 o->inventory[0]);
     if (weapon)
         WriteSaveTag(fp, **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
     else
         WriteSaveTag(fp, 1u);
 
-    n = *(const int32_t *)(o + SAVED_OFF_LIST_COUNT);
+    n = o->followers.count;
     if (n > 0)
-        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST),
+        orig_fwrite(o->followers.uids,
                     (size_t)n * 4, 1, fp);
 
-    *(int32_t *)(o + SAVED_OFF_TABLE_REC2) = rec;
+    o->tableRec2Index = rec;
     return 1;
 }
 
-int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType3(am2_FILE *fp, AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
     int32_t  rec, n;
 
     if (!o)
@@ -2117,24 +2116,24 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
 
     ObjClearFootprint((AM2_Object *)o);
 
-    rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC3);
+    rec = o->tableRec3Index;
     if (rec)
-        *(int32_t *)(o + SAVED_OFF_TABLE_REC3) =
+        o->tableRec3Index =
             (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
-    orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE3_RECORD_SIZE, 1, fp);
+    orig_fwrite(&o->field94, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
-    n = *(const int32_t *)(o + SAVED_OFF_LIST_COUNT);
+    n = o->followers.count;
     if (n > 0)
-        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST),
+        orig_fwrite(o->followers.uids,
                     (size_t)n * 4, 1, fp);
 
-    n = *(const int32_t *)(o + SAVED_OFF_LIST2_COUNT);
+    n = o->posePending;
     if (n > 0)
-        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST2),
+        orig_fwrite(o->riders.uids,
                     (size_t)n * 4, 1, fp);
 
-    *(int32_t *)(o + SAVED_OFF_TABLE_REC3) = rec;
+    o->tableRec3Index = rec;
     ObjSetFootprint((AM2_Object *)o);
     return 1;
 }
@@ -2155,7 +2154,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
  * twenty bytes would do, so the gaps are deliberate rather than a stride;
  * what is in them is not established.
  */
-int32_t __cdecl SaveType4(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType4(am2_FILE *fp, AM2_Object *obj)
 {
     const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
 
@@ -2168,7 +2167,7 @@ int32_t __cdecl SaveType4(am2_FILE *fp, void *obj)
     return 1;
 }
 
-int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
 {
     const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
 
@@ -2297,7 +2296,7 @@ void *__cdecl LoadType7(am2_FILE *fp, const void *hdr)
  *
  * VERIFIED BY READING. Its caller is the savegame writer; nothing in the
  * suite saves. */
-int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
+int32_t __cdecl SaveOneItem(am2_FILE *fp, AM2_Object *obj)
 {
     if (!SaveItemHeader(fp, obj))
         return 0;
