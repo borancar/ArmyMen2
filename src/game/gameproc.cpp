@@ -1539,8 +1539,13 @@ static inline void CopyTypeRecord(void *dst, const void *src, size_t n)
 struct AM2_Type8Obj {
     uint8_t     pad_[0xA4];
     AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
-    uint8_t     rest_[0x94 + AM2_TYPE8_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
+    uint8_t     padB0_[0x52C - 0xB0];
+    int32_t     kind;                   /* +0x52C, what CreateRoach is given */
+    uint8_t     rest_[0x94 + AM2_TYPE8_RECORD_SIZE - 0x530];
 };
+#if !defined(_MSC_VER)
+static_assert(sizeof(AM2_Type8Obj) == 0x94 + AM2_TYPE8_RECORD_SIZE, "AM2_Type8Obj");
+#endif
 
 AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 {
@@ -1553,7 +1558,7 @@ AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
     orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
 
     o = (AM2_Object *)(uint8_t *)CreateRoach(
-            *(const int32_t *)(rec + 0x498),
+            obj.kind,
             g_dirScratch,
             h->pos.x,
             h->pos.y,
@@ -1634,9 +1639,27 @@ AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
  * in at +0x94, the one list at OBJ_OFF_PTR_LIST a class member. */
 struct AM2_Type2Obj {
     uint8_t     pad_[0xA4];
-    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
-    uint8_t     rest_[0x94 + AM2_TYPE2_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
+    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST, TYPE2_REC_OFF_LIST */
+    uint8_t     padB0_[4];
+    int32_t     scriptState;            /* +0xB4 TYPE2_REC_OFF_SCRIPT */
+    uint8_t     padB8_[0xC4 - 0xB8];
+    uint32_t    followUid;              /* +0xC4 TYPE2_REC_OFF_CLEAR_30 */
+    uint8_t     padC8_[4];
+    uint32_t    targetUid;              /* +0xCC TYPE2_REC_OFF_CLEAR_38 */
+    uint8_t     padD0_[0x52C - 0xD0];
+    int32_t     tableRec2Index;         /* +0x52C TYPE2_REC_OFF_SLOT */
+    uint8_t     pad530_[0x538 - 0x530];
+    int32_t     pose;                   /* +0x538 TYPE2_REC_OFF_POSE */
+    uint8_t     pad53C_[0x564 - 0x53C];
+    uint32_t    heldWeaponUid;          /* +0x564 TYPE2_REC_OFF_CLEAR_4D0 */
+    uint8_t     pad568_[4];
+    uint32_t    uid56C;                 /* +0x56C TYPE2_REC_OFF_CLEAR_4D8 */
+    uint32_t    riding;                 /* +0x570 TYPE2_REC_OFF_CLEAR_4DC */
+    uint8_t     rest_[0x94 + AM2_TYPE2_RECORD_SIZE - 0x574];
 };
+#if !defined(_MSC_VER)
+static_assert(sizeof(AM2_Type2Obj) == 0x94 + AM2_TYPE2_RECORD_SIZE, "AM2_Type2Obj");
+#endif
 
 AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
@@ -1664,11 +1687,11 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
         UidRemapAdd(h->uid, o->uid);
         h->uid = o->uid;
 
-        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D0) = 0;
-        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_30)  = 0;
-        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_38)  = 0;
-        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D8) = 0;
-        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4DC) = 0;
+        obj.heldWeaponUid = 0;
+        obj.followUid     = 0;
+        obj.targetUid     = 0;
+        obj.uid56C        = 0;
+        obj.riding        = 0;
     } else {
         o = (AM2_Object *)(uint8_t *)CreateTrooper(
                 g_dirScratch,
@@ -1714,12 +1737,12 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 
     o->tableRec2 =
         g_objTableRecords
-        + *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT) * AM2_OBJ_TABLE_REC_SIZE;
+        + obj.tableRec2Index * AM2_OBJ_TABLE_REC_SIZE;
 
     memset(&o->followers, 0, sizeof(AM2_PtrList));
 
-    if (*(const int32_t *)(rec + TYPE2_REC_OFF_COUNT) > 0) {
-        for (i = 0; i < *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT); i++) {
+    if (obj.list.count > 0) {
+        for (i = 0; i < obj.list.count; i++) {
             orig_fread(&uid, 4, 1, fp);
             /* Renumbering DROPS the inventory rather than remapping it: the
              * uid is read and thrown away. The original's own test, not a
@@ -1770,9 +1793,9 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     o->deadline58 =
         (int32_t)h->deadline58;
     o->scriptState =
-        *(const int32_t *)(rec + TYPE2_REC_OFF_SCRIPT);
+        obj.scriptState;
     o->pose = 1;
-    SetUnitPose(o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
+    SetUnitPose(o, obj.pose);
 
     memset((void *)&obj.list, 0, sizeof obj.list);
 
@@ -1837,11 +1860,17 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 /* The vehicle's: both lists, so the compiler builds and tears down two. */
 struct AM2_Type3Obj {
     uint8_t     pad_[0xA4];
-    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
-    uint8_t     padV_[0x538 - 0xA4 - sizeof(AM2_PtrList)];
-    AM2_PtrList riders;                 /* VEHICLE_OFF_PTR_LIST */
+    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST, TYPE3_REC_OFF_LIST */
+    uint8_t     padB0_[0x52C - 0xB0];
+    int32_t     vehicleKind;            /* +0x52C TYPE3_REC_OFF_KIND */
+    uint8_t     pad530_[4];
+    int32_t     tableRec3Index;         /* +0x534 TYPE3_REC_OFF_SLOT */
+    AM2_PtrList riders;                 /* +0x538 VEHICLE_OFF_PTR_LIST */
     uint8_t     rest_[0x94 + AM2_TYPE3_RECORD_SIZE - 0x538 - sizeof(AM2_PtrList)];
 };
+#if !defined(_MSC_VER)
+static_assert(sizeof(AM2_Type3Obj) == 0x94 + AM2_TYPE3_RECORD_SIZE, "AM2_Type3Obj");
+#endif
 
 AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 {
@@ -1856,7 +1885,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
-    o = (AM2_Object *)(uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
+    o = (AM2_Object *)(uint8_t *)CreateVehicle(obj.vehicleKind,
                                  g_dirScratch,
                                  h->pos.x,
                                  h->pos.y,
@@ -1874,14 +1903,14 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
     o->tableRec3 =
         g_objTableRecords
-        + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
+        + (obj.tableRec3Index
            * AM2_OBJ_TABLE_REC_SIZE);
     o->rank = AM2_TYPE3_LOAD_RANK;
 
     memset(&o->followers, 0, sizeof(AM2_PtrList));
 
-    if (*(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT) > 0) {
-        for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT); i++) {
+    if (obj.list.count > 0) {
+        for (i = 0; i < obj.list.count; i++) {
             orig_fread(&uid, 4, 1, fp);
             ((AM2_Rec *)(&o->followers))->PtrListPush((void *)(uintptr_t)uid);
         }
@@ -1889,8 +1918,8 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
     memset(&o->riders, 0, sizeof(AM2_PtrList));
 
-    if (*(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT) > 0) {
-        for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT); i++) {
+    if (obj.riders.count > 0) {
+        for (i = 0; i < obj.riders.count; i++) {
             orig_fread(&uid, 4, 1, fp);
             ((AM2_Rec *)(&o->riders))->PtrListPush((void *)(uintptr_t)uid);
         }
@@ -2203,24 +2232,32 @@ AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
      * other loaders have it. */
     struct {
         uint8_t head[OBJ_OFF_FIELD_94];
-        uint8_t rec[AM2_TYPE6_RECORD_SIZE];
+        struct {                        /* the explosion arm, TYPE6_REC_OFF_* */
+            int32_t  kind;              /* +0x94 */
+            int32_t  damage;            /* +0x98 */
+            AM2_Rect rect;              /* +0x9C */
+            uint32_t due;               /* +0xAC */
+            int32_t  sound;             /* +0xB0 */
+            int32_t  mode;              /* +0xB4 */
+            uint32_t source;            /* +0xB8 */
+        } rec;
     } obj;
     const AM2_Object *h = (const AM2_Object *)hdr;
     AM2_Object       *made;
 
-    orig_fread(obj.rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
+    orig_fread(&obj.rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
 
     made = (AM2_Object *)(uint8_t *)orig_spawn_at(
                h->pos.x,
                h->pos.y,
-               *(const int32_t *)(obj.rec + TYPE6_REC_OFF_KIND),
+               obj.rec.kind,
                h->owner,
-               *(const uint32_t *)(obj.rec + TYPE6_REC_OFF_UID),
-               *(const int32_t *)(obj.rec + TYPE6_REC_OFF_EXTRA),
+               obj.rec.source,
+               obj.rec.damage,
                0, 1, (int32_t)h->uid, 0);
 
     memcpy(made, h, (size_t)kItemHeaderSize);
-    CopyTypeRecord(&made->field94, obj.rec, AM2_TYPE6_RECORD_SIZE);
+    CopyTypeRecord(&made->field94, &obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
 
