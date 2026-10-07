@@ -298,7 +298,7 @@
 #define g_hudSargeOffsets        ((int16_t *)(uintptr_t)ADDR_HUD_SARGE_OFFSETS)  /* 0x004766B0 */
 #define g_hudSquadSlotXy         ((int16_t *)(uintptr_t)ADDR_HUD_SQUAD_SLOT_XY)  /* 0x004766C8 */
 #define g_hudWidgetA             (*(struct AM2_HudTop **)(uintptr_t)ADDR_HUD_WIDGET_A)  /* 0x004FCF00 */
-#define g_hudWidgetB             (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)  /* 0x004FCF54 */
+#define g_hudWidgetB             (*(AM2_HudPanel **)(uintptr_t)ADDR_HUD_WIDGET_B)  /* 0x004FCF54 */
 #define g_hudWidgetC             (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)  /* 0x004FCF4C */
 #define g_hudWidgetTable         ((AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE)  /* 0x004FCF04 */
 #define g_iatGetTickCount        ((void *)(uintptr_t)ADDR_IAT_GET_TICK_COUNT)  /* 0x0046F084 */

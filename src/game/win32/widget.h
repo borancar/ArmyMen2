@@ -96,7 +96,7 @@ typedef struct AM2_Widget {
                                      * same thing. */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
     int32_t  unknown48;             /* 0x0048 */
-    int32_t  disabled;              /* 0x004C  set disqualifies from focus, and
+    int32_t  disabled;              /* 0x004C  COUNTBTN_OFF_DISABLED: set disqualifies from focus, and
                                      * the multiplayer panel's update writes it
                                      * per row on exactly the policy its button
                                      * handlers guard on -- a row with a real
@@ -356,7 +356,7 @@ struct AM2_KeyRow : AM2_Label {
 
 struct AM2_ButtonBase : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    int32_t row;                    /* 0x0058  MPBTN_OFF_ROW, which player row */
+    int32_t row;                    /* 0x0058  MPBTN_OFF_ROW MOVIE_BUTTON_OFF_INDEX, the row */
     int32_t repeats;                /* 0x005C  BUTTON_OFF_REPEATS BUTTON_BASE_OFF_A, auto-repeat */
     uint32_t deadline;              /* 0x0060  BUTTON_OFF_DEADLINE BUTTON_BASE_OFF_B, next repeat */
     void (__cdecl *onRight)(AM2_Widget *); /* 0x0064  BUTTON_OFF_ON_RIGHT BUTTON_BASE_OFF_C */
@@ -516,10 +516,23 @@ struct AM2_MpSpin : AM2_Widget {
 
 struct AM2_Blinker : AM2_Panel {
     typedef AM2_Panel Base;       /* VC6's C2437: see AM2_TextList */
-    AM2_Sprite *sprite0;            /* 0x0060  MULTISPR_OFF_SPRITE0, the first bitmap's */
-    AM2_Sprite *sprites[2];         /* 0x0064  MULTISPR_OFF_SPRITES */
-    int32_t     index;              /* 0x006C  MULTISPR_OFF_INDEX */
-    uint8_t     pad70[0x80 - 0x70];
+    union {                         /* 0x0060, two readings of one widget: */
+        struct {                    /*   as a multi-sprite, */
+            AM2_Sprite *sprite0;    /* 0x0060  MULTISPR_OFF_SPRITE0, the first bitmap's */
+            AM2_Sprite *sprites[2]; /* 0x0064  MULTISPR_OFF_SPRITES */
+            int32_t     index;      /* 0x006C  MULTISPR_OFF_INDEX */
+        };
+        struct {                    /*   and as a blinking toggle: */
+            AM2_Sprite *spriteOff;  /* 0x0060  TOGGLE_OFF_SPRITE_OFF */
+            AM2_Sprite *spriteOn;   /* 0x0064  TOGGLE_OFF_SPRITE_ON */
+            int32_t     active;     /* 0x0068  BLINK_OFF_ACTIVE, non-zero while flashing */
+            int32_t     state;      /* 0x006C  TOGGLE_OFF_STATE, non-zero picks ON */
+        };
+    };
+    uint32_t    period;             /* 0x0070  BLINK_OFF_PERIOD, ms between flips */
+    int32_t     remaining;          /* 0x0074  BLINK_OFF_REMAINING, flips before it stops */
+    uint32_t    elapsed;            /* 0x0078  BLINK_OFF_ELAPSED, ms since the last flip */
+    uint32_t    last;               /* 0x007C  BLINK_OFF_LAST, GetTickCount then */
     AM2_Blinker(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
     explicit AM2_Blinker(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
     ~AM2_Blinker();
@@ -527,22 +540,34 @@ struct AM2_Blinker : AM2_Panel {
 
 struct AM2_Typer : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_Typer[AM2_TYPER_BYTES - sizeof(AM2_Widget)];
+    char        text[0x400];        /* 0x0058  TYPER_OFF_TEXT, lines separated by `|` */
+    uint32_t    last;               /* 0x0458  TYPER_OFF_LAST, GetTickCount at the last reveal */
+    int32_t     shown;              /* 0x045C  TYPER_OFF_SHOWN, characters revealed */
+    AM2_Widget *blinker;            /* 0x0460  TYPER_OFF_BLINKER, ticked on every reveal */
     AM2_Typer(AM2_Rect box, const char *message);
     explicit AM2_Typer(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };
 
 struct AM2_HudRadar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudRadar[AM2_HUD_RADAR_BYTES - sizeof(AM2_Widget)];
+    AM2_Sprite *sprite0;            /* 0x0058  HUD_OFF_SPRITE0, the map bitmap */
     AM2_HudRadar();
     explicit AM2_HudRadar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudRadar();
 };
 
+/* One weapon row of the SARGE panel, HUDSARGE_REC_STRIDE bytes. */
+struct AM2_HudSargeSlot {
+    int32_t index;                  /* 0x0000  HUDSARGE_REC_INDEX, -1 empty */
+    int32_t field4;                 /* 0x0004 */
+    int32_t count;                  /* 0x0008  HUDSARGE_REC_COUNT, printed when >= 0 */
+    int32_t ready;                  /* 0x000C  HUDSARGE_REC_READY HUDSARGE_REC_HIGHLIGHT: 0, 1 or 2 */
+};
+
 struct AM2_HudSarge : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudSarge[AM2_HUD_SARGE_BYTES - sizeof(AM2_Widget)];
+    AM2_Sprite *sprites[31];        /* 0x0058  HUDSARGE_OFF_SPRITES, what a slot's index picks */
+    AM2_HudSargeSlot slots[6];      /* 0x00D4  HUDSARGE_OFF_SLOTS */
     AM2_HudSarge();
     explicit AM2_HudSarge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudSarge();
@@ -574,7 +599,8 @@ struct AM2_HudSquad : AM2_Widget {
 
 struct AM2_HudCmd : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudCmd[AM2_HUD_CMD_BYTES - sizeof(AM2_Widget)];
+    int32_t     slots[3];           /* 0x0058  HUDCMD_OFF_SLOTS, -1 for an empty slot */
+    int32_t     selected;           /* 0x0064  HUDCMD_OFF_SELECTED, the highlighted slot */
     AM2_HudCmd();
     explicit AM2_HudCmd(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudCmd();
@@ -582,9 +608,9 @@ struct AM2_HudCmd : AM2_Widget {
 
 struct AM2_HudEdge : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    int32_t       field58;        /* 0x0058 */
-    AM2_Sprite   *sprite;         /* 0x005C  EDGE_OFF_SPRITE, under each label */
-    AM2_Sprite   *ammoSprite;     /* 0x0060  EDGE_OFF_AMMO_SPRITE */
+    AM2_Sprite   *sprite0;        /* 0x0058  HUD_OFF_SPRITE0 */
+    AM2_Sprite   *sprite;         /* 0x005C  EDGE_OFF_SPRITE HUD_OFF_SPRITE1, under each label */
+    AM2_Sprite   *ammoSprite;     /* 0x0060  EDGE_OFF_AMMO_SPRITE HUD_OFF_SPRITE2 */
     int32_t       healthPct;      /* 0x0064  EDGE_OFF_HEALTH_PCT, the trooper's bar */
     char          captionA[0x20]; /* 0x0068  EDGE_OFF_CAPTION_A, the vehicle or ARMOR */
     int32_t       secondPct;      /* 0x0088  EDGE_OFF_SECOND_PCT, whatever A names */
@@ -622,7 +648,15 @@ struct AM2_MpTeam : AM2_ButtonBase {
 
 struct AM2_CountButton : AM2_ButtonBase {
     typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_CountButton[AM2_COUNT_BUTTON_BYTES - sizeof(AM2_ButtonBase)];
+    AM2_Sprite *spr;                /* 0x0068  COUNTBTN_OFF_SPR, the normal face */
+    AM2_Sprite *sprOff;             /* 0x006C  COUNTBTN_OFF_SPR_OFF, when disabled */
+    uint8_t     lit;                /* 0x0070  COUNTBTN_OFF_LIT, fills behind the sprite */
+    uint8_t     pad71[3];
+    void (__cdecl *onToggle)(AM2_Widget *); /* 0x0074  COUNTBTN_OFF_ON_TOGGLE */
+    int32_t     menuRow;            /* 0x0078  COUNTBTN_OFF_MENU_ROW, into ADDR_BUILD_MENU */
+    int32_t     field7C;            /* 0x007C */
+    int32_t     count;              /* 0x0080  COUNTBTN_OFF_COUNT, formatted with "%d" */
+    int32_t     field84;            /* 0x0084 */
     AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
     explicit AM2_CountButton(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_CountButton();
@@ -630,7 +664,14 @@ struct AM2_CountButton : AM2_ButtonBase {
 
 struct AM2_HudPanel : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_HudPanel[AM2_HUD_B_BYTES - sizeof(AM2_Widget)];
+    AM2_Sprite *sprite0;            /* 0x0058  HUD_OFF_SPRITE0 */
+    int32_t     open;               /* 0x005C  HUDPANEL_OFF_OPEN, which way to slide */
+    int32_t     field60;            /* 0x0060 */
+    int32_t     stop;               /* 0x0064  HUDPANEL_OFF_STOP, the open position */
+    AM2_Widget *pointsField;        /* 0x0068  HUDPANEL_OFF_POINTS_FIELD, drawn from below */
+    char        pointsText[0xC];    /* 0x006C  HUDPANEL_OFF_POINTS_TEXT */
+    uint8_t     pad78[0x8C - 0x78];
+    char        caption[AM2_HUD_B_BYTES - 0x8C]; /* 0x008C  HUDPANEL_OFF_CAPTION */
     AM2_HudPanel();
     explicit AM2_HudPanel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudPanel();
@@ -726,7 +767,9 @@ struct AM2_DeleteGameScreen : AM2_ScreenBase {
 };
 struct AM2_DlgBattleJoinScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_BATTLE_JOIN_SIZE - sizeof(AM2_ScreenBase)];
+    char        name[0x18];         /* 0x0064  BATTLEJOIN_OFF_NAME, the edit's buffer */
+    uint8_t     pad7C[0x84 - 0x7C];
+    int32_t     chosen;             /* 0x0084  BATTLEJOIN_OFF_CHOSEN, the row Select stored */
     AM2_DlgBattleJoinScreen(const char *bmp);
     ~AM2_DlgBattleJoinScreen();
 };
@@ -759,7 +802,8 @@ struct AM2_EnterNameScreen : AM2_ScreenBase {
 };
 struct AM2_LoadGameScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_LOAD_GAME_SIZE - sizeof(AM2_ScreenBase)];
+    int32_t     field64;            /* 0x0064 */
+    char        name[AM2_LOAD_GAME_SIZE - 0x68]; /* 0x0068  LOAD_GAME_OFF_NAME */
     AM2_LoadGameScreen(const char *bmp, int32_t flag);
     ~AM2_LoadGameScreen();
 };
