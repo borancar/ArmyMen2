@@ -292,8 +292,6 @@ release_v2:
     }
 }
 
-#define MAP_DESC_FLAG    0x08u
-#define MAP_DESC_SURFACE 0x10u
 
 typedef void (__cdecl *am2_void_fn)(void);
 
@@ -314,14 +312,14 @@ void __cdecl RestoreLostSurfaces(void)
     /* The map keeps its surface in a descriptor, and only wants it restored
      * while the flag at +8 is clear. */
     if (g_mapSprite &&
-        *(int32_t *)(g_mapSprite + MAP_DESC_FLAG) == 0) {
+        g_mapSprite->format == 0) {
         LPDIRECTDRAWSURFACE surf =
-            *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAP_DESC_SURFACE);
+            g_mapSprite->image.surface;
 
         if (surf && IDirectDrawSurface_IsLost(surf) != DD_OK) {
             /* Reload through the descriptor rather than the local: the restore
              * is what the original re-reads it for. */
-            surf = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAP_DESC_SURFACE);
+            surf = g_mapSprite->image.surface;
             if (IDirectDrawSurface_Restore(surf) == DD_OK)
                 RestoreTileSet();   /* the pixels are gone; redraw them */
         }
@@ -629,7 +627,7 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
  * without knowing it: +0x10 is `image`, exactly where ReleaseSprite looks. */
 void __cdecl FreeMapSurfaces(void)
 {
-    ReleaseSprite(*(AM2_Sprite * *)&g_mapSprite);
+    ReleaseSprite(g_mapSprite);
     *(AM2_Sprite * *)&g_mapSprite = NULL;
 
     if (g_mapCache) {
@@ -879,7 +877,7 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
  * allocation of exactly the size used. That is the original's shape and the
  * reason the answer is the SIZE rather than the pointer: the pointer goes
  * back through the caller's `dest`. */
-int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+int32_t __cdecl EncodeBig(const void *pixels, AM2_BitmapRec *dest, int32_t w,
                           int32_t h, const uint8_t *remap)
 {
     uint8_t        buf[AM2_ENCODE_SCRATCH];
@@ -936,12 +934,12 @@ int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
     }
 
     size = (int32_t)(out - buf);
-    *(void **)dest = orig_malloc((size_t)size);
-    memcpy(*(void **)dest, buf, (size_t)size);
+    dest->image = orig_malloc((size_t)size);
+    memcpy(dest->image, buf, (size_t)size);
     return size;
 }
 
-int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
+int32_t __cdecl EncodeSmall(const void *pixels, AM2_BitmapRec *dest, int32_t w,
                           int32_t h, const uint8_t *remap)
 {
     uint8_t        buf[AM2_ENCODE_SCRATCH];
@@ -998,13 +996,13 @@ int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
     }
 
     size = (int32_t)(out - buf);
-    *(void **)dest = orig_malloc((size_t)size);
-    memcpy(*(void **)dest, buf, (size_t)size);
+    dest->image = orig_malloc((size_t)size);
+    memcpy(dest->image, buf, (size_t)size);
     return size;
 }
 
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
-                           uint8_t *dest, const uint8_t *remap)
+                           AM2_BitmapRec *dest, const uint8_t *remap)
 {
     uint8_t   table[256];
     /* The original keeps ONE register for this and reads it both ways round,
@@ -1016,16 +1014,16 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
      *
      * Written from the flag rather than from the register, with the `?:` arms
      * swapped to keep that half identical. */
-    int32_t   plain   = !(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_RESERVE10);
+    int32_t   plain   = !(dest->flags & BMP_FLAG_RESERVE10);
     int32_t   i;
     int32_t   result = 0;   /* every exit returns it, the failures too */
 
     /* Copy the geometry across first; the original does this before anything
      * can fail, so the record is consistent even on the error paths. */
-    *(uint32_t *)(dest + BMP_OFF_WIDTH)  = src[1];
-    *(uint32_t *)(dest + BMP_OFF_HEIGHT) = src[2];
-    *(uint32_t *)(dest + 0x0C)           = src[6];
-    *(uint32_t *)(dest + 0x10)           = src[7];
+    dest->width  = (int32_t)src[1];
+    dest->height = (int32_t)src[2];
+    dest->hotX   = (int32_t)src[6];
+    dest->hotY   = (int32_t)src[7];
 
     if (!remap) {
         uint8_t from = 0;
@@ -1051,23 +1049,23 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
     }
 
     /* The geometry is read back from the record at each use. */
-#define W ((int32_t)*(uint32_t *)(dest + BMP_OFF_WIDTH))
-#define H ((int32_t)*(uint32_t *)(dest + BMP_OFF_HEIGHT))
+#define W (dest->width)
+#define H (dest->height)
 
     /* The flags are read from the record at every use. */
-    if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SOFTWARE) {
-        *(uint32_t *)(dest + BMP_OFF_FLAGS) &= ~BMP_FLAG_SOFTWARE;
-        dest[BMP_OFF_KEY] = 0;
+    if (dest->flags & BMP_FLAG_SOFTWARE) {
+        dest->flags &= ~BMP_FLAG_SOFTWARE;
+        dest->keyIndex = 0;
 
         if (W * H < BMP_SOFTWARE_LIMIT) {
             result = EncodeSmall(pixels, dest, W, H, remap);
             if (!plain)
-                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 0x10;
+                dest->flags |= 0x10;
             else
-                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 8;
+                dest->flags |= 8;
         } else {
             result = EncodeBig(pixels, dest, W, H, remap);
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
+            dest->flags |= 4;
         }
         return result;
     }
@@ -1095,21 +1093,21 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 
         /* Ask before taking: if the card has not got room, do not make it say
          * so by failing. */
-        if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
+        if (!(dest->flags & BMP_FLAG_SYSMEM)) {
             IDirectDraw2_GetAvailableVidMem(g_ddraw2, &want, &total, &freeVid);
             if (freeVid < (DWORD)(W * H))
-                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
+                dest->flags |= BMP_FLAG_SYSMEM;
         }
-        if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)
+        if (dest->flags & BMP_FLAG_SYSMEM)
             ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 
         /* One "CreateSurface failed" for both attempts; the retry in system
          * memory is only worth making when video memory was what we asked
          * for. */
         if (IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL) != DD_OK) {
-            if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
+            if (!(dest->flags & BMP_FLAG_SYSMEM)) {
                 orig_log("Failed to put surface into video memory!\n");
-                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
+                dest->flags |= BMP_FLAG_SYSMEM;
                 ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
                 if (IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL)
                         == DD_OK)
@@ -1126,7 +1124,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
 
         result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels, W, H,
-                              remap, (uint32_t *)(dest + BMP_OFF_KEY));
+                              remap, &dest->key);
         if (!result) {
             IDirectDrawSurface_Release(surf);
         lockfail:
@@ -1135,10 +1133,10 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
 
         IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
-        *(LPDIRECTDRAWSURFACE *)(dest + BMP_OFF_SURFACE) = surf;
+        dest->surface = surf;
 
-        if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_NO_COLORKEY))
-            SetSurfaceColorKey(surf, dest[BMP_OFF_KEY]);
+        if (!(dest->flags & BMP_FLAG_NO_COLORKEY))
+            SetSurfaceColorKey(surf, dest->keyIndex);
         return result;
     }
 #undef W

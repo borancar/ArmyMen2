@@ -383,7 +383,7 @@
 #define g_mapPadbitLayer         (*(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER)  /* 0x00514EC4 */
 #define g_mapPadLayer            (*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER)  /* 0x00514EC8 */
 #define g_mapRowShift            (*(uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)  /* 0x00514DE4 */
-#define g_mapSprite              (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)  /* 0x00514E90 */
+#define g_mapSprite              (*(struct AM2_Sprite **)(uintptr_t)ADDR_MAP_SURFACE)  /* 0x00514E90 */
 #define g_mapTiles               (*(uint8_t **)(uintptr_t)ADDR_MAP_TILES)  /* 0x00514EB8 */
 #define g_mapTilesH              (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)  /* 0x00514DE0 */
 #define g_mapTilesW              (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W)  /* 0x00514DDC */

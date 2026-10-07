@@ -915,7 +915,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
  * original writes and the only order that does not leak the handle on a failed
  * read. `remap` is passed as NULL, so MakeBitmap builds its own table from the
  * display palette. */
-int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
+int32_t __cdecl LoadBitmapDescriptor(const char *name, AM2_BitmapRec *out)
 {
     uint8_t   header[0x428];
     am2_FILE *fp;
@@ -938,7 +938,7 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     if (!pixels)
         return 0;
 
-    rc = MakeBitmap((const uint32_t *)header, pixels, (uint8_t *)out, 0);
+    rc = MakeBitmap((const uint32_t *)header, pixels, out, 0);
     orig_free(pixels);
     return rc;
 }
@@ -982,27 +982,27 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
 int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
                                   int32_t flags)
 {
-    uint8_t  rec[AM2_BMP_RECORD_SIZE];
+    AM2_BitmapRec rec;
     int32_t  x, y;
     uint32_t merged;
 
-    *(uint32_t *)(rec + BMP_OFF_FLAGS) = (uint32_t)flags;
+    rec.flags = (uint32_t)flags;
 
-    if (!LoadBitmapDescriptor(name, rec)) {
+    if (!LoadBitmapDescriptor(name, &rec)) {
         spr->image.rle16 = 0;
         return 0;
     }
 
-    spr->image.rle16 = *(AM2_Rle16 **)(rec + BMP_OFF_SURFACE);
-    spr->keyIndex    = rec[BMP_OFF_KEY];
+    spr->image.rle16 = (AM2_Rle16 *)rec.image;
+    spr->keyIndex    = rec.keyIndex;
 
     spr->bounds.top    = 0;
     spr->bounds.left   = 0;
-    spr->bounds.right  = *(const int32_t *)(rec + BMP_OFF_WIDTH);
-    spr->bounds.bottom = *(const int32_t *)(rec + BMP_OFF_HEIGHT);
+    spr->bounds.right  = rec.width;
+    spr->bounds.bottom = rec.height;
 
-    x = *(const int32_t *)(rec + BMP_OFF_HOT_X);
-    y = *(const int32_t *)(rec + BMP_OFF_HOT_Y);
+    x = rec.hotX;
+    y = rec.hotY;
 
     spr->hotX = (int16_t)x;
     spr->hotY = (int16_t)y;
@@ -1013,7 +1013,7 @@ int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
     ClampHotSpot(spr->attachX);
     ClampHotSpot(spr->attachY);
 
-    merged = (*(const uint32_t *)(rec + BMP_OFF_FLAGS) & 0x1Cu)
+    merged = (rec.flags & 0x1Cu)
              | ((uint32_t)flags & 1u);
     spr->flags |= merged;
 

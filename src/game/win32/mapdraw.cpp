@@ -190,7 +190,7 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
 
     if (!dest)
         return;
-    sheet = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + 0x10);
+    sheet = g_mapSprite->image.surface;
     if (!sheet)
         return;
 
@@ -320,7 +320,7 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 int32_t __cdecl LoadAtlFile(const char *path)
 {
     uint32_t  header[DIB_HEADER_DWORDS];
-    uint8_t   rec[AM2_BMP_REC_BYTES];
+    AM2_BitmapRec rec;
     am2_FILE *fp;
     uint32_t  magic, formSize, chunkSize;
     int32_t   offset;
@@ -340,7 +340,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
         goto bad;
 
     do {
-        uint8_t *spr;
+        AM2_Sprite *spr;
         void    *pixels;
         int32_t  shift, tw, th;
 
@@ -355,11 +355,11 @@ int32_t __cdecl LoadAtlFile(const char *path)
         }
         offset += (int32_t)chunkSize;
 
-        spr = (uint8_t *)am2_malloc(AM2_MAP_SPRITE_BYTES);
-        *(void * *)&g_mapSprite = spr;
+        spr = (AM2_Sprite *)am2_malloc(AM2_MAP_SPRITE_BYTES);
+        g_mapSprite = spr;
         memset(spr, 0, AM2_MAP_SPRITE_BYTES);
 
-        *(int32_t *)(rec + BMP_OFF_FLAGS) = 1;
+        rec.flags = 1;
 
         pixels = ReadDibChunk(fp, header);
         if (!pixels)
@@ -367,21 +367,21 @@ int32_t __cdecl LoadAtlFile(const char *path)
 
         if (*(void *const *)&g_activePalette
             && g_tilesetReserve)
-            *(int32_t *)(rec + BMP_OFF_FLAGS) |= 0x80;
+            rec.flags |= 0x80;
 
-        MakeBitmap(header, pixels, rec, (const uint8_t *)0);
+        MakeBitmap(header, pixels, &rec, (const uint8_t *)0);
         am2_free(pixels);
 
 #define spr (g_mapSprite)
-        *(void **)(spr + 0x10) = *(void *const *)(rec + BMP_OFF_SURFACE);
-        *(uint8_t *)(spr + 0x2C) = rec[BMP_OFF_KEY];
-        *(int32_t *)(spr + 0x18) = 0;
-        *(int32_t *)(spr + 0x14) = 0;
-        *(int32_t *)(spr + 0x1C) = *(const int32_t *)(rec + BMP_OFF_WIDTH);
-        *(int32_t *)(spr + 0x20) = *(const int32_t *)(rec + BMP_OFF_HEIGHT);
-        *(int32_t *)(spr + 0x0C) |= 1;
+        spr->image.surface = rec.surface;
+        spr->keyIndex = rec.keyIndex;
+        spr->bounds.top = 0;
+        spr->bounds.left = 0;
+        spr->bounds.right = rec.width;
+        spr->bounds.bottom = rec.height;
+        spr->flags |= 1;
 
-        shift = Log2Mask((uint32_t)*(const int32_t *)(spr + 0x1C)) & 0xFF;
+        shift = Log2Mask((uint32_t)spr->bounds.right) & 0xFF;
         g_tileShiftLog = shift;
         if (shift < 1) {
             FreeMapSurfaces();
@@ -409,10 +409,7 @@ bad:
 
 /* g_mapSprite, above, is the same record PaintMapTiles reads: the global
  * holds a POINTER to it, so reaching the surface is two dereferences and
- * not one. Width and height sit at +0x1C and +0x20 of the same record. */
-#define MAPSPR_OFF_SURFACE 0x10
-#define MAPSPR_OFF_WIDTH   0x1C
-#define MAPSPR_OFF_HEIGHT  0x20
+ * not one. */
 
 void __cdecl RestoreTileSet(void)
 {
@@ -491,12 +488,12 @@ void __cdecl RestoreTileSet(void)
                 remap[i] = (uint8_t)i;
         }
 
-        surf = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAPSPR_OFF_SURFACE);
+        surf = g_mapSprite->image.surface;
         desc.dwSize = sizeof(desc);
         if (IDirectDrawSurface_Lock(surf, NULL, &desc, DDLOCK_WAIT, NULL) == DD_OK) {
             if (BlitBitmapIn(desc.lpSurface, desc.lPitch, pixels,
-                             *(int32_t *)(g_mapSprite + MAPSPR_OFF_WIDTH),
-                             *(int32_t *)(g_mapSprite + MAPSPR_OFF_HEIGHT),
+                             g_mapSprite->bounds.right,
+                             g_mapSprite->bounds.bottom,
                              remap, &scratch))
                 IDirectDrawSurface_Unlock(surf, desc.lpSurface);
             else

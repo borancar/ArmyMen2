@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
+#include "surface.h"           /* AM2_BitmapRec */
 #include "../blit.h"
 #include "../rect.h"
 #include "../anim.h"
@@ -47,7 +48,7 @@ void *__cdecl SpriteSetForKey(uint32_t key);
 /* 0x004230F0. Fill a 0x1C-byte bitmap record from a file NAME: open it, read
  * one DIB chunk, hand it to MakeBitmap, free the pixels. Zero if any step
  * failed. */
-int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out);
+int32_t __cdecl LoadBitmapDescriptor(const char *name, AM2_BitmapRec *out);
 
 /* 0x004456B0. Reload a sprite from a named bitmap, through the record above. */
 int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,

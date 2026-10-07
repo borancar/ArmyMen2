@@ -20,6 +20,26 @@
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
 
+/* What MakeBitmap fills (AM2_BMP_RECORD_SIZE): the image -- an RLE buffer
+ * for a software sprite, a DirectDraw surface otherwise -- and the header
+ * fields LoadBitmapDescriptor's caller copies into an AM2_Sprite. */
+typedef struct AM2_BitmapRec {
+    union {                         /* +0x00 BMP_OFF_SURFACE */
+        void               *image;
+        uint8_t            *rle;    /*   EncodeSmall's or EncodeBig's buffer */
+        LPDIRECTDRAWSURFACE surface;
+    };
+    int32_t   width;                /* +0x04 BMP_OFF_WIDTH */
+    int32_t   height;               /* +0x08 BMP_OFF_HEIGHT */
+    int32_t   hotX;                 /* +0x0C BMP_OFF_HOT_X, {hotX, attachX} */
+    int32_t   hotY;                 /* +0x10 BMP_OFF_HOT_Y, {hotY, attachY} */
+    uint32_t  flags;                /* +0x14 BMP_OFF_FLAGS */
+    union {                         /* +0x18 BMP_OFF_KEY: */
+        uint32_t key;               /*   in, a byte count; out, BlitBitmapIn's */
+        uint8_t  keyIndex;          /*   the transparent index it leaves */
+    };
+} AM2_BitmapRec;
+
 
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
 struct AM2_Bitmap {
@@ -88,14 +108,14 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header);
  * LoadBitmapDescriptor was reconstructed it had no caller of ours -- it was
  * defined, patched, and reached only through the detour. */
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
-                           uint8_t *dest, const uint8_t *remap);
+                           AM2_BitmapRec *dest, const uint8_t *remap);
 
 /* 0x0041BBC0 and 0x0041BD20. The two run-length encoders, which differ only
  * in the width of a row-table entry. Both answer the encoded SIZE; the buffer
  * goes back through `dest`. */
-int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+int32_t __cdecl EncodeBig(const void *pixels, AM2_BitmapRec *dest, int32_t w,
                           int32_t h, const uint8_t *remap);
-int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
+int32_t __cdecl EncodeSmall(const void *pixels, AM2_BitmapRec *dest, int32_t w,
                             int32_t h, const uint8_t *remap);
 void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size);
 
