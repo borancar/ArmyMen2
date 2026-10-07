@@ -1799,7 +1799,7 @@ void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc)
  * the tile arm and the height arm are compared by the A/B, the object loop is
  * not entered at all, and the vacuous guard is unreachable by construction.
  */
-int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref)
+int32_t __cdecl BlockWeightAt(AM2_Object *from, AM2_Point at, AM2_Point ref)
 {
     uint8_t *o;
     int32_t  total = 0;
@@ -1828,7 +1828,7 @@ int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref)
         /* TileAttrAt's body, inline for both tiles as the image has it. */
         if (abs(*(const int8_t *)(g_tileAttrs + tile)
                 - *(const int8_t *)(g_tileAttrs
-                      + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE)))
+                      + from->tile))
             > AM2_BLOCK_HEIGHT_STEP)
             total += AM2_BLOCK_FULL;
     }
@@ -2840,7 +2840,7 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
  * Its fourth argument goes straight into BlockWeightDamaging's fifth, which
  * that function never reads. Kept because the call sites are the original's.
  */
-int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
+int32_t __cdecl RoachMaskWeight(AM2_Object *from, int32_t dir, uint32_t at,
                                 int32_t unused)
 {
     int32_t     total = 0;
@@ -2860,7 +2860,7 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
 
         chain = ObjectsAtPoint((const AM2_Point *)&pt,
                                g_objMapDesc);
-        total += BlockWeightDamaging(from, pt, chain, *(const AM2_Point *)&at,
+        total += BlockWeightDamaging(from, pt, (AM2_Object *)chain, *(const AM2_Point *)&at,
                                      unused);
     }
 #undef COUNT
@@ -2912,16 +2912,16 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
  * and cleans five; the body reads four. Same shape as ObjBlockWeight's unused
  * third parameter one level down, and reproduced the same way.
  */
-int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *chain,
                                     AM2_Point ref, int32_t unused)
 {
-    uint8_t *o     = (uint8_t *)chain;
+    AM2_Object *o     = chain;
     int32_t  total = 0;
     uint32_t tile;
 
     (void)unused;
 
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
         total += ObjBlockWeight(from, o, at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
@@ -2929,8 +2929,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
         if (ObjIsWatchedKind((const AM2_Object *)o)
             && (!g_mpSession
                 || AM2_THE_COMM->CommMustBroadcast(
-                                     (int16_t)*(const int8_t *)
-                                         (o + OBJ_OFF_ARMY))))
+                                     (int16_t)o->owner)))
             DamageObject((AM2_Object *)o, AM2_BLOCK_WEAR_AMOUNT, AM2_BLOCK_WEAR_KIND,
                          ((const AM2_Object *)o)->uid, 0, 0);
     }
@@ -2947,7 +2946,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
         /* TileAttrAt's body, inline for both tiles as BlockWeightAt's is. */
         if (abs(*(const int8_t *)(g_tileAttrs + tile)
                 - *(const int8_t *)(g_tileAttrs
-                      + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE)))
+                      + from->tile))
             > AM2_BLOCK_HEIGHT_STEP)
             total += AM2_BLOCK_FULL;
     }
@@ -3132,13 +3131,13 @@ add:
  * one-character error no A/B here could ever report. That is why the polarity
  * is spelled out rather than left to the code.
  */
-int32_t __cdecl BlockWeightChain(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightChain(AM2_Object *from, AM2_Point at, AM2_Object *chain,
                                  AM2_Point ref)
 {
     int32_t  total = 0;
     uint16_t tile;
 
-    for (; chain; chain = *(void **)((uint8_t *)chain + OBJ_OFF_QUERY_NEXT)) {
+    for (; chain; chain = chain->queryNext) {
         total += ObjBlockWeight(from, chain, at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
@@ -3481,11 +3480,11 @@ int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
  * flagged in ADDR_TILE_FLAGS and of ADDR_CELL_WEIGHTS 15 or more is
  * AM2_SHOT_STRUCK_HARD; everything else is AM2_SHOT_STRUCK_NOTHING.
  */
-int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
+int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
 {
-    uint8_t       *s = (uint8_t *)shot;
+    AM2_Object       *s = shot;
     /* The type record is re-read through the shot at each use. */
-#define REC (*(const uint8_t *const *)(s + OBJ_OFF_FIELD_94))
+#define REC (s->field94)
     int32_t        code = *(const int32_t *)(REC + TYPEREC_OFF_CODE);
     uint8_t       *o;
     int32_t        scratch;
@@ -3495,15 +3494,15 @@ int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
         /* OBJ_OFF_RANK on a SHOT is the shooter's uid -- see orig.h. */
         if (((const AM2_Object *)o)->uid
-            == *(const uint32_t *)(s + OBJ_OFF_RANK))
+            == s->shooterUid)
             continue;
 
         if (!ShotHitsObj((AM2_Object *)o, code,
-                                *(const int8_t *)(s + OBJ_OFF_ARMY),
+                                s->owner,
                                 height, (AM2_Object *)shot, &scratch))
             continue;
 
-        ApplyShotDamage(o, shot, at, height, scratch);
+        ApplyShotDamage((AM2_Object *)o, shot, at, height, scratch);
 
         if (code != 3)
             return AM2_SHOT_STRUCK_NOTHING;
@@ -3516,12 +3515,12 @@ int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
                                   + TYPEREC_OFF_FIELD_3C) > 0)
             continue;
 
-        *(int32_t *)(s + OBJ_OFF_FIELD_44) =
+        s->field44 =
             20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
     }
 
 /* The shot's TILE, re-read at each use. */
-#define TILE (*(const uint16_t *)(s + OBJ_OFF_TILE))
+#define TILE (s->tile)
 
     /* Nested onto the struck-ground return the image lays out last. */
     if ((int16_t)*(const int8_t *)((g_tileAttrs) + TILE)
@@ -3532,7 +3531,7 @@ int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
                 return AM2_SHOT_STRUCK_HARD;
             return AM2_SHOT_STRUCK_NOTHING;
         }
-        *(int32_t *)(s + OBJ_OFF_FIELD_44) =
+        s->field44 =
             20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
     }
     return AM2_SHOT_STRUCK_GROUND;
@@ -3578,11 +3577,11 @@ int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
  * offset. On a shot it is the uid of whoever fired it: DamageObject takes it
  * as the attacker and LookupByUID resolves it four instructions later.
  */
-void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
+void __cdecl ApplyShotDamage(AM2_Object *target, AM2_Object *shot, AM2_Point unusedA,
                              int16_t unusedB, int32_t doubled)
 {
-    const uint8_t *sh  = (const uint8_t *)shot;
-    const uint8_t *rec = *(const uint8_t *const *)(sh + OBJ_OFF_FIELD_94);
+    const AM2_Object *sh  = shot;
+    const uint8_t *rec = sh->field94;
     int32_t amount = *(const int32_t *)(rec + TYPEREC_OFF_DAMAGE);
     int32_t code   = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
     int32_t kind;
@@ -3615,15 +3614,15 @@ void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
     }
 
     DamageObject((AM2_Object *)target, amount, kind,
-                 *(const uint32_t *)(sh + OBJ_OFF_RANK),
-                 (int32_t)(int8_t)(*(const uint8_t *)(sh + OBJ_OFF_FACING)
+                 sh->shooterUid,
+                 (int32_t)(int8_t)(sh->facing
                                    + AM2_SHOT_DIR_BIAS),
                  0);
 
     if (ObjsAreAllied((const AM2_Object *)sh, (const AM2_Object *)target, 0))
         return;
 
-    owner = (uint8_t *)LookupByUID(*(const uint32_t *)(sh + OBJ_OFF_RANK));
+    owner = (uint8_t *)LookupByUID(sh->shooterUid);
     if (!ObjIsTypeIn238((const AM2_Object *)owner))
         return;
 
@@ -3749,7 +3748,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
 /* One object's weight, inlined into BlockWeightTroops: the image returns the
  * constant arms straight in eax and keeps the default in a register of its
  * own, and its by-value `ref` is the copy homed in the caller's dead slot. */
-static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
+static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
                                        AM2_Point ref)
 {
     int32_t w;
@@ -3757,45 +3756,43 @@ static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
     if (o == f)
         return 0;
     w = AM2_BLOCK_FULL;
-    if (ObjIsItem((const AM2_Object *)o)) {
-        w = *(const int8_t *)(o + OBJ_OFF_RANK);
-    } else if (ObjIsType2((const AM2_Object *)o)) {
+    if (ObjIsItem(o)) {
+        w = o->itemFlag;
+    } else if (ObjIsType2(o)) {
         /* Every refusal lands on one `return 0`. */
         if (!f)
             goto zero;
-        if (*(const int8_t *)(f + OBJ_OFF_ARMY)
+        if (f->owner
             == (int32_t)g_defaultOwner
-            && *(const uint32_t *)((const uint8_t *)LookupOwnerObj(
-                   g_defaultOwner)
-                   + OBJ_OFF_RIDING)
-               == ((const AM2_Object *)f)->uid
-            && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
+            && ((const AM2_Object *)LookupOwnerObj(g_defaultOwner))->riding
+               == f->uid
+            && f->field10C == 0)
             return 0;
-        if (ObjsAreAllied((const AM2_Object *)f, (const AM2_Object *)o, 0))
+        if (ObjsAreAllied(f, o, 0))
             return AM2_BLOCK_FULL;
     zero:
         return 0;
     } else if (f
-               && (ObjIsType3((const AM2_Object *)o)
-                   || ObjIsType8((const AM2_Object *)o))) {
-        if (ApproxDist(&ref, (const AM2_Point *)(o + OBJ_OFF_POS))
-            >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                          (const AM2_Point *)(o + OBJ_OFF_POS)))
+               && (ObjIsType3(o)
+                   || ObjIsType8(o))) {
+        if (ApproxDist(&ref, &o->pos)
+            >= ApproxDist(&f->pos,
+                          &o->pos))
             return 0;
     }
     return w;
 }
 
-int32_t __cdecl BlockWeightTroops(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *chain,
                                   AM2_Point ref)
 {
     uint8_t *o;
-    uint8_t *f     = (uint8_t *)from;
+    AM2_Object *f     = from;
     int32_t  total = 0;
     uint32_t tile;
 
     for (o = (uint8_t *)chain; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        int32_t w = TroopBlockWeight(f, o, ref);
+        int32_t w = TroopBlockWeight(f, (AM2_Object *)o, ref);
 
         total += w;
         if (total >= AM2_BLOCK_FULL)
@@ -3892,8 +3889,8 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, AM2_Point at)
                                       g_objMapDesc);
 
         total += (kind == AM2_MASK_CHAIN_KIND)
-                 ? BlockWeightChain((void *)0, here, chain, at)
-                 : BlockWeightTroops((void *)0, here, chain, at);
+                 ? BlockWeightChain((AM2_Object *)(void *)0, here, (AM2_Object *)chain, at)
+                 : BlockWeightTroops((AM2_Object *)(void *)0, here, (AM2_Object *)chain, at);
     }
 #undef COUNT
 #undef PTS
@@ -4913,39 +4910,38 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
  * cases and every input is an argument or a plain field -- and that oracle is
  * not written yet.
  */
-int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
+int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut *sight,
                                int32_t ready)
 {
-    const uint8_t *o   = (const uint8_t *)obj;
-    uint8_t       *out = (uint8_t *)sight;
+    const AM2_Object *o   = obj;
+    AM2_SightOut  *out = sight;
     int32_t        cls;
 
     /* FOUR REFUSALS, one test, and the `return 0` they share is the last
      * thing in the function. */
-    if (o != (const uint8_t *)0
-        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (o != 0
+        && !(o->flags & OBJ_FLAG_DESTROYED)
         && !Type2Field5A4Set((const AM2_Object *)o)
-        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+        && o->soldierKind
            != AM2_SOLDIER_KIND_ACTION_B) {
         cls = ClassifyByCode74(o);
 
     /* `Braced` is the nine-pose set plus soldier kind 7, written out as a chain
      * of compares in every arm that asks it; `Aimed` is the (seen && ready)
      * pick between two poses. */
-#define POSE  (*(const int32_t *)(o + OBJ_OFF_POSE))
+#define POSE  (o->pose)
 #define BRACED (POSE == 0x19 || POSE == 0x1C || POSE == 0x13 || POSE == 0x1A  \
                     || POSE == 0x1D || POSE == 0x14 || POSE == 0x06             \
                     || POSE == 0x1E || POSE == 0x15                             \
-                    || *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)             \
+                    || o->soldierKind             \
                            == AM2_SOLDIER_KIND_ACTION_A)
-#define AIMED(a, b) (*(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) && ready \
+#define AIMED(a, b) (out->seen && ready \
                          ? (a) : (b))
-#define STATE (*(int32_t *)(out + SIGHTCOUT_OFF_STATE))
+#define STATE (out->state)
 
-        switch (**(const int32_t *const *)((const uint8_t *)weapon
-                                           + OBJ_OFF_FIELD_C0)) {
+        switch (*weapon->typeRec) {
         case 3:                                                        /* FLAM */
-            if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+            if (o->field44 > 0)
                 return 1;
             switch (cls) {
             case 1:
@@ -4987,7 +4983,7 @@ raise_s:
 
         case 1:  case 7:  case 8:  case 9:  case 10:
         case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
-            if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+            if (o->field44 > 0)
                 return 1;
             switch (cls) {
             case 1:
@@ -9983,7 +9979,7 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
             /* &base, and that is the one byte the two loops differ in. */
             list = ObjectsAtPoint(&at,
                                   g_objMapDesc);
-            weight += BlockWeightChain(v, pt, list, at);
+            weight += BlockWeightChain(v, pt, (AM2_Object *)list, at);
 
             if (apply && list) {
                 for (o = (AM2_Object *)list; o != 0;
@@ -10037,7 +10033,7 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
 
             list = ObjectsAtPoint((const AM2_Point *)&pt,
                                   g_objMapDesc);
-            weight += BlockWeightTroops(v, pt, list, at);
+            weight += BlockWeightTroops(v, pt, (AM2_Object *)list, at);
 
             if (apply && list) {
                 for (o = (AM2_Object *)list; o != 0;
@@ -10106,7 +10102,7 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
         AM2_Point pt = at;
 
         list = ObjectsAtPoint(&pt, g_objMapDesc);
-        if (BlockWeightTroops(v, pt, list, at) >= AM2_BLOCK_CLEAR)
+        if (BlockWeightTroops(v, pt, (AM2_Object *)list, at) >= AM2_BLOCK_CLEAR)
             answer = weight = AM2_VEHICLE_BLOCKED_WEIGHT;
     }
 
@@ -10238,7 +10234,7 @@ void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out)
         const uint8_t *entry;
 
         if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
-            && BlockWeightAt((void *)0, *out, *out) < AM2_BLOCK_CLEAR)
+            && BlockWeightAt((AM2_Object *)(void *)0, *out, *out) < AM2_BLOCK_CLEAR)
             return;
 
         if (++step >= leg) {

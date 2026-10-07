@@ -29,7 +29,7 @@ int32_t __cdecl WeaponPoseIndex(struct AM2_Object *obj, struct AM2_Object *weapo
  * fire this weapon. It WRITES SIGHTCOUT_OFF_STATE and answers 1 on every path
  * past its four refusals, so the caller's discarding of the result is correct.
  * Forty-three item kinds through eight arms. */
-int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
+int32_t __cdecl SelectFirePose(struct AM2_Object *obj, struct AM2_Object *weapon, struct AM2_SightOut *sight,
                                int32_t ready);
 
 /* 0x00429220, one caller -- the deploy dispatcher's default arm. Put an
@@ -319,7 +319,7 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
  * Both points are passed BY VALUE: callers copy the one point into two
  * registers, `mov ecx,eax; push eax; push ecx`, which is VC6 copying two
  * struct arguments. */
-int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref);
+int32_t __cdecl BlockWeightAt(struct AM2_Object *from, AM2_Point at, AM2_Point ref);
 
 /* 0x00448FB0, three call sites, all in ADDR_AI_44AFB0. The SIXTH variant:
  * the walk inlined, WITH BlockWeightAt's height step, no trooper arm, a
@@ -331,7 +331,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at, AM2_Object *chain,
 
 /* 0x0045B690. The same total for a chain the caller has already collected,
  * with the tile term on AM2_TILE_OPEN and no height step. */
-int32_t __cdecl BlockWeightChain(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightChain(struct AM2_Object *from, AM2_Point at, struct AM2_Object *chain,
                                  AM2_Point ref);
 
 /* 0x0045BC70, three callers. How blocked is this vehicle, at this point,
@@ -347,7 +347,7 @@ int32_t __cdecl VehicleBlockWeight(struct AM2_Object *veh, uint8_t facing, AM2_P
  * AM2_TILE_OPEN, with BlockWeightAt's height step, and DAMAGING every object
  * in the chain that ObjIsWatchedKind accepts. Its fifth argument is never
  * read. See item.cpp. */
-int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightDamaging(struct AM2_Object *from, AM2_Point at, struct AM2_Object *chain,
                                     AM2_Point ref, int32_t unused);
 
 /* 0x0043D050, four call sites in two functions. How obstructed is a roach at
@@ -462,7 +462,7 @@ void __cdecl ObjClearRoachFootprint(struct AM2_Object *obj);
  * this file passes AM2_Point. Not an oversight: VC6 allocates registers in
  * the CALLER differently for a struct argument, and RoachStepTailA only
  * matches the image when this parameter is an integer. */
-int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
+int32_t __cdecl RoachMaskWeight(struct AM2_Object *from, int32_t dir, uint32_t at,
                                 int32_t unused);
 
 /* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_FIELD_94
@@ -519,18 +519,18 @@ void __cdecl DamageTrooper(struct AM2_Object *obj, int32_t amount, uint8_t d, in
 void __cdecl DamageVehicle(struct AM2_Object *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
-void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
+void __cdecl ApplyShotDamage(struct AM2_Object *target, struct AM2_Object *shot, AM2_Point unusedA,
                              int16_t unusedB, int32_t doubled);
 
 /* 0x0043C000, one caller -- the type-5 stepper, type 5 being the SHOT. Damage
  * everything at a point that this shot can hit, then ask the terrain whether
  * it stops there. Answers one of AM2_SHOT_STRUCK_*. */
-int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height);
+int32_t __cdecl ShotStrike(struct AM2_Object *shot, AM2_Point at, int16_t height);
 
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */
-int32_t __cdecl BlockWeightTroops(void *from, AM2_Point at, void *chain,
+int32_t __cdecl BlockWeightTroops(struct AM2_Object *from, AM2_Point at, struct AM2_Object *chain,
                                   AM2_Point ref);
 
 /* 0x0045BBB0. Sum the block weight over a vehicle mask's points for a heading.

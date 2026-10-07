@@ -1828,7 +1828,7 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
          * one load, its copy pushed beside it, as the image has it. */
         AM2_Point ref = *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT);
 
-        if (BlockWeightAt((void *)0,
+        if (BlockWeightAt((AM2_Object *)(void *)0,
                           *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), ref)
             >= (int32_t)AM2_CELL_WEIGHT_STEP)
             return;

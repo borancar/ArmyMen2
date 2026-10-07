@@ -564,7 +564,7 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
 
     /* The five soldiers, and the mine -- laid out last in the image. */
     case 0: case 1: case 2: case 3: case 4: case 17:
-        weight = BlockWeightAt((void *)0, where,
+        weight = BlockWeightAt((AM2_Object *)(void *)0, where,
                                where);
         break;
 
