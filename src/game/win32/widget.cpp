@@ -9827,10 +9827,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
                 const char *names = *(const char *const *)
                                         (maps + NAMEREC_OFF_MAPS);
-                int32_t     n     = *(const int32_t *)
-                                        (maps + NAMEREC_OFF_COUNT);
 
-                for (i = 0; i < n; i++) {
+                for (i = 0; i < *(const int32_t *)(maps + NAMEREC_OFF_COUNT); i++) {
                     uint8_t *lvl = (uint8_t *)FindLevelByName(
                         (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
 
@@ -10410,7 +10408,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 {
     uint8_t       *panel = (uint8_t *)0;
     const uint8_t *rec;
-    char           path[AM2_MP_RULES_PATH];
+    char           path[0x40];
     int32_t        chosen;
     int32_t        i;
 
@@ -10461,10 +10459,11 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 
     /* -1, NOT 0 -- see above. */
     chosen = -1;
+    /* The name is recomputed from the record at each use, as OnMpGameType's. */
+#define NM (*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS) \
+            + (size_t)i * AM2_MP_MAP_NAME_BYTES)
     for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
-        const char *nm = *(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
-                         + (size_t)i * AM2_MP_MAP_NAME_BYTES;
-        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)nm);
+        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)NM);
 
         if (!lvl)
             continue;
@@ -10476,9 +10475,10 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
                     (const char *)(lvl + LEVEL_OFF_NAME), lvl);
         }
 
-        if (strcmp(nm, &g_mapName_) == 0)
+        if (strcmp(NM, &g_mapName_) == 0)
             chosen = i;
     }
+#undef NM
 
     if (chosen == -1) {
         MpComplain(panel, "%s does not have map.");

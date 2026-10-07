@@ -215,6 +215,16 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The reverse-hoist probe** (`unhoist.py`, session tmp directory),
+    still 1537 (2026-10-07).
+    - It replaces a local initialised from a plain expression with that
+      expression at each use, and scores the result.
+    - CheckMapRules 95 -> 9:
+      - the map name is recomputed, as in OnMpGameType;
+      - the rules path buffer is 0x40 bytes, as the image's 0x248 frame
+        needs. Only the three buffers' slot order is left.
+    - MpPanelScreen 257 -> 230: the map count is re-read in the loop test.
+    - ObjAfterMove 26 -> 23: the mask rectangle is read at each use.
   - **OnMpGameType matched** (2026-10-07), 1536 -> 1537.
     - The map name is recomputed from the record at each of its two uses.
       It does not go through an `nm` local.

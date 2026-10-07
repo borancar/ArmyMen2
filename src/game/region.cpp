@@ -2493,7 +2493,8 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     uint8_t       *o = (uint8_t *)obj;
     (void)unused;
     uint8_t        mask[AM2_TILEMASK_BYTES];
-    const int32_t *rect  = (const int32_t *)(mask + TILEMASK_OFF_RECT);
+    /* The rectangle is read out of the mask at each use: no local. */
+#define rect ((const int32_t *)(mask + TILEMASK_OFF_RECT))
     const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
     /* A byte, unlike ItemTeardown's int32: it is then a stack variable, as
      * the image keeps it (stored at +0x1C, its low byte re-read for the add),
@@ -2610,6 +2611,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     }
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+#undef rect
 }
 
 /* ListBoxAction -- original 0x00438F10, one caller.
