@@ -4712,7 +4712,7 @@ void __cdecl PlacementScreenClick(AM2_Point at)
         if (!g_mouseChanged)
             return;
 
-        RefundPlacedUnit((uint8_t *)obj,
+        RefundPlacedUnit((AM2_Object *)(uint8_t *)obj,
                          (int32_t)g_defaultOwner,
                          &g_ourPoints);
 

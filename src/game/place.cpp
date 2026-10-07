@@ -620,22 +620,22 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
      * and the type table walked by index (a signed `jl`). */
 #define TYPE(i, off) (((const int32_t (*)[AM2_UNIT_TYPE_STRIDE / 4]) \
                        ((uintptr_t)g_unitTypes))[i][(off) / 4])
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = (AM2_Object *)(uint8_t *)obj;
     int32_t  found = 0;
     int32_t  slot;
     int32_t  i;
 
     if (ObjIsTypeIn238((const AM2_Object *)obj)
         || ObjIsItem((const AM2_Object *)obj)) {
-        if (*(const int8_t *)(o + OBJ_OFF_ARMY) == army) {
+        if (o->owner == army) {
             switch (*(const int32_t *)o) {
             case 3:
                 found = 1;
                 break;
 
             case 2:
-                if (!*(const int32_t *)(o + OBJ_OFF_SARGE)
-                    && !*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+                if (!o->sarge
+                    && !o->aiDriven)
                     found = 1;
                 break;
 
@@ -646,8 +646,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
                     if (!TYPE(i, UNIT_TYPE_OFF_TROOPER)
                         && !TYPE(i, UNIT_TYPE_OFF_VEHICLE)
                         && UnitKindMatches(
-                               *(const int32_t *)(*(const uint8_t *const *)
-                                                      (o + OBJ_OFF_FIELD_94)
+                               *(const int32_t *)(o->field94
                                                   + TYPEREC_OFF_FIELD_08),
                                TYPE(i, UNIT_TYPE_OFF_KIND), slot))
                         found = 1;
@@ -713,39 +712,39 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
 #define rec (g_unitTypes \
              + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE)
 #define kind (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
-    uint8_t       *made;
-    uint8_t       *weapon;
+    AM2_Object       *made;
+    AM2_Object       *weapon;
     uint8_t       *rows;
 
     *points -= *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
 
     if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
-        made = (uint8_t *)CreateTrooper(
+        made = (AM2_Object *)(uint8_t *)CreateTrooper(
                    (char *)name, where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
-        ObjSetFieldA((AM2_Object *)made, (uint32_t)group);
+        ObjSetFieldA(made, (uint32_t)group);
 
-        weapon = (uint8_t *)CreateWeapon(
+        weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
                      g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
                      g_zeroXY,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
-            *(int32_t *)(made + TROOPER_OFF_WEAPON_UID) =
-                *(const int32_t *)(weapon + 4);
-            SoldierKindForWeapon((AM2_Object *)made,
-                **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
-            SendTrooperSetWeapon(made, *(const uint32_t *)(weapon + 4), 0);
+            made->field54C =
+                (int32_t)weapon->uid;
+            SoldierKindForWeapon(made,
+                *((const uint32_t *)weapon->typeRec));
+            SendTrooperSetWeapon(made, weapon->uid, 0);
         }
 
-        rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
+        rows = ((uint8_t *)made->rowSet.rows);
         *(uint8_t *)(rows + ROW_OFF_HEADING) =
-            *(const uint8_t *)(made + OBJ_OFF_FACING);
-        StepObjRows((AM2_Object *)made);
-        ObjTileChanged((AM2_Object *)made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+            made->facing;
+        StepObjRows(made);
+        ObjTileChanged(made, made->heightSet, 1);
         return;
     }
 
@@ -756,36 +755,36 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         /* The caller's NAME, as the trooper arm passes it -- not the
          * directory scratch the weapon calls take. The image pushes the
          * seventh argument here (0x0043AE12). */
-        made = (uint8_t *)CreateVehicle(
+        made = (AM2_Object *)(uint8_t *)CreateVehicle(
                    kind, (char *)name,
                    where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, facing);
 
-        rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
+        rows = ((uint8_t *)made->rowSet.rows);
         *(uint8_t *)(rows + ROW_OFF_HEADING) =
-            *(const uint8_t *)(made + OBJ_OFF_FACING);
+            made->facing;
 
-        if (*(const int32_t *)(made + OBJ_OFF_ROW_COUNT) > 1)
-            *(uint8_t *)(*(uint8_t **)(made + OBJ_OFF_ROWS)
+        if (made->rowSet.count > 1)
+            *(uint8_t *)(((uint8_t *)made->rowSet.rows)
                          + ROW_OFF_FIELD_B0) =
-                *(const uint8_t *)(made + OBJ_OFF_FIELD_530);
+                made->turretFacing;
 
-        StepObjRows((AM2_Object *)made);
-        ObjTileChanged((AM2_Object *)made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+        StepObjRows(made);
+        ObjTileChanged(made, made->heightSet, 1);
 
-        n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
+        n = made->rowSet.count;
         rows = 0;
         if (n > 0)
-            rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
+            rows = ((uint8_t *)made->rowSet.rows);
 
         for (i = 1; i < n; i++) {
-            uint8_t *row = *(uint8_t **)(made + OBJ_OFF_ROWS)
+            uint8_t *row = ((uint8_t *)made->rowSet.rows)
                            + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
 
-            *(uint32_t *)(row + ROW_OFF_X) =
-                *(const uint32_t *)(made + OBJ_OFF_POS);
+            *(AM2_Point *)(row + ROW_OFF_X) =
+                made->pos;
             *(int16_t *)(row + ROW_OFF_X) +=
                 *(const int16_t *)(*(const uint8_t *const *)(rows + 4)
                                    + SPR_OFF_OVX);
@@ -794,10 +793,10 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                                    + SPR_OFF_OVY);
 
             RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
-            n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
+            n = made->rowSet.count;
         }
 
-        ObjSetFieldA((AM2_Object *)made, (uint32_t)group);
+        ObjSetFieldA(made, (uint32_t)group);
         return;
     }
 
@@ -811,30 +810,30 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         if (kind >= AM2_PILLBOX_KIND_FIRST && kind <= AM2_PILLBOX_KIND_LAST)
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
-        made = (uint8_t *)CreateItem((char *)name, slot, key,
+        made = (AM2_Object *)(uint8_t *)CreateItem((char *)name, slot, key,
                                      where, flag,
                                      0, 0);
 
         if (made)
-            ApplyHeightItem((AM2_Object *)made,
-                (int8_t)(g_tileAttrs)[((AM2_Object *)made)->tile]);
+            ApplyHeightItem(made,
+                (int8_t)(g_tileAttrs)[(made)->tile]);
 
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
             if (kind == AM2_PLACE_KIND_POST_CREATE) {
                 ItemPostCreate(slot, where);
                 if (!AllyFlag(g_defaultOwner,
                               (uint32_t)slot))
-                    ObjConceal((AM2_Object *)made, 1);
+                    ObjConceal(made, 1);
             }
             return;
         }
 
         /* A pillbox: the building is made, now the man inside and his gun. */
-        *(uint32_t *)(made + OBJ_OFF_FLAGS) |= OBJ_FLAG_SHOT_PROOF;
+        made->flags |= OBJ_FLAG_SHOT_PROOF;
 
         {
             int32_t wkind;
-            uint8_t *occupant;
+            AM2_Object *occupant;
 
             if (kind == 0)
                 wkind = AM2_PILLBOX_WEAPON_RIFLE;
@@ -842,15 +841,15 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 wkind = (kind == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
                                     : AM2_PILLBOX_WEAPON_MG;
 
-            occupant = (uint8_t *)CreateTrooper(
+            occupant = (AM2_Object *)(uint8_t *)CreateTrooper(
                            g_dirScratch,
                            where.x,
                            where.y,
                            AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                            0, 0, 0, 1, facing);
-            ObjSetFieldA((AM2_Object *)occupant, (uint32_t)group);
+            ObjSetFieldA(occupant, (uint32_t)group);
 
-            weapon = (uint8_t *)CreateWeapon(
+            weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
                          g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),
@@ -858,34 +857,34 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {
-                *(int32_t *)(occupant + TROOPER_OFF_WEAPON_UID) =
-                    *(const int32_t *)(weapon + 4);
-                SoldierKindForWeapon((AM2_Object *)occupant,
-                    **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
+                occupant->field54C =
+                    (int32_t)weapon->uid;
+                SoldierKindForWeapon(occupant,
+                    *((const uint32_t *)weapon->typeRec));
                 SendTrooperSetWeapon(occupant,
-                                     *(const uint32_t *)(weapon + 4), 0);
+                                     weapon->uid, 0);
             }
 
-            rows = *(uint8_t **)(occupant + OBJ_OFF_ROWS);
+            rows = ((uint8_t *)occupant->rowSet.rows);
             *(uint8_t *)(rows + ROW_OFF_HEADING) =
-                *(const uint8_t *)(occupant + OBJ_OFF_FACING);
-            StepObjRows((AM2_Object *)occupant);
+                occupant->facing;
+            StepObjRows(occupant);
 
-            *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
+            occupant->rank = 4;
             {
                 /* Read once: one 16-bit load stored to both fields. */
                 int16_t hp = g_pillboxTrooperHealth;
 
-                *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) = hp;
-                *(int16_t *)(occupant + OBJ_OFF_HEALTH)     = hp;
+                occupant->maxHealth = hp;
+                occupant->health     = hp;
             }
             /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
              * apart, and tools/checkoffsetuse.py is what caught the slip. */
-            *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;
-            *(int32_t *)(occupant + OBJ_OFF_FIELD_540) = 1;
+            occupant->aiDriven  = 1;
+            occupant->field540 = 1;
 
-            ObjTileChanged((AM2_Object *)occupant,
-                           *(const int8_t *)(occupant + OBJ_OFF_HEIGHT_SET), 1);
+            ObjTileChanged(occupant,
+                           occupant->heightSet, 1);
         }
     }
 #undef kind
@@ -943,16 +942,16 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
  * UNIT_TYPE_OFF_ names, which is the same three addresses said legibly, and
  * is why checkoffsetuse reports 0 and 0x20 on one side and 0x18 on the other.
  */
-void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points)
+void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
 {
     int32_t  cost = 0;
     int32_t  i = 0;
 
-    if (!ObjIsTypeIn238((const AM2_Object *)o)
-        && !ObjIsItem((const AM2_Object *)o))
+    if (!ObjIsTypeIn238(o)
+        && !ObjIsItem(o))
         return;
 
-    if (*(const int8_t *)(o + OBJ_OFF_ARMY) != slot)
+    if (o->owner != slot)
         return;
 
     switch (*(const int32_t *)o) {
@@ -963,31 +962,31 @@ void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points)
             if (!*(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
                 continue;
             if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND)
-                != *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND))
+                != o->vehicleKind)
                 continue;
             cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
         }
         break;
 
     case AM2_OBJ_TYPE_TROOPER: {
-        uint8_t *w;
+        AM2_Object *w;
 
-        if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        if (o->sarge)
             return;
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+        if (o->aiDriven)
             return;
 
-        w = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_WEAPON_UID));
+        w = LookupByUID(o->inventory[0]);
         if (!w)
             return;
-        if (!ObjIsType4((const AM2_Object *)w))
+        if (!ObjIsType4(w))
             return;
 
         for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
             if (!*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER))
                 continue;
             if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND)
-                != **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                != *w->typeRec)
                 continue;
             cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
         }
@@ -1007,7 +1006,7 @@ void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points)
                 continue;
             if (UnitKindMatches(
                     *(const int32_t *)(
-                        *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
+                        o->field94
                         + AAIREC_OFF_KEY),
                     *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND), army))
                 goto found;
@@ -1016,9 +1015,9 @@ void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points)
 found:
 
         /* Climb to the root of the chain -- see the note above. */
-        while (*(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID))
-            o = (uint8_t *)LookupByUID(
-                *(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID));
+        while ((uint32_t)o->followers.capacity)
+            o = LookupByUID(
+                (uint32_t)o->followers.capacity);
 
         kind = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND);
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
@@ -1027,35 +1026,35 @@ found:
         }
 
         {
-            uint8_t *inside = (uint8_t *)0;
-            uint8_t *w;
+            AM2_Object *inside = (AM2_Object *)0;
+            AM2_Object *w;
             int32_t  want;
             int32_t  n;
 
             for (n = 1; n <= AM2_PILLBOX_UID_SCAN; n++) {
-                uint8_t *c = (uint8_t *)LookupByUID(
-                    ((const AM2_Object *)o)->uid + (uint32_t)n);
+                AM2_Object *c = LookupByUID(
+                    (o)->uid + (uint32_t)n);
 
-                if (ObjIsType2((const AM2_Object *)c)) {
+                if (ObjIsType2(c)) {
                     inside = c;
                     break;
                 }
             }
 
             {
-                uint32_t wuid = *(const uint32_t *)(inside + OBJ_OFF_WEAPON_UID);
+                uint32_t wuid = inside->inventory[0];
 
-                w = (uint8_t *)LookupByUID(wuid);
+                w = LookupByUID(wuid);
             }
             if (!w)
                 return;
-            if (!ObjIsType4((const AM2_Object *)w))
+            if (!ObjIsType4(w))
                 return;
 
             /* Kind 9 has its own arm that sets the default again; it is
              * in the image (`dec eax; jne`) whatever it was for. */
             want = 0;
-            switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
+            switch (*w->typeRec) {
             case 4:  want = 1; break;
             case 8:  want = 2; break;
             case 9:  want = 0; break;
@@ -1074,7 +1073,7 @@ found:
             }
 
             /* Destroyed either way -- see the note. */
-            DestroyByType((AM2_Object *)inside);
+            DestroyByType(inside);
         }
         break;
     }
@@ -1086,7 +1085,7 @@ found:
     if (cost <= 0)
         return;
 
-    DestroyByType((AM2_Object *)o);
+    DestroyByType(o);
     *points += cost;
 }
 
