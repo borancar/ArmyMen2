@@ -8434,7 +8434,7 @@ void __cdecl StepType3(AM2_Object *o)
 
                 /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
                 o->gate = 0;
-                LeaveRemainsRow(row);
+                LeaveRemainsRow((const AM2_MapRow *)row);
                 DestroyByType(o);
             }
             goto post;

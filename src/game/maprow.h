@@ -219,7 +219,7 @@ void __cdecl FreeSeqContexts(void);
 
 /* 0x00461EA0. Leave a remains row behind a dying object: four fields off the
  * source row, ROW_OFF_FIELD_26 forced to 3, then RowUpdate. */
-void __cdecl LeaveRemainsRow(const void *src);
+void __cdecl LeaveRemainsRow(const struct AM2_MapRow *src);
 
 /* 0x00461F90. Pick a sprite from the grid by direction and elapsed time,
  * write it into the row, and answer whether more frames remain. */

@@ -612,7 +612,7 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
  * it with 0. Two tests that could have been one, kept apart because that is
  * how the original reads.
  */
-int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
+int32_t __cdecl IsPlacedUnit(AM2_Object *obj, int32_t army)
 {
     /* Every case sets `found` and breaks to the one `return found`; VC6
      * copies that return into the constant arms itself, which is how the

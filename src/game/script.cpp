@@ -2741,7 +2741,7 @@ triggers_done:
         /* The second argument is an OBJECT and the original passes a literal
          * zero here, which the callee reads as "no object" -- so the notify
          * this pad eventually sends carries a zero uid. */
-        PadFinalise(&PAD, (void *)0);
+        PadFinalise(&PAD, (AM2_Object *)(void *)0);
     }
 
     /* The name resolves to the pad, and only now does the pad count move. */

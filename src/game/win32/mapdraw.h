@@ -12,7 +12,7 @@
 extern "C" {
 /* 0x0045AAF0, one caller. Where a vehicle puts somebody getting out: the
  * nearest passable tile within AM2_BOAT_EXIT_MAX. 1 and *out, or 0. */
-int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out);
+int32_t __cdecl BoatExitPoint(struct AM2_Object *vehicle, AM2_Point *out);
 
 #endif
 
@@ -146,7 +146,7 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
                             uint8_t colourB, int32_t phase);
 /* The object is AM2_Object; taken as void here so mapdraw.h stays includable
  * from src/inject, which is C and has no object model. */
-int32_t __cdecl RadarBlipColour(const void *obj, int32_t *blink);
+int32_t __cdecl RadarBlipColour(const struct AM2_Object *objv, int32_t *blink);
 
 /* 0x0042B2E0, one caller. Start a screen shake, taking the maximum of each
  * field against whatever is already running. */

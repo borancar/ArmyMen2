@@ -4697,7 +4697,7 @@ void __cdecl PlacementScreenClick(AM2_Point at)
     } else {
         /* ---- selling ---- */
         if (!obj
-            || !IsPlacedUnit(obj,
+            || !IsPlacedUnit((AM2_Object *)obj,
                              (int32_t)g_defaultOwner)) {
             OverlayPrepare(0, 0);
             return;

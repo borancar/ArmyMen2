@@ -57,7 +57,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army);
  * the twin of armymsg.cpp's SendVehicleExit, so message kind 0x25 is now ours
  * at both ends. */
 void __cdecl RecvVehicleExit(void *msg);
-void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle);
+void __cdecl VehicleTakeOutOccupant(uint32_t uid, struct AM2_Object *vehicle);
 
 /* 0x00401210. Drain one message list into another, head first. Here rather
  * than in gameproc.cpp because of SELFTEST_SRC; see commmsg.cpp. */
@@ -89,7 +89,7 @@ void __cdecl CommTuneChangeLimit(void);
  * uid lands in is the one the message logs as `globTarg`, so the wire format's
  * own word and the caller disagree; the parameter is named for what is passed
  * to it, which is the half that is evidenced. */
-void __cdecl TrooperFireSend(void *trooper, void *weapon);
+void __cdecl TrooperFireSend(struct AM2_Object *trooper, struct AM2_Object *target);
 
 /* 0x00431C30 and 0x00430120. MenuMessage logs a line and shows it; its third
  * argument picks WHICH of the panel's two indicators blinks, and is not a

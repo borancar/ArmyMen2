@@ -1592,10 +1592,10 @@ void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
  * strip's vehicle table is not, so the trap is real and not universal; the
  * tables still have to be read either way, which is how this was established.
  */
-int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
+int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
 {
-    const AM2_Object *obj  = (const AM2_Object *)objv;
-    const AM2_Object    *self = (const AM2_Object *)objv;
+    const AM2_Object *obj  = objv;
+    const AM2_Object    *self = objv;
     int32_t        colour;
 
     colour = AM2_THE_COMM->CommArmyOfSlot(
@@ -2919,7 +2919,7 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
  * (startCol - endCol) + mapW - 1 lands it on rowStart + mapW, exactly one row
  * down. ADDR_MAP_TILES_W is re-read inside the loop because the original
  * re-reads it; it cannot change while this runs. */
-int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out)
+int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out)
 {
     const AM2_Object   *v = (const AM2_Object *)vehicle;
     const AM2_Point *pos = &v->pos;

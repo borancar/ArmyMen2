@@ -1521,7 +1521,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
  * uid that names nothing faults. The original's, and the third of these in
  * this family; the send side has the same shape with its vehicle.
  */
-void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle)
+void __cdecl VehicleTakeOutOccupant(uint32_t uid, AM2_Object *vehicle)
 {
     AM2_Object *v = (AM2_Object *)vehicle;
     AM2_Object *unit;
@@ -1571,7 +1571,7 @@ void __cdecl RecvVehicleExit(void *msg)
     if (vehicle) {
         /* The trooper's uid is decoded before the vehicle is pushed. */
         uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
-        VehicleTakeOutOccupant(trooper, vehicle);
+        VehicleTakeOutOccupant(trooper, (AM2_Object *)vehicle);
     }
 }
 
@@ -2069,7 +2069,7 @@ typedef struct {
     uint8_t        pad19[3];
 } AM2_TrooperFireMsg;
 
-void __cdecl TrooperFireSend(void *trooper, void *target)
+void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
 {
     AM2_Object           *t = (AM2_Object *)trooper;
     AM2_TrooperFireMsg msg;
@@ -2087,7 +2087,7 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
     msg.hdr.kind = AM2_MSG_TROOPER_FIRE;
     msg.hdr.uid  = UidOnWire(t->uid);
     msg.target   = UidOnWire(t->sight.uid);
-    msg.shotAt   = UidOnWire(*(const uint32_t *)((const uint8_t *)target + 4));
+    msg.shotAt   = UidOnWire(target->uid);
     msg.x        = t->sight.spot.at.x;
     msg.y        = t->sight.spot.at.y;
     msg.z        = t->sight.spot.ground;

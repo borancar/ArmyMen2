@@ -57,7 +57,7 @@ void pad_install(void);
 
 /* 0x004375A0, one caller. Run one pad's trigger for a frame: act on the two
  * transitions of its comparison and nothing else. */
-void __cdecl PadFinalise(void *pad, void *obj);
+void __cdecl PadFinalise(void *pad, struct AM2_Object *obj);
 
 /* 0x004376C0 and 0x00437770, two callers each, both ObjTileHook. The two
  * halves of the pad walk: when an object's tile changes, every pad number it
@@ -69,7 +69,7 @@ void __cdecl PadFinalise(void *pad, void *obj);
  * pads: a damage pass BEFORE the tile-changed early exit, then two independent
  * pad mechanisms. Returns 1 when any enter or leave fired -- the caller
  * discards it. */
-int32_t __cdecl ObjTileHook(void *obj);
+int32_t __cdecl ObjTileHook(struct AM2_Object *obj);
 
 /* 0x00437570 and 0x00437540. The two handlers a pad registers when it has an
  * enter or leave event to raise: match the uid the pad recorded against the
@@ -81,7 +81,7 @@ void __cdecl EvtPadOn(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
 void __cdecl EvtPadOff(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
                        int32_t, const uint8_t *pad);
 
-void __cdecl PadNumberEnter(void *obj, void *padNumber);
-void __cdecl PadNumberLeave(void *obj, void *padNumber);
+void __cdecl PadNumberEnter(struct AM2_Object *obj, void *padNumber);
+void __cdecl PadNumberLeave(struct AM2_Object *obj, void *padNumber);
 
 #endif /* AM2_PAD_H */

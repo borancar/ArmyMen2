@@ -117,6 +117,6 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
 
 /* 0x00437400, four callers. Does an object match a selector -- either a named
  * one, or a bitmask of nine independent tests? */
-int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj);
+int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, struct AM2_Object *obj);
 
 #endif /* AM2_OBJSCRIPT_H */

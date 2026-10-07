@@ -2301,7 +2301,7 @@ void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
  * row, not the row. Reading it as the row writes the sprite over the slot
  * pointer, which is the obj -> table -> slot shape CLAUDE.md records taking
  * the game down on its first run. */
-void __cdecl LeaveRemainsRow(const void *src)
+void __cdecl LeaveRemainsRow(const AM2_MapRow *src)
 {
     const AM2_MapRow *s = (const AM2_MapRow *)src;
     AM2_MapRow       *r = (AM2_MapRow *)*(uint8_t **)RowPoolBAlloc();

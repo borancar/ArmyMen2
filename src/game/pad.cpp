@@ -117,7 +117,7 @@ typedef struct {
     int16_t pads[1];    /* really 32; only the count bounds the walk */
 } AM2_PadNumberHead;
 
-void __cdecl PadNumberEnter(void *obj, void *padNumber)
+void __cdecl PadNumberEnter(AM2_Object *obj, void *padNumber)
 {
     const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
     uint8_t *pads = (uint8_t *)kPads;
@@ -147,7 +147,7 @@ void __cdecl PadNumberEnter(void *obj, void *padNumber)
     } while (i < pn->count);
 }
 
-void __cdecl PadNumberLeave(void *obj, void *padNumber)
+void __cdecl PadNumberLeave(AM2_Object *obj, void *padNumber)
 {
     const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
     uint8_t *pads = (uint8_t *)kPads;
@@ -216,7 +216,7 @@ void __cdecl PadNumberLeave(void *obj, void *padNumber)
  * registered with the pad itself as its argument and `owns` clear, so the
  * teardown will not free the pad.
  */
-void __cdecl PadFinalise(void *pad, void *obj)
+void __cdecl PadFinalise(void *pad, AM2_Object *obj)
 {
     uint8_t *p = (uint8_t *)pad;
     uint32_t uid = obj ? ((const AM2_Object *)obj)->uid : 0;
@@ -293,7 +293,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
  * `call; add esp, 4` without testing eax. orig.h called it void(obj), which is
  * harmless and inaccurate. Reproduced as it is -- the mirror of Log2Mask,
  * where the function writes only al and the vectors needed a byte_ret flag. */
-int32_t __cdecl ObjTileHook(void *obj)
+int32_t __cdecl ObjTileHook(AM2_Object *obj)
 {
     AM2_Object       *o = (AM2_Object *)obj;
 #define padLayer (g_mapPadLayer)

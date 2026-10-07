@@ -294,9 +294,9 @@ AM2_Object *__cdecl ObjByUidAlias(uint32_t uid)
  *
  * The last call is handed ADDR_ZERO_POINT as a packed point, the same
  * global OverlayPrepare seeds its offsets from. */
-void __cdecl SelectUnit(void *obj)
+void __cdecl SelectUnit(AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
@@ -307,11 +307,11 @@ void __cdecl SelectUnit(void *obj)
         return;
 
     for (i = 0; i < REC[1]; i++)
-        if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4))
+        if ((*(const uint32_t *const *)&REC[2])[i] == o->uid)
             return;
 
-    ((AM2_Rec *)REC)->PtrListPush((void *)(uintptr_t)*(const uint32_t *)(o + 4));
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+    ((AM2_Rec *)REC)->PtrListPush((void *)(uintptr_t)o->uid);
+    o->flags |= OBJ_FLAG_SELECTED;
     OnSelectionChanged(g_zeroPoint);
 #undef REC
 }
@@ -329,9 +329,9 @@ void __cdecl SelectUnit(void *obj)
  *
  * The final notify is handed ADDR_ZERO_POINT as a packed point, exactly as
  * SelectUnit's is. */
-void __cdecl DeselectUnit(void *obj)
+void __cdecl DeselectUnit(AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
@@ -341,15 +341,15 @@ void __cdecl DeselectUnit(void *obj)
 
     i = 0;
     while (i < REC[1]) {
-        if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4)) {
+        if ((*(const uint32_t *const *)&REC[2])[i] == o->uid) {
             ((AM2_Rec *)REC)->ListRemoveAt(i);
-            *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
+            o->flags &= ~(uint32_t)OBJ_FLAG_SELECTED;
         } else {
             i++;
         }
     }
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
+    o->flags &= ~(uint32_t)OBJ_FLAG_SELECTED;
     OnSelectionChanged(g_zeroPoint);
 #undef REC
 }

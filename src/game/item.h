@@ -938,7 +938,7 @@ void __cdecl SelectRankedWeapon(AM2_Object *unit);
  *
  * The point is a `const void *` here rather than an AM2_Point; the
  * definition casts it back. */
-int32_t __cdecl ObjRowsMaskAt(void *obj, const void *pt);
+int32_t __cdecl ObjRowsMaskAt(struct AM2_Object *obj, const AM2_Point *ptv);
 
 /* 0x004276F0, one caller. The savegame uid fixup: put every type 2's six
  * inventory uids through the remap table. */

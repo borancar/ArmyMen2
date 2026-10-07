@@ -112,7 +112,7 @@ int place_install(void);
 /* 0x0043B0A0, one caller -- the manual placement screen. Does this object count
  * as one of that army's placed units? A vehicle always; a trooper unless it is
  * Sarge or carries something; an item only if some non-unit type claims it. */
-int32_t __cdecl IsPlacedUnit(void *obj, int32_t army);
+int32_t __cdecl IsPlacedUnit(struct AM2_Object *obj, int32_t army);
 
 /* 0x0043B160, one caller -- the manual placement screen. Take a placed unit
  * back off the map and put its cost back into `points`. */

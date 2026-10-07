@@ -6267,7 +6267,7 @@ void __cdecl StepType8(AM2_Object *o)
             if (!RowAnimFinished(row))
                 break;
             RowFaceSprite(row);
-            LeaveRemainsRow(row);
+            LeaveRemainsRow((const AM2_MapRow *)row);
             DestroyByType(o);
             break;
 
@@ -9112,12 +9112,12 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
  * expressions in the original -- `[ebp]` after `lea ebp,[ebx+0xC]` for the
  * left, and `[ebx+0x10]` for the top. Same two fields either way.
  */
-int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
+int32_t __cdecl ObjRowsMaskAt(AM2_Object *obj, const AM2_Point *ptv)
 {
-    const AM2_Point *pt = (const AM2_Point *)ptv;
-    AM2_Object       *o = (AM2_Object *)obj;
+    const AM2_Point *pt = ptv;
+    AM2_Object       *o = obj;
     AM2_MapRow       *row;
-    const uint8_t *spr;
+    const AM2_Sprite *spr;
     int32_t        x;
     int32_t        y;
 
@@ -9127,10 +9127,10 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
         return 0;
 
     row = o->rowSet.rows;
-    spr = ((const uint8_t *)row->sprite);
+    spr = row->sprite;
     if (!spr)
         return 0;
-    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+    if (!spr->image.rle16)
         return 0;
 
     if (!PointInRect(&row->rect, pt))
@@ -9139,14 +9139,14 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
     x = pt->x - row->rect.left;
     y = pt->y - row->rect.top;
 
-    switch (*(const int32_t *)(spr + SPR_OFF_FORMAT)) {
+    switch (spr->format) {
     case 1:
         return MaskPixelSolid32((uint16_t)x, (uint16_t)y,
-                                *(const void *const *)(spr + SPR_OFF_IMAGE));
+                                spr->image.rle32);
     case 2:
     case 3:
         return MaskPixelSolid((uint16_t)x, (uint16_t)y,
-                              *(const void *const *)(spr + SPR_OFF_IMAGE));
+                              spr->image.rle16);
     default:
         return 1;               /* no software mask: assume solid */
     }
@@ -10706,7 +10706,7 @@ int32_t __cdecl TryTakeWeapon(AM2_Object *cand, AM2_Object *unit)
 
         for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
             void   *w = WeaponByUid(u->inventory[i]);
-            int32_t v = ThingCode(w, u);
+            int32_t v = ThingCode((const AM2_Object *)w, u);
 
             if (v < best) {
                 best = v;

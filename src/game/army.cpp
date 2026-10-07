@@ -202,7 +202,7 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
  * rather than by including that header, for the reason script.cpp declares
  * PreloadSprite: army.cpp is flat and must name no Win32 type. This signature
  * has none. */
-extern "C" int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out);
+extern "C" int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out);
 
 
 /* ExitOneFromVehicle -- original 0x0045AC90, four callers. Empty ONE seat:

@@ -640,11 +640,11 @@ AM2_Object *__cdecl NextItem(void);
 
 /* 0x00427CE0. Add an object's uid to the selected group, unless it is already
  * there or the group is over its cap, and mark the object. */
-void __cdecl SelectUnit(void *obj);
+void __cdecl SelectUnit(struct AM2_Object *obj);
 
 /* Original: 0x00427C80, four callers. The counterpart of SelectUnit: drop the
  * object from the selection list and clear OBJ_FLAG_SELECTED. */
-void __cdecl DeselectUnit(void *obj);
+void __cdecl DeselectUnit(struct AM2_Object *obj);
 
 int objtable_install(void);
 

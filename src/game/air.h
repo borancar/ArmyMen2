@@ -168,12 +168,12 @@ void __cdecl ToggleFogOfWar(void);
 
 /* 0x004064E0, four callers. Is `who` standing at the named army's flag base?
  * Answers 0 for YES -- see air.cpp. */
-int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
+int32_t __cdecl AtFlagBase(const struct AM2_Object *who, const struct AM2_Object *owner, int32_t army,
                            const char *name);
 
 /* 0x00406550, two callers. A thing's own code to a result code -- mostly a
  * constant, four flag-base tests and one health comparison. See air.cpp. */
-int32_t __cdecl ThingCode(const void *who, const void *owner);
+int32_t __cdecl ThingCode(const struct AM2_Object *who, const struct AM2_Object *owner);
 
 /* 0x00448E60. How much `obj` obstructs, as seen from `from` and measured
  * against `at`. 0, an item's own byte, or AM2_BLOCK_FULL. The third argument

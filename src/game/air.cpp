@@ -1069,7 +1069,7 @@ void __cdecl AirSupportPop(void)
  * four callers all pass literals, which is what makes that harmless here.
  *
  * The distance is ApproxDist's diamond metric, not a circle. */
-int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
+int32_t __cdecl AtFlagBase(const AM2_Object *who, const AM2_Object *owner, int32_t army,
                            const char *name)
 {
     const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
@@ -1200,7 +1200,7 @@ int32_t __cdecl ObjBlockWeight(AM2_Object *from, AM2_Object *obj, AM2_Point unus
  * applies it twice and is wrong for a negative maximum. No object ships with
  * one, which is exactly why that would have gone unnoticed.
  */
-int32_t __cdecl ThingCode(const void *who, const void *owner)
+int32_t __cdecl ThingCode(const AM2_Object *who, const AM2_Object *owner)
 {
     const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
     const AM2_Object *o = (const AM2_Object *)(const uint8_t *)owner;

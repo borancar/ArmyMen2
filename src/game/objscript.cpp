@@ -774,7 +774,7 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
  * The local-army test sign-extends the byte and the three literal ones do not
  * -- `movsx` against `cmp byte`. No army is negative, so it cannot matter.
  */
-int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
+int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, AM2_Object *obj)
 {
     AM2_Object *o = (AM2_Object *)obj;
 
