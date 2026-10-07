@@ -73,7 +73,7 @@ int32_t __cdecl ObjIsFriendly(const AM2_Object *obj)
 
 AM2_Object *__cdecl LookupOwnerObj(uint32_t owner)
 {
-    void   **list;
+    AM2_PtrList *list;
     int32_t  i;
 
     int32_t army = (int32_t)owner;
@@ -83,30 +83,30 @@ AM2_Object *__cdecl LookupOwnerObj(uint32_t owner)
     if (army < 0 || army >= AM2_ARMY_COUNT)
         return 0;
 
-    list = (void **)g_armyObjLists[army];
-    for (i = 0; i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT); i++) {
+    list = g_armyObjLists[army];
+    for (i = 0; i < list->count; i++) {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
+            list->uids[i]);
 
         if (obj && obj->type == AM2_OBJ_TYPE_2
             && obj->sarge)
             return obj;
         /* The list pointer is re-read from the global every iteration, as the
          * original does; nothing here can move it. */
-        list = (void **)g_armyObjLists[army];
+        list = g_armyObjLists[army];
     }
     return 0;
 }
 
 void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(AM2_Object *obj))
 {
-    void    *list = g_armyObjLists[army];
+    AM2_PtrList *list = g_armyObjLists[army];
     int32_t  i    = 0;
 
     /* No range check on `army` here, where ArmyLeader has one. */
-    while (i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT)) {
+    while (i < list->count) {
         AM2_Object     *obj = LookupByUID(
-            (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
+            list->uids[i]);
 
         if (!obj) {
             /* Gone: drop it and do NOT advance, since everything after it has

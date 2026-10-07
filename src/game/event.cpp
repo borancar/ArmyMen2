@@ -1129,11 +1129,11 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
     i = 0;
 
     /* The slot's list is re-indexed at every use. */
-#define list (((uint8_t * *)g_armyObjLists)[army])
+#define list (g_armyObjLists[army])
 
-    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
+    while (i < list->count) {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t **)(list + LIST_OFF_UIDS))[i]);
+            list->uids[i]);
 
         if (obj == 0) {
             ((AM2_Rec *)list)->ListRemoveAt(i);
@@ -2107,15 +2107,15 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
  * defect recorded there does not apply. */
 void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 {
-    uint8_t **lists = (uint8_t * *)g_armyObjLists;
+    AM2_PtrList **lists = g_armyObjLists;
     int32_t   slot  = AM2_THE_COMM->CommSlotForArmy(
                                       army);
     int32_t   i     = 0;
 
     /* The list pointer is re-read from the table at every use. */
-    while (i < *(const int32_t *)(lists[slot] + LIST_OFF_COUNT)) {
+    while (i < lists[slot]->count) {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t **)(lists[slot] + LIST_OFF_UIDS))[i]);
+            lists[slot]->uids[i]);
 
         if (obj == 0) {
             ((AM2_Rec *)lists[slot])->ListRemoveAt(i);
@@ -3056,11 +3056,11 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     slot = AM2_THE_COMM->CommSlotForArmy(army);
 
     /* The army's list is re-read from the table at every use. */
-#define LIST (((uint8_t * *)g_armyObjLists)[slot])
+#define LIST (g_armyObjLists[slot])
     i = 0;
-    while (i < *(const int32_t *)(LIST + LIST_OFF_COUNT)) {
+    while (i < LIST->count) {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t *const *)(LIST + LIST_OFF_UIDS))[i]);
+            LIST->uids[i]);
 
         if (!obj) {
             ((AM2_Rec *)LIST)->ListRemoveAt(i);

@@ -398,16 +398,16 @@ int32_t __cdecl SaveDefaultCof(void)
     WriteSaveTag(fp, AM2_SAVETAG_COF);
 
     /* The army's list is re-read through its slot at each use. */
-#define LIST ((uint8_t *)g_armyObjLists[g_defaultOwner])
+#define LIST (g_armyObjLists[g_defaultOwner])
     i = 0;
     for (;;) {
         AM2_Object *obj;
 
-        if (i >= *(const int32_t *)(LIST + LIST_OFF_COUNT))
+        if (i >= LIST->count)
             break;
 
         obj = LookupByUID(
-                  ((const uint32_t *)*(void **)(LIST + LIST_OFF_UIDS))[i]);
+                  LIST->uids[i]);
         if (!obj) {
             ((AM2_Rec *)LIST)->ListRemoveAt(i);
             continue;
@@ -1133,15 +1133,15 @@ int32_t __cdecl PlaceScenario(void)
         SelectUnit(lead);
 
         /* Our army's list, re-read from the table at every use. */
-#define list (((uint8_t ** *)g_armyObjLists)[g_defaultOwner])
+#define list (g_armyObjLists[g_defaultOwner])
         while (1) {         /* not `for (;;)`, which VC6 rotates */
             AM2_Object  *obj;
 
-            if (i >= *(const int32_t *)((const uint8_t *)list + 4))
+            if (i >= list->count)
                 break;
 
             obj = LookupByUID(
-                      ((const uint32_t *const *)list)[2][i]);
+                      list->uids[i]);
             if (!obj) {
                 /* A stale uid is REMOVED and the index does not advance. */
                 ((AM2_Rec *)list)->ListRemoveAt(i);
@@ -2621,7 +2621,7 @@ void __cdecl TeardownDefTables(void)
 
 void __cdecl InitArmyObjLists(void)
 {
-    void **slot;
+    AM2_PtrList **slot;
     int32_t i;
 
     slot = g_armyObjLists;
@@ -2631,12 +2631,12 @@ void __cdecl InitArmyObjLists(void)
 
 void __cdecl FreeArmyObjLists(void)
 {
-    void **slot;
+    AM2_PtrList **slot;
     int32_t i;
 
     slot = g_armyObjLists;
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
-        void *list = slot[i];
+        AM2_PtrList *list = slot[i];
 
         if (list) {
             ClearPtrListAlias(list);

@@ -8264,7 +8264,7 @@ void __cdecl SoldierNameOf(const AM2_Object *obj, char *out)
 void __cdecl AwardOwnArmyXp(void)
 {
     /* Army 0's list, its pointer re-read at every use (Type2ActionAll's twin). */
-#define LIST (((AM2_PtrList *const *)g_armyObjLists)[0])
+#define LIST (g_armyObjLists[0])
     int32_t i = 0;
 
     while (i < LIST->count) {

@@ -112,7 +112,7 @@
 #define g_animNext               (*(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT)  /* 0x004FCDE8 */
 #define g_appActive              (*(int32_t *)(uintptr_t)ADDR_APP_ACTIVE)  /* 0x004FA02C */
 #define g_appGuid                ((uint8_t *)(uintptr_t)ADDR_APP_GUID)  /* 0x0046F8A8 */
-#define g_armyObjLists           ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)  /* 0x004F9ECC */
+#define g_armyObjLists           ((struct AM2_PtrList **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)  /* 0x004F9ECC */
 #define g_armyPacket             ((uint8_t *)(uintptr_t)ADDR_ARMY_PACKET)  /* 0x004FAA68 */
 #define g_armyPacketB            ((uint8_t *)(uintptr_t)ADDR_ARMY_PACKET_B)  /* 0x004FB270 */
 #define g_armyPacketSeq          (*(int32_t *)(uintptr_t)ADDR_ARMY_PACKET_SEQ)  /* 0x004FAA70 */

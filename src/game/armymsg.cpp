@@ -531,21 +531,20 @@ void __cdecl TellOneSlot(int32_t slot)
 {
     uint8_t         msg[AM2_TROOP_BATCH_MAX];
     AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
-    const uint8_t  *list;
+    const AM2_PtrList *list;
     int32_t         i = 0;
 
     h->len  = (uint16_t)sizeof(AM2_ArmyMsgHdr);
     h->kind = AM2_MSG_TROOP_BATCH;
     h->uid  = 0;
 
-    list = (const uint8_t *)
-        (g_armyObjLists)[slot];
-    if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
+    list = g_armyObjLists[slot];
+    if (list->count <= 0)
         return;
 
     do {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+            list->uids[i]);
 
         if (obj) {
             if (!(obj->flagsLo & OBJ_FLAG_DESTROYED)
@@ -561,10 +560,9 @@ void __cdecl TellOneSlot(int32_t slot)
             }
         }
 
-        list = (const uint8_t *)
-            (g_armyObjLists)[slot];
+        list = g_armyObjLists[slot];
         i++;
-    } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
+    } while (i < list->count);
 
     if (h->len != sizeof(AM2_ArmyMsgHdr))
         ArmyMessageSend(msg);
@@ -2004,21 +2002,20 @@ void __cdecl SendVehicleUpdates(int32_t slot)
 {
     uint8_t         msg[AM2_TROOP_BATCH_MAX];
     AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
-    const uint8_t  *list;
+    const AM2_PtrList *list;
     int32_t         i = 0;
 
     h->len  = (uint16_t)sizeof(AM2_ArmyMsgHdr);
     h->kind = AM2_MSG_VEHICLE_BATCH;
     h->uid  = 0;
 
-    list = (const uint8_t *)
-        (g_armyObjLists)[slot];
-    if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
+    list = g_armyObjLists[slot];
+    if (list->count <= 0)
         return;
 
     do {
         AM2_Object *obj = LookupByUID(
-            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+            list->uids[i]);
 
         if (obj) {
             if (!(obj->flagsLo & OBJ_FLAG_DESTROYED)
@@ -2034,10 +2031,9 @@ void __cdecl SendVehicleUpdates(int32_t slot)
             }
         }
 
-        list = (const uint8_t *)
-            (g_armyObjLists)[slot];
+        list = g_armyObjLists[slot];
         i++;
-    } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
+    } while (i < list->count);
 
     if (h->len != sizeof(AM2_ArmyMsgHdr))
         ArmyMessageSend(msg);

@@ -88,6 +88,14 @@ typedef struct AM2_RecordList {
     AM2_Rect           box;       /* +0x20 LISTHDR_OFF_BOX_LEFT, world units */
 } AM2_RecordList;
 
+/* A pointer list's layout without its constructor, for the ones embedded in
+ * an object's per-type unions: a capacity, a count and the uids. */
+typedef struct AM2_UidList {
+    int32_t   capacity;           /* +0x00 */
+    int32_t   count;              /* +0x04 */
+    uint32_t *uids;               /* +0x08 */
+} AM2_UidList;
+
 /* The 0x20-byte row set an object carries at OBJ_OFF_SUBRECORD: the record
  * list its rows were built from, the row count (OBJ_OFF_ROW_COUNT), the rows
  * themselves (OBJ_OFF_ROWS), AM2_OBJ_ROW_STRIDE apart, and the bounding
@@ -310,11 +318,8 @@ typedef struct AM2_Object {
             uint8_t  _padaa[2];
             int32_t  flown;         /*   +0xAC MISSILE_OFF_FLOWN, units travelled */
         };
-        struct {                    /*   types 2, 3 and 8: who follows it, */
-            int32_t   capacity;     /*   OBJ_OFF_PTR_LIST, a pointer list */
-            int32_t   count;        /*   SUBREC_OFF_COUNT */
-            uint32_t *uids;         /*   SUBREC_OFF_ROWS */
-        } followers;
+        AM2_UidList followers;      /*   types 2, 3 and 8: who follows it,
+                                     *   OBJ_OFF_PTR_LIST */
     };
     union {                         /* +0xB0, by object type: */
         int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
@@ -434,11 +439,7 @@ typedef struct AM2_Object {
             uint32_t       lastSeq;         /* +0x5CC TROOPER_OFF_LAST_SEQ */
         };
         struct {                    /* a vehicle's (type 3) */
-            struct {                /* +0x538 VEHICLE_OFF_PTR_LIST, its riders: */
-                int32_t   capacity; /*   a pointer list */
-                int32_t   count;
-                uint32_t *uids;
-            } riders;
+            AM2_UidList riders;     /* +0x538 VEHICLE_OFF_PTR_LIST, its riders */
             int32_t   deathKind;    /* +0x544 0 destroyed outright, 5 the burn-out */
             int32_t   field548;     /* +0x548 0 drags the turret onto the hull */
             int32_t   field54C;     /* +0x54C */

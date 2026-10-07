@@ -242,6 +242,21 @@ main result so far (details in `src/vc6/README.md`):
     straight to the call. It used to sit inside the test. The native build
     clears the path buffer first, so that case reads an empty name rather
     than stack garbage.
+  - **Offset casts become struct members across the tree** (2026-10-08),
+    1548 held, nothing lost. Every object-taking function in region, item,
+    army, objtype, misc, gameproc, air, widget, place, cheat, event,
+    mapdraw, armymsg and commmsg takes AM2_Object, and object locals are
+    typed. New records replace the offset families they named:
+    AM2_ObjMask (OBJMASK_/MASKREC_), AM2_TileMask (TILEMASK_), the record
+    list AM2_RecordList and its AM2_ListRec (LISTHDR_/LISTREC_/DEFSPEC_),
+    AM2_RowSpec, AM2_SpriteGroupC, AM2_ParticleKind and AM2_UidList.
+    AM2_RowSet is the full 0x20-byte set, so the object's loose box is
+    rowSet.looseBox. Map-row and sprite reads go through AM2_MapRow and
+    AM2_Sprite; the anim, sprite and army-list globals are typed.
+    - A struct-by-value parameter changes the CALLER's register
+      allocation; RoachMaskWeight keeps its scalar point.
+    - KEEP_DECLS flipped four times on the way and settles between empty
+      and one block; see relinkos.py for the history.
   - **Typed vehicle and roach steps** (2026-10-07), 1548 held, nothing lost.
     Step3ChooseFacing/TurnState/TurnBlocked/Drive/Input, Type2PlayerInput,
     and the roach step family (RoachAliveStepB, RoachStepAllowed,

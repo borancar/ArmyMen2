@@ -196,7 +196,7 @@ static inline AM2_Object *OurLeaderUnit(void)
      * has none. The army's list is re-read through its slot each time. */
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         AM2_PtrList *const *slot =
-            &((AM2_PtrList *const *)g_armyObjLists)[owner];
+            &g_armyObjLists[owner];
         int32_t i;
 
         for (i = 0; i < (*slot)->count; i++) {

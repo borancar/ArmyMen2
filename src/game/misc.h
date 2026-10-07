@@ -68,8 +68,11 @@ static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)
  * AM2_Rec, whose layout this shares. */
 struct AM2_PtrList {
     int32_t  capacity;              /* +0x00 */
-    int32_t  count;                 /* +0x04 */
-    void   **items;                 /* +0x08 */
+    int32_t  count;                 /* +0x04 LIST_OFF_COUNT */
+    union {                         /* +0x08 LIST_OFF_UIDS */
+        void     **items;
+        uint32_t  *uids;            /*   the army lists hold object uids */
+    };
     AM2_PtrList();
     ~AM2_PtrList();
 #if defined(__GNUC__)

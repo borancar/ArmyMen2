@@ -6948,15 +6948,15 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
             int32_t army = (r & 1) ? (int32_t)o->owner
                                    : (r >> 1) % 4;
             /* The list is re-read from the table after the rand() call. */
-#define list ((uint8_t *)g_armyObjLists[army])
-            if (*(const int32_t *)(list + LIST_OFF_COUNT) > 0) {
+#define list (g_armyObjLists[army])
+            if (list->count > 0) {
                 /* The modulus is taken from `army`'s count and the array from
                  * the object's OWN army. See the header: reproduced. */
                 int32_t     idx = orig_region_rand()
-                                  % *(const int32_t *)(list + LIST_OFF_COUNT);
+                                  % list->count;
                 AM2_Object *t   = LookupByUID(
-                    (*(const uint32_t *const *)((uint8_t *)g_armyObjLists
-                        [o->owner] + LIST_OFF_UIDS))[idx]);
+                    g_armyObjLists
+                        [o->owner]->uids[idx]);
 
                 if (t && ApproxDist(&o->pos, &t->pos) < AM2_AI_ATTACH_RANGE)
                     ObjAttachTo(o, t);

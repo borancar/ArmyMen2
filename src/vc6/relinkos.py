@@ -102,9 +102,10 @@ def _aggregated(va):
 # typed g_objCtxObjA and save-index aliases settle it with none kept; the
 # vehicle's last-sent fields bring back the 0x00515FD8 block; the typed
 # object and tile masks settle on the 0x004F96C0 block alone; the typed
-# record lists and row sets settle it with none kept.
+# record lists and row sets settle it with none kept; the typed army
+# object lists settle on the 0x004FC8C8 block alone.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ()
+KEEP_DECLS = ((0x004FC8C8, 0x004FC994),)
 
 
 def _kept(va):

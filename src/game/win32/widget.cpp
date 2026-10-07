@@ -16699,18 +16699,18 @@ void __cdecl PointerActionFollow(AM2_Object *obj, AM2_Point at)
     DeselectAll();
 
     for (i = 0; ; ) {
-        AM2_PtrList *list = ((AM2_PtrList **)g_armyObjLists)
+        AM2_PtrList *list = g_armyObjLists
                                 [*(const int32_t *)&g_defaultOwner];
         AM2_Object  *o;
 
         if (i >= list->count)
             return;
 
-        o = LookupByUID((uint32_t)(uintptr_t)list->items[i]);
+        o = LookupByUID(list->uids[i]);
 
         if (!o) {
             /* Gone: drop it and DO NOT advance. */
-            ((AM2_Rec *)(void *)(g_armyObjLists)
+            ((AM2_Rec *)(g_armyObjLists)
                              [*(const int32_t *)&g_defaultOwner])->ListRemoveAt(
                          i);
             continue;
@@ -17555,7 +17555,7 @@ static inline AM2_Object *OurLeaderUnitReread(int32_t owner)
         return LookupByUID(g_ourLeaderUid);
     if (owner >= 0 && owner < AM2_COMM_SLOTS) {
         AM2_PtrList *const *slot =
-            &((AM2_PtrList *const *)g_armyObjLists)[owner];
+            &g_armyObjLists[owner];
         int32_t i;
 
         for (i = 0; i < (*slot)->count; i++) {
