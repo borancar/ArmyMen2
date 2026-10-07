@@ -1016,7 +1016,6 @@ void __cdecl AppendTroopState(void *msg, AM2_Object *o)
         if (o->sarge && interval > 1)
             interval = 1;
 
-        uint32_t age = seq - o->sentPosSeq;
 
         /* The exact test JUMPS PAST the coarse one when it sets the flag, and
          * FALLS INTO it when it does not -- so a position that has not moved
@@ -1024,16 +1023,15 @@ void __cdecl AppendTroopState(void *msg, AM2_Object *o)
          * zero), so an `else if` would answer the same; written as the branch
          * runs rather than as the answer it happens to give. */
         flags = 0;
-        if (age >= interval && (o->pos.x != o->sentPos.x || o->pos.y != o->sentPos.y))
+        if (seq - o->sentPosSeq >= interval && (o->pos.x != o->sentPos.x || o->pos.y != o->sentPos.y))
             flags = 0x80000000u;
-        else if (age >= comm->enoughChangeLimit && (dx > 8 || dy > 8))
+        else if (seq - o->sentPosSeq >= comm->enoughChangeLimit && (dx > 8 || dy > 8))
             flags = 0x80000000u;
 
+        /* Each age is recomputed at its test, as the image does. */
         {
-            uint32_t age = seq - o->sentFacingSeq;
-
-            if ((age >= interval && o->facing != o->sentFacing)
-                || (age >= comm->enoughChangeLimit
+            if ((seq - o->sentFacingSeq >= interval && o->facing != o->sentFacing)
+                || (seq - o->sentFacingSeq >= comm->enoughChangeLimit
                     && (((uint32_t)o->sentFacing ^ (uint32_t)o->facing)
                         & 0xFFFFFFF0u)))
                 flags |= 0x40000000u;

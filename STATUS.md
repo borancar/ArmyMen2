@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1541 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1542 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,10 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **AppendTroopState matched** (2026-10-07), 1541 -> 1542. The position
+    and facing ages are recomputed from `seq` at each test, with no `age`
+    locals. The extra uses of `seq` give it the lower stack slot, as in the
+    image.
   - **DrawEffectLayer fixed, not matched** (2026-10-07), still 1541. The B
     pair was skipped whenever the A pair was idle: a `continue` where the
     image jumps on to the B test. Now an `if` around the A part. The
