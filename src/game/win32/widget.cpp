@@ -2601,26 +2601,24 @@ typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
  * original does a dword and a word. That measurement is what covers these five,
  * and it is not repeatable now. Sharing a tail and keeping the tool's coverage
  * are in tension; this records which was chosen. */
-static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
+static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t withMode)
 {
-    *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
-    *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
-    *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
-    *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
+    u->sight.field00 = 1;
+    u->sight.bearing    = u->facing;
+    u->sight.hit   = 1;
+    u->sight.seen   = 1;
 
     /* {x, y, z} copied as one 6-byte struct: a dword and a word. */
     {
-        struct AimPoint { int16_t x, y, z; };
-        *(struct AimPoint *)(u + UNIT_OFF_FIRE_X) =
-            *(const struct AimPoint *)&g_aimX;
+        u->sight.spot = g_aimSpot;
     }
 
-    *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
-        *(const uint32_t *)((const uint8_t *)target + OBJ_OFF_UID);
+    u->sight.uid =
+        target->uid;
 
     if (withMode)
-        *(int32_t *)(u + UNIT_OFF_FIRE_MODE) =
-            *(const int32_t *)(u + OBJ_OFF_POSE);
+        u->sight.state =
+            u->pose;
 }
 
 
@@ -3921,9 +3919,9 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
  * OBJ_OFF_FIELD_C0 record, the same reach HudSargeUpdate uses for its
  * tooltip. Only kinds 2, 3, 4, 5 and 43 get an icon of their own; kind 1 is
  * a case of its own that answers what the default does. */
-static inline int32_t HudSquadWeaponIcon(const uint8_t *weapon)
+static inline int32_t HudSquadWeaponIcon(const AM2_Object *weapon)
 {
-    switch (**(const int32_t *const *)(weapon + OBJ_OFF_FIELD_C0)) {
+    switch (*weapon->typeRec) {
     case 1:  return 1;
     case 2:  return 3;
     case 3:  return 4;
@@ -3935,9 +3933,9 @@ static inline int32_t HudSquadWeaponIcon(const uint8_t *weapon)
 }
 
 /* The vehicle's icon: kinds 0..3 and 5, with 4 falling to the default. */
-static inline int32_t HudSquadVehicleIcon(const uint8_t *veh)
+static inline int32_t HudSquadVehicleIcon(const AM2_Object *veh)
 {
-    switch (*(const int32_t *)(veh + VEHICLE_OFF_KIND)) {
+    switch (veh->vehicleKind) {
     case 0:  return 7;
     case 1:  return 8;
     case 2:  return 9;
@@ -4352,7 +4350,7 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
 {
     int32_t   off = (int32_t)army * 4;
     AM2_Point hit;
-    uint8_t  *o;
+    AM2_Object  *o;
 
     /* Four parallel per-army tables, indexed through one scaled offset. */
 #define AIM(addr) (*(int32_t *)((uint8_t *)((void *)(uintptr_t)(addr)) + off))
@@ -4381,10 +4379,10 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
 #undef AIM
 #undef PT
 
-    o = (uint8_t *)ObjectsHitByPoint(&hit,
+    o = (AM2_Object *)ObjectsHitByPoint(&hit,
                                      g_objMapDesc);
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT))
-        DamageObject((AM2_Object *)o, g_aimDamage, 1,
+    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext))
+        DamageObject(o, g_aimDamage, 1,
                      uid, 0, 0);
 }
 
@@ -4755,9 +4753,9 @@ void __cdecl PlacementScreenClick(AM2_Point at)
 void __cdecl HudPostUpdate(void)
 {
     AM2_Point at;
-    void    *leader;
-    void    *obj;
-    void    *weapon;
+    AM2_Object    *leader;
+    AM2_Object    *obj;
+    AM2_Object    *weapon;
     int32_t  ours;         /* the context object is ours to command */
     int32_t  aiming;       /* an aim overlay was prepared this frame */
     int32_t  repeat = 0;   /* the held weapon keeps acting while held */
@@ -4852,9 +4850,7 @@ void __cdecl HudPostUpdate(void)
          * handling. Note the refusal needs BOTH tests: a non-vehicle reaches
          * the arm through the first `je`, not past it. */
         if (!ObjIsType3((const AM2_Object *)ctx)
-            || *(const int32_t *)((const uint8_t *)
-                   g_objCtxObjA
-                   + VEHICLE_OFF_KIND) != 3) {
+            || g_objCtxObjA->vehicleKind != 3) {
             OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
             aiming = 1;
         }
@@ -4863,10 +4859,9 @@ void __cdecl HudPostUpdate(void)
         VehicleDismountAll((void *)0, at);
 
     /* ---- what the leader is holding ----------------------------------- */
-    leader = LookupOwnerObj(g_defaultOwner);
+    leader = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
     if (leader) {
-        int32_t sel = *(const int32_t *)((const uint8_t *)leader
-                                         + UNIT_OFF_INVENTORY_SEL);
+        int32_t sel = leader->inventorySel;
 
         {
             uint32_t uid = *(const uint32_t *)((const uint8_t *)leader
@@ -4879,8 +4874,7 @@ void __cdecl HudPostUpdate(void)
             /* obj -> type record -> kind, then the kind's own record. Three
              * loads, not two: OBJ_OFF_FIELD_C0 is a POINTER to the type. */
             const uint8_t *type =
-                *(const uint8_t *const *)((const uint8_t *)weapon
-                                          + OBJ_OFF_FIELD_C0);
+                ((const uint8_t *)weapon->typeRec);
             int32_t kind = *(const int32_t *)(type + ITEMTYPE_OFF_KIND);
 
             repeat = *(const int32_t *)(g_missileDefs
@@ -4900,7 +4894,7 @@ void __cdecl HudPostUpdate(void)
         if (us && ctx == us)
             ours = 1;
         if (leader
-            && *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING)
+            && leader->riding
                    == ctx)
             ours = 1;
     }
@@ -4914,9 +4908,8 @@ void __cdecl HudPostUpdate(void)
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                   + *(const int16_t *)&g_viewY);
-    obj = ObjectsHitByPoint(&at, g_objMapDesc);
-    for (; obj; obj = *(void *const *)((const uint8_t *)obj
-                                       + OBJ_OFF_QUERY_NEXT)) {
+    obj = (AM2_Object *)ObjectsHitByPoint(&at, g_objMapDesc);
+    for (; obj; obj = obj->queryNext) {
         if (ours) {
             pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;
             if (pick && pick(obj))
@@ -4963,7 +4956,7 @@ hit_ours:
     if (CHANGED) {
         if (BUTTON || !SLOT1)
             goto claim;
-        SLOT1((AM2_Object *)obj, at);
+        SLOT1(obj, at);
         goto tail;
     }
     /* The button did not change, so this is a hold. Only a weapon whose kind
@@ -4973,7 +4966,7 @@ hit_ours:
     if (!BUTTON)
         goto idle;
     if (SLOT1)
-        SLOT1((AM2_Object *)obj, at);
+        SLOT1(obj, at);
     goto tail;
 
 hit_generic:
@@ -4981,7 +4974,7 @@ hit_generic:
         goto tail;
     if (BUTTON || !ACTION)
         goto claim;
-    ACTION((AM2_Object *)obj, at);
+    ACTION(obj, at);
     goto tail;
 
 claim:
@@ -5663,10 +5656,10 @@ AM2_HudSarge::~AM2_HudSarge()
 void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
 {
     AM2_Object *u = unit;
-    uint8_t *w;
+    AM2_Object *w;
     int32_t  kind;
 
-    w = (uint8_t *)WeaponByUid(
+    w = WeaponByUid(
             u->inventory[slot]);
     if (!w)
         return;
@@ -5676,7 +5669,7 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
     if (u->inventorySel == slot) {
         g_viewSnap = 1;
 
-        kind = **(const int32_t **)(w + OBJ_OFF_FIELD_C0);
+        kind = *w->typeRec;
         switch (kind) {
         case 0x17: {
             int16_t hp = u->health;
@@ -6319,7 +6312,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 weapon = (const uint8_t *)WeaponByUid(uid);
             }
             if (weapon)
-                sq->recs[slot].index = HudSquadWeaponIcon(weapon);
+                sq->recs[slot].index = HudSquadWeaponIcon((const AM2_Object *)weapon);
             else
                 sq->recs[slot].index = 1;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
@@ -6331,7 +6324,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         } else if (ObjIsType3(obj)) {
             int32_t k;
 
-            sq->recs[slot].index = HudSquadVehicleIcon((const uint8_t *)obj);
+            sq->recs[slot].index = HudSquadVehicleIcon((const AM2_Object *)(const uint8_t *)obj);
             sq->recs[slot].detailArg = (int32_t)obj->uid;
             SQUAD_BAR(sq->recs[slot].barW, obj);
             sq->recs[slot].icons = 0;
@@ -6374,7 +6367,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                         if (!weapon)
                             continue;
 
-                        sq->recs[slot].index = HudSquadWeaponIcon(weapon);
+                        sq->recs[slot].index = HudSquadWeaponIcon((const AM2_Object *)weapon);
                         sq->recs[slot].detailArg =
                             (int32_t)rider->uid;
                         sq->recs[slot].eject = 1;
@@ -7054,13 +7047,13 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 
     /* Pass three: which three commands the current object offers. The
      * context object is read afresh at each use. */
-#define CTX ((uint8_t *)g_objCtxObjA)
+#define CTX (g_objCtxObjA)
     memset(slots, 0xFF, AM2_HUD_CMD_SLOTS * sizeof(int32_t));
 
     if (ObjType2Field548((const AM2_Object *)CTX)) {
         slots[0] = 1;
         slots[1] = 2;
-        if (*(const int32_t *)(CTX + UNIT_OFF_INVENTORY_SEL) > 0)
+        if (CTX->inventorySel > 0)
             slots[2] = 3;
     } else if (ObjIsType3((const AM2_Object *)CTX)) {
         /* A vehicle offers Sarge's two when he is its first occupant, and
@@ -16814,7 +16807,7 @@ void __cdecl PointerActionMode4(AM2_Object *target, AM2_Point at)
         return;
 
     for (i = 0; i < g_selectedCount; ) {
-        uint8_t *o = (uint8_t *)LookupByUID(
+        AM2_Object *o = LookupByUID(
             (g_selectedItems)[i]);
         AM2_Point slot;
         int32_t  ot;
@@ -16831,29 +16824,29 @@ void __cdecl PointerActionMode4(AM2_Object *target, AM2_Point at)
             continue;
         }
 
-        FormationSlotPoint(i, at, (AM2_Object *)o, &slot);
-        ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
+        FormationSlotPoint(i, at, o, &slot);
+        ObjAttachTo(o, (AM2_Object *)0);
 
         /* Written before the test that may replace it -- see above. */
-        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 0;
+        o->aiMode = 0;
 
         if (tgt
             && !ArmyAlliedWithObjInline(
                    *(const int32_t *)&g_defaultOwner, (const AM2_Object *)tgt, 0)) {
-            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+            o->followUid =
                 tgt->uid;
-            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
+            o->aiMode  = 3;
         } else {
-            PointActionA((AM2_Object *)o, slot);
+            PointActionA(o, slot);
         }
 
         if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
-                *(uint32_t *)(o + OBJ_OFF_UID_56C) =
+                o->uid56C =
                     g_pointerHoverUid;
-                PointActionA((AM2_Object *)o, at);
+                PointActionA(o, at);
             } else {
-                *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+                o->uid56C = 0;
             }
         }
         i++;
@@ -17011,7 +17004,7 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
         return;
 
     for (i = 0; i < g_selectedCount; ) {
-        uint8_t *o = (uint8_t *)LookupByUID(
+        AM2_Object *o = LookupByUID(
             (g_selectedItems)[i]);
         int32_t  ot;
 
@@ -17026,21 +17019,21 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
             /* The original hands FormationSlotPoint the address of its own
              * first argument slot -- the target is a packed point, and the
              * slot is overwritten with this unit's place in the formation. */
-            FormationSlotPoint(i, at, (AM2_Object *)o, (AM2_Point *)&target);
+            FormationSlotPoint(i, at, o, (AM2_Point *)&target);
 
-            ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
-            *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 1;
-            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = AM2_AI_MODE_IGNORE;
+            ObjAttachTo(o, (AM2_Object *)0);
+            o->fieldEC = 1;
+            o->aiMode  = AM2_AI_MODE_IGNORE;
 
-            PointActionA((AM2_Object *)o, *(const AM2_Point *)&target);
+            PointActionA(o, *(const AM2_Point *)&target);
 
             if (ObjIsType2Inline(o)) {
                 if (GetMenuRow() == AM2_MENU_ROW_8) {
-                    *(uint32_t *)(o + OBJ_OFF_UID_56C) =
+                    o->uid56C =
                         g_pointerHoverUid;
-                    PointActionA((AM2_Object *)o, at);
+                    PointActionA(o, at);
                 } else {
-                    *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+                    o->uid56C = 0;
                 }
             }
         }
@@ -17084,14 +17077,14 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
  * Not exercised: its key is not one any drive here presses. */
 void __cdecl VehicleDismountAll(void *a, AM2_Point b)
 {
-    uint8_t *veh;
+    AM2_Object *veh;
     uint8_t *driver;
     int32_t  i;
 
     (void)a;
     (void)b;
 
-    veh = *(uint8_t * *)&g_objCtxObjA;
+    veh = (AM2_Object *)*(uint8_t * *)&g_objCtxObjA;
     if (!veh)
         return;
     if (!ObjIsType3Inline(veh))
@@ -17100,28 +17093,28 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
         return;
 
     driver = (uint8_t *)LookupByUID(
-        **(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540));
+        *veh->riders.uids);
 
     while ((int32_t)Field53C(veh) > 1) {
         uint8_t *o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540))[1]);
+            (veh->riders.uids)[1]);
 
         if (ObjIsType2Inline(o))
             ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
 
-        if (!ExitOneFromVehicle(1, (AM2_Object *)veh))
+        if (!ExitOneFromVehicle(1, veh))
             break;
     }
 
-    ExitOneFromVehicle(0, (AM2_Object *)veh);
+    ExitOneFromVehicle(0, veh);
 
-    for (i = 0; i < *(const int32_t *)(veh + SAVED_OFF_LIST_COUNT); ) {
+    for (i = 0; i < veh->followers.count; ) {
         uint8_t *o = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(veh + SAVED_OFF_LIST))[i]);
+            (veh->followers.uids)[i]);
 
         if (!o) {
             /* No i++ -- the removal shifts the next entry into this slot. */
-            ((AM2_Rec *)(veh + OBJ_OFF_PTR_LIST))->ListRemoveAt(i);
+            ((AM2_Rec *)&veh->followers)->ListRemoveAt(i);
             continue;
         }
         ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
@@ -17218,25 +17211,24 @@ void __cdecl PointerDropItem(AM2_Object *obj, AM2_Point at)
  * a single equality. */
 void __cdecl SetWeaponTargetMedic(AM2_Object *target, AM2_Point at)
 {
-    uint8_t       *u;
-    const uint8_t *weapon;
+    AM2_Object       *u;
+    const AM2_Object *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = (uint8_t *)LookupByUID(
+    u = LookupByUID(
             g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
         return;
 
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)g_weaponSlot * 4));
+    weapon = WeaponByUid(
+        u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
                            + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI)
         return;
     RecordAimedFire(u, target, 1);
@@ -17244,25 +17236,24 @@ void __cdecl SetWeaponTargetMedic(AM2_Object *target, AM2_Point at)
 
 void __cdecl SetWeaponTargetWrench(AM2_Object *target, AM2_Point at)
 {
-    uint8_t       *u;
-    const uint8_t *weapon;
+    AM2_Object       *u;
+    const AM2_Object *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = (uint8_t *)LookupByUID(
+    u = LookupByUID(
             g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
         return;
 
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)g_weaponSlot * 4));
+    weapon = WeaponByUid(
+        u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
                            + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
         return;
     RecordAimedFire(u, target, 1);
@@ -17272,27 +17263,26 @@ void __cdecl SetWeaponTargetWrench(AM2_Object *target, AM2_Point at)
  * weapon lookup: the UNIT's own OBJ_OFF_SOLDIER_KIND must be under 6. */
 void __cdecl SetWeaponTargetKind2A(AM2_Object *target, AM2_Point at)
 {
-    uint8_t       *u;
-    const uint8_t *weapon;
+    AM2_Object       *u;
+    const AM2_Object *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = (uint8_t *)LookupByUID(
+    u = LookupByUID(
             g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
         return;
-    if (*(const int32_t *)(u + OBJ_OFF_SOLDIER_KIND) >= 6)
+    if (u->soldierKind >= 6)
         return;
 
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)g_weaponSlot * 4));
+    weapon = WeaponByUid(
+        u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
                            + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_2A)
         return;
     RecordAimedFire(u, target, 1);
@@ -17329,30 +17319,29 @@ void __cdecl SetWeaponTargetKind2A(AM2_Object *target, AM2_Point at)
  * installs a mode above 0; the same holds for this one. Verified by reading. */
 void __cdecl SetWeaponTargetAimed(AM2_Object *target, AM2_Point at)
 {
-    uint8_t       *u;
-    const uint8_t *weapon;
+    AM2_Object       *u;
+    const AM2_Object *weapon;
 
     (void)at;
 
     if (!target)
         return;
 
-    u = (uint8_t *)LookupByUID(
+    u = LookupByUID(
             g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
         return;
 
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)g_weaponSlot * 4));
+    weapon = WeaponByUid(
+        u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
 
     {
         int32_t kind = *(const int32_t *)
-            (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+            (((const uint8_t *)weapon->typeRec)
              + ITEMTYPE_OFF_KIND);
 
         if (kind < AM2_ITEM_KIND_DISG_0 || kind > AM2_ITEM_KIND_DISG_3)
@@ -17367,25 +17356,24 @@ void __cdecl SetWeaponTargetAimed(AM2_Object *target, AM2_Point at)
  * unit was in survives the order. */
 void __cdecl SetWeaponTargetSweeper(AM2_Object *target, AM2_Point at)
 {
-    uint8_t       *u;
-    const uint8_t *weapon;
+    AM2_Object       *u;
+    const AM2_Object *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = (uint8_t *)LookupByUID(
+    u = LookupByUID(
             g_weaponOwnerId);
     if (!u)
         return;
     if (!ObjIsType2Inline(u))
         return;
 
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)g_weaponSlot * 4));
+    weapon = WeaponByUid(
+        u->inventory[g_weaponSlot]);
     if (!weapon)
         return;
-    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+    if (*(const int32_t *)(((const uint8_t *)weapon->typeRec)
                            + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MSWP)
         return;
     RecordAimedFire(u, target, 0);
