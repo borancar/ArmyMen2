@@ -340,7 +340,7 @@
 #define g_lastMsgValue           (*(int32_t *)(uintptr_t)ADDR_LAST_MSG_VALUE)  /* 0x004F48F0 */
 #define g_lastTickMs             (*(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS)  /* 0x00511E0C */
 #define g_leaderFacing           (*(uint8_t *)(uintptr_t)ADDR_LEADER_FACING)  /* 0x00511E54 */
-#define g_leaderPos              (*(uint32_t *)(uintptr_t)ADDR_LEADER_POS)  /* 0x00511E50 */
+#define g_leaderPos              (*(AM2_Point *)(uintptr_t)ADDR_LEADER_POS)  /* 0x00511E50 */
 #define g_leakCount              (*(int32_t *)(uintptr_t)ADDR_LEAK_COUNT)  /* 0x0050C344 */
 #define g_leakRecords            (*(void **)(uintptr_t)ADDR_LEAK_RECORDS)  /* 0x0050C348 */
 #define g_leakTotal              (*(int32_t *)(uintptr_t)ADDR_LEAK_TOTAL)  /* 0x0050C340 */
