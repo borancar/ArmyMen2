@@ -1349,11 +1349,10 @@ void __cdecl FreeMapLayers(void)
         int32_t n;
 
         for (n = 0; n < g_regionStride; n++) {
-            uint8_t *r = (uint8_t *)g_regions
-                         + (uint32_t)n * AM2_REGION_SIZE;
+            AM2_Region *r = &g_regions[n];
 
-            if (*(const uint8_t *)(r + REGION_OFF_NLINKS) > 0)
-                am2_free(*(void **)(r + REGION_OFF_LINKS));
+            if (r->nlinks > 0)
+                am2_free(r->links);
         }
 
         am2_free(g_regions);

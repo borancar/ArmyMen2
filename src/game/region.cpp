@@ -56,13 +56,11 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * address rather than two. */
 /* 0x00514EF0 holds a POINTER to the array, not the array. Same shape as the
  * cell map above; getting this wrong took the game down on the first run. */
-#define kRegions      (*(uint8_t * *)&g_regions)
+#define kRegions      (g_regions)
 #define kTracePF      (g_optTracePf)
 
-#define kNLinks(r)  (*(uint8_t *)(kRegions + (r) * AM2_REGION_SIZE \
-                                 + REGION_OFF_NLINKS))
-#define kLinks(r)   (*(AM2_RegionLink **)(kRegions + (r) * AM2_REGION_SIZE \
-                                          + REGION_OFF_LINKS))
+#define kNLinks(r)  (kRegions[r].nlinks)
+#define kLinks(r)   (kRegions[r].links)
 
 /* 0x0042B860. Record that two cells connect their regions.
  *
@@ -192,20 +190,20 @@ void __cdecl BuildRegionGraph(void)
 
             if (region >= g_regionStride) {
 #define old ((int32_t)g_regionStride)
-                kRegions = (uint8_t *)am2_realloc(kRegions,
+                kRegions = (AM2_Region *)am2_realloc(kRegions,
                     (size_t)(region + 1) * AM2_REGION_SIZE);
-                memset(kRegions + (uint32_t)old * AM2_REGION_SIZE, 0,
+                memset(&kRegions[old], 0,
                        (size_t)(region - old + 1) * AM2_REGION_SIZE);
 #undef old
                 g_regionStride =
                     (int16_t)(region + 1);
             }
 
-#define r (kRegions + (uint32_t)region * AM2_REGION_SIZE)
-            if (!*(const int32_t *)(r + REGION_OFF_ACTIVE)) {
-                *(int32_t *)(r + REGION_OFF_ACTIVE) = 1;
-                *(int16_t *)(r + REGION_OFF_ID)     = (int16_t)region;
-                *(int16_t *)(r + REGION_OFF_TILE)   = (int16_t)tile;
+#define r (&kRegions[region])
+            if (!r->active) {
+                r->active = 1;
+                r->id     = (int16_t)region;
+                r->tile   = (int16_t)tile;
 
                 if (kTracePF)
                     orig_log((const char *)
@@ -674,35 +672,33 @@ int32_t __cdecl RegionsNear(const AM2_Object *a, const AM2_Object *b,
  */
 void __cdecl ActivateRegion(int32_t region)
 {
-    uint8_t *rec;
+    int32_t *rec;
 
     if (region >= g_regionStride)
         return;
 
-    rec = *(uint8_t *const *)&g_regions
-          + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
+    rec = &g_regions[region].active;
 
-    if (*(const int32_t *)rec != 0)
+    if (*rec != 0)
         return;
 
-    *(int32_t *)rec = 1;
+    *rec = 1;
     (g_regionStamp)++;
 }
 
 void __cdecl InactivateRegion(int32_t region)
 {
-    uint8_t *rec;
+    int32_t *rec;
 
     if (region >= g_regionStride)
         return;
 
-    rec = *(uint8_t *const *)&g_regions
-          + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
+    rec = &g_regions[region].active;
 
-    if (*(const int32_t *)rec == 0)
+    if (*rec == 0)
         return;
 
-    *(int32_t *)rec = 0;
+    *rec = 0;
     (g_regionStamp)++;
 }
 
@@ -6033,7 +6029,7 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
  * log, so x and y come out of the tile index by a mask and a shift, written
  * as one expression the way the original computes it, inline, three times
  * in RegionFindPath. */
-#define RS_TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
+#define RS_TILE(r) ((uint32_t)(r)->tile)
 #define RS_SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu)
 #define RS_WMASK   ((uint32_t)(g_mapTilesW - 1))
 /* A macro, not an inline function: as a function its parameters are two
@@ -6043,10 +6039,9 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
     ApproxDistXY((int32_t)((RS_TILE(b) & RS_WMASK) - (RS_TILE(a) & RS_WMASK)), \
                  (int32_t)((RS_TILE(b) >> RS_SHIFT) - (RS_TILE(a) >> RS_SHIFT)))
 
-static inline uint8_t *RegionAt(int32_t id)
+static inline AM2_Region *RegionAt(int32_t id)
 {
-    return (uint8_t *)g_regions
-           + (uint32_t)id * AM2_REGION_SIZE;
+    return &g_regions[id];
 }
 
 /* RegionFindPath -- original 0x00437E70, 1,168 bytes, one caller, and that
@@ -6145,17 +6140,15 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 #define WALK  (g_regionWalk)
 #define PREV  (g_regionInsertPrev)
 #define GEN   (g_regionGeneration)
-#define I32(r, off) (*(int32_t *)((r) + (off)))
-#define PTR(r, off) (*(uint8_t **)((r) + (off)))
     int32_t  edges = 0;
     int32_t  i;
     int32_t  g;
     int32_t  h;
     int16_t *slot;
 
-    if (!I32(RegionAt(to), REGION_OFF_ACTIVE))
+    if (!RegionAt(to)->active)
         return 0;
-    if (!I32(RegionAt(from), REGION_OFF_ACTIVE))
+    if (!RegionAt(from)->active)
         return 0;
 
     if (g_regionSearchState == -1) {
@@ -6163,18 +6156,18 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
         GOAL = RegionAt(to);
         HEAD = RegionAt(from);
 
-        I32(HEAD, REGION_OFF_G) = 0;
+        HEAD->g = 0;
         /* _ftol in the original; a C cast truncates toward zero the same
          * way and the value cannot be negative here. */
-        I32(HEAD, REGION_OFF_H) = (int32_t)
+        HEAD->h = (int32_t)
             ((double)RegionSpan(HEAD, GOAL)
              * *(const double *)(uintptr_t)AM2_CONST_1_5);
-        I32(HEAD, REGION_OFF_DEPTH) = 0;
-        *(uint16_t *)(HEAD + REGION_OFF_STAMP) = (uint16_t)GEN;
-        *(uint8_t *)(HEAD + REGION_OFF_STATE)  = AM2_REGION_STATE_OPEN;
-        PTR(HEAD, REGION_OFF_PREV)   = (uint8_t *)0;
-        PTR(HEAD, REGION_OFF_NEXT)   = (uint8_t *)0;
-        PTR(HEAD, REGION_OFF_PARENT) = (uint8_t *)0;
+        HEAD->depth = 0;
+        HEAD->stamp = (uint16_t)GEN;
+        HEAD->state  = AM2_REGION_STATE_OPEN;
+        HEAD->prev   = (AM2_Region *)0;
+        HEAD->next   = (AM2_Region *)0;
+        HEAD->parent = (AM2_Region *)0;
     } else {
         /* Dead -- see above. Written out because the original has it. */
         HEAD = g_regionResumeNode;
@@ -6187,101 +6180,94 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
             return 0;
 
         CUR  = HEAD;
-        HEAD = PTR(HEAD, REGION_OFF_NEXT);
+        HEAD = HEAD->next;
         if (HEAD)
-            PTR(HEAD, REGION_OFF_PREV) = (uint8_t *)0;
+            HEAD->prev = (AM2_Region *)0;
 
-        *(uint8_t *)(CUR + REGION_OFF_STATE) = AM2_REGION_STATE_CLOSED;
+        CUR->state = AM2_REGION_STATE_CLOSED;
 
-        if (*(const int16_t *)(CUR + REGION_OFF_ID) == to)
+        if (CUR->id == to)
             break;
 
         /* The link count and table are read through the region's ID, not
          * through CUR -- the same record, reached the long way. */
         for (i = 0;
-             i < *(const uint8_t *)(RegionAt(*(const int16_t *)
-                                        (CUR + REGION_OFF_ID))
-                                    + REGION_OFF_NLINKS);
+             i < RegionAt(CUR->id)->nlinks;
              i++) {
             edges++;
 
-            if (!I32(RegionAt(*(const int16_t *)
-                         (PTR(RegionAt(*(const int16_t *)(CUR + REGION_OFF_ID)),
-                              REGION_OFF_LINKS) + i * AM2_REGION_LINK_SIZE)),
-                     REGION_OFF_ACTIVE))
+            if (!RegionAt(RegionAt(CUR->id)->links[i].to)->active)
                 continue;
 
-            NB = RegionAt(*(const int16_t *)
-                     (PTR(RegionAt(*(const int16_t *)(CUR + REGION_OFF_ID)),
-                          REGION_OFF_LINKS) + i * AM2_REGION_LINK_SIZE));
+            NB = RegionAt(RegionAt(CUR->id)->links[i].to);
 
-            g = I32(CUR, REGION_OFF_G)
+            g = CUR->g
                 + RegionSpan(CUR, NB) * AM2_REGION_STEP_WEIGHT;
             h = (int32_t)((double)RegionSpan(NB, GOAL)
                           * *(const double *)(uintptr_t)AM2_CONST_1_5);
 
             /* The stamp is widened, not GEN narrowed: past 0xFFFF searches
              * no stamp matches and every node looks fresh. */
-            if (*(const uint16_t *)(NB + REGION_OFF_STAMP) == GEN) {
-                if (*(const uint8_t *)(NB + REGION_OFF_STATE)
+            if (NB->stamp == GEN) {
+                if (NB->state
                     & AM2_REGION_STATE_OPEN) {
-                    if (g >= I32(NB, REGION_OFF_G))
+                    if (g >= NB->g)
                         continue;
 
                     /* h is NOT rewritten here -- see above. */
-                    PTR(NB, REGION_OFF_PARENT) = CUR;
-                    I32(NB, REGION_OFF_G)      = g;
-                    I32(NB, REGION_OFF_DEPTH)  = I32(CUR, REGION_OFF_DEPTH) + 1;
+                    NB->parent = CUR;
+                    NB->g      = g;
+                    NB->depth  = CUR->depth + 1;
 
                     /* Unlink, so the insertion below can place it again -- and
                      * at the head it drops the whole list (see above). */
-                    if (PTR(NB, REGION_OFF_PREV))
-                        PTR(PTR(NB, REGION_OFF_PREV), REGION_OFF_NEXT) =
-                            PTR(NB, REGION_OFF_NEXT);
+                    if (NB->prev)
+                        NB->prev->next =
+                            NB->next;
                     else
-                        HEAD = (uint8_t *)0;
-                    if (PTR(NB, REGION_OFF_NEXT))
-                        PTR(PTR(NB, REGION_OFF_NEXT), REGION_OFF_PREV) =
-                            PTR(NB, REGION_OFF_PREV);
-                } else if (*(const uint8_t *)(NB + REGION_OFF_STATE)
+                        HEAD = (AM2_Region *)0;
+                    if (NB->next)
+                        NB->next->prev =
+                            NB->prev;
+                } else if (NB->state
                            & AM2_REGION_STATE_CLOSED) {
                     continue;
                 }
             } else {
-                *(uint16_t *)(NB + REGION_OFF_STAMP) = (uint16_t)GEN;
-                I32(NB, REGION_OFF_G)        = g;
-                I32(NB, REGION_OFF_H)        = h;
-                PTR(NB, REGION_OFF_PARENT)   = CUR;
-                I32(NB, REGION_OFF_DEPTH)    = I32(CUR, REGION_OFF_DEPTH) + 1;
-                *(uint8_t *)(NB + REGION_OFF_STATE) = AM2_REGION_STATE_OPEN;
+                NB->stamp = (uint16_t)GEN;
+                NB->g        = g;
+                NB->h        = h;
+                NB->parent   = CUR;
+                NB->depth    = CUR->depth + 1;
+                NB->state = AM2_REGION_STATE_OPEN;
             }
 
             /* Insert NB into the open list, sorted by g+h ascending. */
             if (!HEAD) {
                 HEAD = NB;
-                PTR(NB, REGION_OFF_NEXT)   = (uint8_t *)0;
-                PTR(HEAD, REGION_OFF_PREV) = (uint8_t *)0;
+                NB->next   = (AM2_Region *)0;
+                HEAD->prev = (AM2_Region *)0;
                 continue;
             }
 
-            for (WALK = HEAD, PREV = (uint8_t *)0; WALK;
-                 WALK = PTR(WALK, REGION_OFF_NEXT)) {
-                if (I32(WALK, REGION_OFF_H) + I32(WALK, REGION_OFF_G)
-                    >= I32(NB, REGION_OFF_H) + I32(NB, REGION_OFF_G))
+            for (WALK = HEAD, PREV = (AM2_Region *)0; WALK;
+                 WALK = WALK->next) {
+                if (WALK->h + WALK->g
+                    >= NB->h + NB->g)
                     break;
                 PREV = WALK;
             }
 
             if (PREV) {
-                PTR(NB, REGION_OFF_NEXT) = PTR(PREV, REGION_OFF_NEXT);
-                if (PTR(NB, REGION_OFF_NEXT))
-                    PTR(PTR(NB, REGION_OFF_NEXT), REGION_OFF_PREV) = NB;
-                PTR(PREV, REGION_OFF_NEXT) = NB;
-                PTR(NB, REGION_OFF_PREV)   = PREV;
+                NB->next = PREV->next;
+                if (NB->next)
+                    NB->next->prev = NB;
+                PREV->next = NB;
+                NB->prev   = PREV;
             } else {
-                PTR(NB, REGION_OFF_NEXT)   = HEAD;
-                PTR(NB, REGION_OFF_PREV)   = (uint8_t *)0;
-                PTR(HEAD, REGION_OFF_PREV) = NB;
+                NB->next   = HEAD;
+                NB->prev   = (AM2_Region *)0;
+                HEAD->prev = NB;
                 HEAD = NB;
             }
         }
@@ -6289,14 +6275,14 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 
     /* Found: CUR is the goal. */
     WALK = CUR;
-    if (I32(CUR, REGION_OFF_DEPTH) >= AM2_REGION_DEPTH_MAX)
+    if (CUR->depth >= AM2_REGION_DEPTH_MAX)
         return 0;
 
-    *len = I32(CUR, REGION_OFF_DEPTH) + 1;
+    *len = CUR->depth + 1;
 
-    for (slot = path + I32(CUR, REGION_OFF_DEPTH); WALK;
-         WALK = PTR(WALK, REGION_OFF_PARENT))
-        *slot-- = *(const int16_t *)(WALK + REGION_OFF_ID);
+    for (slot = path + CUR->depth; WALK;
+         WALK = WALK->parent)
+        *slot-- = WALK->id;
 
     (void)edges;
     return 1;
@@ -6307,8 +6293,6 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 #undef WALK
 #undef PREV
 #undef GEN
-#undef I32
-#undef PTR
 }
 #undef RegionSpan
 #undef RS_TILE
@@ -6357,9 +6341,7 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
 #define COST   (g_regionCost)
 #define STRIDE (g_regionStride)
 #define STAMP  (g_regionStamp)
-    if (!*(const int32_t *)((const uint8_t *)
-              g_regions
-              + (uint32_t)to * AM2_REGION_SIZE + REGION_OFF_ACTIVE))
+    if (!g_regions[to].active)
         return;
 
     if (!RegionFindPath(from, to, path, &len)) {

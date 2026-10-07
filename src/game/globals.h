@@ -615,21 +615,21 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_recordLists            (*(struct AM2_RecordList ***)(uintptr_t)ADDR_RECORD_LISTS)  /* 0x00516140 */
 #define g_recvScratch            ((void *)(uintptr_t)ADDR_RECV_SCRATCH)  /* 0x004F8790 */
 #define g_regionCost             (*(uint8_t **)(uintptr_t)ADDR_REGION_COST)  /* 0x00514EFC */
-#define g_regionCurrent          (*(uint8_t **)(uintptr_t)ADDR_REGION_CURRENT)  /* 0x00654C28 */
+#define g_regionCurrent          (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_CURRENT)  /* 0x00654C28 */
 #define g_regionGeneration       (*(int32_t *)(uintptr_t)ADDR_REGION_GENERATION)  /* 0x00654C2C */
-#define g_regionGoal             (*(uint8_t **)(uintptr_t)ADDR_REGION_GOAL)  /* 0x00523DC0 */
-#define g_regionInsertPrev       (*(uint8_t **)(uintptr_t)ADDR_REGION_INSERT_PREV)  /* 0x00523D98 */
-#define g_regionNeighbour        (*(uint8_t **)(uintptr_t)ADDR_REGION_NEIGHBOUR)  /* 0x00523D9C */
+#define g_regionGoal             (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_GOAL)  /* 0x00523DC0 */
+#define g_regionInsertPrev       (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_INSERT_PREV)  /* 0x00523D98 */
+#define g_regionNeighbour        (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_NEIGHBOUR)  /* 0x00523D9C */
 #define g_regionNext             (*(uint8_t **)(uintptr_t)ADDR_REGION_NEXT)  /* 0x00514EF4 */
 #define g_regionOfCell           (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)  /* 0x00514ECC */
-#define g_regionOpenHead         (*(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD)  /* 0x00523DC4 */
+#define g_regionOpenHead         (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_OPEN_HEAD)  /* 0x00523DC4 */
 #define g_regionResumeGoalid     (*(int32_t *)(uintptr_t)ADDR_REGION_RESUME_GOALID)  /* 0x00523DCC */
-#define g_regionResumeNode       (*(uint8_t **)(uintptr_t)ADDR_REGION_RESUME_NODE)  /* 0x0053C4C8 */
-#define g_regions                (*(void **)(uintptr_t)ADDR_REGIONS)  /* 0x00514EF0 */
+#define g_regionResumeNode       (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_RESUME_NODE)  /* 0x0053C4C8 */
+#define g_regions                (*(struct AM2_Region **)(uintptr_t)ADDR_REGIONS)  /* 0x00514EF0 */
 #define g_regionSearchState      (*(int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE)  /* 0x00487824 */
 #define g_regionStamp            (*(uint8_t *)(uintptr_t)ADDR_REGION_STAMP)  /* 0x00514EF8 */
 #define g_regionStride           (*(int16_t *)(uintptr_t)ADDR_REGION_STRIDE)  /* 0x00514EEC */
-#define g_regionWalk             (*(uint8_t **)(uintptr_t)ADDR_REGION_WALK)  /* 0x00523DD4 */
+#define g_regionWalk             (*(struct AM2_Region **)(uintptr_t)ADDR_REGION_WALK)  /* 0x00523DD4 */
 #define g_remapBright            (*(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT)  /* 0x00507230 */
 #define g_remapBrightBuf         ((uint8_t *)(uintptr_t)ADDR_REMAP_BRIGHT_BUF)  /* 0x004FE09C */
 #define g_remapDark              (*(uint8_t **)(uintptr_t)ADDR_REMAP_DARK)  /* 0x004FE084 */

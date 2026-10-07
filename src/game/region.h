@@ -28,6 +28,27 @@ typedef struct {
     int16_t into;    /* +0x04, the cell on the far side */
 } AM2_RegionLink;
 
+/* One region of the routing graph, AM2_REGION_SIZE bytes. Up to `links` is
+ * shape, written by BuildRegionGraph; the rest is RegionFindPath's A*
+ * working set, meaningful only while `stamp` is the current generation. */
+typedef struct AM2_Region {
+    int16_t            id;        /* +0x00 REGION_OFF_ID */
+    uint16_t           tile;      /* +0x02 REGION_OFF_TILE, the first to claim it */
+    int32_t            active;    /* +0x04 REGION_OFF_ACTIVE */
+    uint8_t            nlinks;    /* +0x08 REGION_OFF_NLINKS */
+    uint8_t            _pad09[3];
+    AM2_RegionLink    *links;     /* +0x0C REGION_OFF_LINKS */
+    int32_t            g;         /* +0x10 REGION_OFF_G, cost from the start */
+    int32_t            h;         /* +0x14 REGION_OFF_H, ApproxDistXY * 1.5 */
+    int32_t            depth;     /* +0x18 REGION_OFF_DEPTH, hops from the start */
+    uint16_t           stamp;     /* +0x1C REGION_OFF_STAMP, the generation */
+    uint8_t            state;     /* +0x1E REGION_OFF_STATE: 1 open, 2 closed */
+    uint8_t            _pad1F;
+    struct AM2_Region *parent;    /* +0x20 REGION_OFF_PARENT, the came-from */
+    struct AM2_Region *prev;      /* +0x24 REGION_OFF_PREV, the open list */
+    struct AM2_Region *next;      /* +0x28 REGION_OFF_NEXT */
+} AM2_Region;
+
 /* 0x0042B860. Record that two cells connect their regions. Does nothing if
  * either cell has no region, or if this exact edge is already present. */
 void __cdecl AddRegionLink(int32_t cell, int32_t neighbour);
