@@ -127,8 +127,8 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
     /* Spelled through the block they live in: both flags are inside it, and
      * that is what keeps VC6 from hoisting the stores above the strcpy
      * that could overwrite them. */
-    *(int32_t *)(kBlock + GAMEPROC_OFF_HAVE_DEFAULT_COF) = 0;
-    *(int32_t *)(kBlock + GAMEPROC_OFF_LOAD_PENDING)     = 1;
+    ((AM2_SelList *)kBlock)->haveDefaultCof = 0;
+    ((AM2_SelList *)kBlock)->loadPending    = 1;
     return 1;
 }
 
@@ -445,11 +445,11 @@ int32_t __cdecl SaveDefaultCof(void)
                 SaveScriptName(fp, obj);
 
                 for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
-                    void *w = LookupByUID(
+                    AM2_Object *w = LookupByUID(
                         (&obj->inventory[0])[slot]);
 
                     if (w) {
-                        SaveOneItem(fp, (AM2_Object *)w);
+                        SaveOneItem(fp, w);
                         SaveScriptName(fp, w);
                     }
                 }
@@ -1681,7 +1681,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
                 g_dirScratch,
                 h->pos.x,
                 h->pos.y,
-                *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
+                obj.tableRec2Index,
                 h->owner,
                 (int32_t)h->flags, 1, 0, 0, 0);
 
@@ -1698,7 +1698,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
                 g_dirScratch,
                 h->pos.x,
                 h->pos.y,
-                *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
+                obj.tableRec2Index,
                 h->owner,
                 (int32_t)h->flags, 1,
                 h->uid, 0, 0);
@@ -1891,7 +1891,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
                                  g_dirScratch,
                                  h->pos.x,
                                  h->pos.y,
-                                 *(const int32_t *)(rec + TYPE3_REC_OFF_SLOT),
+                                 obj.tableRec3Index,
                                  h->owner,
                                  (int32_t)h->flags, 1,
                                  (int32_t)h->uid, 0);
@@ -2767,7 +2767,7 @@ int32_t __cdecl WalkCellKeepEnemy(AM2_Object *obj)
     return ArmyAlliedWithObj((int32_t)g_defaultOwner, (const AM2_Object *)obj, 0) == 0;
 }
 
-void *__cdecl WalkCellWrapper(void *unused, AM2_Point at)
+AM2_Object *__cdecl WalkCellWrapper(void *unused, AM2_Point at)
 {
     (void)unused;
 
@@ -2878,18 +2878,14 @@ fail:
  * constructor returns. */
 void * __attribute__((thiscall)) AM2_SelList::SelListConstruct()
 {
-    void *block = this;
-
-    InitPtrList((uint8_t *)block + GAMEPROC_OFF_SELECTED);
-    return block;
+    InitPtrList(this->selected);
+    return this;
 }
 
 /* 0x004248D0, thiscall. One `add ecx` and a tail jump. */
 void __attribute__((thiscall)) AM2_SelList::SelListDestruct()
 {
-    void *block = this;
-
-    ClearPtrListAlias((uint8_t *)block + GAMEPROC_OFF_SELECTED);
+    ClearPtrListAlias(this->selected);
 }
 
 /* 0x004248A0 and 0x004248C0: the two thunks that name the object. Each is

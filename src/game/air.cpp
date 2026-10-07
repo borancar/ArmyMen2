@@ -1824,7 +1824,7 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
 
         trooper->inventory[0] =
             weapon->uid;
-        *((uint8_t *)trooper + OBJ_OFF_FACING) = FACE[i];
+        trooper->facing = FACE[i];
 
         SoldierKindForWeapon(trooper,
             (uint32_t)weapon->typeRec->kind);

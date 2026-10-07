@@ -11,7 +11,16 @@
 
 
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+/* The game-process block at ADDR_GAMEPROC_BLOCK: the player's save folder as
+ * a string at its start, the 0x438 bytes SaveGameProcSection writes, and the
+ * selection list further on. */
 struct AM2_SelList {
+    char     dir[0x120];            /* +0x000 the current player, a save folder */
+    char     strB[0x370 - 0x120];   /* +0x120 ADDR_GAMEPROC_STR_B */
+    int32_t  loadPending;           /* +0x370 GAMEPROC_OFF_LOAD_PENDING */
+    int32_t  haveDefaultCof;        /* +0x374 GAMEPROC_OFF_HAVE_DEFAULT_COF */
+    uint8_t  pad378[0x8A0 - 0x378];
+    uint8_t  selected[0x10];        /* +0x8A0 GAMEPROC_OFF_SELECTED, a pointer list */
     void * __attribute__((thiscall)) SelListConstruct();
     void __attribute__((thiscall)) SelListDestruct();
 };
@@ -41,7 +50,7 @@ void __cdecl FreeArmyObjLists(void);
 void __cdecl Call4057D0(struct AM2_Object *o, struct AM2_SightOut *out,
                         struct AM2_SightCtx *c);
 void __cdecl DefFinish(void);
-void *__cdecl WalkCellWrapper(void *unused, AM2_Point at);
+struct AM2_Object *__cdecl WalkCellWrapper(void *unused, AM2_Point at);
 void __cdecl ResetHostState(void);
 
 #endif

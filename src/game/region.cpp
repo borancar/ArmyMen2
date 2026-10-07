@@ -8952,7 +8952,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     int32_t    code;                /* frame +0x1C, the trooper's slot reused */
     int32_t    dist;                /* frame +0x24, the output's slot reused */
     int32_t    cls;
-    void      *hit;
+    AM2_Object *hit;
     int32_t    moved = 0;
 
     if ((*(am2_char_fn *)&g_charHandler) != 0)
@@ -9216,9 +9216,9 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
             hit = WalkCellWrapper(o, aim);
             if (hit != 0) {
-                out->spot.ground = (uint16_t)(ObjHeight((const AM2_Object *)hit) - 4);
+                out->spot.ground = (uint16_t)(ObjHeight(hit) - 4);
                 o->ammo =
-                    *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
+                    (int32_t)hit->uid;
             } else {
                 out->spot.ground = (uint16_t)ObjHeight(o);
                 o->ammo = 0;
@@ -9263,9 +9263,9 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
         hit = WalkCellWrapper(o, aim);
         if (hit != 0) {
-            out->spot.ground = (uint16_t)(ObjHeight((const AM2_Object *)hit) - 4);
+            out->spot.ground = (uint16_t)(ObjHeight(hit) - 4);
             o->ammo =
-                *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
+                (int32_t)hit->uid;
         } else {
             out->spot.ground = (uint16_t)ObjHeight(o);
             o->ammo = 0;

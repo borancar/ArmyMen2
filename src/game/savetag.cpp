@@ -78,10 +78,10 @@ void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)
  * The write goes through the game's own fwrite for the same reason the tags go
  * through the game's own helper: the FILE * came from the game's CRT.
  */
-int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
+int32_t __cdecl SaveScriptName(am2_FILE *fp, const AM2_Object *obj)
 {
     /* The index and the name are re-read at each use, as the image does. */
-#define INDEX (*(const int32_t *)((const uint8_t *)rec + SCRIPT_REF_OFF_NAME_INDEX))
+#define INDEX (obj->nameIdx)
 #define NAME  ((*(const AM2_ScriptName *const *)&g_scriptNames)[INDEX].name)
     uint32_t n;
 
@@ -130,7 +130,7 @@ int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
  *
  * It always answers 1, like the save half, and the caller does not look.
  */
-int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec)
+int32_t __cdecl LoadScriptName(am2_FILE *fp, AM2_Object *obj)
 {
     uint32_t tag;
     uint32_t n;
@@ -139,14 +139,14 @@ int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec)
     orig_fread(&tag, 4, 1, fp);
 
     if (tag == AM2_SAVETAG_NO_NAME) {
-        *(int32_t *)((uint8_t *)rec + SCRIPT_REF_OFF_NAME_INDEX) = -1;
+        obj->nameIdx = -1;
         return 1;
     }
 
     orig_fread(&n, 4, 1, fp);
     orig_fread(name, n, 1, fp);
 
-    ScriptBindUniqueName(rec, name);
+    ScriptBindUniqueName(obj, name);
 
     return 1;
 }

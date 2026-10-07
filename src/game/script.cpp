@@ -419,14 +419,14 @@ void __cdecl DeclareBuiltinNames(void)
  * that one. Reproduced, and the same reasoning applies: a file this game
  * wrote cannot do it, because the save half writes strlen + 1 of a table
  * entry. Two unchecked copies in a row is worth saying once. */
-void __cdecl ScriptBindUniqueName(void *rec, char *name)
+void __cdecl ScriptBindUniqueName(AM2_Object *obj, char *name)
 {
-    uint8_t *r = (uint8_t *)rec;
+    AM2_Object *r = obj;
     char     tried[AM2_SCRIPT_UNIQUE_BUF];
     int32_t  n;
     int32_t  index;
 
-    if (!rec || !name)
+    if (!obj || !name)
         return;
 
     n = 1;
@@ -436,9 +436,9 @@ void __cdecl ScriptBindUniqueName(void *rec, char *name)
     index = ScriptFindName(tried);
     while (index >= 0) {
         if (kScriptNames[index].value == 0) {
-            *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) = index;
+            r->nameIdx = index;
             kScriptNames[index].value =
-                *(const int32_t *)(r + SCRIPT_REF_OFF_VALUE);
+                (int32_t)r->uid;
             return;
         }
 
@@ -447,9 +447,9 @@ void __cdecl ScriptBindUniqueName(void *rec, char *name)
         index = ScriptFindName(tried);
     }
 
-    *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) =
+    r->nameIdx =
         AddNameTableName(tried, AM2_NAME_TYPE_REF,
-                         *(const int32_t *)(r + SCRIPT_REF_OFF_VALUE));
+                         (int32_t)r->uid);
 }
 
 /* The original re-reads the count every iteration. Nothing in the loop can

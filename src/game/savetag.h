@@ -32,10 +32,10 @@ int savetag_install(void);
 
 /* 0x00428760, two callers. Write a script-name reference into a savegame:
  * the "no name" tag alone, or the name tag, the length and the string. */
-int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec);
+int32_t __cdecl SaveScriptName(am2_FILE *fp, const struct AM2_Object *obj);
 
 /* 0x004287E0, one caller. The load half of SaveScriptName: read the tag, and
  * for a real name a length and that many bytes, then bind the record. */
-int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec);
+int32_t __cdecl LoadScriptName(am2_FILE *fp, struct AM2_Object *obj);
 
 #endif /* AM2_SAVETAG_H */

@@ -217,7 +217,7 @@ int32_t __cdecl ScriptFindName(const char *name);
  * LOWER-CASES ITS CALLER'S BUFFER IN PLACE, which is why `name` is not
  * const. See script.cpp for the entry-adoption case and for the two
  * unchecked copies. */
-void __cdecl ScriptBindUniqueName(void *rec, char *name);
+void __cdecl ScriptBindUniqueName(struct AM2_Object *obj, char *name);
 
 /* 0x00444A90. Render one token as text into `out`, which it returns.
  *
