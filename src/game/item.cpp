@@ -4561,7 +4561,7 @@ void __cdecl FlameTick(void)
  * predicted from the caller before the code was written. */
 void __cdecl PadAdvanceDeadlines(void)
 {
-    AM2_Pad *pads = (AM2_Pad *)g_pads;
+    AM2_Pad *pads = g_pads;
     int32_t  n    = g_padCount;
     int32_t  i;
 

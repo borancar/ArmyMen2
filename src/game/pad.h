@@ -57,7 +57,7 @@ void pad_install(void);
 
 /* 0x004375A0, one caller. Run one pad's trigger for a frame: act on the two
  * transitions of its comparison and nothing else. */
-void __cdecl PadFinalise(void *pad, struct AM2_Object *obj);
+void __cdecl PadFinalise(struct AM2_Pad *pad, struct AM2_Object *obj);
 
 /* 0x004376C0 and 0x00437770, two callers each, both ObjTileHook. The two
  * halves of the pad walk: when an object's tile changes, every pad number it
@@ -77,11 +77,11 @@ int32_t __cdecl ObjTileHook(struct AM2_Object *obj);
  * in event.cpp's savegame restore, and compared by pointer in its save -- so
  * all four sites must name the same function, never the image address. */
 void __cdecl EvtPadOn(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
-                      int32_t, const uint8_t *pad);
+                      int32_t, const struct AM2_Pad *pad);
 void __cdecl EvtPadOff(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
-                       int32_t, const uint8_t *pad);
+                       int32_t, const struct AM2_Pad *pad);
 
-void __cdecl PadNumberEnter(struct AM2_Object *obj, void *padNumber);
-void __cdecl PadNumberLeave(struct AM2_Object *obj, void *padNumber);
+void __cdecl PadNumberEnter(struct AM2_Object *obj, struct AM2_PadNumber *padNumber);
+void __cdecl PadNumberLeave(struct AM2_Object *obj, struct AM2_PadNumber *padNumber);
 
 #endif /* AM2_PAD_H */

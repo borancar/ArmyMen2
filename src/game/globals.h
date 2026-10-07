@@ -535,8 +535,8 @@
 #define g_packetThreadId         ((uint8_t *)(uintptr_t)ADDR_PACKET_THREAD_ID)  /* 0x004F8B90 */
 #define g_padBitTable            ((int32_t *)(uintptr_t)ADDR_PAD_BIT_TABLE)  /* 0x00486444 */
 #define g_padCount               (*(int32_t *)(uintptr_t)ADDR_PAD_COUNT)  /* 0x00511DF8 */
-#define g_padNumbers             ((uint8_t *)(uintptr_t)ADDR_PAD_NUMBERS)  /* 0x0051F198 */
-#define g_pads                   ((uint8_t *)(uintptr_t)ADDR_PADS)  /* 0x00516198 */
+#define g_padNumbers             ((struct AM2_PadNumber *)(uintptr_t)ADDR_PAD_NUMBERS)  /* 0x0051F198 */
+#define g_pads                   ((struct AM2_Pad *)(uintptr_t)ADDR_PADS)  /* 0x00516198 */
 #define g_paintObject            (*(uint8_t * *)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
 #define g_paletteCopy            ((void *)(uintptr_t)ADDR_PALETTE_COPY)  /* 0x005022C8 */
 #define g_paletteCycleCount      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)  /* 0x00486164 */

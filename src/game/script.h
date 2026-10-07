@@ -273,37 +273,46 @@ int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at);
 
 
 /* A pad: a region of the map that triggers when something enters it. The
- * parser writes the first ten fields; the record is 72 bytes. */
-typedef struct {
-    int32_t id;             /* +0x00, its own index */
+ * parser writes the first ten fields; the record is 72 bytes. PadFinalise
+ * compares `itemCount` against `threshold` and fires the enter or leave
+ * event, after the `delay` clause's wait when there is one. */
+typedef struct AM2_Pad {
+    int32_t id;             /* +0x00 PAD_OFF_ID, its own index */
     int32_t number;         /* +0x04, the number the script gave, 0..255 */
     int32_t name;           /* +0x08, name-table index */
-    int32_t compared;       /* +0x0C, 1 once a <, = or > has been seen */
-    int32_t specific;       /* +0x10, 1 when a named item is the trigger */
-    int32_t trigger;        /* +0x14, the flag set -- or the name index when
-                             * `specific`, which is why the two are exclusive */
-    int32_t compare;        /* +0x18, 0 for '=', 1 for '<', 2 for '>' */
-    int32_t threshold;      /* +0x1C */
-    int32_t delay0;         /* +0x20, from the optional `delay` clause */
-    int32_t delay1;         /* +0x24 */
-    uint8_t rest[0x38 - 0x28];  /* +0x28 is the event key; event.cpp writes it
-                                 * through this, which is why it stays a blob */
+    int32_t compared;       /* +0x0C PAD_OFF_COMPARED, 1 once a <, = or > was seen */
+    int32_t specific;       /* +0x10 PAD_OFF_SPECIFIC, 1 when a named item triggers */
+    int32_t trigger;        /* +0x14 PAD_OFF_TRIGGER, the flag set -- or the name
+                             * index when `specific`, which is why the two are
+                             * exclusive */
+    int32_t compare;        /* +0x18 PAD_OFF_CMP_OP, 0 '=', 1 '<', 2 '>' */
+    int32_t threshold;      /* +0x1C PAD_OFF_CMP_A */
+    int32_t delay0;         /* +0x20 PAD_OFF_EVENT_ENTER, the `delay` clause's
+                             * enter wait; 0 notifies at once */
+    int32_t delay1;         /* +0x24 PAD_OFF_EVENT_LEAVE, and its leave wait */
+    int32_t uidEnter;       /* +0x28 PAD_OFF_UID_ENTER, the delayed enter event */
+    int32_t uidLeave;       /* +0x2C PAD_OFF_UID_LEAVE */
+    int32_t itemCount;      /* +0x30 PAD_OFF_ITEM_COUNT, what is standing on it */
+    int32_t damage;         /* +0x34 PAD_OFF_DAMAGE, setdamagepad's amount */
     /* The pad's own repeat clock, advanced once a frame by PadAdvanceDeadlines
      * -- see maprow.cpp's neighbours in item.cpp. A period of zero or less
      * means the pad does not repeat and the deadline is left alone. */
     int32_t period;         /* +0x38, milliseconds */
-    int32_t dueAt;          /* +0x3C, game-clock ms */
-    uint8_t rest40[72 - 0x40];
+    int32_t dueAt;          /* +0x3C PAD_OFF_DAMAGE_DUE, game-clock ms */
+    int32_t damageKind;     /* +0x40 PAD_OFF_DAMAGE_KIND */
+    int32_t inside;         /* +0x44 PAD_OFF_INSIDE */
 } AM2_Pad;
 
 /* Everything sharing one pad number, and where that number sits on the map.
  * The centroid is in sixteenths of a cell. */
-typedef struct {
-    int16_t count;          /* +0x00 */
-    int16_t pads[32];       /* +0x02, indices into the pad array */
+typedef struct AM2_PadNumber {
+    int16_t count;          /* +0x00 PADNUM_OFF_COUNT */
+    int16_t pads[32];       /* +0x02 PADNUM_OFF_IDS, indices into the pad array */
     int16_t cx;             /* +0x42 */
     int16_t cy;             /* +0x44 */
-    uint8_t rest[76 - 0x46];
+    uint8_t _pad46[2];
+    int32_t live;           /* +0x48 PADNUM_OFF_PADS: set by a damaging pad;
+                             * zero means nothing to walk */
 } AM2_PadNumber;
 
 /* 0x004440E0. `pad <name> <number> <trigger-words...> [<=> <int>] [delay a b]`.

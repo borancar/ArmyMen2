@@ -31,8 +31,8 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 };
 #endif
 
-#define kPads        ((void *)(uintptr_t)((void *)g_pads))
-#define kPadNumbers  ((void *)(uintptr_t)((void *)g_padNumbers))
+#define kPads        (g_pads)
+#define kPadNumbers  (g_padNumbers)
 #define kPadCount    (*(int32_t *)(uintptr_t)((void *)&g_padCount))
 
 void __cdecl ResetPads(void)
@@ -112,34 +112,29 @@ void __cdecl ResetPadsAlias(void)
  * entry index is stepped by two bytes -- these are int16 indices into the pad
  * array, not pointers. */
 
-typedef struct {
-    int16_t count;
-    int16_t pads[1];    /* really 32; only the count bounds the walk */
-} AM2_PadNumberHead;
-
-void __cdecl PadNumberEnter(AM2_Object *obj, void *padNumber)
+void __cdecl PadNumberEnter(AM2_Object *obj, AM2_PadNumber *padNumber)
 {
-    const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
-    uint8_t *pads = (uint8_t *)kPads;
+    const AM2_PadNumber *pn = padNumber;
+    AM2_Pad *pads = kPads;
     int32_t  i    = 0;
 
     if (pn->count <= 0)
         return;
 
     do {
-        uint8_t *pad = pads + (uint32_t)(int32_t)pn->pads[i] * AM2_PAD_STRIDE;
+        AM2_Pad *pad = &pads[pn->pads[i]];
 
-        if (*(const int32_t *)(pad + PAD_OFF_COMPARED)) {
-            if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
-                              *(const int32_t *)(pad + PAD_OFF_TRIGGER), obj)) {
-                *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) += 1;
+        if (pad->compared) {
+            if (ObjMatchesSel(pad->specific,
+                              pad->trigger, obj)) {
+                pad->itemCount += 1;
                 PadFinalise(pad, obj);
             }
-        } else if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
-                                 *(const int32_t *)(pad + PAD_OFF_TRIGGER),
+        } else if (ObjMatchesSel(pad->specific,
+                                 pad->trigger,
                                  obj)) {
             EventNotify(AM2_PAD_NOTIFY_ENTER,
-                        *(const int32_t *)(pad + PAD_OFF_ID),
+                        pad->id,
                         ((const AM2_Object *)obj)->uid,
                         0, 0, 0, 0, 0, 0, 0);
         }
@@ -147,36 +142,39 @@ void __cdecl PadNumberEnter(AM2_Object *obj, void *padNumber)
     } while (i < pn->count);
 }
 
-void __cdecl PadNumberLeave(AM2_Object *obj, void *padNumber)
+void __cdecl PadNumberLeave(AM2_Object *obj, AM2_PadNumber *padNumber)
 {
-    const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
-    uint8_t *pads = (uint8_t *)kPads;
+    const AM2_PadNumber *pn = padNumber;
+    AM2_Pad *pads = kPads;
     int32_t  i    = 0;
 
     if (pn->count <= 0)
         return;
 
     do {
-        uint8_t *pad = pads + (uint32_t)(int32_t)pn->pads[i] * AM2_PAD_STRIDE;
+        AM2_Pad *pad = &pads[pn->pads[i]];
 
-        if (*(const int32_t *)(pad + PAD_OFF_COMPARED)) {
-            if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
-                              *(const int32_t *)(pad + PAD_OFF_TRIGGER), obj)) {
-                *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) -= 1;
-                if (*(const int32_t *)(pad + PAD_OFF_ITEM_COUNT) < 0) {
+        if (pad->compared) {
+            if (ObjMatchesSel(pad->specific,
+                              pad->trigger, obj)) {
+                pad->itemCount -= 1;
+                if (pad->itemCount < 0) {
                     am2_log("pad # %d thinks there are less than zero items on it\n",
+                            /* A signed divide of the BYTE distance: the image's
+                             * imul by 76's magic. Element subtraction compiles
+                             * to VC6's unsigned exact divide instead. */
                             (int32_t)(((const uint8_t *)pn
                                        - (const uint8_t *)kPadNumbers)
                                       / AM2_PAD_NUMBER_STRIDE));
-                    *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) = 0;
+                    pad->itemCount = 0;
                 }
                 PadFinalise(pad, obj);
             }
-        } else if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
-                                 *(const int32_t *)(pad + PAD_OFF_TRIGGER),
+        } else if (ObjMatchesSel(pad->specific,
+                                 pad->trigger,
                                  obj)) {
             EventNotify(AM2_PAD_NOTIFY_LEAVE,
-                        *(const int32_t *)(pad + PAD_OFF_ID),
+                        pad->id,
                         ((const AM2_Object *)obj)->uid,
                         0, 0, 0, 0, 0, 0, 0);
         }
@@ -216,55 +214,55 @@ void __cdecl PadNumberLeave(AM2_Object *obj, void *padNumber)
  * registered with the pad itself as its argument and `owns` clear, so the
  * teardown will not free the pad.
  */
-void __cdecl PadFinalise(void *pad, AM2_Object *obj)
+void __cdecl PadFinalise(AM2_Pad *pad, AM2_Object *obj)
 {
-    uint8_t *p = (uint8_t *)pad;
+    AM2_Pad *p = pad;
     uint32_t uid = obj ? ((const AM2_Object *)obj)->uid : 0;
 
-    if (ScriptCompare(*(const int32_t *)(p + PAD_OFF_CMP_A),
-                      *(const int32_t *)(p + PAD_OFF_CMP_OP),
-                      *(const int32_t *)(p + PAD_OFF_ITEM_COUNT))) {
-        if (*(const int32_t *)(p + PAD_OFF_INSIDE))
+    if (ScriptCompare(p->threshold,
+                      p->compare,
+                      p->itemCount)) {
+        if (p->inside)
             return;
 
-        *(int32_t *)(p + PAD_OFF_INSIDE)    = 1;
-        *(int32_t *)(p + PAD_OFF_UID_LEAVE) = 0;
+        p->inside    = 1;
+        p->uidLeave = 0;
 
-        if (!*(const int32_t *)(p + PAD_OFF_EVENT_ENTER)) {
+        if (!p->delay0) {
             EventNotify(AM2_PAD_NOTIFY_ENTER,
-                        *(const int32_t *)(p + PAD_OFF_ID), uid,
+                        p->id, uid,
                         0, 0, 0, 0, 0, 0, 0);
             return;
         }
 
-        *(int32_t *)(p + PAD_OFF_UID_ENTER) = AllocUid();
-        EventRegister(0, *(const int32_t *)(p + PAD_OFF_UID_ENTER), 0,
+        p->uidEnter = AllocUid();
+        EventRegister(0, p->uidEnter, 0,
                       (const void *)EvtPadOn, p, 0);
-        EventNotify(0, *(const int32_t *)(p + PAD_OFF_UID_ENTER), uid,
+        EventNotify(0, p->uidEnter, uid,
                     0, 0, 0, 0,
-                    *(const int32_t *)(p + PAD_OFF_EVENT_ENTER), 1, 0);
+                    p->delay0, 1, 0);
         return;
     }
 
-    if (!*(const int32_t *)(p + PAD_OFF_INSIDE))
+    if (!p->inside)
         return;
 
-    *(int32_t *)(p + PAD_OFF_INSIDE)    = 0;
-    *(int32_t *)(p + PAD_OFF_UID_ENTER) = 0;
+    p->inside    = 0;
+    p->uidEnter = 0;
 
-    if (!*(const int32_t *)(p + PAD_OFF_EVENT_LEAVE)) {
+    if (!p->delay1) {
         EventNotify(AM2_PAD_NOTIFY_LEAVE,
-                    *(const int32_t *)(p + PAD_OFF_ID), uid,
+                    p->id, uid,
                     0, 0, 0, 0, 0, 0, 0);
         return;
     }
 
-    *(int32_t *)(p + PAD_OFF_UID_LEAVE) = AllocUid();
-    EventRegister(0, *(const int32_t *)(p + PAD_OFF_UID_LEAVE), 0,
+    p->uidLeave = AllocUid();
+    EventRegister(0, p->uidLeave, 0,
                   (const void *)EvtPadOff, p, 0);
-    EventNotify(0, *(const int32_t *)(p + PAD_OFF_UID_LEAVE), uid,
+    EventNotify(0, p->uidLeave, uid,
                 0, 0, 0, 0,
-                *(const int32_t *)(p + PAD_OFF_EVENT_LEAVE), 1, 0);
+                p->delay1, 1, 0);
 }
 
 /* 0x00437860, one caller -- ObjTileChanged, when OBJ_OFF_FLAGS bit 3 is clear.
@@ -309,28 +307,26 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
      * pad layer here WITHOUT the null test both later passes make. */
     tile = o->tile;
     if (padLayer[tile] > 0) {
-        const uint8_t *num = g_padNumbers
-                             + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
+        const AM2_PadNumber *num = &g_padNumbers[padLayer[tile]];
 
-        if (*(const int32_t *)(num + PADNUM_OFF_PADS) != 0
-            && *(const int16_t *)(num + PADNUM_OFF_COUNT) > 0) {
-            const int16_t *ids = (const int16_t *)(num + PADNUM_OFF_IDS);
+        if (num->live != 0
+            && num->count > 0) {
+            const int16_t *ids = num->pads;
 
             /* The count is re-read each pass, as the image compares it; the
              * test above stands for the first. */
             i = 0;
             do {
-                const uint8_t *pad = g_pads
-                                     + (uint32_t)ids[i] * AM2_PAD_STRIDE;
+                const AM2_Pad *pad = &g_pads[ids[i]];
 
-                if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
+                if (pad->damage != 0
                     && g_gameClockMs
-                       > *(const uint32_t *)(pad + PAD_OFF_DAMAGE_DUE))
+                       > (uint32_t)pad->dueAt)
                     DamageObject(o,
-                                 *(const int32_t *)(pad + PAD_OFF_DAMAGE),
-                                 *(const int32_t *)(pad + PAD_OFF_DAMAGE_KIND),
+                                 pad->damage,
+                                 pad->damageKind,
                                  0, 0, 0);
-            } while (++i < *(const int16_t *)(num + PADNUM_OFF_COUNT));
+            } while (++i < num->count);
         }
     }
 
@@ -349,9 +345,9 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
             uint8_t entered = (uint8_t)(~prevBits & curBits);
             uint8_t left    = (uint8_t)(~curBits  & prevBits);
             const int32_t *mask = g_padBitTable;
-            uint8_t *num = g_padNumbers;
+            AM2_PadNumber *num = g_padNumbers;
 
-            for (i = 0; i < AM2_PAD_BITS; i++, num += AM2_PAD_NUMBER_STRIDE) {
+            for (i = 0; i < AM2_PAD_BITS; i++, num++) {
                 if (mask[i] & entered)
                     PadNumberEnter(o, num);
                 else if (mask[i] & left)
@@ -368,11 +364,9 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
 
         if (curPad != prevPad) {
             if (curPad != 0)
-                PadNumberEnter(o, g_padNumbers
-                                  + (uint32_t)curPad * AM2_PAD_NUMBER_STRIDE);
+                PadNumberEnter(o, &g_padNumbers[curPad]);
             if (prevPad != 0)
-                PadNumberLeave(o, g_padNumbers
-                                  + (uint32_t)prevPad * AM2_PAD_NUMBER_STRIDE);
+                PadNumberLeave(o, &g_padNumbers[prevPad]);
             changed = 1;
         }
     }
@@ -403,28 +397,28 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
  *
  * Argument 8 is the pad EventRegister stored and argument 2 is the uid to
  * match, which is the convention every handler in event.cpp follows. */
-static inline void EvtPadRaise(const uint8_t *pad, int32_t want, int32_t payload,
-                               uint32_t field, int32_t type)
+static inline void EvtPadRaise(const AM2_Pad *pad, int32_t uid, int32_t want,
+                               int32_t payload, int32_t type)
 {
-    if (*(const int32_t *)(pad + field) != want)
+    if (uid != want)
         return;
 
-    EventNotify(type, *(const int32_t *)(pad + PAD_OFF_ID), (uint32_t)payload,
+    EventNotify(type, pad->id, (uint32_t)payload,
                 0, 0, 0, 0, 0, 0, 0);
 }
 
 void __cdecl EvtPadOn(int32_t a1, int32_t want, int32_t payload, int32_t a4,
-                      int32_t a5, int32_t a6, int32_t a7, const uint8_t *pad)
+                      int32_t a5, int32_t a6, int32_t a7, const AM2_Pad *pad)
 {
     (void)a1; (void)a4; (void)a5; (void)a6; (void)a7;
-    EvtPadRaise(pad, want, payload, PAD_OFF_UID_ENTER, AM2_EVT_PADON);
+    EvtPadRaise(pad, pad->uidEnter, want, payload, AM2_EVT_PADON);
 }
 
 void __cdecl EvtPadOff(int32_t a1, int32_t want, int32_t payload, int32_t a4,
-                       int32_t a5, int32_t a6, int32_t a7, const uint8_t *pad)
+                       int32_t a5, int32_t a6, int32_t a7, const AM2_Pad *pad)
 {
     (void)a1; (void)a4; (void)a5; (void)a6; (void)a7;
-    EvtPadRaise(pad, want, payload, PAD_OFF_UID_LEAVE, AM2_EVT_PADOFF);
+    EvtPadRaise(pad, pad->uidLeave, want, payload, AM2_EVT_PADOFF);
 }
 
 void pad_install(void)

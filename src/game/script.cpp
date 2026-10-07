@@ -1029,9 +1029,9 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     return 1;
 }
 
-#define kPads       ((AM2_Pad *)g_pads)
+#define kPads       (g_pads)
 #define kPadCount   (g_padCount)
-#define kPadNumbers ((AM2_PadNumber *)g_padNumbers)
+#define kPadNumbers (g_padNumbers)
 
 /* ScriptLocation: each coordinate is an integer or `refvar <name>`, written
  * out at both uses because the image's two copies differ. X steps past the

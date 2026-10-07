@@ -512,7 +512,7 @@ int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
     return 1;
 }
 
-#define kPads ((AM2_Pad *)g_pads)
+#define kPads (g_pads)
 
 int32_t __cdecl LoadEventSection(am2_FILE *fp)
 {
@@ -541,12 +541,12 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
         if (kind == (int32_t)AM2_EVTSAVE_PAD_A) {
             orig_fread(&idx, 4, 1, fp);
             pad = &kPads[idx];
-            *(int32_t *)pad->rest = key;              /* +0x28 */
+            pad->uidEnter = key;                      /* +0x28 */
             EventRegister(0, key, 0, (const void *)EvtPadOn, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_PAD_B) {
             orig_fread(&idx, 4, 1, fp);
             pad = &kPads[idx];
-            *(int32_t *)pad->rest = key;              /* +0x28 */
+            pad->uidEnter = key;                      /* +0x28 */
             EventRegister(0, key, 0, (const void *)EvtPadOff, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
             void *rec = orig_malloc(0x10);
@@ -3965,23 +3965,20 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x3A: {                                /* setdamagepad */
         /* The pad is indexed afresh at every store, as the image does. */
-#define pad (g_pads \
-             + (size_t)act->subject * AM2_PAD_STRIDE)
+#define pad (&g_pads[act->subject])
         if (act->subject < 0 || act->subject >= g_padCount)
             return;
-        *(int32_t *)(pad + PAD_OFF_DAMAGE)      = act->n1;
-        *(int32_t *)(pad + 0x38)                = act->n0;
-        *(int32_t *)(pad + PAD_OFF_DAMAGE_KIND) = act->extra;
+        pad->damage      = act->n1;
+        pad->period                             = act->n0;
+        pad->damageKind = act->extra;
 
         /* Only a positive damage marks the pad's NUMBER as live, and the
          * number is reached through the pad's own +0x04 rather than by the
          * pad index -- two different arrays with two different strides. */
         if (act->n1 > 0) {
-            uint8_t *num = g_padNumbers
-                         + (size_t)*(const int32_t *)(pad + 0x04)
-                           * AM2_PAD_NUMBER_STRIDE;
+            AM2_PadNumber *num = &g_padNumbers[pad->number];
 
-            *(int32_t *)(num + PADNUM_OFF_PADS) = 1;
+            num->live = 1;
         }
         return;
 #undef pad
