@@ -872,10 +872,13 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             StepObjRows((AM2_Object *)occupant);
 
             *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
-            *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) =
-                g_pillboxTrooperHealth;
-            *(int16_t *)(occupant + OBJ_OFF_HEALTH) =
-                g_pillboxTrooperHealth;
+            {
+                /* Read once: one 16-bit load stored to both fields. */
+                int16_t hp = g_pillboxTrooperHealth;
+
+                *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) = hp;
+                *(int16_t *)(occupant + OBJ_OFF_HEALTH)     = hp;
+            }
             /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
              * apart, and tools/checkoffsetuse.py is what caught the slip. */
             *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;

@@ -318,6 +318,13 @@ def main():
             placed[m.group(2)] = addr[m.group(1)]
             sym_va["_" + m.group(2)] = addr[m.group(1)]
     sym_va["_am2_origstate"] = 0x0048E000
+    # Relink-only scalars (globals.h, am2_rl_*): globals the original kept as
+    # their own symbols but the other builds reach as a view into a larger
+    # table. VC6 loads a lone short with a word load and a table element
+    # with a dword one, so the symbol's shape is part of the match.
+    for m in re.finditer(r"\b(am2_rl_\w+);\s*/\*\s*(0x[0-9A-Fa-f]+)",
+                         open(os.path.join(BM.REPO, "src/game/globals.h")).read()):
+        sym_va["_" + m.group(1)] = int(m.group(2), 16)
     # The relink build's per-global view of am2_origstate (src/vc6/relinkos.py):
     # am2_os_<member> is that member's own VA. Regenerated here so it cannot lag
     # standalone.h's redirects.

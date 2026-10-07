@@ -567,7 +567,19 @@
 #define g_pickReach66275c        (*(int32_t *)(uintptr_t)ADDR_PICK_REACH_66275C)  /* 0x0066275C */
 #define g_pickReach662894        (*(int32_t *)(uintptr_t)ADDR_PICK_REACH_662894)  /* 0x00662894 */
 #define g_pickReach6628c8        (*(int32_t *)(uintptr_t)ADDR_PICK_REACH_6628C8)  /* 0x006628C8 */
-#define g_pillboxTrooperHealth   (*(int16_t *)(uintptr_t)ADDR_PILLBOX_TROOPER_HEALTH)  /* 0x00473E44 */
+/* A scalar of its own in the original: VC6 loads a lone short global with a
+ * 16-bit `mov ax`, and an element of a larger object with a dword load, so the
+ * relink build gives it its own symbol (relink.py maps am2_rl_* by the address
+ * in the comment). Elsewhere it is a view into am2_rank_records. */
+#if defined(AM2_RELINK)
+#ifdef __cplusplus
+extern "C"
+#endif
+const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
+#define g_pillboxTrooperHealth   am2_rl_pillbox_trooper_health
+#else
+#define g_pillboxTrooperHealth   (*(const int16_t *)(uintptr_t)ADDR_PILLBOX_TROOPER_HEALTH)  /* 0x00473E44 */
+#endif
 #define g_pitch                  (*(int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)  /* 0x00502AD0 */
 #define g_placeFacing            (*(uint8_t *)(uintptr_t)ADDR_PLACE_FACING)  /* 0x004FCF8C */
 #define g_placeFlag4fcf88        (*(int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88)  /* 0x004FCF88 */

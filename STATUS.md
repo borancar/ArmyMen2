@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1525 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1526 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,23 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **MakePlacedUnit matched: the pillbox HP is a scalar** (2026-10-07),
+    1525 -> 1526.
+    - The image loads the pillbox trooper's health with one 16-bit
+      `mov ax` and stores it to both fields. VC6 gives that load only to
+      a lone short global copied into a local. An element of a larger
+      object gets a dword load. Every spelling that reads the global twice
+      reloads after the first store, `const` included.
+    - The relink build now gives the value its own symbol: globals.h
+      declares `am2_rl_pillbox_trooper_health` under AM2_RELINK with its
+      VA in a comment, and relink.py maps every `am2_rl_*` that way. The
+      other builds keep the view into am2_rank_records.
+    - Scans written along the way, in the session tmp directory:
+      - widthscan: global load widths;
+      - reloadscan: global load counts;
+      - immscan: immediate constants;
+      - ternscan: zero-then-set against a ternary.
+      Most hits were register ties, or jump tables disassembled as code.
   - **MakePlacedUnit passes the caller's name to CreateVehicle: 84 -> 5**
     (2026-10-07), no count change.
     - A real argument bug: the vehicle arm handed CreateVehicle the
