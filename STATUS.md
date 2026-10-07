@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1533 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1535 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,16 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **BuildVehicleMask and BuildRoachMask matched** (2026-10-07), 1533 ->
+    1535.
+    - Same method: ablate each statement and look for the image's exact
+      instruction.
+    - Deleting the index clamp after `AnimIndexOfId` produced it. The
+      helper's parameter and return were the invisible temporaries. The
+      original writes the search out, as the helper's own comment says.
+    - BuildRoachMask also indexes `g_roachMasks[facing]` instead of
+      walking a pointer. VC6 strength-reduces the index to the image's
+      pointer, set up inside the loop's entry test.
   - **PointerPickRepair matched with the minimal-clone lab** (2026-10-07),
     1532 -> 1533.
     - The function was copied into a standalone file with raw offsets and

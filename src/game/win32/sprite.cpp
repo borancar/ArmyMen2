@@ -1849,10 +1849,12 @@ void __cdecl BuildRoachMask(void)
 {
     const AM2_AnimTable *t = ((AM2_AnimTable *)g_roachAnims);
     AM2_Anim            *a;
-    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+    int32_t              i;
     int32_t              facing;
-    uint8_t             *out;
 
+    for (i = 0; i < t->count; i++)
+        if (t->entries[i].id == AM2_ANIM_ID_VEHICLE)
+            break;
     if (i >= t->count)
         i = 0;
     a = t->entries[i].anim;
@@ -1861,7 +1863,6 @@ void __cdecl BuildRoachMask(void)
 
     /* No early return for zero directions: the loop's own test is the only
      * one, as the image has it. */
-    out = (uint8_t *)g_roachMasks[0].pts;
     for (facing = 0; facing < a->directions; facing++) {
         AM2_Sprite *spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
@@ -1897,15 +1898,14 @@ void __cdecl BuildRoachMask(void)
                 count++;
             }
 
-        /* The original walks a pointer to each record's POINTS and writes
-         * the count one dword below it, through `[ebp-4]`.
-         * Getting this wrong by one dword put the whole table over the global
-         * at 0x00654CA4 with every point still correct, and `bootcamp` and
-         * `mission` were both clean on it -- the mis-centred trig table
-         * again. tools/maskdump.py is what caught it. */
-        *(int32_t *)(out - 4) = count;
-        memcpy(out, found, (size_t)count * 4);
-        out += AM2_MASK_STRIDE;
+        /* Indexed by facing. VC6 strength-reduces it to the pointer the image
+         * walks (to each record's POINTS, the count written through
+         * `[ebp-4]`), set up inside the loop's entry test. Getting the record
+         * base wrong by one dword once put the whole table over the global at
+         * 0x00654CA4 with every point still correct, and `bootcamp` and
+         * `mission` were both clean on it; tools/maskdump.py caught it. */
+        g_roachMasks[facing].count = count;
+        memcpy(g_roachMasks[facing].pts, found, (size_t)count * 4);
     }
 }
 
@@ -1929,9 +1929,12 @@ void __cdecl BuildVehicleMask(int32_t kind)
 {
     const AM2_AnimTable *t = &((AM2_AnimTable *)g_vehicleAnims)[kind];
     AM2_Anim            *a;
-    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+    int32_t              i;
     int32_t              dir;
 
+    for (i = 0; i < t->count; i++)
+        if (t->entries[i].id == AM2_ANIM_ID_VEHICLE)
+            break;
     if (i >= t->count)
         i = 0;
     a = t->entries[i].anim;
