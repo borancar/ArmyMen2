@@ -1189,7 +1189,7 @@ done:
 void __cdecl ResetLevelState(void)
 {
     int32_t  *matrix = g_allyMatrix;
-    uint8_t  *comm;
+    AM2_Comm  *comm;
     int32_t   i, j;
 
     g_levelFlagE30 = 1;
@@ -1233,21 +1233,20 @@ void __cdecl ResetLevelState(void)
     comm = g_commObject;
 
     for (i = 0; i < AM2_COMM_PLAYERS; i++) {
-        const uint8_t *a = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
+        const AM2_CommSlot *a = &comm->slots[i];
 
-        if (!*(const int32_t *)(a + COMM_SLOT_OFF_TAKEN))
+        if (!a->wasHere)
             continue;
-        if (!*(const int32_t *)(a + COMM_SLOT_OFF_TEAM))
+        if (!a->team)
             continue;
 
         for (j = 0; j < AM2_COMM_PLAYERS; j++) {
-            const uint8_t *b = comm + COMM_OFF_PLAYERS
-                               + j * COMM_PLAYER_STRIDE;
+            const AM2_CommSlot *b = &comm->slots[j];
 
-            if (!*(const int32_t *)(b + COMM_SLOT_OFF_TAKEN))
+            if (!b->wasHere)
                 continue;
-            if (*(const int32_t *)(a + COMM_SLOT_OFF_TEAM)
-                != *(const int32_t *)(b + COMM_SLOT_OFF_TEAM))
+            if (a->team
+                != b->team)
                 continue;
 
             matrix[i * AM2_COMM_PLAYERS + j] = 1;
@@ -2575,8 +2574,7 @@ void __cdecl ZeroUnread50C34C(void)
 int32_t __cdecl NoteKind31(void *rec)
 {
     if (**(const int32_t *const *)((const uint8_t *)rec + 0x20) == AM2_KIND_31)
-        *(int32_t *)(g_commObject
-                     + COMM_OFF_SAW_KIND_31) = 1;
+        g_commObject->sawKind31 = 1;
 
     return 0;
 }

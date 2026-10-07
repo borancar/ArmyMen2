@@ -142,9 +142,7 @@ int32_t __cdecl CanAffordUnit(int32_t type, int32_t points)
 char *__cdecl BuildPlacementPath(char *dest, int32_t slot)
 {
     const char *colour = (const char *)0;
-    int32_t     army   = *(const int32_t *)(g_commObject
-                                            + (size_t)slot * AM2_PLAYER_STRIDE
-                                            + COMM_ARMY_OFF_COLOUR);
+    int32_t     army   = g_commObject->slots[(size_t)slot].colour;
 
     switch (army) {
     case 0: colour = "green"; break;

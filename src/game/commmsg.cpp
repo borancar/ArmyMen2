@@ -109,21 +109,21 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
 static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
 {
-    const uint8_t *comm = kCommObj;
+    const AM2_Comm *comm = kCommObj;
 
     *(int32_t *)(record + AM2_MSG_VALUE) = value;
 
-    if (!*(const int32_t *)(comm + AM2_COMM_CONNECTED))
+    if (!comm->connected)
         return;
 
     SendGameMsg((void *)record, 0, 1);
 
     /* Re-read: the original does not reuse the register it had. */
     comm = kCommObj;
-    if (!*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (!comm->verbose)
         return;
 
-    am2_log(fmt, *(const int32_t *)(comm + AM2_COMM_SELF_ID), value);
+    am2_log(fmt, (int32_t)comm->selfId, value);
 }
 
 void __cdecl SendColorMsg(int32_t colour)
@@ -270,25 +270,23 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 {
     /* The comm object is read at every use. */
-#define COMM ((uint8_t *)kCommObj)
+#define COMM (kCommObj)
     void *dlg;
 
     /* Clients only -- the exact mirror of the host-only receive. */
-    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (COMM->isHost)
         return;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("SendGameReadyToLoadMsg\n %s", ready ? "TRUE" : "FALSE");
 
-    *(int32_t *)(COMM + (uint32_t)AM2_THE_COMM->CommSlotOfId(
-                            *(const int32_t *)(COMM + AM2_COMM_SELF_ID))
-                        * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY_TO_LOAD) = ready;
+    COMM->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(
+                            (int32_t)COMM->selfId)].readyToLoad = ready;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
                 AM2_THE_COMM->CommSlotOfId(
-                    *(const int32_t *)(COMM + AM2_COMM_SELF_ID)),
+                    (int32_t)COMM->selfId),
                 ready ? "TRUE" : "FALSE");
 #undef COMM
 
@@ -321,24 +319,24 @@ extern "C" void     __cdecl UnPauseGame(uint32_t bits);
 
 int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 {
-    const uint8_t *comm = kCommObj;
+    const AM2_Comm *comm = kCommObj;
     int32_t        rc   = 0;
 
     (void)unused;   /* pushed by every call site, read by none. */
     *(int32_t *)(g_msgMap + AM2_MSG_VALUE) = result;
 
     /* The host has nobody to tell, and says so with a 1 rather than a 0. */
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (comm->isHost)
         return 1;
 
-    if (*(const int32_t *)(comm + AM2_COMM_CONNECTED)) {
+    if (comm->connected) {
         rc   = SendGameMsg((void *)g_msgMap, 0, 1);
         comm = kCommObj;
-        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+        if (comm->verbose) {
             /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is
              * not printed at all. The original's. */
             am2_log("SendMapMsg from %x   Error = %d \n",
-                    *(const int32_t *)(comm + AM2_COMM_SELF_ID), result);
+                    (int32_t)comm->selfId, result);
         }
     }
     return rc;
@@ -347,14 +345,14 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
-#define COMM  ((uint8_t *)kCommObj)
+#define COMM  (kCommObj)
 #define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
     int32_t slot;
 
-    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (!COMM->isHost)
         return;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("ReceivedMapMsg from %x  Result = %d (4 is nominal) \n",
                 dpid, VALUE);
 
@@ -364,12 +362,10 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
      * the same nothing as anything above 8. */
     switch (VALUE) {
     case 0:
-        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                     + COMM_ARMY_OFF_MAP_OK) = 1;
+        COMM->slots[(uint32_t)slot].mapOk = 1;
         break;
     case 1: case 2: case 3: case 4: case 6: case 8:
-        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                     + COMM_ARMY_OFF_MAP_OK) = 0;
+        COMM->slots[(uint32_t)slot].mapOk = 0;
         PlaySoundAt(3, 0, 0, 0, 0);
         break;
     default:
@@ -397,11 +393,11 @@ static inline void RepaintDialogAndSendPlayers(void)
 
 void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
 {
-#define COMM ((uint8_t *)kCommObj)
-    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST)) {
+#define COMM (kCommObj)
+    if (COMM->isHost) {
         int32_t slot;
 
-        if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+        if (COMM->verbose)
             am2_log("ReceivedColorMsg from %x  Color =%d \n",
                     dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
@@ -415,20 +411,19 @@ void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
 
 void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
 {
-#define COMM ((uint8_t *)kCommObj)
+#define COMM (kCommObj)
     /* comm is re-read at each use; the body sits inside the host test, so
      * the registers are saved before it. */
-    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST)) {
+    if (COMM->isHost) {
         int32_t slot;
 
-        if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+        if (COMM->verbose)
             am2_log("ReceivedTeamMsg from %x  Team =%d \n",
                     dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
         slot = ((AM2_Comm *)COMM)->CommSlotOfId(dpid);
         /* Written straight in, with none of the colour half's checking. */
-        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                     + COMM_ARMY_OFF_TEAM)
+        COMM->slots[(uint32_t)slot].team
             = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
 
         RepaintDialogAndSendPlayers();
@@ -446,26 +441,23 @@ static inline void CommEndSetupInline(void)
     /* The comm object is re-read from its global at every use. */
 #define comm kCommObj
     /* Only the host decides that setup is over. */
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!comm->isHost)
         return;
 
     /* The count is re-read each time round rather than hoisted. */
-    for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++) {
-        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    for (i = 0; i < comm->playerCount; i++) {
+        if (comm->verbose)
             am2_log("m_ArmyReady[%d] = %d \n", i,
-                    *(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                                       + COMM_ARMY_OFF_READY));
+                    comm->slots[(uint32_t)i].ready);
 
         /* -1 is the only id treated as empty, though 0 is documented as one
          * too -- so a slot holding 0 must be ready. The original's test. */
-        if (*(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                               + AM2_PLAYER_ID) != -1
-            && !*(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                                   + COMM_ARMY_OFF_READY))
+        if ((int32_t)comm->slots[(uint32_t)i].id != -1
+            && !comm->slots[(uint32_t)i].ready)
             return;
     }
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (comm->verbose)
         am2_log("Sending EndSetupMessage\n");
 #undef comm
 
@@ -481,26 +473,24 @@ void __cdecl CommEndSetup(void)
 void __cdecl SendGameReadyMsg(int32_t ready)
 {
     /* The comm object is re-read at every use, as the image does. */
-#define comm ((uint8_t *)kCommObj)
+#define comm (kCommObj)
 
     /* Gated on the verbosity field like the rest of the group -- unlike
      * SendGameStartMsg, whose opening line is not. */
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (comm->verbose)
         am2_log("SendGameReadyMsg\n %s", ready ? "TRUE" : "FALSE");
 
     /* Our own slot: the id comes from the comm object, where the receive half
      * takes it from the message. */
-    *(int32_t *)(comm + (uint32_t)((AM2_Comm *)comm)->CommSlotOfId(
-                                *(const int32_t *)(comm + AM2_COMM_SELF_ID))
-                            * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY) = ready;
+    comm->slots[(uint32_t)((AM2_Comm *)comm)->CommSlotOfId(
+                                (int32_t)comm->selfId)].ready = ready;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+    if (comm->verbose) {
         /* The lookup runs a second time inside the `if`, as in both
          * ready-to-load halves. */
         am2_log("Setting m_ArmyReady[%d] to %s\n",
                 ((AM2_Comm *)comm)->CommSlotOfId(
-                                     *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
+                                     (int32_t)comm->selfId),
                 ready ? "TRUE" : "FALSE");
     }
 
@@ -517,16 +507,14 @@ void __cdecl SendGameReadyMsg(int32_t ready)
 void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 {
     /* The comm object is re-read at every use, as the image does. */
-#define COMM ((uint8_t *)kCommObj)
+#define COMM (kCommObj)
 #define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("ReceiveGameReadyMsg\n");
 
-    *(int32_t *)(COMM + (uint32_t)((AM2_Comm *)COMM)->CommSlotOfId(dpid)
-                            * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY) = VALUE;
+    COMM->slots[(uint32_t)((AM2_Comm *)COMM)->CommSlotOfId(dpid)].ready = VALUE;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("Setting m_ArmyReady[%d] to %s\n",
                 ((AM2_Comm *)COMM)->CommSlotOfId(dpid),
                 VALUE ? "TRUE" : "FALSE");
@@ -539,22 +527,20 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
-#define COMM  ((uint8_t *)kCommObj)
+#define COMM  (kCommObj)
 #define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
     void *dlg;
 
     /* Host only. */
-    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (!COMM->isHost)
         return;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+    if (COMM->verbose)
         am2_log("ReceiveGameReadyToLoadMsg\n");
 
-    *(int32_t *)(COMM + (uint32_t)AM2_THE_COMM->CommSlotOfId(dpid)
-                        * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY_TO_LOAD) = VALUE;
+    COMM->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(dpid)].readyToLoad = VALUE;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED)) {
+    if (COMM->verbose) {
         /* The lookup runs a SECOND time here; the original does not reuse the
          * slot it just computed. */
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
@@ -577,12 +563,12 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 
 void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from)
 {
-    const uint8_t *comm = kCommObj;
+    const AM2_Comm *comm = kCommObj;
 
     (void)msg;
     (void)from;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (comm->verbose)
         am2_log("ReceiveEndSetupMsg\n");
 
     orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
@@ -757,19 +743,18 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 {
     /* The comm object and each record's id are read at every use. */
-#define COMM ((uint8_t *)kCommObj)
-#define ID   (*(const uint32_t *)(COMM + (uint32_t)i * COMM_ARMY_RECORD_SIZE \
-                                  + AM2_PLAYER_ID))
+#define COMM (kCommObj)
+#define ID   (COMM->slots[(uint32_t)i].id)
     int32_t ok = 1;
     int32_t i;
 
     (void)dpid;   /* the dispatcher passes it; this one never reads it. */
 
     /* The host sent this; it does not receive it. */
-    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (COMM->isHost)
         return;
 
-    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED)) {
+    if (COMM->verbose) {
         /* "Seed is %d" pushes a literal 0 here as well as in the send half, so
          * the seed this function is about is never in either log. */
         am2_log("ReceiveStartGameMsg for %d Players.  Seed is %d \n",
@@ -777,8 +762,8 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
     }
 
     /* The count is re-read every iteration, as everywhere else in this file. */
-    for (i = 0; i < *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT); i++) {
-        if ((int32_t)ID == *(const int32_t *)(COMM + AM2_COMM_SELF_ID))
+    for (i = 0; i < COMM->playerCount; i++) {
+        if ((int32_t)ID == (int32_t)COMM->selfId)
             continue;
 
         /* 7 is a result code, not a map. The second argument is the id, which
@@ -851,7 +836,7 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
         PAUSE_BLOCK(PAUSE_BIT_B_SLOT0)
     }
 
-    if (*(const int32_t *)(kCommObj + AM2_COMM_LOG_ENABLED) && mask)
+    if (kCommObj->verbose && mask)
         am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
                 "pauseflags = %x (%x) (msg Pause=%x)\n",
                 dpid, slot, *(const int32_t *)(m + AM2_MSG_PAUSE),
@@ -886,17 +871,15 @@ typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
  * -1 when the count is zero or nothing matches. */
 int32_t __attribute__((thiscall)) AM2_Comm::CommFindPlayer(int32_t dpid)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
-    const uint8_t *c = (const uint8_t *)comm;
-    int32_t        n = *(const int32_t *)(c + COMM_OFF_PLAYER_COUNT);
+    const AM2_Comm *c = comm;
+    int32_t        n = c->playerCount;
     int32_t        i;
 
     for (i = 0; i < n; i++)
-        if (*(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
-                               + AM2_PLAYER_ID) == dpid)
-            return *(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
-                                      + AM2_PLAYER_ARMY);
+        if ((int32_t)c->slots[(uint32_t)i].id == dpid)
+            return c->slots[(uint32_t)i].colour;
     return -1;
 }
 
@@ -907,14 +890,12 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommFindPlayer(int32_t dpid)
  * carry. Everything else reads the slot's active flag. */
 int32_t __attribute__((thiscall)) AM2_Comm::ArmyInPlay(uint32_t uid)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
     int32_t army = UidArmy((int32_t)UidOnWire(uid));
 
     if (army != AM2_PLAYERS_MAX)
-        return *(const int32_t *)((const uint8_t *)comm
-                                  + (uint32_t)army * AM2_PLAYER_STRIDE
-                                  + AM2_PLAYER_ACTIVE);
+        return comm->slots[(uint32_t)army].wasHere;
     return 1;
 }
 
@@ -1204,7 +1185,7 @@ void __cdecl RecvTrooperFire(void *msg)
     unit->fireFlag =
         *(const uint8_t *)(m + 0x18);
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+    if (kCommObj->verbose)
         am2_log("Trooper Fire Rec, trooper: %x,  face:%d, pos (%d,%d,%d),"
                 " loctarg %x, globTarg %x, weapidx %d\n",
                 troopUid,
@@ -1255,7 +1236,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
     AM2_Object *trooper;
     AM2_Object *item;
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+    if (kCommObj->verbose)
         am2_log("-->Trooper Drop Item Received: Trooper: %x, item: %x,"
                 " request: %d, slot: %d, quant: %d \n",
                 UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)),
@@ -1283,7 +1264,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
             return;
 
         RemoveInventoryItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
-        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        if (kCommObj->verbose)
             am2_log("Weapon destroyed before dropping; but we handled it\n");
         return;
     }
@@ -1291,13 +1272,13 @@ void __cdecl RecvTrooperDropItem(void *msg)
     if (!ObjIsType4(item))
         return;
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+    if (kCommObj->verbose)
         am2_log("Drop item received & performed; ammo %d\n",
                 *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
 
-    if (((AM2_Comm *)kCommObj)->CommMustBroadcast(
+    if (kCommObj->CommMustBroadcast(
             (int16_t)trooper->owner)) {
-        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        if (kCommObj->verbose)
             am2_log("\tDrop Item already handled (it's my unit)\n");
         return;
     }
@@ -1487,13 +1468,13 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
         return;
 
     case AM2_MSG_TROOPER_DROP_ITEM:
-        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        if (kCommObj->verbose)
             orig_log("troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE\n");
         RecvTrooperDropItem(msg);
         return;
 
     case AM2_MSG_TROOPER_WEAPON:
-        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        if (kCommObj->verbose)
             orig_log("troopMessageReceive: got eTROOPER_SET_WEAPON_MESSAGE\n");
         RecvTrooperSetWeapon(msg);
         return;
@@ -1562,7 +1543,7 @@ void __cdecl RecvVehicleExit(void *msg)
     const uint8_t *m = (const uint8_t *)msg;
     void          *vehicle;
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+    if (kCommObj->verbose)
         orig_log("-->Vehicle Exit Received: Vehicle: %x, trooper: %x\n",
                  UidOnWire(*(const uint32_t *)(m + 4)),
                  UidOnWire(*(const uint32_t *)(m + 8)));
@@ -1651,7 +1632,7 @@ static inline void RecordGameOver(int32_t winner)
 void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
 {
     uint8_t  *m    = (uint8_t *)msg;
-    uint8_t  *comm = (uint8_t *)kCommObj;
+    AM2_Comm  *comm = kCommObj;
     /* The uid is read from the message at every use. */
 #define uid (*(const uint32_t *)(m + AM2_ARMYMSG_UID))
     int32_t   army;
@@ -1659,7 +1640,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
 
     (void)seq;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
+    if (!comm->msgsEnabled)
         return;
 
     if (!((AM2_Comm *)(comm))->ArmyInPlay(uid)) {
@@ -1740,7 +1721,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
 
     /* Only the first five packets of a session are logged. */
     if (*(const uint32_t *)(pkt + PACKET_OFF_SEQ) < 5
-        && *(const int32_t *)(kCommObj + AM2_COMM_LOG_ENABLED))
+        && kCommObj->verbose)
         am2_log("Get Packed  %x bytes seq %d Chksum %x \n",
                 *(const int32_t *)(pkt + PACKET_OFF_LEN),
                 *(const int32_t *)(pkt + PACKET_OFF_SEQ),
@@ -1749,9 +1730,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
     /* A bad checksum is counted and complained about, and then the packet is
      * walked anyway. */
     if (XorChecksum(pkt)) {
-#define ERRS (*(int32_t *)((uint8_t *)kCommObj \
-                           + (uint32_t)slot * COMM_ARMY_RECORD_SIZE \
-                           + COMM_ARMY_OFF_CHKSUM_ERRS))
+#define ERRS (kCommObj->slots[(uint32_t)slot].chksumErrs)
         am2_log("Receive Checksum Error from %x seq %d\n",
                 dpid, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
         ERRS = ERRS + 1;
@@ -1935,21 +1914,21 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
-    uint8_t       *comm = (uint8_t *)kCommObj;
+    AM2_Comm       *comm = kCommObj;
     uint8_t       *q;
 
     (void)dpid;   /* given, and never read -- alone in this family. */
 
     /* The host is the one that sends this. */
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (comm->isHost)
         return;
 
-    *(int32_t *)(comm + COMM_OFF_SEND_FLAGS) =
+    comm->sendFlags =
         *(const int32_t *)(m + AM2_MSG_VALUE);
 
     /* OUR record, not the sender's. */
     q = (uint8_t *)FindPlayerById(
-            *(const uint32_t *)((uint8_t *)kCommObj + AM2_COMM_SELF_ID));
+            kCommObj->selfId);
     if (!q)
         return;
 
@@ -1960,7 +1939,7 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
                                  int32_t to)
 {
-    const uint8_t *comm = kCommObj;
+    const AM2_Comm *comm = kCommObj;
     uint8_t       *m    = (uint8_t *)msg;
     int32_t        type;
 
@@ -1970,7 +1949,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
     (void)size;
     (void)to;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
+    if (!comm->msgsEnabled)
         return;
 
     type = *(const int32_t *)(m + AM2_MSG_TYPE);
@@ -1998,7 +1977,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
 
     case 8:
         /* Tested only to complain; the handler runs either way. */
-        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (comm->isHost)
             am2_log("Message Error:  Host should not receive PLAYERMSG\n");
         ReceivePlayerMsg((const AM2_PlayerMsg *)m, from);
         return;
@@ -2008,19 +1987,19 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
         return;
 
     case 9:
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (!comm->isHost)
             return;
         ReceivedColorMsg(m, from);
         return;
 
     case 17:
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (!comm->isHost)
             return;
         ReceivedTeamMsg(m, from);
         return;
 
     case 18:
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (!comm->isHost)
             return;
         ReceiveGameReadyToLoadMsg(m, from);
         return;
@@ -2076,11 +2055,11 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
     const uint8_t     *flow;
     int32_t            seq;
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_DPLAY) == 0)
+    if (kCommObj->dplay == 0)
         return;
 
     flow = (const uint8_t *)FindPlayerById(
-               (uint32_t)*(const int32_t *)(kCommObj + COMM_OFF_OUR_PLAYER_ID));
+               (uint32_t)(int32_t)kCommObj->selfId);
     seq = *(const int32_t *)(flow + FLOW_OFF_SEQUENCE);
 
     msg.hdr.len  = AM2_MSG_TROOPER_FIRE_LEN;
@@ -2099,7 +2078,7 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
 
     ArmyMessageSend(&msg);
 
-    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+    if (kCommObj->verbose)
         am2_log("Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), "
                 "loctarg %x, globTarg %x, weap %d, seq:%d\n",
                 t->uid, t->facing,
@@ -2224,7 +2203,7 @@ void __cdecl CommDrainMsgs(void)
 {
     uint8_t *node;
 
-    if (!*(const int32_t *)(kCommObj + AM2_COMM_OFF_ACTIVE))
+    if (!kCommObj->active)
         return;
 
     for (node = (uint8_t *)MsgListRemHead(g_msgListB);
@@ -2284,8 +2263,7 @@ void __cdecl TellEachSlot(void)
          * COMM_ARMY_OFF_REMOTE (+0x20C) until the VC6 relink put the two side
          * by side -- a different field of the same record, so it asked the
          * wrong question of each slot in a multiplayer session. */
-        if (!*(const int32_t *)(kCommObj + slot * COMM_ARMY_RECORD_SIZE
-                                + COMM_ARMY_OFF_WAS_HERE))
+        if (!kCommObj->slots[slot].wasHere)
             continue;
         if (!((AM2_Comm *)(void *)kCommObj)->CommMustBroadcast((int16_t)slot))
             continue;
@@ -2567,14 +2545,14 @@ void __cdecl SendChatTo(char *text, int32_t slot)
      * before it knows whether it is zero. */
     rec[MSG_CHAT_OFF_INK] =
         *(g_objTableRecords
-          + (uint32_t)((AM2_Comm *)kCommObj)->CommArmyOfSlot(
+          + (uint32_t)kCommObj->CommArmyOfSlot(
                 *(const int32_t *)&g_defaultOwner)
             * AM2_OBJ_TABLE_REC_SIZE
           + OBJ_TABLE_REC_OFF_INK);
     if (!rec[MSG_CHAT_OFF_INK])
         rec[MSG_CHAT_OFF_INK] = g_whiteInk;
 
-    SendGameMsg(rec, ((AM2_Comm *)kCommObj)->CommPlayerId(slot), 0);
+    SendGameMsg(rec, kCommObj->CommPlayerId(slot), 0);
 }
 
 
@@ -2603,12 +2581,12 @@ void __cdecl CommTuneChangeLimit(void)
 {
     /* The comm object is read at every use. */
 #define COMM  (g_commObject)
-#define LIMIT (*(uint32_t *)(COMM + COMM_OFF_ENOUGH_CHANGE_LIMIT))
+#define LIMIT (COMM->enoughChangeLimit)
     uint32_t seq;
     uint32_t sent;
 
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              *(const uint32_t *)(COMM + COMM_OFF_OUR_PLAYER_ID))
+              COMM->selfId)
           + FLOW_OFF_SEQUENCE);
 
     if (g_bandwidthLastSeq < seq) {
@@ -2630,7 +2608,7 @@ void __cdecl CommTuneChangeLimit(void)
                      sent, LIMIT);
         }
 
-        *(uint32_t *)(COMM + COMM_OFF_SEND_INTERVAL) = LIMIT + 1u;
+        COMM->sendInterval = LIMIT + 1u;
     }
 
     TellEachSlot();
@@ -2860,9 +2838,9 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
 int32_t __cdecl FlowRecvMessage(void *nodev)
 {
 #define comm (g_commObject)
-#define VERBOSE (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+#define VERBOSE (comm->verbose)
 #define FROM (*(const uint32_t *)(node + MSGNODE_OFF_FROM))
-#define MINE (*(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
+#define MINE (comm->selfId)
     uint8_t *node = (uint8_t *)nodev;
     uint8_t *msg;
     uint8_t *sender, *me, *sent, *copy;
@@ -3066,7 +3044,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         expected = *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1;
         if (*(const uint32_t *)(me + FLOW_OFF_SEQUENCE) == 1 && expected == 1
             && *(const uint32_t *)(me + FLOW_OFF_READY) == 0) {
-            if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0) {
+            if (comm->isHost == 0) {
                 if (VERBOSE)
                     am2_log("Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d\n",
                             FROM, *(const uint32_t *)(msg + PACKET_OFF_SEQ),
@@ -3375,10 +3353,10 @@ void __cdecl RecvVehicle1E(void *msg)
 void __cdecl RecvVehicle24(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
-    uint8_t       *comm = g_commObject;
+    AM2_Comm       *comm = g_commObject;
     void          *vehicle;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Received: Vehicle: %x, trooper: %x\n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)));
@@ -3485,8 +3463,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
     o->dest = g_zeroXY;
     ObjSetFootprint(o);
 
-    if (*(const int32_t *)(g_commObject
-                           + COMM_OFF_VERBOSE))
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"-->vehicleUpdateMessageUnpack: ID:%x, Change:%d%d%d, Pos (%d,%d), facing:%d, gunfacing:%d, intent.facing:%d, intent.gunfacing:%d, action:%d, rev:%d, half:%d, slow:%d\n",
                 o->uid,
                 head >> 31, (head >> 30) & 1u, (head >> 29) & 1u,
@@ -3546,7 +3523,7 @@ void __cdecl RecvVehicle1D(void *msg)
     AM2_Object       *vehicle;
     AM2_Object       *item;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)),
@@ -3554,7 +3531,7 @@ void __cdecl RecvVehicle1D(void *msg)
                 *(const int32_t *)(m + 0x18),
                 *(const int32_t *)(m + 0x14));
 
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) != 0) {
+    if (comm->isHost != 0) {
         if (request == 2)
             return;
         if (request == 3)
@@ -3584,14 +3561,14 @@ void __cdecl RecvVehicle1D(void *msg)
         return;
 
     if (request == 2) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Tell pickup item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
         return;
     }
 
     if (request == 3) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Tell Drop item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
         /* The answer is discarded -- the original calls it and drops it. */
@@ -3620,7 +3597,7 @@ void __cdecl RecvVehicle1D(void *msg)
     }
 
     if (request == 1) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Request drop item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
     }
@@ -3661,7 +3638,7 @@ void __cdecl RecvVehicle1F(void *msg)
     AM2_Object       *vehicle;
     void          *item;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)),
@@ -3685,7 +3662,7 @@ void __cdecl RecvVehicle1F(void *msg)
             return;
         if ((w->flags & 2u) == 0)
             return;
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Weapon destroyed before dropping; but we handled it\n");
         return;
     }
@@ -3693,7 +3670,7 @@ void __cdecl RecvVehicle1F(void *msg)
     if (!ObjIsType4((const AM2_Object *)item))
         return;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log((const char *)(uintptr_t)"Drop item received & performed; ammo %d\n",
                 *(const int32_t *)(m + 0x14));
 
@@ -3701,7 +3678,7 @@ void __cdecl RecvVehicle1F(void *msg)
                            (int16_t)vehicle->owner))
         return;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log((const char *)(uintptr_t)"\tDrop Item already handled (it's my unit)\n");
 #undef comm
 }
@@ -3751,8 +3728,7 @@ void __cdecl RecvVehicle1C(void *msg)
     /* +0x529 is the spread seed; see SendVehicleFire on why it stays raw. */
     veh->fireFlag               = *(const uint8_t *)(m + 0x14);
 
-    if (*(const int32_t *)(g_commObject
-                           + COMM_OFF_VERBOSE))
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"Vehicle Fire Rec, vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x\n",
                 vehUid,
                 (uint32_t)veh->turretFacing,

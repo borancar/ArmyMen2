@@ -158,37 +158,29 @@ uint32_t __cdecl GetReSendMask(uint32_t id)
     return 0;
 }
 
-#define AM2_ARMY_STRIDE 112u
-
 void __attribute__((thiscall)) AM2_Comm::CommSetSlotRemote(int32_t slot)
 {
-    *(int32_t *)((uint8_t *)this + (uint32_t)slot * AM2_ARMY_STRIDE
-                 + COMM_ARMY_OFF_REMOTE) = 1;
+    this->slots[(uint32_t)slot].remote = 1;
 }
 
 void __attribute__((thiscall)) AM2_Comm::CommClearSlotRemote(int32_t slot)
 {
-    *(int32_t *)((uint8_t *)this + (uint32_t)slot * AM2_ARMY_STRIDE
-                 + COMM_ARMY_OFF_REMOTE) = 0;
+    this->slots[(uint32_t)slot].remote = 0;
 }
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommSlotRemote(int16_t slot)
 {
-    const uint8_t *rec = (const uint8_t *)this
-                         + (uint32_t)(int32_t)slot * AM2_ARMY_STRIDE;
-    int32_t        id  = *(const int32_t *)((const uint8_t *)this
-                                            + (uint32_t)(int32_t)slot
-                                              * AM2_ARMY_STRIDE
-                                            + AM2_PLAYER_ID);
+    const AM2_CommSlot *rec = &this->slots[(uint32_t)(int32_t)slot];
+    int32_t        id  = (int32_t)this->slots[(uint32_t)(int32_t)slot].id;
 
     /* 0 and -1 are both "nobody", which is the convention CLAUDE.md records
      * for this field and which ReceiveGameReadyMsg's loop disagrees with. */
     if (id != 0 && id != -1)
-        return *(const int32_t *)(rec + COMM_ARMY_OFF_REMOTE) != 0;
+        return rec->remote != 0;
 
     /* An empty slot that once held someone answers a different question. */
-    if (*(const int32_t *)(rec + COMM_ARMY_OFF_WAS_HERE))
-        return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST) == 0;
+    if (rec->wasHere)
+        return this->isHost == 0;
 
     return -1;
 }
@@ -205,7 +197,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
         return this->CommSlotRemote(army) == 0;
 
     /* The neutral army is the host's to speak for. */
-    return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST) != 0;
+    return this->isHost != 0;
 }
 
 /* NOT AM2_PLAYER_STRIDE -- orig.h already has that name on 0x70, the comm

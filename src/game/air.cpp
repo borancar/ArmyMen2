@@ -242,8 +242,7 @@ found:
         uint32_t *t = (uint32_t *)(NREC(i) + NACKREC_OFF_TIME);
 
         if (now > *t + capped) {
-            if (*(const int32_t *)((const uint8_t *)
-                    *(void *const *)&g_commObject + COMM_OFF_VERBOSE))
+            if (g_commObject->verbose)
                 am2_log("Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d count = %d nackinterval = %d\n",
                         seq, *(const uint32_t *)(p + PEER_OFF_ID), now,
                         *t + capped, now - *t - capped,

@@ -159,22 +159,20 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #else
 #define AM2_WP_INLINE static inline
 #endif
-static inline const char *PlayerName(uint8_t *comm, int32_t slot)
+static inline const char *PlayerName(AM2_Comm *comm, int32_t slot)
 {
-    return (const char *)(comm + COMM_OFF_PLAYERS
-                          + (uint32_t)slot * COMM_PLAYER_STRIDE
-                          + COMM_SLOT_OFF_NAME);
+    return comm->slots[(uint32_t)slot].name;
 }
 
 /* Ask DirectPlay for the session description again and clear the two bits that
  * close it, so a replacement player can still join. Both halves are ours. */
 AM2_WP_INLINE void ReopenSession(void)
 {
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     void *desc;
 
     CommGetSessionDesc(comm);
-    desc = *(void **)(comm + COMM_OFF_SESSION_DESC);
+    desc = comm->sessionDesc;
     if (!desc)
         return;
     *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
@@ -189,12 +187,12 @@ AM2_WP_INLINE void ReopenSession(void)
 AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
 {
     /* The comm object is read from its global at every use. */
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     uint32_t id   = (uint32_t)wParam;
     int32_t  slot;
     char     text[128];
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         orig_log("DESTROYPLAYER Win Message for player %x\n", id);
 
     if (!id || id == 0xFFFFFFFFu)
@@ -217,7 +215,7 @@ AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
             int32_t removed = ((AM2_Comm *)comm)->CommRemovePlayer(id);
 
             DestroyFlow(id);
-            if (removed && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            if (removed && comm->isHost)
                 SendPlayerMsg(1);
         }
 
@@ -237,13 +235,13 @@ AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
             MenuMessage(text, 4, 1);
         }
 
-        if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4
-            && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if ((uint32_t)comm->playerCount < 4
+            && comm->isHost)
             ReopenSession();
         return 1;
     }
 
-    if (id != *(const uint32_t *)(comm + COMM_OFF_PLAYER_MADE)) {
+    if (id != (uint32_t)comm->connected) {
         int32_t left;
 
         slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
@@ -252,10 +250,10 @@ AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
         left = ((AM2_Comm *)comm)->CommPlayerLeft(id);
         DestroyFlow(id);
         if (left && g_gameState == 2 && g_netGame
-            && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            && comm->isHost)
             CommEndSetup();
 
-        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (comm->isHost)
             /* Not a sprite: hand the departed player's units to the AI. Both
              * halves are ours now -- the walk and the callback -- so the callback
              * goes in by NAME. It was ADDR_OBJ_TO_AI cast to a pointer while it
@@ -282,17 +280,17 @@ AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
 AM2_WP_INLINE LRESULT OnHostMigrated(void)
 {
     /* The comm object is read from its global at every use. */
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     char     text[128];
 
-    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
+    comm->isHost = 1;
     g_mpSession = 1;
     if (g_gameState == 1) {
         g_subState     = 7;
         g_overlayDirty = 1;
     }
 
-    if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4)
+    if ((uint32_t)comm->playerCount < 4)
         ReopenSession();
 
     orig_sprintf(text, "Player %s is now the host.",
@@ -310,7 +308,7 @@ AM2_WP_INLINE LRESULT OnHostMigrated(void)
 AM2_WP_INLINE LRESULT OnSetupDone(void)
 {
     /* The comm object is read from its global at every use. */
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
 
     g_netGame = 0;
     SetFogOfWar((int32_t)((g_gameOverFlags >> 18) & 1u));

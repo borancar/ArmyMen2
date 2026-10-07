@@ -744,8 +744,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
  * because the call sites are what carry the format strings that named these
  * functions in the first place. */
 #define kEventDebug \
-    (*(const int32_t *)((const uint8_t *)*(void * *)&g_commObject \
-                        + COMM_OFF_VERBOSE))
+    (g_commObject->verbose)
 
 
 /* Both stay original and are reached by address. ArmyMessageSend is the whole
@@ -1880,7 +1879,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                g_dirScratch,
                obj->pos.x,
                obj->pos.y,
-               ((AM2_Comm *)kCommObject)->CommArmyOfSlot(army),
+               kCommObject->CommArmyOfSlot(army),
                army, 0, 0, 0, 1, 0);
     if (!unit)
         return;
@@ -2774,10 +2773,10 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
                         int32_t maskB, int32_t delay, int32_t removeevent,
                         int32_t arg)
 {
-    const uint8_t *comm = g_commObject;
+    const AM2_Comm *comm = g_commObject;
 
     if (g_mpSession != 0
-        && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)
+        && comm->isHost == 0)
         return;
 
     if (g_subState
@@ -3157,11 +3156,9 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
     }
 
     case AM2_OPERAND_SLOT_TAKEN: {
-        const uint8_t *comm = g_commObject;
+        const AM2_Comm *comm = g_commObject;
 
-        if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
-                               + (uint32_t)a * COMM_PLAYER_STRIDE
-                               + COMM_SLOT_OFF_TAKEN))
+        if (comm->slots[(uint32_t)a].wasHere)
             return ((AM2_Comm *)(void *)comm)->CommSlotHasPlayer(a) ? 1 : 2;
         return 0;
 
@@ -3594,7 +3591,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
         unit = (AM2_Object *)(uint8_t *)CreateTrooper(act->text, at.x,
                                         at.y,
-                                        ((AM2_Comm *)kCommObject)->CommArmyOfSlot(
+                                        kCommObject->CommArmyOfSlot(
                                                        act->army),
                                         act->army, 0, 0, 0, 1, 0);
         if (unit == 0)
@@ -3631,9 +3628,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * multiplayer; the fifth is CommArmyOfSlot of the same field, always.
          * They are not the same call and not the same direction. */
         CreateVehicle(act->n0, act->text, at.x, at.y,
-                      ((AM2_Comm *)kCommObject)->CommArmyOfSlot(act->army),
+                      kCommObject->CommArmyOfSlot(act->army),
                       ((g_mpSession) != 0)
-                          ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
+                          ? kCommObject->CommSlotForArmy(act->army)
                           : act->army,
                       0, 0, 0, 0);
         return;
@@ -3870,7 +3867,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         int32_t army;
 
         if (g_mpSession != 0)
-            army = ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army);
+            army = kCommObject->CommSlotForArmy(act->army);
         else
             army = act->army;
         EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),

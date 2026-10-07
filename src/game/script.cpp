@@ -3243,13 +3243,13 @@ static inline void ScriptReadWithLog(const char *path)
 {
     int32_t ok;
 
-    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE))
+    if (kCommObject->verbose)
         am2_log("reading script %s: ", path);
 
     ok = ReadScript(path, (AM2_ScriptCtx *)g_scriptContext);
 
     /* Re-read the flag: ReadScript can have changed it. */
-    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE)) {
+    if (kCommObject->verbose) {
         if (ok)
             am2_log("worked!\n");
         else
@@ -3315,8 +3315,8 @@ void __cdecl LoadLevelScript(void)
         ScriptReadWithLog(path);
 
         for (i = 0; i < AM2_PLAYERS_MAX; i++) {
-#define SLOT (kCommObject + (size_t)i * AM2_PLAYER_STRIDE)
-            if (!*(const int32_t *)(SLOT + AM2_PLAYER_ACTIVE))
+#define SLOT (&kCommObject->slots[(size_t)i])
+            if (!SLOT->wasHere)
                 continue;
             /* A slot a real player still holds needs no AI script. The test
              * is the DirectPlay id, so this reads the opposite way round from
@@ -3326,10 +3326,10 @@ void __cdecl LoadLevelScript(void)
              * prints from NULL. No slot carries one, and this is the
              * original's own omission. */
             if ((colour = (const char *)(uintptr_t)
-                     ((AM2_Comm *)kCommObject)->CommSlotHasPlayer(i)) != 0)
+                     kCommObject->CommSlotHasPlayer(i)) != 0)
                 continue;
 
-            switch (*(const int32_t *)(SLOT + AM2_PLAYER_ARMY)) {
+            switch (SLOT->colour) {
             case 0: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_GREEN); break;
             case 1: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_TAN);   break;
             case 2: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_BLUE);  break;

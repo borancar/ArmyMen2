@@ -328,14 +328,14 @@ void __cdecl ResetToTitle(void)
  * arm also clears the game-over snapshot, which is why it requests state 0. */
 void __cdecl StartIntro(void)
 {
-    uint8_t *comm = g_commObject;
+    AM2_Comm *comm = g_commObject;
 
-    if (!*(const int32_t *)(comm + ADDR_COMM_OFF_LOBBY)) {
+    if (!comm->lobbyStarting) {
         CommLobbyStart(comm);
         comm = g_commObject;
     }
 
-    if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
+    if (comm->lobbied) {
         RequestState(1);
         return;
     }
@@ -577,11 +577,11 @@ static inline void ParseCommandLine(char *cmdLine)
     if (strstr(cmdLine, "-traceVEH"))  opt(((uintptr_t)&g_traceVeh)) = 1;
 
     if (strstr(cmdLine, "-debugComm"))
-        *(int32_t *)(g_commObject + COMM_OFF_VERBOSE) = 1;
+        g_commObject->verbose = 1;
     if (strstr(cmdLine, "-traceComm"))
-        *(int32_t *)(g_commObject + COMM_OFF_TRACE) = 1;
+        g_commObject->trace = 1;
     if (strstr(cmdLine, "-logComm"))
-        *(int32_t *)(g_commObject + COMM_OFF_LOG) = 1;
+        g_commObject->log = 1;
 
     if (strstr(cmdLine, "-tracewin"))  opt(((uintptr_t)g_optTraceWin)) = 1;
     if (strstr(cmdLine, "-dbg"))       opt(((uintptr_t)&g_optDbg)) = 1;

@@ -103,33 +103,30 @@ void __cdecl StartSelectedGame(void)
             return;
         }
 
-        *(int32_t *)(COMM + COMM_OFF_LOCAL) = 1;
+        COMM->local = 1;
 
         /* A DirectPlay object left over from browsing sessions is dropped: a
          * local game has no use for it and it would otherwise stay
          * connected. */
-        if (*(void **)(COMM + COMM_OFF_DPLAY))
+        if (COMM->dplay)
             CommDropDirectPlay(COMM);
 
         /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
         for (i = 1; i < 4; i++) {
-            *(int32_t *)(COMM + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
-                         + COMM_SLOT_OFF_TAKEN) = 1;
-            orig_sprintf((char *)(COMM + COMM_OFF_PLAYERS
-                                  + i * COMM_PLAYER_STRIDE
-                                  + COMM_SLOT_OFF_NAME),
+            COMM->slots[i].wasHere = 1;
+            orig_sprintf(COMM->slots[i].name,
                          "Computer%d", i);
         }
 
         g_menuRequest    = REQUEST_LOCAL;
         g_menuRequestSet = 1;
         ApplyGameSettings();
-        *(int32_t *)(COMM + COMM_OFF_IS_HOST) = 1;
+        COMM->isHost = 1;
     } else {
         /* An existing session: point DirectPlay at it and let the menu
          * know. */
         if (CommInitializeConnection(COMM, connection)) {
-            *(int32_t *)(COMM + COMM_OFF_LOCAL) = 0;
+            COMM->local = 0;
             g_menuRequest    = REQUEST_JOINED;
             g_menuRequestSet = 1;
         }
@@ -190,7 +187,7 @@ void __cdecl StartMultiplayerGame(void)
     ApplyGameSettings();
     ClearMenuMsgs();
 
-    *(int32_t *)(g_commObject + COMM_OFF_IS_HOST) = 0;
+    g_commObject->isHost = 0;
 
     /* Made once and kept. A failed allocation leaves it null, which the open
      * below then refuses -- the original checks rather than assuming. */
@@ -204,7 +201,7 @@ void __cdecl StartMultiplayerGame(void)
 
     /* The member call itself: through msgslot.h's inline forwarder the
      * session pointer lands in a different register. */
-    if (!((AM2_Comm *)g_commObject)->CommEnumSessions(g_sessionObject)) {
+    if (!g_commObject->CommEnumSessions(g_sessionObject)) {
         g_menuRequest    = REQUEST_REFUSED;
         g_menuRequestSet = 1;
     }
@@ -260,13 +257,13 @@ void __cdecl HostBattle(void)
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
-    if (!((AM2_Comm *)g_commObject)->CommCreatePlayer(player, 0, 0, 0)) {
+    if (!g_commObject->CommCreatePlayer(player, 0, 0, 0)) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
     /* The host is always slot 0. */
-    strcpy((char *)(g_commObject + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
+    strcpy(g_commObject->slots[0].name,
            player);
 
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -508,7 +505,7 @@ void __cdecl OnQuit(void)
  * BattleJoinOk, sets no such flag. */
 void __cdecl OnStartWar(AM2_Widget *w)
 {
-    uint8_t *comm;
+    AM2_Comm *comm;
 
     (void)w;
 
@@ -528,7 +525,7 @@ void __cdecl OnStartWar(AM2_Widget *w)
     ClearMenuMsgs();
 
     comm = g_commObject;
-    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
+    comm->isHost = 1;
 }
 
 int startgame_install(void)

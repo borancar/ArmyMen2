@@ -787,8 +787,7 @@ void __cdecl ItemPreDestroy(AM2_Object *o, int32_t cells)
 }
 
 #define kCommDbg \
-    (*(const int32_t *)((const uint8_t *)*(void * *)&g_commObject \
-                        + COMM_OFF_VERBOSE))
+    (g_commObject->verbose)
 
 /* 0x00429C80. Release an item object's allocation, by its own log line.
  *
@@ -1051,8 +1050,7 @@ void __cdecl DestroyItemObject(AM2_Object *o, int32_t arg, int32_t notify)
  * A sentence beside a seam goes stale exactly when the seam closes. */
 
 #define kCommDebug \
-    (*(const int32_t *)((const uint8_t *)*(void * *)&g_commObject \
-                        + COMM_OFF_VERBOSE))
+    (g_commObject->verbose)
 
 /* 0x004285F0. Destroy one item, dispatching on its kind.
  *
@@ -2241,7 +2239,7 @@ struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_Map
 void __cdecl WeaponRespawn(AM2_Object *obj)
 {
     AM2_Object  *o = obj;
-    uint8_t  *comm;
+    AM2_Comm  *comm;
     uint32_t  flags;
     int32_t   kind;
     int32_t   quantity;       /* both arms below write it */
@@ -2260,7 +2258,7 @@ void __cdecl WeaponRespawn(AM2_Object *obj)
         return;
 
     comm = g_commObject;
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!comm->isHost)
         goto mark;
 
     if (flags & OBJ_FLAG_RESPAWN_RANDOM) {
@@ -3993,7 +3991,7 @@ void __cdecl ItemPreDestroyAlias(AM2_Object *obj, int32_t arg)
 
 /* The four teardowns and the broadcast test, all still the original's. */
 typedef void (__cdecl *am2_destroy_fn)(void *obj);
-#define kItemComm  (*(void *const *)&g_commObject)
+#define kItemComm  (g_commObject)
 
 /* 0x00428DA0, 22 callers. Destroy an object, then tell the others.
  *
@@ -4030,7 +4028,7 @@ void __cdecl DestroyByType(AM2_Object *obj)
     default: DestroyObjCommon(o); break;
     }
 
-    if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)o->owner))
+    if (kItemComm->CommMustBroadcast((int16_t)o->owner))
         SendObjDestroyed(o);
 }
 
@@ -4188,7 +4186,7 @@ void __cdecl DestroyObjCommon(AM2_Object *o)
 
         next = cur->chainNextUid;
 
-        if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)cur->owner))
+        if (kItemComm->CommMustBroadcast((int16_t)cur->owner))
             SendObjDestroyed(cur);
     }
 }
@@ -4340,7 +4338,7 @@ void __cdecl DeployItem(AM2_Object *obj, AM2_Point where, int32_t resurrect,
 #define WHERE where
 #define OWNER ((int16_t)o->owner)
     if (g_mpSession && suppress == 0
-        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(OWNER))
+        && !kItemComm->CommMustBroadcast(OWNER))
         return;
 
     if (resurrect) {
@@ -4378,7 +4376,7 @@ void __cdecl DeployItem(AM2_Object *obj, AM2_Point where, int32_t resurrect,
 
     if (suppress)
         return;
-    if (!((AM2_Comm *)kItemComm)->CommMustBroadcast(OWNER))
+    if (!kItemComm->CommMustBroadcast(OWNER))
         return;
 
     SendItemDeploy(obj, resurrect);
@@ -5177,10 +5175,10 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
 
             if (AM2_THE_COMM->CommMustBroadcast(
                                   (int16_t)o->owner)) {
-                const uint8_t *comm =
+                const AM2_Comm *comm =
                     g_commObject;
 
-                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                if (comm->verbose)
                     orig_log("DamageTrooper: droping armor UIDN:%x\n",
                              armour->uid);
 
@@ -5590,7 +5588,7 @@ static void __cdecl TriggerItemDestroyed(AM2_Object *obj, AM2_Object *attacker)
 {
     const AM2_Object *o = obj;
 
-    if (*(const int32_t *)((const uint8_t *)kItemComm + COMM_OFF_VERBOSE))
+    if (kItemComm->verbose)
         am2_log("TriggerItemDestroyed, item uid=%x, by uid = %x\n",
                 ((const AM2_Object *)obj)->uid,
                 attacker ? ((const AM2_Object *)attacker)->uid : 0u);
@@ -5743,13 +5741,13 @@ void __cdecl DamageObject(AM2_Object *obj, int32_t amount, int32_t kind,
     }
 
     if (g_mpSession && suppress == 0
-        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
+        && !kItemComm->CommMustBroadcast(attackerOwner))
         return;
 
     if (o->health <= 0) {
         NotifyDamaged(obj, (AM2_Object *)attacker);
         if (g_mpSession && suppress == 0
-            && ((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
+            && kItemComm->CommMustBroadcast(attackerOwner))
             DamageBroadcast(obj, attackerUid, amount, kind,
                                   &o->pos, 0);
         return;
@@ -5775,7 +5773,7 @@ void __cdecl DamageObject(AM2_Object *obj, int32_t amount, int32_t kind,
     NotifyDamaged(obj, (AM2_Object *)attacker);
 
     if (g_mpSession && suppress == 0
-        && ((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
+        && kItemComm->CommMustBroadcast(attackerOwner))
         DamageBroadcast(obj, attackerUid, amount, kind,
                               &o->pos, 0);
 
@@ -5783,7 +5781,7 @@ void __cdecl DamageObject(AM2_Object *obj, int32_t amount, int32_t kind,
         return;
 
     if (g_mpSession
-        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(
+        && !kItemComm->CommMustBroadcast(
                               (int16_t)o->owner))
         return;
 
@@ -5846,7 +5844,7 @@ void __cdecl FreeOverdueItems(void)
         uint32_t    flags = obj->flags;
 
         if ((flags & OBJ_FLAG_REPLACED) && !(flags & OBJ_FLAG_NO_SWEEP)) {
-            if (((AM2_Comm *)kItemComm)->CommMustBroadcast((int16_t)obj->owner))
+            if (kItemComm->CommMustBroadcast((int16_t)obj->owner))
                 ItemGoneMessageSend(obj);
             FreeItem(obj, 1);
         }
@@ -6751,7 +6749,7 @@ void __cdecl UseInventoryItem(AM2_Object *unit, int32_t slot)
         && !((AM2_Comm *)comm)->CommMustBroadcast((int16_t)u->owner))
         return;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         am2_log("UseInventoryItem\n");
 
     if (slot <= 0)
@@ -6777,7 +6775,7 @@ void __cdecl UseInventoryItem(AM2_Object *unit, int32_t slot)
 
     if (((AM2_Comm *)comm)->CommMustBroadcast(
                           (int16_t)u->owner)) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             am2_log("UseInventoryItem: droping item:%x\n",
                     (item)->uid);
 
@@ -6843,8 +6841,7 @@ void __cdecl TrooperDropItem(AM2_Object *unit, int32_t slot, AM2_Point at)
      * read the verbose flag 0x418 bytes past it. */
     if (AM2_THE_COMM->CommMustBroadcast(
                           (int16_t)u->owner)) {
-        if (*(const int32_t *)(g_commObject
-                               + COMM_OFF_VERBOSE))
+        if (g_commObject->verbose)
             am2_log("TrooperDropItem  %x\n", (item)->uid);
 
         TrooperDropItemSend(u, item, slot,
@@ -9580,7 +9577,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
     AM2_Object *held;
 
     NotifyPickedUp((AM2_Object *)item, (AM2_Object *)troop);
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         orig_log("TrooperHostApprovedPickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
@@ -9588,20 +9585,20 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
 
     switch (kind) {
     case AM2_ITEM_KIND_HOT_TARGET:
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("\tTrooperHostApprovedPickupItem: HotTarget\n");
         DestroyByType((AM2_Object *)item);
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("TrooperHostApprovedPickupItem %x\n",
                      ((const AM2_Object *)w)->uid);
         return;
 
     case AM2_ITEM_KIND_MEDKIT:
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("\tTrooperHostApprovedPickupItem:Medkit\n");
         ForEachArmyObject(t->owner,
                           MedkitHealOne);
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("TrooperHostApprovedPickupItem %x\n",
                      ((const AM2_Object *)w)->uid);
         SpeakLine(AM2_SPEAK_HITSSPOT, t->owner);
@@ -9609,7 +9606,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
     }
 
     if (t->inventory[slot]) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("\tTrooperHostApprovedPickupItem: we've got somthing in "
                      "that slot\n");
 
@@ -9655,7 +9652,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
                     w->typeRec->capacity;
         }
     } else {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("\tTrooperHostApprovedPickupItem: new weapon\n");
         w->ammo = ammo;
         t->inventory[slot] =
@@ -9745,7 +9742,7 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
                 t->pos.y);
     NotifyPickedUp((AM2_Object *)item, (AM2_Object *)troop);
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (comm->verbose)
         orig_log("TrooperRemotePickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
@@ -9756,7 +9753,7 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
     if (kind != AM2_ITEM_KIND_HOT_TARGET) {
         if (kind != AM2_ITEM_KIND_MEDKIT) {
             if (t->inventory[slot]) {
-                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                if (comm->verbose)
                     orig_log("\tTrooperRemotePickupItem: we've got somthing in that slot\n");
 
                 held = WeaponByUid(
@@ -9781,12 +9778,12 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
 
                 if (!w->ammo
                     && w->owner == 4   /* the neutral army; item.cpp spells it as the literal */
-                    && *(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+                    && comm->isHost) {
                     WeaponRespawn((AM2_Object *)item);
                     w->flags |= OBJ_FLAG_REPLACED;
                 }
             } else {
-                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                if (comm->verbose)
                     orig_log("\tTrooperRemotePickupItem: new weapon\n");
                 w->ammo = ammo;
                 t->inventory[slot] =
@@ -9795,12 +9792,12 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
                 WeaponRespawn((AM2_Object *)item);
             }
         } else {
-            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            if (comm->verbose)
                 orig_log("\tTrooperRemotePickupItem:Medkit\n");
             ForEachArmyObject(t->owner,
                               MedkitHealOne);
 
-            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            if (comm->verbose)
                 orig_log("\tTrooperRemotePickupItem %x\n",
                          ((const AM2_Object *)w)->uid);
 
@@ -9814,7 +9811,7 @@ void __cdecl TrooperRemotePickupItem(AM2_Object *troop, AM2_Object *item, int32_
             }
         }
     } else {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log("\tTrooperRemotePickupItem: HotTarget\n");
         DestroyByType((AM2_Object *)item);
     }
@@ -11038,8 +11035,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
     AM2_Point out;   /* NearestClearPoint's answer: its own slot in the image */
     uint8_t   height;
 
-    if (*(const int32_t *)(g_commObject
-                           + COMM_OFF_VERBOSE) != 0)
+    if (g_commObject->verbose != 0)
         orig_log("DeployTrooper: uid:%x, pos=(%d,%d)\n",
                  ((const AM2_Object *)o)->uid, x, y);
 
@@ -12371,7 +12367,7 @@ void __cdecl DamageItem(AM2_Object *obj, int32_t amount, uint8_t extra, int32_t 
             DamageItemChain((AM2_Object *)obj, amount, extra, kind, attacker);
             return;
         }
-        if ((uint32_t)o->followers.capacity)
+        if (o->followers.capacity)
             return;
     }
 
@@ -12695,7 +12691,7 @@ after_flight:
         if (!TimedDirFrame(rows,
                                    o->facing))
             outcome = 4;
-        if ((uint32_t)o->scriptState) {
+        if (o->scriptState) {
             AM2_Object *ahead = LookupByUID(
                 (uint32_t)o->scriptState);
 
@@ -12934,7 +12930,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
     if (kind == AM2_ITEM_KIND_MEDKIT) {
         ForEachArmyObject(t->owner,
                           MedkitHealOne);
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                      ((const AM2_Object *)w)->uid);
         w->flags |= OBJ_FLAG_REPLACED;
@@ -13023,7 +13019,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
             held->ammo +=
                 w->ammo;
 
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        if (comm->verbose)
             orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP_2)),
                      ((const AM2_Object *)w)->uid);
 
@@ -13052,7 +13048,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
 
         switch (kind) {
         case AM2_ITEM_KIND_HOT_TARGET:
-            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            if (comm->verbose)
                 orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                          ((const AM2_Object *)w)->uid);
             DestroyByType(w);
@@ -13061,7 +13057,7 @@ void __cdecl TrooperPickupItem(AM2_Object *trooper, AM2_Object *item, int32_t sl
         case AM2_ITEM_KIND_MEDKIT:
             ForEachArmyObject(t->owner,
                               MedkitHealOne);
-            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            if (comm->verbose)
                 orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                          ((const AM2_Object *)w)->uid);
             w->flags |= OBJ_FLAG_REPLACED;
@@ -13549,7 +13545,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
      * obvious tidy-up and changes the behaviour. */
     case 20:
         if (!(tgt && *(const int32_t *)tgt == 1
-              && tgt->aai->key
+              && (int32_t)tgt->aai->key
                  == g_createWatchedKind)) {
             AM2_Object *o;
             fromP[0] = (int16_t)AM2_FTOL(
@@ -13563,7 +13559,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             if (o)
                 for (;;) {
                     if (*(const int32_t *)o == 1
-                        && o->aai->key
+                        && (int32_t)o->aai->key
                            == g_createWatchedKind) {
                         target = o;
                         break;
@@ -14124,8 +14120,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     memset(o, 0, 0x35u * 4u);
 
     if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid)) {
-        if (*(const int32_t *)(g_commObject
-                               + COMM_OFF_VERBOSE))
+        if (g_commObject->verbose)
             am2_log("CreateWeapon\n");
         am2_free(o);
         return (void *)0;

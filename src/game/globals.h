@@ -168,7 +168,7 @@
 #define g_colourWhiteB           (*(uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE_B)  /* 0x004FE1AD */
 #define g_commEnumCount          (*(int32_t *)(uintptr_t)ADDR_COMM_ENUM_COUNT)  /* 0x004751B4 */
 #define g_commGlobal             ((void *)(uintptr_t)ADDR_COMM_GLOBAL)  /* 0x004FA480 */
-#define g_commObject             (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)  /* 0x004751B0 */
+#define g_commObject             (*(AM2_Comm **)(uintptr_t)ADDR_COMM_OBJECT)  /* 0x004751B0 */
 #define g_connectionList         (*(void **)(uintptr_t)ADDR_CONNECTION_LIST)  /* 0x004FA900 */
 #define g_cpunormspeed           (*(am2_cpuspeed_fn *)(uintptr_t)ADDR_CPUNORMSPEED_FN)  /* 0x004F9FE8 */
 #define g_createWatchedKind      (*(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)  /* 0x00516160 */

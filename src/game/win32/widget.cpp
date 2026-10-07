@@ -2498,9 +2498,7 @@ static inline void MpComplain(AM2_MpPanelScreen *panel, const char *fmt, char *l
 
     ShowBadMapPreview(panel->preview);
     am2_sprintf(line, fmt,
-                (const char *)(g_commObject + COMM_OFF_PLAYERS
-                    + (size_t)*(const int32_t *)&g_defaultOwner
-                      * AM2_COMM_SLOT_STRIDE + COMM_SLOT_OFF_NAME));
+                g_commObject->slots[(size_t)*(const int32_t *)&g_defaultOwner].name);
     Announce(line);
 }
 
@@ -7216,12 +7214,10 @@ AM2_HudTop::AM2_HudTop()
         return;
 
     if (g_mpSession != 0) {
-        const uint8_t *comm = g_commObject;
+        const AM2_Comm *comm = g_commObject;
         uint32_t       me   = g_defaultOwner;
 
-        if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
-                               + (size_t)me * AM2_COMM_SLOT_STRIDE
-                               + COMM_SLOT_OFF_TEAM) != 0) {
+        if (comm->slots[(size_t)me].team != 0) {
             AM2_Rect    box;
             AM2_CheckBox *cb;
 
@@ -7327,10 +7323,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
         for (i = 0; i < AM2_COMM_SLOTS; i++) {
             if ((uint32_t)i == g_defaultOwner)
                 continue;
-            id = *(const int32_t *)(g_commObject
-                                    + COMM_OFF_PLAYERS
-                                    + (size_t)i * AM2_COMM_SLOT_STRIDE
-                                    + COMM_SLOT_OFF_ID);
+            id = (int32_t)g_commObject->slots[(size_t)i].id;
             if (id == 0 || id == -1)
                 continue;
             if (!AM2_THE_COMM->AllyFlag((int32_t)g_defaultOwner,
@@ -9037,7 +9030,7 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
 void __cdecl BattleJoinOk(void)
 {
     AM2_DlgBattleJoinScreen      *dlg = (AM2_DlgBattleJoinScreen *)g_paintObject;
-    uint8_t      *comm;
+    AM2_Comm      *comm;
     int32_t       row;
 
     /* The session list is re-read at each use, as the image does. */
@@ -9050,21 +9043,21 @@ void __cdecl BattleJoinOk(void)
 #define name ((const char *)((uint8_t *)dlg + BATTLEJOIN_OFF_NAME))
 
     if (row >= 0 && row < rows->count && strlen(name) >= 1
-        && ((AM2_Comm *)g_commObject)->CommJoinSession(
+        && g_commObject->CommJoinSession(
                            *(const GUID **)(rows->text
                                       + (uint32_t)row * AM2_LIST_ROW_STRIDE
                                       + AM2_LIST_ROW_VALUE))) {
 
         comm = g_commObject;
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        if (!comm->isHost) {
             CommGetSessionDesc(comm);
             comm = g_commObject;
-            *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
-                *(const int32_t *)(*(uint8_t **)(comm + COMM_OFF_SESSION_DESC)
+            comm->playerCount =
+                *(const int32_t *)((uint8_t *)comm->sessionDesc
                                    + AM2_DPSESSION_OFF_CUR_PLAYERS);
         }
 
-        if (((AM2_Comm *)g_commObject)->CommCreatePlayer(name, 0, 0, 0)) {
+        if (g_commObject->CommCreatePlayer(name, 0, 0, 0)) {
             OnLobbySlave();
             PlaySoundAt(2, 0, 0, 0, 0);
             g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_VIEW;
@@ -9249,9 +9242,7 @@ void __cdecl RefreshMapSelection(void)
         g_mpScriptChecksum = MpScriptChecksum();
         g_mapChecksum      = MapChecksum();
 
-        *(int32_t *)((uint8_t *)g_commObject
-                     + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
-                     + COMM_ARMY_OFF_MAP_OK) = 1;
+        g_commObject->slots[(uint32_t)g_defaultOwner].mapOk = 1;
         g_levelIndex = 0;
     } else {
         /* The error sound is inside the preview test: with no preview
@@ -9261,9 +9252,7 @@ void __cdecl RefreshMapSelection(void)
             PlaySoundAt(3, 0, 0, 0, 0);
         }
         g_mapChecksum = 0;
-        *(int32_t *)((uint8_t *)g_commObject
-                     + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
-                     + COMM_ARMY_OFF_MAP_OK) = 0;
+        g_commObject->slots[(uint32_t)g_defaultOwner].mapOk = 0;
         g_levelIndex = 0;
     }
 }
@@ -9399,13 +9388,11 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         /* The row's own name: the comm slot's player, or `-- Open --`. */
         {
-            const uint8_t *comm = g_commObject;
+            const AM2_Comm *comm = g_commObject;
 
-            if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS
-                                    + (size_t)i * AM2_COMM_SLOT_STRIDE) > 0)
+            if (comm->slots[(size_t)i].id > 0)
                 am2_sprintf(name, "%s",
-                            comm + COMM_OFF_SLOT_NAME
-                            + (size_t)i * AM2_COMM_SLOT_STRIDE);
+                            comm->slots[(size_t)i].name);
             else
                 am2_sprintf(name, (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
         }
@@ -9769,8 +9756,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget *child;
 
-        if (*(const int32_t *)(g_commObject
-                               + COMM_OFF_IS_HOST))
+        if (g_commObject->isHost)
             child = new AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
                                    g_scoreLimit,
                                    0x64, 0x2706, 0x64, w,
@@ -9890,8 +9876,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child;
 
         /* Two allocations, one per arm, as the image has them. */
-        if (*(const int32_t *)(g_commObject
-                               + COMM_OFF_IS_HOST))
+        if (g_commObject->isHost)
             child = new AM2_Button("03_016_00_start.bmp",
                                    "03_016_01_start.bmp",
                                    "03_016_02_start.bmp", 1,
@@ -9965,8 +9950,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
 
     /* Each arm stores its constant into both buttons. */
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
-        if (*(const uint32_t *)((uint32_t)i * AM2_PLAYER_STRIDE + g_commObject
-                                + AM2_PLAYER_ID) > 0) {
+        if (g_commObject->slots[(uint32_t)i].id > 0) {
             if (i == g_ourSlot) {
                 colours[i]->disabled = 0;
                 teams[i]->disabled   = 0;
@@ -9974,7 +9958,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
                 colours[i]->disabled = 1;
                 teams[i]->disabled   = 1;
             }
-        } else if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)) {
+        } else if (g_commObject->isHost) {
             colours[i]->disabled = 0;
             teams[i]->disabled   = 0;
         } else {
@@ -10055,23 +10039,20 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
 {
     /* The comm object is read at every use, and the player count compared
      * unsigned (`jbe`). */
-#define COMM ((uint8_t *)g_commObject)
+#define COMM (g_commObject)
     (void)w;
 
-    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (!COMM->isHost)
         return;
 
-    if (*(const uint32_t *)(COMM + COMM_OFF_PLAYER_COUNT) > 1
+    if ((uint32_t)COMM->playerCount > 1
         && !AM2_THE_COMM->CommAllPlayersAgreed()) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         Announce("Not everybody has the same version/map/rules.");
         return;
     }
 
-    *(int32_t *)(COMM + COMM_OFF_PLAYERS
-                 + *(const int32_t *)&g_defaultOwner
-                   * AM2_COMM_SLOT_STRIDE
-                 + COMM_SLOT_OFF_READY_TO_LOAD) = 1;
+    COMM->slots[*(const int32_t *)&g_defaultOwner].readyToLoad = 1;
 
     if (!AM2_THE_COMM->CommAllPlayersReady()) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
@@ -10096,25 +10077,23 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
 
 void __cdecl MpReadyToLoad(void)
 {
-    const uint8_t *comm = g_commObject;
-    const uint8_t *slot;
+    const AM2_Comm *comm = g_commObject;
+    const AM2_CommSlot *slot;
     char           text[0x40];
 
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (comm->isHost)
         return;
 
-    slot = comm + COMM_OFF_PLAYERS
-           + (uintptr_t)g_defaultOwner * COMM_PLAYER_STRIDE;
-    if (*(const int32_t *)(slot + COMM_SLOT_OFF_READY_TO_LOAD))
+    slot = &comm->slots[(uintptr_t)g_defaultOwner];
+    if (slot->readyToLoad)
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);
     SendGameReadyToLoadMsg(1);
 
-    slot = g_commObject + COMM_OFF_PLAYERS
-           + (uintptr_t)g_defaultOwner * COMM_PLAYER_STRIDE;
+    slot = &g_commObject->slots[(uintptr_t)g_defaultOwner];
     am2_sprintf(text, "%s is ready.",
-                slot + COMM_SLOT_OFF_NAME);
+                slot->name);
     Announce(text);
 }
 
@@ -10127,13 +10106,13 @@ void __cdecl MpRequestOptions(void)
 
 void __cdecl MpLeaveSession(void)
 {
-    uint8_t *comm;
+    AM2_Comm *comm;
 
     PlaySoundAt(2, 0, 0, 0, 0);
     CommDropSession(g_commObject);
 
     comm = g_commObject;
-    if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
+    if (comm->lobbied) {
         RequestState(AM2_STATE_MP_LOBBY);
         return;
     }
@@ -10188,7 +10167,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     char           path[AM2_MP_GAMETYPE_PATH];
     int32_t        i;
 
-    if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+    if (!g_commObject->isHost)
         return;
     if (!rows || row < 0 || row >= rows->count)
         return;
@@ -10334,7 +10313,7 @@ void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     const AM2_Level *lvl;
 
     (void)w;
-    if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+    if (!g_commObject->isHost)
         return;
     if (!rows || row < 0 || row >= rows->count)
         return;
@@ -10545,10 +10524,10 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
  * panel holding it. */
 void __cdecl MpCommitScore(AM2_Widget *w)
 {
-    const uint8_t *comm = (const uint8_t *)g_commObject;
+    const AM2_Comm *comm = g_commObject;
     const AM2_Edit *edit;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!comm->isHost)
         return;
 
     edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
@@ -10559,11 +10538,11 @@ void __cdecl MpCommitScore(AM2_Widget *w)
 
 void __cdecl MpCommitPoints(AM2_Widget *w)
 {
-    const uint8_t *comm = (const uint8_t *)g_commObject;
+    const AM2_Comm *comm = g_commObject;
     const AM2_Edit *edit;
     int32_t           value;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!comm->isHost)
         return;
 
     edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
@@ -10582,7 +10561,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
 
     int32_t        record;
     /* Whether we host is read from the comm object at each use. */
-#define host (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+#define host (g_commObject->isHost)
     AM2_CTOR_VTABLE(w, VTABLE_OPTIONS_MENU_MP);
     SetGameDir(g_dirScratch);
 
@@ -10734,7 +10713,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
 void __cdecl OptionsRequest(void)
 {
     PlaySoundAt(2, 0, 0, 0, 0);
-    g_menuRequest = *(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
+    g_menuRequest = g_commObject->isHost
                     ? AM2_MENU_REQUEST_OPTIONS
                     : AM2_MENU_REQUEST_OPTIONS_VIEW;
     g_menuRequestSet = 1;
@@ -10828,7 +10807,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
     AM2_MpName       *self = (AM2_MpName *)w;
 #define comm (g_commObject)
 #define slot (self->row)
-#define rec (comm + slot * AM2_PLAYER_STRIDE)
+#define rec (&comm->slots[slot])
     RECT           vis;
     /* SIXTEEN BYTES, the original's frame. A dot per 7.5 s of silence
      * means a player unheard for two minutes writes past it; reproduced. */
@@ -10843,12 +10822,12 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * condition is `id != 0`, not `id > 0`: a -1 id takes the OCCUPIED branch
      * here even though AM2_PLAYER_ID's own comment calls 0 and -1 both "none".
      * Reproduced as written rather than as the comment reads. */
-    if (*(const uint32_t *)((uint8_t *)rec + AM2_PLAYER_ID) > 0) {
+    if (rec->id > 0) {
         if (g_eventFlags
             & (AM2_MP_PAUSE_BIT0 << slot)) {
             uint32_t now = orig_get_tick_count();
             int32_t  n   = (int32_t)((now * AM2_MP_DOT_NUM
-                                      - *(const uint32_t *)((uint8_t *)rec + AM2_PLAYER_HEARD)
+                                      - rec->heard
                                         * AM2_MP_DOT_NUM)
                                      / AM2_MP_DOT_DEN);
 
@@ -10864,12 +10843,12 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
         } else {
             am2_sprintf(self->text,
                         (const char *)((void *)(uintptr_t)(AM2_STR_PCT_S)),
-                        (uint8_t *)rec + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME);
+                        rec->name);
             w->MpNameSetInk(MpNameInk(slot));
             self->paper = MpNamePaper(slot);
         }
     } else {
-        if (*(const int32_t *)((uint8_t *)rec + AM2_PLAYER_ACTIVE))
+        if (rec->wasHere)
             am2_sprintf(self->text,
                         (const char *)((void *)(uintptr_t)(AM2_STR_COMPUTER_SLOT)));
         else
@@ -10909,21 +10888,18 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
  * working value, which is why the prototype is uint8_t. */
 uint8_t __cdecl MpNameInk(int32_t row)
 {
-    const uint8_t *comm;
+    const AM2_Comm *comm;
     uint32_t       id;
-    int32_t        ms   = PlayerLatency(*(const uint32_t *)(g_commObject
-                                          + (uint32_t)row * AM2_PLAYER_STRIDE
-                                          + AM2_PLAYER_ID));
+    int32_t        ms   = PlayerLatency(g_commObject->slots[(uint32_t)row].id);
     uint8_t        ink  = g_hiliteColour;
     const uint8_t *player;
 
     /* Re-read, as the original does: it loads the comm object again after
      * the call rather than keeping the register. */
     comm = g_commObject;
-    id   = *(const uint32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                               + AM2_PLAYER_ID);
+    id   = comm->slots[(uint32_t)row].id;
 
-    if (id == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
+    if (id == comm->selfId)
         return ink;
 
     if ((uint32_t)ms > AM2_LATENCY_MID)
@@ -10951,12 +10927,12 @@ uint8_t __cdecl MpNameInk(int32_t row)
 uint8_t __cdecl MpNamePaper(int32_t row)
 {
     /* The player record is addressed afresh at each use. */
-#define PLAYER(off) (*(const int32_t *)(g_commObject + (uint32_t)row * AM2_PLAYER_STRIDE + (off)))
-    if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
-        && !PLAYER(COMM_ARMY_OFF_MAP_OK))
+#define PLAYER (g_commObject->slots[(uint32_t)row])
+    if (g_commObject->isHost
+        && !PLAYER.mapOk)
         return g_colourNoMap;
 
-    return PLAYER(COMM_ARMY_OFF_READY_TO_LOAD)
+    return PLAYER.readyToLoad
                ? g_colourBelowBg
                : g_backgroundColour;
 #undef PLAYER
@@ -10984,26 +10960,24 @@ void __cdecl OnMpName(AM2_Widget *w)
 {
     /* The comm object and the row are re-read where the image re-reads
      * them: after the flag is set. */
-#define COMM ((uint8_t *)g_commObject)
+#define COMM (g_commObject)
 #define ROW  (*(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW))
     int32_t *active;
 
-    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+    if (!COMM->isHost)
         return;
-    if (ROW < *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT))
+    if (ROW < COMM->playerCount)
         return;
 
-    active = (int32_t *)(COMM + (uint32_t)ROW * AM2_PLAYER_STRIDE
-                         + AM2_PLAYER_ACTIVE);
+    active = &COMM->slots[(uint32_t)ROW].wasHere;
     if (*active) {
         *active = 0;
     } else {
         *active = 1;
         /* Numbered from the first computer slot, not from the row. */
-        orig_sprintf((char *)(COMM + (uint32_t)ROW * AM2_PLAYER_STRIDE
-                              + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
+        orig_sprintf(COMM->slots[(uint32_t)ROW].name,
                      "Computer%d",
-                     ROW - *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT) + 1);
+                     ROW - COMM->playerCount + 1);
     }
 #undef COMM
 #undef ROW
@@ -11041,7 +11015,7 @@ AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
 
 void __cdecl OnMpColour(AM2_Widget *w)
 {
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     AM2_MpPanelScreen *screen = (AM2_MpPanelScreen *)(g_paintObject);
     int32_t  row    = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *sel;
@@ -11052,8 +11026,8 @@ void __cdecl OnMpColour(AM2_Widget *w)
     /* the shared guard expanded in place, and row 3 -- not colourable --
      * refused with it; the body is inside. */
     if ((g_ourSlot == row
-         || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
-             && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)))
+         || (comm->isHost
+             && row >= comm->playerCount))
         && row != 3) {
         sel = (int32_t *)((uint8_t *)screen + MP_PANEL_OFF_COLOUR_SEL);
         if (sel[row] == -1)
@@ -11066,7 +11040,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
         sel[row] = next;
 
         army = ((AM2_Comm *)comm)->CommArmyOfSlot(next);
-        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        if (comm->isHost) {
             ((AM2_Comm *)comm)->CommSetArmyColour(
                                  *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
                                  army);
@@ -11102,13 +11076,11 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
     AM2_Widget *w = this;
 
     const AM2_ButtonBase *self = (const AM2_ButtonBase *)w;
-    uint8_t       *comm = g_commObject;
+    AM2_Comm       *comm = g_commObject;
     int32_t        row  = self->row;
     int32_t        which = 4;
 
-    if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
-                           + row * COMM_PLAYER_STRIDE
-                           + COMM_SLOT_OFF_INDEX) != 0x63)
+    if (comm->slots[row].colour != 0x63)
         which = ((AM2_Comm *)comm)->CommArmyOfSlot(row);
 
     w->sprite = ((struct AM2_Sprite * *)g_mpPanelSpritesA)[which];
@@ -11138,22 +11110,21 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
 
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
 {
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *team;
     int32_t  next;
 
     /* the shared guard expanded in place, the body inside it. */
     if (g_ourSlot == row
-        || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
-            && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))) {
-        team = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                           + COMM_ARMY_OFF_TEAM);
+        || (comm->isHost
+            && row >= comm->playerCount)) {
+        team = &comm->slots[(uint32_t)row].team;
         next = *team + 1;
         if (next > AM2_MP_TEAM_MAX)
             next = 0;
 
-        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        if (comm->isHost) {
             *team = next;
             PlaySoundAt(2, 0, 0, 0, 0);
             SendPlayerMsg(0);
@@ -11170,22 +11141,21 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w)
  * to 0.  Everything after the arithmetic is shared. */
 void __cdecl OnMpTeamRight(AM2_Widget *w)
 {
-#define comm ((uint8_t *)g_commObject)
+#define comm (g_commObject)
     int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *team;
     int32_t  next;
 
     /* the shared guard expanded in place, the body inside it. */
     if (g_ourSlot == row
-        || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
-            && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))) {
-        team = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                           + COMM_ARMY_OFF_TEAM);
+        || (comm->isHost
+            && row >= comm->playerCount)) {
+        team = &comm->slots[(uint32_t)row].team;
         next = *team - 1;
         if (next < 0)
             next = AM2_MP_TEAM_MAX;
 
-        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        if (comm->isHost) {
             *team = next;
             PlaySoundAt(2, 0, 0, 0, 0);
             SendPlayerMsg(0);
@@ -11214,11 +11184,9 @@ void __attribute__((thiscall)) AM2_Widget::MpTeamPaint(RECT clip)
     AM2_Widget *w = this;
 
     const AM2_ButtonBase *self = (const AM2_ButtonBase *)w;
-    const uint8_t *comm = g_commObject;
+    const AM2_Comm *comm = g_commObject;
     int32_t        row  = self->row;
-    int32_t        team = *(const int32_t *)(comm + COMM_OFF_PLAYERS
-                                             + row * COMM_PLAYER_STRIDE
-                                             + COMM_SLOT_OFF_TEAM);
+    int32_t        team = comm->slots[row].team;
 
     w->sprite = ((struct AM2_Sprite * *)g_mpPanelSpritesB)[team];
     ::WidgetPaint(w, clip);
@@ -11449,7 +11417,7 @@ void __cdecl OpenTitleScreen(void)
 
     CloseCurrentScreen();
     SetGameDir(g_dirScratch);
-    ((AM2_Comm *)g_commObject)->CommClose();
+    g_commObject->CommClose();
     CommDropDirectPlay(g_commObject);
     g_mpSession = 0;
     g_gameprocBlock = '\0';
@@ -13586,7 +13554,7 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
     if (!*(const int32_t *)((const uint8_t *)w + GAMEMENU_OFF_ABORT))
         return;
 
-    if (*(const int32_t *)(g_commObject + COMM_OFF_LOBBIED))
+    if (g_commObject->lobbied)
         RequestState(AM2_STATE_MP_LOBBY);
     else
         RequestState(AM2_STATE_MENU);

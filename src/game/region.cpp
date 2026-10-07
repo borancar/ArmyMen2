@@ -9903,7 +9903,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             /* +0xD8 counts consecutive blocked frames and scales the speed
              * by it -- again in opposite directions on the two arms. */
             if ((uint32_t)o->stuckCount > 0 && speed != 0) {
-                int32_t t = (int32_t)(uint32_t)o->stuckCount * speed;
+                int32_t t = (int32_t)o->stuckCount * speed;
 
                 if (r->field0C != 0) {
                     int32_t c = o->field55C;

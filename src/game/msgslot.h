@@ -495,34 +495,75 @@ int msgslot_install(void);
  * caller code, so the injected build is unaffected. */
 /* One player slot of the comm object, 0x70 bytes, four from +0x20C. */
 struct AM2_CommSlot {
-    uint32_t pad00;             /* +0x00 */
-    int32_t  colour;            /* +0x04 COMM_ARMY_OFF_COLOUR */
-    uint32_t id;                /* +0x08 AM2_PLAYER_ID, the DirectPlay id */
+    int32_t  remote;            /* +0x00 COMM_ARMY_OFF_REMOTE */
+    int32_t  colour;            /* +0x04 COMM_SLOT_OFF_INDEX COMM_ARMY_OFF_COLOUR, 0x63 empty */
+    uint32_t id;                /* +0x08 COMM_SLOT_OFF_ID, the DirectPlay id */
     char     name[0x40];        /* +0x0C COMM_SLOT_OFF_NAME */
-    int32_t  team;              /* +0x4C COMM_ARMY_OFF_TEAM */
-    int32_t  wasHere;           /* +0x50 COMM_ARMY_OFF_WAS_HERE */
-    uint8_t  pad54[0x0C];       /* +0x54 */
-    uint32_t joinedMs;          /* +0x60 COMM_OFF_SLOT_JOINED_MS */
-    int32_t  readyToLoad;       /* +0x64 COMM_ARMY_OFF_READY_TO_LOAD */
-    uint32_t pad68;             /* +0x68 */
-    int32_t  field278;          /* +0x6C COMM_OFF_SLOT_FIELD_278 */
+    int32_t  team;              /* +0x4C COMM_SLOT_OFF_TEAM COMM_ARMY_OFF_TEAM */
+    int32_t  wasHere;           /* +0x50 COMM_SLOT_OFF_TAKEN COMM_ARMY_OFF_WAS_HERE */
+    int32_t  chksumErrs;        /* +0x54 COMM_ARMY_OFF_CHKSUM_ERRS */
+    uint32_t unacked;           /* +0x58 COMM_SLOT_OFF_UNACKED */
+    int32_t  field5C;           /* +0x5C COMM_SLOT_OFF_FIELD_5C */
+    uint32_t heard;             /* +0x60 COMM_SLOT_OFF_HEARD, GetTickCount of the last packet */
+    int32_t  readyToLoad;       /* +0x64 COMM_SLOT_OFF_READY_TO_LOAD */
+    int32_t  ready;             /* +0x68 COMM_SLOT_OFF_READY */
+    int32_t  mapOk;             /* +0x6C COMM_ARMY_OFF_MAP_OK, what ReceivedMapMsg sets */
 };
 
+/* The send and receive statistics rings, 30 samples each. */
+#define AM2_COMM_STAT_SAMPLES 30
+
 struct AM2_Comm {
-    /* The fields its users read by name; the gaps are not yet transcribed. */
-    uint8_t      pad000[0x20C];
-    AM2_CommSlot slots[4];      /* +0x20C */
-    uint32_t     selfId;        /* +0x3CC AM2_COMM_SELF_ID, our own player id */
+    uint32_t     field000;      /* +0x000 */
+    uint32_t     statIndex;     /* +0x004 COMM_OFF_STAT_INDEX, ring cursor, 0..29 */
+    uint32_t     rxIndex;       /* +0x008 COMM_OFF_RX_INDEX */
+    uint32_t     statTimes[AM2_COMM_STAT_SAMPLES]; /* +0x00C COMM_OFF_STAT_TIMES */
+    uint32_t     statSizes[AM2_COMM_STAT_SAMPLES]; /* +0x084 COMM_OFF_STAT_SIZES */
+    uint32_t     rxTimes[AM2_COMM_STAT_SAMPLES];   /* +0x0FC COMM_OFF_RX_TIMES */
+    uint32_t     rxSizes[AM2_COMM_STAT_SAMPLES];   /* +0x174 COMM_OFF_RX_SIZES */
+    uint32_t     rxMax;         /* +0x1EC COMM_OFF_RX_MAX */
+    uint32_t     statMax;       /* +0x1F0 COMM_OFF_STAT_MAX */
+    uint32_t     rxBytes;       /* +0x1F4 COMM_OFF_RX_BYTES */
+    uint32_t     statBytes;     /* +0x1F8 COMM_OFF_STAT_BYTES */
+    uint32_t     rxPackets;     /* +0x1FC COMM_OFF_RX_PACKETS */
+    uint32_t     statPackets;   /* +0x200 COMM_OFF_STAT_PACKETS */
+    void        *regKey;        /* +0x204 the HKEY RegCreateKeyExA opens */
+    uint32_t     regDisposition; /* +0x208 what RegCreateKeyExA reports */
+    AM2_CommSlot slots[4];      /* +0x20C COMM_OFF_PLAYERS */
+    uint32_t     selfId;        /* +0x3CC COMM_OFF_OUR_PLAYER_ID AM2_COMM_SELF_ID */
     int32_t      playerCount;   /* +0x3D0 COMM_OFF_PLAYER_COUNT */
-    uint32_t     pad3d4;        /* +0x3D4 */
+    const void  *appGuid;       /* +0x3D4 COMM_OFF_APP_GUID, a GUID * */
     int32_t      isHost;        /* +0x3D8 COMM_OFF_IS_HOST */
-    uint8_t      pad3dc[8];     /* +0x3DC */
-    int32_t      connected;     /* +0x3E4 AM2_COMM_CONNECTED */
-    uint8_t     *sessionDesc;   /* +0x3E8 COMM_OFF_SESSION_DESC */
-    void        *dplay;         /* +0x3EC COMM_OFF_DPLAY */
-    uint8_t      pad3f0[0x28];  /* +0x3F0 */
-    int32_t      verbose;       /* +0x418 COMM_OFF_VERBOSE, AM2_COMM_LOG_ENABLED */
-    uint8_t      pad41c[0x5C];  /* +0x41C */
+    int32_t      active;        /* +0x3DC COMM_OFF_JOINED AM2_COMM_OFF_ACTIVE */
+    int32_t      sawKind31;     /* +0x3E0 COMM_OFF_SAW_KIND_31 */
+    int32_t      connected;     /* +0x3E4 COMM_OFF_PLAYER_MADE AM2_COMM_CONNECTED */
+    void        *sessionDesc;   /* +0x3E8 COMM_OFF_SESSION_DESC, a DPSESSIONDESC2 */
+    void        *dplay;         /* +0x3EC COMM_OFF_DPLAY, an IDirectPlay4A */
+    void        *lobbyBuf;      /* +0x3F0 COMM_OFF_LOBBY_BUF, a DPLCONNECTION */
+    void        *lobby;         /* +0x3F4 COMM_OFF_LOBBY, an IDirectPlayLobby3A */
+    int32_t      lobbied;       /* +0x3F8 COMM_OFF_LOBBIED */
+    int32_t      lobbyStarting; /* +0x3FC COMM_OFF_LOBBY_STARTING */
+    int32_t      local;         /* +0x400 COMM_OFF_LOCAL, non-zero once the game runs */
+    int32_t      msgsEnabled;   /* +0x404 COMM_OFF_MSGS_ENABLED */
+    uint32_t     sendStamp;     /* +0x408 COMM_OFF_SEND_STAMP, GetTickCount at the last send */
+    uint32_t     statsSince;    /* +0x40C COMM_OFF_STATS_SINCE, ms */
+    uint32_t     bufferMax;     /* +0x410 COMM_OFF_BUFFER_MAX */
+    uint32_t     sendFlags;     /* +0x414 COMM_OFF_SEND_FLAGS */
+    int32_t      verbose;       /* +0x418 COMM_OFF_VERBOSE AM2_COMM_LOG_ENABLED */
+    int32_t      field41C;      /* +0x41C */
+    uint32_t     coalesceMs;    /* +0x420 COMM_OFF_COALESCE_MS */
+    uint32_t     maxHoldMs;     /* +0x424 COMM_OFF_MAX_HOLD_MS */
+    uint32_t     bufferDefault; /* +0x428 COMM_OFF_BUFFER_DEFAULT */
+    uint8_t      caps[0x28];    /* +0x42C COMM_OFF_CAPS, a DPCAPS */
+    int32_t      timeoutsOn;    /* +0x454 COMM_OFF_TIMEOUTS_ON */
+    int32_t      statBwMax;     /* +0x458 COMM_OFF_STAT_BW_MAX */
+    int32_t      rxBwMax;       /* +0x45C COMM_OFF_RX_BW_MAX */
+    int32_t      statBwSamples; /* +0x460 COMM_OFF_STAT_BW_SAMPLES */
+    int32_t      rxBwSamples;   /* +0x464 COMM_OFF_RX_BW_SAMPLES */
+    int32_t      statBwOver;    /* +0x468 COMM_OFF_STAT_BW_OVER */
+    int32_t      rxBwOver;      /* +0x46C COMM_OFF_RX_BW_OVER */
+    int32_t      trace;         /* +0x470 COMM_OFF_TRACE */
+    int32_t      log;           /* +0x474 COMM_OFF_LOG */
     uint32_t     enoughChangeLimit; /* +0x478 COMM_OFF_ENOUGH_CHANGE_LIMIT */
     uint32_t     sendInterval;  /* +0x47C COMM_OFF_SEND_INTERVAL */
 
@@ -597,6 +638,11 @@ static_assert(offsetof(AM2_Comm, sessionDesc) == 0x3E8, "sessionDesc");
 static_assert(offsetof(AM2_Comm, dplay)       == 0x3EC, "dplay");
 static_assert(offsetof(AM2_Comm, verbose)     == 0x418, "verbose");
 static_assert(offsetof(AM2_Comm, sendInterval) == 0x47C, "sendInterval");
+static_assert(offsetof(AM2_Comm, statPackets) == 0x200, "statPackets");
+static_assert(offsetof(AM2_Comm, caps)        == 0x42C, "caps");
+static_assert(offsetof(AM2_Comm, timeoutsOn)  == 0x454, "timeoutsOn");
+static_assert(offsetof(AM2_Comm, rxTimes)     == 0x0FC, "rxTimes");
+static_assert(offsetof(AM2_CommSlot, mapOk)   == 0x6C,  "mapOk");
 #endif
 static inline int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
 { return ((AM2_Comm *)comm)->ArmyInPlay(uid); }
@@ -663,7 +709,7 @@ static inline int32_t CommMustBroadcast(void *comm, int16_t army)
 /* The one comm object, for a direct member call. Calling through the inline
  * forwarders above changes VC6's register allocation at the call site, so a
  * byte-matched caller spells `AM2_THE_COMM->Method(...)`. */
-#define AM2_THE_COMM ((AM2_Comm *)*(void * *)&g_commObject)
+#define AM2_THE_COMM (g_commObject)
 #endif
 
 /* 0x00401050. Append a node to the tail of a mutex-guarded list. Twelve

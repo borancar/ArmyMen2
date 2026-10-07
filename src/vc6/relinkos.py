@@ -106,9 +106,9 @@ def _aggregated(va):
 # object lists settle on the 0x004FC8C8 block alone; the typed seq
 # records settle it with none kept; the typed AAI records bring back the
 # 0x00511BC8 block beside the 0x004F96C0 one; the explosion arm settles
-# it with none kept.
+# it with none kept; the typed comm object wants the 0x00515FD8 block.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ()
+KEEP_DECLS = ((0x00515FD8, 0x00516078),)
 
 
 def _kept(va):

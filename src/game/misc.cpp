@@ -1154,18 +1154,18 @@ int32_t __cdecl MeetsAllThree(AM2_Object *p)
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommSlotForArmy(int32_t army)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
     if (army == 4)
         return 4;
 
-    const uint8_t *p;
+    const AM2_CommSlot *p;
     uint32_t       i;                   /* unsigned: the loop test is `jb` */
 
     /* i before p, and i++ before p's step: the original's order. */
-    for (i = 0, p = (const uint8_t *)comm + AM2_PLAYER_ARMY;
-         i < AM2_PLAYERS_MAX; i++, p += AM2_PLAYER_STRIDE) {
-        if (*(const int32_t *)p == army)
+    for (i = 0, p = comm->slots;
+         i < AM2_PLAYERS_MAX; i++, p++) {
+        if (p->colour == army)
             return (int32_t)i;
     }
     /* No match and slot 0 share an answer. */
@@ -1189,7 +1189,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotForArmy(int32_t army)
  * difference; written as an ordinary local here. */
 int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
     int32_t idx = this->CommArmyOfSlot(slot);
     int32_t out;
@@ -1228,7 +1228,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 void __cdecl ApplyGameSettings(void)
 {
     /* The comm object is read at every use. */
-#define comm ((uint8_t *)(g_commObject))
+#define comm (g_commObject)
     int32_t *pool = g_armyPoints;
     int32_t  i;
 
@@ -1247,12 +1247,8 @@ void __cdecl ApplyGameSettings(void)
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         pool[i] = AM2_DEFAULT_SCORE_LIMIT;
-        *(int32_t *)(comm + COMM_OFF_PLAYERS
-                     + (size_t)i * AM2_COMM_SLOT_STRIDE
-                     + COMM_SLOT_OFF_INDEX) = i;
-        *(int32_t *)(comm + COMM_OFF_PLAYERS
-                     + (size_t)i * AM2_COMM_SLOT_STRIDE
-                     + COMM_SLOT_OFF_TEAM) = 0;
+        comm->slots[(size_t)i].colour = i;
+        comm->slots[(size_t)i].team = 0;
     }
 
     if (g_nameTableCount != 0) {
@@ -1298,23 +1294,22 @@ void __cdecl ApplyGameSettings(void)
  * it, which is the useful direction for a function this small. */
 int32_t __attribute__((thiscall)) AM2_Comm::CommTeamScore(int32_t slot)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
-    const uint8_t *players = (const uint8_t *)comm + COMM_OFF_PLAYERS;
+    const AM2_CommSlot *players = comm->slots;
     int32_t        team;
     int32_t        total;
     int32_t        i;
 
-    team = *(const int32_t *)(players + (size_t)slot * AM2_COMM_SLOT_STRIDE
-                              + COMM_SLOT_OFF_TEAM);
+    team = players[(size_t)slot].team;
     total = 0;
     if (team == 0)
         return ::GetArmyScore(comm, slot);
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
-        const uint8_t *rec = players + (size_t)i * AM2_COMM_SLOT_STRIDE;
-        if (*(const int32_t *)(rec + COMM_SLOT_OFF_TAKEN) != 0
-            && *(const int32_t *)(rec + COMM_SLOT_OFF_TEAM) == team)
+        const AM2_CommSlot *rec = &players[(size_t)i];
+        if (rec->wasHere != 0
+            && rec->team == team)
             total += ::GetArmyScore(comm, i);
     }
     return total;
@@ -1333,18 +1328,16 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommTeamScore(int32_t slot)
  * CommSlotForArmy. Reproduced. */
 int32_t __attribute__((thiscall)) AM2_Comm::CommWasHereForArmy(int32_t army)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
-    const uint8_t *p;
+    const AM2_CommSlot *p;
     int32_t        i;
 
     /* i before p, and i++ before p's step: the original's order. */
-    for (i = 0, p = (const uint8_t *)comm + COMM_ARMY_OFF_COLOUR;
-         i < AM2_PLAYERS_MAX; i++, p += AM2_PLAYER_STRIDE) {
-        if (*(const int32_t *)p == army)
-            return *(const int32_t *)((const uint8_t *)comm
-                                      + (uint32_t)i * AM2_PLAYER_STRIDE
-                                      + COMM_ARMY_OFF_WAS_HERE);
+    for (i = 0, p = comm->slots;
+         i < AM2_PLAYERS_MAX; i++, p++) {
+        if (p->colour == army)
+            return comm->slots[(uint32_t)i].wasHere;
     }
 
     return 0;
@@ -1393,27 +1386,22 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSetArmyColour(int32_t slot, int3
 
     held = this->CommSlotForArmy(colour);
 
-    if (*(const int32_t *)((const uint8_t *)AM2_THE_COMM + COMM_OFF_IS_HOST)
+    if (AM2_THE_COMM->isHost
         && (uint32_t)slot < (uint32_t)held) {
-        int32_t *mine = (int32_t *)((uint8_t *)this
-                                    + (uint32_t)slot * AM2_PLAYER_STRIDE
-                                    + AM2_PLAYER_ARMY);
+        int32_t *mine = &this->slots[(uint32_t)slot].colour;
         int32_t  was  = *mine;
 
         *mine = colour;
-        *(int32_t *)((uint8_t *)this + (uint32_t)held * AM2_PLAYER_STRIDE
-                     + AM2_PLAYER_ARMY) = was;
+        this->slots[(uint32_t)held].colour = was;
     }
     return slot;
 }
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommSlotHasPlayer(int32_t slot)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
-    int32_t id = *(const int32_t *)((const uint8_t *)comm +
-                                    (size_t)slot * AM2_PLAYER_STRIDE +
-                                    AM2_PLAYER_ID);
+    int32_t id = (int32_t)comm->slots[(size_t)slot].id;
 
     return id != 0 && id != -1;
 }
@@ -1572,13 +1560,11 @@ int32_t __cdecl ActionKeyDown(int32_t action)
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommArmyOfSlot(int32_t slot)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
     if (slot == 4)
         return 4;
-    return *(const int32_t *)((const uint8_t *)comm
-                              + (uint32_t)slot * AM2_PLAYER_STRIDE
-                              + AM2_PLAYER_ARMY);
+    return comm->slots[(uint32_t)slot].colour;
 }
 
 /* 0x0042A6B0 and 0x0042A710, thiscall. The {capacity, count, items} record's
@@ -1840,8 +1826,7 @@ void __cdecl AiTakeAbandoned(void)
     int32_t army;
 
     for (army = 0; army < AM2_COMM_ARMY_COUNT; army++) {
-        if (!*(const int32_t *)(COMM + (uint32_t)army * AM2_PLAYER_STRIDE
-                                + COMM_ARMY_OFF_WAS_HERE))
+        if (!COMM->slots[(uint32_t)army].wasHere)
             continue;
         if (((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotHasPlayer(army))
             continue;
@@ -1944,8 +1929,7 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
     /* The comm object and our army are re-read at each use. */
 #define COMM  (g_commObject)
 #define MINE  (g_defaultOwner)
-#define TEAM(slot) (*(const int32_t *)(COMM + (size_t)(slot) * AM2_PLAYER_STRIDE \
-                                        + COMM_ARMY_OFF_TEAM))
+#define TEAM(slot) (COMM->slots[(size_t)(slot)].team)
     int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotForArmy(army);
     int32_t won;
 
@@ -1976,14 +1960,12 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
  */
 int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerId(int32_t slot)
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
 
     if (slot == -1)
         return 0;
 
-    return *(const int32_t *)((const uint8_t *)comm
-                              + (size_t)slot * AM2_PLAYER_STRIDE
-                              + AM2_PLAYER_ID);
+    return (int32_t)comm->slots[(size_t)slot].id;
 }
 
 /* 0x0040F8A0 and 0x0040F8E0, one caller each and both in 0x00431850. The same
@@ -2018,45 +2000,38 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerId(int32_t slot)
  * where the names come from, so the naming is no better verified than the
  * bodies are.
  */
-/* `inline` is load-bearing: the original has this body at every call site,
- * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
- * each caller compiled to push/call/pop -- the relink found it. */
-static inline int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
+/* The same walk in both, written out at each as the original has it. The id
+ * is spelled twice so VC6 strength-reduces the index into a pointer at the
+ * slot's id, set up after the count test -- the original's order; read once
+ * into a local, the pointer lands on the flag instead. */
+int32_t __attribute__((thiscall)) AM2_Comm::CommAllPlayersAgreed()
 {
-    const uint8_t *rec;
-    int32_t        n    = *(const int32_t *)
-                              ((const uint8_t *)*(void *const *)&g_commObject
-                               + COMM_OFF_PLAYER_COUNT);
-    int32_t        i;
+    AM2_Comm *comm = this;
+    int32_t   n    = g_commObject->playerCount;
+    int32_t   i;
 
-    /* The record is indexed from the counter, which VC6 strength-reduces
-     * into a pointer set up after the count test -- the original's order. */
     for (i = 0; i < n; i++) {
-        int32_t id;
-
-        rec = (const uint8_t *)comm + AM2_PLAYER_ID + i * AM2_PLAYER_STRIDE;
-        id  = *(const int32_t *)rec;
-
-        if (id == 0 || id == -1)
+        if (comm->slots[i].id == 0 || comm->slots[i].id == 0xFFFFFFFFu)
             continue;                   /* no player in this slot */
-        if (*(const int32_t *)(rec + (flag - AM2_PLAYER_ID)) == 0)
+        if (comm->slots[i].mapOk == 0)
             return 0;
     }
     return 1;
 }
 
-int32_t __attribute__((thiscall)) AM2_Comm::CommAllPlayersAgreed()
-{
-    void *comm = this;
-
-    return CommAllPlayersFlagged(comm, AM2_PLAYER_AGREED);
-}
-
 int32_t __attribute__((thiscall)) AM2_Comm::CommAllPlayersReady()
 {
-    void *comm = this;
+    AM2_Comm *comm = this;
+    int32_t   n    = g_commObject->playerCount;
+    int32_t   i;
 
-    return CommAllPlayersFlagged(comm, AM2_PLAYER_READY);
+    for (i = 0; i < n; i++) {
+        if (comm->slots[i].id == 0 || comm->slots[i].id == 0xFFFFFFFFu)
+            continue;                   /* no player in this slot */
+        if (comm->slots[i].readyToLoad == 0)
+            return 0;
+    }
+    return 1;
 }
 
 typedef int32_t (__cdecl *AM2_RandFn)(void);

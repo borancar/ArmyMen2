@@ -366,7 +366,7 @@ uint32_t __cdecl PauseGame(uint32_t bits)
 {
 #define FLAGS (g_eventFlags)
     FLAGS |= bits;
-    if (*(const int32_t *)(g_commObject + COMM_OFF_VERBOSE))
+    if (g_commObject->verbose)
         orig_log("PauseGame: %x (set: %x)\n", FLAGS, bits);
     return FLAGS;
 }
@@ -374,7 +374,7 @@ uint32_t __cdecl PauseGame(uint32_t bits)
 uint32_t __cdecl UnPauseGame(uint32_t bits)
 {
     FLAGS &= ~bits;
-    if (*(const int32_t *)(g_commObject + COMM_OFF_VERBOSE))
+    if (g_commObject->verbose)
         orig_log("UnPauseGame: %x (reset: %x)\n", FLAGS, bits);
     return FLAGS;
 #undef FLAGS
@@ -386,7 +386,7 @@ uint32_t __cdecl UnPauseGame(uint32_t bits)
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline int32_t CommActive(void)
 {
-    return *(const int32_t *)(g_commObject + AM2_COMM_OFF_ACTIVE) != 0;
+    return g_commObject->active != 0;
 }
 
 /* 0x00427420. Mouse then keyboard, and both are ours -- the original is a call
@@ -517,10 +517,10 @@ void __cdecl State1Enter(void)
     RefreshGate(1);
 
     {
-        const uint8_t *comm = g_commObject;   /* the POINTER, dereferenced */
+        const AM2_Comm *comm = g_commObject;   /* the POINTER, dereferenced */
 
-        if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
-            if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        if (comm->lobbied) {
+            if (comm->isHost) {
                 g_subState = AM2_MENU_MODE_LOBBY_HOST;
                 g_mpSession = 1;
             } else {
@@ -1178,7 +1178,7 @@ void __cdecl TakeMenuRequest(void)
                 g_netSettleCount = n;
                 if (n == AM2_NET_SETTLE_FRAMES) {
                     g_netSettleCount = 0;
-                    if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+                    if (g_commObject->isHost)
                         AiTakeAbandoned();
                 }
             }
@@ -1581,8 +1581,7 @@ void __cdecl Substate34Escape(void)
         RequestState(1);
         /* The comm object is read after the calls. */
         g_menuRequest =
-            *(const int32_t *)(g_commObject
-                               + COMM_OFF_IS_HOST)
+            g_commObject->isHost
                 ? AM2_MENU_REQ_MP_HOST : AM2_MENU_REQ_MP_JOIN;
         g_menuRequestSet = 0;
         return;
@@ -1856,8 +1855,7 @@ void __cdecl PausedFrameStep(void)
 
     active = 0;
     for (n = 0; n < 4; n++) {
-        if (*(const int32_t *)(comm + COMM_OFF_SLOT_FIELD_25C
-                               + n * COMM_PLAYER_STRIDE) != 0)
+        if (comm->slots[n].wasHere != 0)
             active++;
     }
 
@@ -1867,7 +1865,7 @@ void __cdecl PausedFrameStep(void)
     xy = row;
 
     for (slot = 0; slot < 4; slot++) {
-#define rec (comm + slot * COMM_PLAYER_STRIDE)
+#define rec (&comm->slots[slot])
         int32_t  team;
         int32_t  mates;
         int32_t  variant;
@@ -1876,17 +1874,16 @@ void __cdecl PausedFrameStep(void)
         char     teamText[20];
         int32_t  width;
 
-        if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_25C) == 0)
+        if (rec->wasHere == 0)
             continue;
 
-        team  = *(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258);
+        team  = rec->team;
         mates = 0;
         if (team > 0) {
             for (n = 0; n < 4; n++) {
-                const uint8_t *o = comm + COMM_OFF_SLOT_FIELD_258
-                                   + n * COMM_PLAYER_STRIDE;
-                if (*(const int32_t *)(o + 4) != 0
-                    && *(const int32_t *)o == team)
+                const AM2_CommSlot *o = &comm->slots[n];
+                if (o->wasHere != 0
+                    && o->team == team)
                     mates++;
             }
         }
@@ -1903,7 +1900,7 @@ void __cdecl PausedFrameStep(void)
                 badge = 1;
             else if (pause & 0x10000u)
                 variant = 0;
-            else if (*(const int32_t *)(rec + 0x274u) == 0
+            else if (rec->ready == 0
                      && g_netGame != 0)
                 variant = 1;
         } else if (pause & kPauseBitsB[slot]) {
@@ -1912,22 +1909,22 @@ void __cdecl PausedFrameStep(void)
             variant = 2;
         } else if (pause & kPauseBitsC[slot]) {
             variant = 0;
-        } else if (*(const int32_t *)(rec + 0x274u) == 0
+        } else if (rec->ready == 0
                    && g_netGame != 0) {
             variant = 1;
         }
 
         DrawSprite((g_mpMarkGrid)
-                       [((AM2_Comm *)comm)->CommArmyOfSlot(slot) * 5 + variant],
+                       [comm->CommArmyOfSlot(slot) * 5 + variant],
                    xy[0], xy[1], 0);
 
-        if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258) != 0) {
+        if (rec->team != 0) {
             /* The team sprite sits 0x5E right of the marker for the small
              * (team) marker and 0x3E for any other. The image's `sub 3; neg;
              * sbb; and ~0x1F; add 0x5E` is VC6's branchless form of a
              * two-constant ternary, not a rounding of x. */
             DrawSprite((g_mpTeamSprites)
-                           [*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258)],
+                           [rec->team],
                        (variant == 3 ? 0x5E : 0x3E) + xy[0],
                        xy[1] + 3, 0);
         }
@@ -1936,7 +1933,7 @@ void __cdecl PausedFrameStep(void)
             DrawSprite(variant == 3 ? g_mpMarkA : g_mpMarkB,
                        xy[0], xy[1], 0);
 
-        if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
+        if (comm->CommSlotHasPlayer(slot))
             DrawLatencyBar(idx, slot);
         else
             DrawSprite(g_mpMarkC,
@@ -1954,7 +1951,7 @@ void __cdecl PausedFrameStep(void)
 
             if (mates > 1) {
                 am2_sprintf(teamText, "%d",
-                            ((AM2_Comm *)comm)->CommTeamScore(slot));
+                            comm->CommTeamScore(slot));
                 width = TextExtent(teamText, 1, NULL);
                 if (!LockSurface(
                         *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
@@ -1978,7 +1975,7 @@ void __cdecl PausedFrameStep(void)
                     *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
             DrawTextClipped(clip.left + 2, clip.top + 2,
-                            (const char *)(rec + 0x218u), 1, clip,
+                            rec->name, 1, clip,
                             g_whiteInk);
             UnlockSurface();
         }
