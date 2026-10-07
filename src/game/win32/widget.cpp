@@ -905,16 +905,21 @@ static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel);
  * width and the row's own band, `top + (row - firstRow) * 14 + 4`, height 14
  * -- the same two constants the hover arithmetic divides by, arrived at from
  * the other direction, which is what makes the row geometry certain. */
-static inline void ListRepaintRow(AM2_Widget *w, int32_t row)
+/* The band's left and right are the caller's: ListUpdate sets them once per
+ * block and repaints two rows with them, which is why the image loads the
+ * rect's left and right before the first test and reuses them after the
+ * PlaySoundAt between the two calls. */
+static inline void ListRepaintBand(AM2_Widget *w, int32_t left,
+                                   int32_t right, int32_t row)
 {
     uint8_t *self = (uint8_t *)w;
-    RECT band;
+    RECT     band;
 
-    band.left  = w->rect.left;
-    band.right = w->rect.right;
-    band.top   = w->rect.top
-                 + (row - *(const int32_t *)(self + LIST_OFF_TOP_ROW))
-                   * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
+    band.left   = left;
+    band.right  = right;
+    band.top    = w->rect.top
+                  + (row - *(const int32_t *)(self + LIST_OFF_TOP_ROW))
+                    * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
     band.bottom = band.top + LIST_ROW_HEIGHT;
 
     WidgetVPaint(w, band);
@@ -15547,17 +15552,18 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
                            (const AM2_Point *)&g_cursorPoint);
 
         if (w->hovered) {
-            int32_t row;
-
             if (!w->flag44)
                 WidgetVFocus(w, 1);
 
-            row = (*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
+            /* The previous selection is taken AGAIN here, after the focus
+             * call: the image reloads the register `wasSel` lives in, so the
+             * repaint at the end compares against this read, not the one at
+             * the top. */
+            wasSel = lb->selected;
+            lb->selected = (*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                    - w->rect.top - LIST_ROW_TOP_MARGIN) / LIST_ROW_HEIGHT
                   + lb->topRow;
-
-            lb->selected = row;
-            if (row >= lb->rows->count)
+            if (lb->selected >= lb->rows->count)
                 lb->selected = lb->rows->count - 1;
 
             if (wasSel != lb->selected) {
@@ -15572,8 +15578,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
                 WidgetVPaint(w, w->rect);
 
-                sel = lb->selected;
-                if (!g_mouseButton && sel >= 0) {
+                if (!g_mouseButton && (sel = lb->selected) >= 0) {
                     if (ListRowIsDead(lb->rows, sel)) {
                         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
                     } else {
@@ -15599,8 +15604,6 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
     /* ---- the keyboard, only with the focus ----------------------------- */
     if (w->flag44) {
-        AM2_Widget *blink = lb->blinker;
-
         if (KeyPressed(AM2_DIK_UP)) {
             int32_t sel = lb->selected;
 
@@ -15609,8 +15612,8 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
                 lb->selected = sel;
                 if (sel < lb->topRow)
                     lb->topRow = sel;
-                if (blink)
-                    BlinkerStart(blink, TYPER_BLINK_MS, 1);
+                if (lb->blinker)
+                    BlinkerStart(lb->blinker, TYPER_BLINK_MS, 1);
             } else {
                 PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
             }
@@ -15627,8 +15630,8 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
                 lb->selected = sel;
                 if (sel >= top + visible)
                     lb->topRow = sel - visible + 1;
-                if (blink)
-                    BlinkerStart(blink, TYPER_BLINK_MS, 1);
+                if (lb->blinker)
+                    BlinkerStart(lb->blinker, TYPER_BLINK_MS, 1);
             } else {
                 PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
             }
@@ -15702,22 +15705,28 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
     /* The window held still, so repaint only what changed -- the band that
      * lost the highlight and the band that gained it. */
     if (lb->selected != wasSel) {
+        int32_t left  = w->rect.left;
+        int32_t right = w->rect.right;
+
         if (wasSel >= 0)
-            ListRepaintRow(w, wasSel);
+            ListRepaintBand(w, left, right, wasSel);
 
         if (lb->selected < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, lb->selected);
+        ListRepaintBand(w, left, right, lb->selected);
 
     } else if (lb->chosen != wasChosen) {
+        int32_t left  = w->rect.left;
+        int32_t right = w->rect.right;
+
         if (wasChosen >= 0)
-            ListRepaintRow(w, wasChosen);
+            ListRepaintBand(w, left, right, wasChosen);
 
         if (lb->chosen < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, lb->chosen);
+        ListRepaintBand(w, left, right, lb->chosen);
     }
 
 }

@@ -75,7 +75,7 @@ void __cdecl SetGamePalette(uint8_t *palette);
  * pushed beneath it, which is how VC6 copies a by-value struct and not how
  * it passes a uint32_t. */
 uint8_t __cdecl NearestPalIndex(const uint32_t *palette, PALETTEENTRY colour,
-                                uint32_t from);
+                                uint8_t from);
 
 /* 0x0041B820, 25 callers. NearestPalIndex with the three channels apart. The
  * original packs them into its own first argument slot and passes the dword,

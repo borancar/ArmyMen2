@@ -1824,7 +1824,17 @@ typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
  *
  * The team-mate count decides the marker's size -- 4 when a slot is alone on
  * its team and 3 when it is not -- and a slot with no team at all skips the
- * count entirely rather than counting zero. */
+ * count entirely rather than counting zero.
+ *
+ * THE COLUMN ADVANCES ONLY FOR A SLOT THAT IS DRAWN. An empty slot's
+ * `continue` jumps past the image's `add esi, 4`, so the active players fill
+ * the row's columns in order however the slots are numbered, which is what a
+ * row chosen by the active count needs. The game-type line reads the row's
+ * start, kept in its own slot across the loop. And a paused slot (variant 2
+ * or below) skips only its score text: the name box below it is still drawn.
+ * An earlier reading had all three wrong -- a per-slot column, the advanced
+ * pointer for the bottom line, and a `continue` past the name box -- and the
+ * byte comparison is what showed them. */
 void __cdecl PausedFrameStep(void)
 {
     /* The image's three per-slot pause-bit tables, each its own global. */
@@ -1834,34 +1844,36 @@ void __cdecl PausedFrameStep(void)
 
     /* The comm object is read at every use. */
 #define comm (g_commObject)
+    const int16_t *row;
     const int16_t *xy;
-    int32_t        active = 0;
+    int32_t        active;
+    int32_t        idx;
     int32_t        slot;
     int32_t        n;
 
     if (g_mpSession == 0)
         return;
 
-
+    active = 0;
     for (n = 0; n < 4; n++) {
         if (*(const int32_t *)(comm + COMM_OFF_SLOT_FIELD_25C
                                + n * COMM_PLAYER_STRIDE) != 0)
             active++;
     }
 
-    active--;
-    xy = (const int16_t *)(g_mpRowCoords
-                           + (uint32_t)active * 16u);
+    idx = active - 1;
+    row = (const int16_t *)(g_mpRowCoords
+                            + (uint32_t)idx * 16u);
+    xy = row;
 
-    for (slot = 0; slot < 4; xy += 2, slot++) {
+    for (slot = 0; slot < 4; slot++) {
 #define rec (comm + slot * COMM_PLAYER_STRIDE)
         int32_t  team;
         int32_t  mates;
         int32_t  variant;
         int32_t  badge;
-        int32_t  army;
         char     scoreText[20];
-        char     teamText[32];
+        char     teamText[20];
         int32_t  width;
 
         if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_25C) == 0)
@@ -1905,59 +1917,52 @@ void __cdecl PausedFrameStep(void)
             variant = 1;
         }
 
-        army = ((AM2_Comm *)comm)->CommArmyOfSlot(slot);
         DrawSprite((g_mpMarkGrid)
-                       [army * 5 + variant],
+                       [((AM2_Comm *)comm)->CommArmyOfSlot(slot) * 5 + variant],
                    xy[0], xy[1], 0);
 
         if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258) != 0) {
-            /* The team sprite's x is the marker's, rounded DOWN to a multiple
-             * of 32 and shifted by 0x5E -- `and edx, ~0x1F` before the add,
-             * so two adjacent columns can share a team badge position. */
-            int32_t tx = ((variant - 3) != 0 ? -1 : 0) & ~0x1F;
-
-            tx += 0x5E + xy[0];
+            /* The team sprite sits 0x5E right of the marker for the small
+             * (team) marker and 0x3E for any other. The image's `sub 3; neg;
+             * sbb; and ~0x1F; add 0x5E` is VC6's branchless form of a
+             * two-constant ternary, not a rounding of x. */
             DrawSprite((g_mpTeamSprites)
                            [*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258)],
-                       tx, xy[1] + 3, 0);
+                       (variant == 3 ? 0x5E : 0x3E) + xy[0],
+                       xy[1] + 3, 0);
         }
 
-        if (badge) {
-            AM2_Sprite *spr = (variant == 3)
-                ? g_mpMarkA
-                : g_mpMarkB;
-
-            DrawSprite(spr, xy[0], xy[1], 0);
-        }
+        if (badge)
+            DrawSprite(variant == 3 ? g_mpMarkA : g_mpMarkB,
+                       xy[0], xy[1], 0);
 
         if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
-            DrawLatencyBar(active, slot);
+            DrawLatencyBar(idx, slot);
         else
             DrawSprite(g_mpMarkC,
                        xy[0] + 0x37, xy[1] + 3, 0);
 
-        if (variant <= 2)
-            continue;
-
-        am2_sprintf(scoreText, "%d",
-                    GetArmyScore(comm, slot));
-        width = TextExtent(scoreText, 1, NULL);
-        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
-            return;
-        DrawText(xy[0] - width + 0x32, xy[1] + 4, scoreText, 1, 0,
-                 g_hiliteColour);
-        UnlockSurface();
-
-        if (mates > 1) {
-            am2_sprintf(teamText, "%d",
-                        ((AM2_Comm *)comm)->CommTeamScore(slot));
-            width = TextExtent(teamText, 1, NULL);
-            if (!LockSurface(
-                    *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
+        if (variant > 2) {
+            am2_sprintf(scoreText, "%d",
+                        GetArmyScore(comm, slot));
+            width = TextExtent(scoreText, 1, NULL);
+            if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
-            DrawText(xy[0] - width + 0x58, xy[1] + 4, teamText, 1, 0,
+            DrawText(xy[0] - width + 0x32, xy[1] + 4, scoreText, 1, 0,
                      g_hiliteColour);
             UnlockSurface();
+
+            if (mates > 1) {
+                am2_sprintf(teamText, "%d",
+                            ((AM2_Comm *)comm)->CommTeamScore(slot));
+                width = TextExtent(teamText, 1, NULL);
+                if (!LockSurface(
+                        *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
+                    return;
+                DrawText(xy[0] - width + 0x58, xy[1] + 4, teamText, 1, 0,
+                         g_hiliteColour);
+                UnlockSurface();
+            }
         }
 
         if (g_infoOverlayOn) {
@@ -1977,21 +1982,21 @@ void __cdecl PausedFrameStep(void)
                             g_whiteInk);
             UnlockSurface();
         }
+        xy += 2;
     }
 
     if (g_infoOverlayOn) {
-        char buf[292];
+        char buf[300];
         RECT clip;
 
+        clip.top    = row[1] + 0x24;
+        clip.left   = row[0];
+        clip.right  = clip.left + 0x190;
+        clip.bottom = clip.top + 0x14;
         am2_sprintf(buf, "Game type: %s, Goal: %d",
                     (const char *)ScriptListFind(
                         &g_mpScriptName) + 0x80,
                     g_scoreLimit);
-
-        clip.top    = xy[1] + 0x24;
-        clip.left   = xy[0];
-        clip.right  = clip.left + 0x190;
-        clip.bottom = clip.top + 0x14;
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;
         DrawTextClipped(clip.left + 2, clip.top + 2, buf, 1, clip,

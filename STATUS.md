@@ -66,8 +66,8 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1524 of
-  1645 byte-identical (2026-10-06), piecewise 399.** The CheatLine /
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1525 of
+  1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
   externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
@@ -215,6 +215,41 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ListUpdate matched; PausedFrameStep fixed and 238 -> 151**
+    (2026-10-07), 1524 -> 1525.
+    - ListUpdate repaints both row bands from a left and right it reads
+      once per block, passed as scalars to ListRepaintBand. Both survive the
+      PlaySoundAt between the two repaints, as in the image.
+    - ListUpdate's hover arm takes `wasSel` again after the focus call: the
+      image reloads that register.
+    - ListUpdate writes the row straight into `lb->selected`, reads
+      `selected` only after the mouse-button test, and re-reads the
+      blinker in the key arms.
+    - PausedFrameStep had three behaviour differences, all found from the
+      bytes:
+      - the column advances only for a slot that is drawn (the empty-slot
+        `continue` skips the image's `add esi, 4`);
+      - the game-type line uses the row's start, not the advanced pointer;
+      - a paused slot skips only its score text, not its name box.
+    - PausedFrameStep's team badge x is `variant == 3 ? 0x5E : 0x3E`.
+      `sub; neg; sbb; and; add` is VC6's two-constant ternary, not a
+      rounding.
+    - PausedFrameStep calls CommArmyOfSlot inside DrawSprite's argument.
+    - PausedFrameStep's buffers are sized from the frame offsets:
+      teamText[20] and buf[300].
+    - NearestPalIndex takes `from` as a uint8_t. MakeBitmap writes its
+      copy as a byte and pushes the dword. NearestPalIndex still matches,
+      and MakeBitmap went from 153 to 152.
+    - Looked at without gain:
+      - HudEdgeUpdate and UpdateTrooperAction keep a `this + const`
+        pointer in a register, which ours folds wherever it is assigned. A
+        lab case keeps it, so this is allocator cost.
+      - CheckMapRules: path scoped to its block.
+      - ScriptSetObjBitmap: eight shapes.
+      - PointerActionFollow: the first OurLeaderUnit's dead loop is placed
+        at the end.
+      - ScriptPad: the image cross-jumps its first ScriptExpect error into
+        its last.
   - **RunScriptAction 129 -> 30** (2026-10-07), no count change.
     - The setbriefvo arm (0x28) sits between setbriefing (0x27) and
       setstratmap (0x29), which is where the image lays out its strcpy to

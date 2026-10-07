@@ -426,13 +426,14 @@ void __cdecl SetGamePalette(uint8_t *pal)
  * it -- so this is not "nearest in the palette" but "nearest among the ones
  * you are allowed to use".
  *
- * Two details are the original's rather than choices. `from` is masked to a
- * byte before the range check, so a value of 0x100 or more searches nothing
- * and answers 0 rather than reading off the end. And the running best starts
+ * Two details are the original's rather than choices. `from` is a BYTE
+ * parameter: the body masks it with 0xFF before the range check, and
+ * MakeBitmap stores its copy with a byte write and pushes the whole dword,
+ * which is VC6 passing a uint8_t. And the running best starts
  * at a sentinel larger than any real distance, so an all-equal palette
  * answers `from` -- the comparison is strict. */
 uint8_t __cdecl NearestPalIndex(const uint32_t *palette, PALETTEENTRY colour,
-                                uint32_t from)
+                                uint8_t from)
 {
     int32_t best = AM2_COLOUR_DIST_MAX;
     uint8_t hit  = 0;
@@ -440,7 +441,7 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, PALETTEENTRY colour,
 
     /* Signed (jge/jl), and declared last: that is what gives `hit` a stack
      * slot of its own rather than the dead `from` argument's. */
-    for (i = (int32_t)(from & 0xFFu); i < 256; i++) {
+    for (i = from; i < 256; i++) {
         int32_t d = ColourDistance(&palette[i], &colour);
 
         if (d < best) {
