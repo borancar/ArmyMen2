@@ -215,7 +215,11 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
-  - **Step3Drive 419 -> 377, still 1532** (2026-10-07).
+  - **Step3Drive 419 -> 372, still 1532** (2026-10-07).
+    - A combined pass (hoist, swap, operand order, ternary, each repeated
+      until nothing improves) found little more: the remap choice in
+      Step3Drive as a ternary (377 -> 372), and FormationPointFar storing
+      the leader's y before its x (12 -> 6).
     - A second hoist round, in apply mode, found four reads in Step3Drive
       that the image takes ahead of their statement:
       - the gun's heading;

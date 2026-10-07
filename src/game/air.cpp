@@ -568,8 +568,8 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 
     (void)follower;
 
-    out->x = *(const int16_t *)(l + OBJ_OFF_POS);
     out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
+    out->x = *(const int16_t *)(l + OBJ_OFF_POS);
 
     switch (*(const int32_t *)l) {
     case 3:

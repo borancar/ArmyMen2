@@ -10761,10 +10761,9 @@ void __cdecl Step3Drive(void *obj, void *rec)
     if (*(const int32_t *)(o + 0x52Cu) == 5) {
         uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
 
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
-            *(void **)(g + 0x30u) = *(void * *)&g_remapIdent;
-        else
-            *(void **)(g + 0x30u) = g_remapBright;
+        *(void **)(g + 0x30u) = (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
+                                    ? *(void * *)&g_remapIdent
+                                    : g_remapBright;
     }
 
     /* Everything under the point the vehicle is MOVING TO, not where it is:
