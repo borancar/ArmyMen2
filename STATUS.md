@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1536 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1537 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,13 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **OnMpGameType matched** (2026-10-07), 1536 -> 1537.
+    - The map name is recomputed from the record at each of its two uses.
+      It does not go through an `nm` local.
+    - The map box is read at its store, after FindLevelByName. It was not
+      read into `maps` before that call.
+    - This is the reverse of the hoisting lever. A local the original did
+      not have changes register weights just as a missing one does.
   - **RecvTrooperWantItem matched** (2026-10-07), 1535 -> 1536.
     - The give amount is one if/else between the quantity and the
       target's count. The original was not `give = quant` and then a

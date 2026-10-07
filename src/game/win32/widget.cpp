@@ -10237,10 +10237,11 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
                  + LIST_OFF_TOP_ROW) = 0;
 
     row = 0;
+    /* The name is recomputed from the record at each use. */
+#define NM (*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS) \
+            + (size_t)i * AM2_MP_MAP_NAME_BYTES)
     for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
-        const char *nm = *(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
-                         + (size_t)i * AM2_MP_MAP_NAME_BYTES;
-        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)nm);
+        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)NM);
 
         if (!lvl)
             continue;
@@ -10249,11 +10250,11 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         ((AM2_Rec *)*(void **)(maps + LIST_OFF_ROWS))->ListAdd(
                 (const char *)(lvl + LEVEL_OFF_NAME), lvl);
 
-        if (strcmp(nm, &g_mapName_) == 0)
+        if (strcmp(NM, &g_mapName_) == 0)
             row = i;
     }
+#undef NM
 
-    maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
     {
         uint8_t *lvl = (uint8_t *)FindLevelByName(
             (char *)(*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
@@ -10264,7 +10265,8 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
          * where reading the instruction alone suggests the FindLevelByName
          * result that was computed two lines earlier. That result is kept in
          * esi and handed to SelectLevel instead. */
-        *(int32_t *)(maps + LIST_OFF_CHOSEN) = row;
+        *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
+                     + LIST_OFF_CHOSEN) = row;
         ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), row);
         SelectLevel(lvl);
         RefreshMapSelection();
