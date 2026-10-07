@@ -348,7 +348,7 @@ typedef struct AM2_Object {
         int32_t    tableRec3Index;  /*   the slot as a save file holds it: an index */
         uint32_t   roachStamp;      /*   ROACH_OFF_STAMP, a roach's: when its fan began */
     };
-    union {                         /* +0x538..+0x5AC, by object type: */
+    union {                         /* +0x538 to the end, by object type: */
         struct {                    /* a unit's (types 2 and 8) */
             int32_t   pose;         /* +0x538 OBJ_OFF_POSE */
             int32_t   posePending;  /* +0x53C OBJ_OFF_POSE_PENDING */
@@ -367,6 +367,16 @@ typedef struct AM2_Object {
             uint32_t  fireStamp;    /* +0x5A0 UNIT_OFF_FIRE_STAMP */
             int32_t   field5A4;     /* +0x5A4 OBJ_OFF_FIELD_5A4 */
             int32_t   field5A8;     /* +0x5A8 OBJ_OFF_FIELD_5A8, the random name index */
+            int32_t        nameIndex;       /* +0x5AC OBJ_OFF_NAME_INDEX */
+            uint32_t       field5B0;        /* +0x5B0 OBJ_OFF_FIELD_5B0, game-clock ms */
+            AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */
+            uint32_t       sentPosSeq;      /* +0x5B8 TROOPER_OFF_SENT_POS_T */
+            uint8_t        sentFacing;      /* +0x5BC TROOPER_OFF_SENT_FACING */
+            uint8_t        _pad5bd[3];
+            uint32_t       sentFacingSeq;   /* +0x5C0 TROOPER_OFF_SENT_FACING_T */
+            int32_t        sentPose;        /* +0x5C4 TROOPER_OFF_SENT_POSE */
+            uint32_t       sentPoseSeq;     /* +0x5C8 TROOPER_OFF_SENT_POSE_T */
+            uint32_t       lastSeq;         /* +0x5CC TROOPER_OFF_LAST_SEQ */
         };
         struct {                    /* a vehicle's (type 3) */
             struct {                /* +0x538 VEHICLE_OFF_PTR_LIST, its riders: */
@@ -393,6 +403,23 @@ typedef struct AM2_Object {
             uint8_t   turnCommitted;/* +0x5A4 the row facing last committed */
             uint8_t   _pad5a5[3];
             int32_t   turnRecommit; /* +0x5A8 non-zero: commit whatever the row reads */
+            AM2_Point vSentPos;     /* +0x5AC VEHICLE_OFF_SENT_POS, last transmitted */
+            uint32_t  vSentPosSeq;  /* +0x5B0 */
+            uint8_t   vSentFacing;  /* +0x5B4 VEHICLE_OFF_SENT_FACING, the hull */
+            uint8_t   _padv5b5[3];
+            uint32_t  vSentFacingSeq; /* +0x5B8 */
+            uint8_t   vSentGun;     /* +0x5BC VEHICLE_OFF_SENT_GUN, the turret */
+            uint8_t   _padv5bd[3];
+            uint32_t  vSentGunSeq;  /* +0x5C0 */
+            uint8_t   vSentIntFacing; /* +0x5C4 VEHICLE_OFF_SENT_INTFACING */
+            uint8_t   _padv5c5[3];
+            uint32_t  vSentIntFacingSeq; /* +0x5C8 */
+            uint8_t   vSentIntGun;  /* +0x5CC VEHICLE_OFF_SENT_INTGUN */
+            uint8_t   _padv5cd[3];
+            uint32_t  vSentIntGunSeq; /* +0x5D0 */
+            uint8_t   vSentAction;  /* +0x5D4 VEHICLE_OFF_SENT_ACTION: kind | three state bits */
+            uint8_t   _padv5d5[3];
+            uint32_t  vSentActionSeq; /* +0x5D8 */
         };
         struct {                    /* a roach's (type 8) */
             int32_t      roachBaseDir; /* +0x538 ROACH_OFF_BASE_DIR, 0..7 */
@@ -400,16 +427,6 @@ typedef struct AM2_Object {
             AM2_RoachOut roachCtl;     /* +0x540 its steering record */
         };
     };
-    int32_t        nameIndex;       /* +0x5AC OBJ_OFF_NAME_INDEX */
-    uint32_t       field5B0;        /* +0x5B0 OBJ_OFF_FIELD_5B0, game-clock ms */
-    AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */
-    uint32_t       sentPosSeq;      /* +0x5B8 TROOPER_OFF_SENT_POS_T */
-    uint8_t        sentFacing;      /* +0x5BC TROOPER_OFF_SENT_FACING */
-    uint8_t        _pad5bd[3];
-    uint32_t       sentFacingSeq;   /* +0x5C0 TROOPER_OFF_SENT_FACING_T */
-    int32_t        sentPose;        /* +0x5C4 TROOPER_OFF_SENT_POSE */
-    uint32_t       sentPoseSeq;     /* +0x5C8 TROOPER_OFF_SENT_POSE_T */
-    uint32_t       lastSeq;         /* +0x5CC TROOPER_OFF_LAST_SEQ */
 } AM2_Object;
 
 #if defined(__cplusplus) && !defined(_MSC_VER)

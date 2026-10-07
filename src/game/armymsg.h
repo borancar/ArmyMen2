@@ -139,7 +139,7 @@ void __cdecl SendVehicleUpdates(int32_t slot);
 /* 0x0045DAA0. Append one vehicle's DELTA update to a message buffer whose
  * first word is its length. The sibling of AppendTroopState, sharing its
  * design and not its code. */
-void __cdecl VehicleUpdateAppend(void *msg, void *obj);
+void __cdecl VehicleUpdateAppend(void *msg, struct AM2_Object *obj);
 
 /* 0x0045E550. Ask each of the four comm slots to send its vehicle batch. */
 void __cdecl SendAllVehicleUpdates(void);
