@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1542 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1546 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,12 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **LoadType2, 3, 6 and 8 matched** (2026-10-07), 1542 -> 1546. The
+    record copy at the end goes through an inline helper,
+    CopyTypeRecord(dst, src, n), not a bare memcpy. The arguments then become
+    temporaries evaluated right to left, so VC6 sets up the count and the
+    source before the destination (`mov ecx, N; lea esi; lea edi`). Found in
+    the lab: every bare memcpy form put the destination first.
   - **Probe sweep over all remaining functions** (2026-10-07). This was
     unhoist, hoist, swap, commute and ternary, in a second scratch tree.
     Gains:

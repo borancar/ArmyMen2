@@ -1534,6 +1534,14 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
  * in CLAUDE.md: nothing in this program throws, VC6's operator new answers
  * NULL rather than throwing, and the registered frame is never consulted.
  */
+/* The record copy the type loaders end with. An inline call, not a bare
+ * memcpy: VC6 then sets up the count and the source before the destination,
+ * as the image does. */
+static inline void CopyTypeRecord(void *dst, const void *src, size_t n)
+{
+    memcpy(dst, src, n);
+}
+
 /* A whole roach object on the stack -- the header's 0x94 bytes and the
  * saved record after them -- because that is what the original declares:
  * its frame is the object's size, and the file is read into it at +0x94.
@@ -1565,7 +1573,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
             *(const int32_t *)(h + 4));
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
+    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
         int32_t now;
@@ -1684,7 +1692,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     }
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE2_RECORD_SIZE);
+    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE2_RECORD_SIZE);
 
     if (!(*(const uint32_t *)(h + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)) {
         *(uint32_t *)(o + OBJ_OFF_FLAGS) =
@@ -1873,7 +1881,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     ClearPtrList(o + OBJ_OFF_PTR_LIST);
     ClearPtrList(o + VEHICLE_OFF_PTR_LIST);
 
-    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
+    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
 
     *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_SLOT) =
         g_objTableRecords
@@ -2223,7 +2231,7 @@ void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
                0, 1, *(const int32_t *)(h + 4), 0);
 
     memcpy(made, h, (size_t)kItemHeaderSize);
-    memcpy(made + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE6_RECORD_SIZE);
+    CopyTypeRecord(made + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
 
