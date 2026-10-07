@@ -230,23 +230,23 @@ uint32_t __cdecl MapChecksum(void)
  * The order is the original's, which copies +0x204 before +0x1C4. Nothing
  * observes the difference; it is free to keep and it is one less thing that
  * differs from the disassembly. */
-void __cdecl SelectLevel(const void *record)
+void __cdecl SelectLevel(const AM2_Level *record)
 {
-    const char *r = (const char *)record;
+    const AM2_Level *r = record;
 
     if (!r)
         return;
 
-    strcpy(&g_mapName_,          r + LEVEL_OFF_MAP_NAME);
-    strcpy(g_tilesetPath,        r + LEVEL_OFF_FOLDER);
-    strcpy(g_levelStrB,       r + LEVEL_OFF_LOAD_SCREEN);
-    strcpy(g_levelStrA,       r + LEVEL_OFF_LOAD_MUSIC);
-    strcpy(&g_levelStrC,       r + LEVEL_OFF_BRIEFING);
-    strcpy(&g_levelSoundName,  r + LEVEL_OFF_BRIEF_SFX);
-    strcpy(g_levelStrD,       r + LEVEL_OFF_STRAT_MAP);
+    strcpy(&g_mapName_,          r->mapName);
+    strcpy(g_tilesetPath,        r->folder);
+    strcpy(g_levelStrB,       r->loadScreen);
+    strcpy(g_levelStrA,       r->loadMusic);
+    strcpy(&g_levelStrC,       r->briefing);
+    strcpy(&g_levelSoundName,  r->briefSfx);
+    strcpy(g_levelStrD,       r->stratMap);
 
     g_tilesetReserve =
-        *(const int32_t *)(r + LEVEL_OFF_CYCLE);
+        r->cycle;
 }
 
 /* 0x0043E8B0 -- empty both level tables. Two {base, count, capacity} triples
@@ -260,22 +260,22 @@ void __cdecl SelectLevel(const void *record)
  * could not have said. */
 void __cdecl FreeLevelTables(void)
 {
-    void *levels = g_levelTable;
-    void *names;
+    AM2_Level *levels = g_levelTable;
+    AM2_NameRec *names;
 
     g_levelCount = 0;
     g_levelTableCap   = 0;
     if (levels)
         am2_free(levels);
 
-    names = *(void * *)&g_nameTableBase;
-    g_levelTable = (void *)0;
+    names = g_nameTableBase;
+    g_levelTable = (AM2_Level *)0;
     g_nameTableCount = 0;
     g_nameTableCap   = 0;
     if (names)
         am2_free(names);
 
-    *(void * *)&g_nameTableBase = (void *)0;
+    g_nameTableBase = (AM2_NameRec *)0;
 }
 
 /* 0x0043E1F0 -- find a level record by id, with the CRT's own bsearch over
@@ -285,14 +285,14 @@ void __cdecl FreeLevelTables(void)
  * set. The rest is never initialised and never read: the comparator at
  * CompareDword looks at that one field. Reproduced as written -- a
  * four-byte key would be a different function if the comparator ever grew. */
-void *__cdecl FindLevelRecord(int32_t id)
+AM2_Level *__cdecl FindLevelRecord(int32_t id)
 {
-    uint8_t key[AM2_LEVEL_RECORD_SIZE];
+    AM2_Level key;
 
-    *(int32_t *)key = id;
+    key.id = id;
 
-    return ((AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))(
-               key, g_levelTable,
+    return (AM2_Level *)((AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))(
+               &key, g_levelTable,
                (uint32_t)g_levelCount,
                AM2_LEVEL_RECORD_SIZE,
                (const void *)CompareDword);
@@ -360,23 +360,22 @@ typedef char *(__cdecl *AM2_StrlwrFn)(char *);
  * that, so it is the compiler's habit and not any of them allowing the body to
  * change it.
  */
-void *__cdecl FindLevelByName(char *name)
+AM2_Level *__cdecl FindLevelByName(char *name)
 {
     /* The level table, read afresh wherever it is used. */
-#define LEVEL(i) (*(char * *)&g_levelTable \
-                  + (uint32_t)(i) * AM2_LEVEL_RECORD_SIZE)
+#define LEVEL(i) (&g_levelTable[i])
     int32_t i;
 
     if (!name)
-        return (void *)0;
+        return (AM2_Level *)0;
 
     orig_strlwr(name);
 
     for (i = 0; i < g_levelCount; i++)
-        if (!strcmp(LEVEL(i) + LEVEL_OFF_MAP_NAME, name))
+        if (!strcmp(LEVEL(i)->mapName, name))
             return LEVEL(i);
 
-    return (void *)0;
+    return (AM2_Level *)0;
 #undef LEVEL
 }
 
@@ -465,27 +464,27 @@ void *__cdecl FindLevelByName(char *name)
  * function this wide reads like more coverage than it is. */
 int32_t __cdecl DefMapLine(int32_t cmd, char *line)
 {
-    uint8_t  rec[AM2_LEVEL_RECORD_SIZE];
+    AM2_Level rec;
     char    *tok;
     int32_t  i;
     int32_t  col;
 
     (void)cmd;
 
-    memset(rec, 0, sizeof rec);
-    *(int32_t *)(rec + LEVEL_OFF_ID) =
+    memset(&rec, 0, sizeof rec);
+    rec.id =
         g_levelCount + 1;
 
     tok = am2_strtok(line, " \t\n;,");
     if (!tok)
         return 2;
-    strcpy((char *)rec + LEVEL_OFF_MAP_NAME, tok);
+    strcpy(rec.mapName, tok);
 
     tok = am2_strtok((char *)0,
                      " \t\n;,");
     if (!tok)
         return 3;
-    strcpy((char *)rec + LEVEL_OFF_NAME, tok);
+    strcpy(rec.name, tok);
 
     /* The original INLINES the title-caser here rather than calling it, and
      * the body it inlines is TitleCaseName instruction for instruction --
@@ -494,25 +493,25 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
      * It was about to be written a second time; misc.cpp has had it under its
      * own address all along. Fourth near-miss of this kind, and the first
      * caught by reading rather than by a tool. */
-    TitleCaseNameInline((char *)rec + LEVEL_OFF_NAME);
+    TitleCaseNameInline(rec.name);
 
     tok = am2_strtok((char *)0,
                      " \t\n;,");
     if (!tok)
         return 4;
-    strcpy((char *)rec + LEVEL_OFF_FOLDER,
+    strcpy(rec.folder,
            "data\\");
-    strcat((char *)rec + LEVEL_OFF_FOLDER, tok);
+    strcat(rec.folder, tok);
 
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_WIN_MOVIE, 5);
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_LOAD_SCREEN, 6);
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_LOAD_MUSIC, 7);
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_BRIEFING, 8);
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_BRIEF_SFX, 9);
-    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_STRAT_MAP, 10);
+    TAKE_MAP_COLUMN(rec.winMovie, 5);
+    TAKE_MAP_COLUMN(rec.loadScreen, 6);
+    TAKE_MAP_COLUMN(rec.loadMusic, 7);
+    TAKE_MAP_COLUMN(rec.briefing, 8);
+    TAKE_MAP_COLUMN(rec.briefSfx, 9);
+    TAKE_MAP_COLUMN(rec.stratMap, 10);
 
     /* No null check -- see above. */
-    if (!DefParseBoolean((int32_t *)(rec + LEVEL_OFF_CYCLE),
+    if (!DefParseBoolean(&rec.cycle,
                          am2_strtok((char *)0,
                                     " \t\n;,")))
         return 11;
@@ -524,21 +523,19 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
         if (!tok)
             return col;
         if (!strcmp("none", tok))
-            strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
-                   + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES,
+            strcpy(rec.loseMovies[i],
                    g_dirScratch);
         else
-            strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
-                   + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES, tok);
+            strcpy(rec.loseMovies[i], tok);
     }
 
-    *(int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX) = 0;
+    rec.movieIndex = 0;
     tok = am2_strtok((char *)0,
                      " \t\n;,");
     if (tok)
-        DefParseNumber((int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX), tok);
+        DefParseNumber(&rec.movieIndex, tok);
 
-    AddLevelRecord(rec);
+    AddLevelRecord(&rec);
     return 0;
 }
 
@@ -569,12 +566,12 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
  * StepObjRows -- three functions in this tree now, so it is the compiler's
  * habit rather than any of them allowing the body to change it.
  */
-void *__cdecl ScriptListFind(char *name)
+AM2_NameRec *__cdecl ScriptListFind(char *name)
 {
     int32_t i;
 
     if (!name)
-        return (void *)0;
+        return (AM2_NameRec *)0;
 
     if (!g_nameTableCount)
         ReadMpMapList();
@@ -582,13 +579,12 @@ void *__cdecl ScriptListFind(char *name)
     orig_strlwr(name);
 
     /* The name table, read afresh wherever it is used. */
-#define REC(i) (*(char * *)&g_nameTableBase \
-                + (uint32_t)(i) * AM2_NAME_RECORD_SIZE)
+#define REC(i) (&g_nameTableBase[i])
     for (i = 0; i < g_nameTableCount; i++)
-        if (!strcmp(REC(i), name))
+        if (!strcmp(REC(i)->name, name))
             return REC(i);
 
-    return (void *)0;
+    return (AM2_NameRec *)0;
 #undef REC
 }
 
@@ -1007,17 +1003,17 @@ void __cdecl FreeScenarios(void)
  * The size arithmetic is `capacity * 780` built out of shifts and `lea`, which
  * is AM2_LEVEL_RECORD_SIZE and is written as that.
  */
-void __cdecl AddLevelRecord(const void *record)
+void __cdecl AddLevelRecord(const AM2_Level *record)
 {
-    uint8_t *table = *(uint8_t * *)&g_levelTable;
+    AM2_Level *table = g_levelTable;
     int32_t  cap;
     int32_t  count;
 
     if (!table) {
-        table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
-                                      * AM2_LEVEL_RECORD_SIZE);
+        table = (AM2_Level *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
+                                        * AM2_LEVEL_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
-        *(uint8_t * *)&g_levelTable    = table;
+        g_levelTable    = table;
         g_levelTableCap = cap;
     } else {
         cap = g_levelTableCap;
@@ -1029,16 +1025,15 @@ void __cdecl AddLevelRecord(const void *record)
         cap += AM2_LEVEL_TABLE_GROW;
         g_levelTableCap = cap;
 
-        table = (uint8_t *)am2_realloc(table,
-                                       (size_t)cap * AM2_LEVEL_RECORD_SIZE);
-        *(uint8_t * *)&g_levelTable = table;
+        table = (AM2_Level *)am2_realloc(table,
+                                         (size_t)cap * AM2_LEVEL_RECORD_SIZE);
+        g_levelTable = table;
 
         count = g_levelCount;
     }
 
     /* The count is read again for the copy and incremented in place. */
-    memcpy(table + (size_t)g_levelCount
-                       * AM2_LEVEL_RECORD_SIZE,
+    memcpy(&table[g_levelCount],
            record, AM2_LEVEL_RECORD_SIZE);
 
     (g_levelCount)++;
@@ -1088,33 +1083,31 @@ void __cdecl AddLevelRecord(const void *record)
  * is what says it is the one shown to a player. ScriptListFind lower-cases
  * what it is given and compares against +0, so the first stays as written.
  */
-void __cdecl NameRecAddMap(void *rec, const void *entry)
+void __cdecl NameRecAddMap(AM2_NameRec *rec, const char *entry)
 {
-    uint8_t *r = (uint8_t *)rec;
+    AM2_NameRec *r = rec;
 
-    if (!*(void **)(r + NAMEREC_OFF_MAPS)) {
-        *(void **)(r + NAMEREC_OFF_MAPS) =
+    if (!r->maps) {
+        r->maps = (char (*)[0x40])
             am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST * AM2_NAMEREC_FIELD);
-        *(int32_t *)(r + NAMEREC_OFF_CAP) = AM2_LEVEL_TABLE_FIRST;
+        r->cap = AM2_LEVEL_TABLE_FIRST;
     }
 
-    if (*(const int32_t *)(r + NAMEREC_OFF_COUNT)
-        >= *(const int32_t *)(r + NAMEREC_OFF_CAP)) {
-        int32_t cap = *(const int32_t *)(r + NAMEREC_OFF_CAP)
+    if (r->count
+        >= r->cap) {
+        int32_t cap = r->cap
                       + AM2_LEVEL_TABLE_GROW;
 
-        *(int32_t *)(r + NAMEREC_OFF_CAP) = cap;
-        *(void **)(r + NAMEREC_OFF_MAPS) =
-            am2_realloc(*(void **)(r + NAMEREC_OFF_MAPS),
+        r->cap = cap;
+        r->maps = (char (*)[0x40])
+            am2_realloc(r->maps,
                         (size_t)cap * AM2_NAMEREC_FIELD);
     }
 
-    memcpy(*(uint8_t **)(r + NAMEREC_OFF_MAPS)
-               + (uint32_t)*(const int32_t *)(r + NAMEREC_OFF_COUNT)
-                 * AM2_NAMEREC_FIELD,
+    memcpy(r->maps[r->count],
            entry, AM2_NAMEREC_FIELD);
 
-    *(int32_t *)(r + NAMEREC_OFF_COUNT) += 1;
+    r->count += 1;
 }
 
 /* 0x0043EAC0. One `rules` line: three tokens into a fresh name record, the
@@ -1122,29 +1115,29 @@ void __cdecl NameRecAddMap(void *rec, const void *entry)
  * searches. */
 int32_t __cdecl DefRulesLine(int32_t cmd, char *line)
 {
-    uint8_t rec[AM2_NAME_RECORD_SIZE];
+    AM2_NameRec rec;
     char   *tok;
 
     (void)cmd;
-    memset(rec, 0, sizeof rec);
+    memset(&rec, 0, sizeof rec);
 
     tok = am2_strtok(line, kMapSep);
     if (!tok)
         return 2;
-    strcpy((char *)rec + NAMEREC_OFF_NAME, tok);
+    strcpy(rec.name, tok);
 
     tok = am2_strtok((char *)0, kMapSep);
     if (!tok)
         return 3;
-    strcpy((char *)rec + NAMEREC_OFF_NAME2, tok);
+    strcpy(rec.name2, tok);
 
     tok = am2_strtok((char *)0, kMapSep);
     if (!tok)
         return 4;
-    strcpy((char *)rec + NAMEREC_OFF_NAME3, tok);
+    strcpy(rec.name3, tok);
 
-    TitleCaseName((char *)rec + NAMEREC_OFF_NAME3);
-    AddNameRecord(rec);
+    TitleCaseName(rec.name3);
+    AddNameRecord(&rec);
     return 0;
 }
 
@@ -1154,7 +1147,7 @@ int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line)
 {
     char  entry[AM2_NAMEREC_FIELD];
     char *tok;
-    void *rec;
+    AM2_NameRec *rec;
 
     (void)cmd;
     memset(entry, 0, sizeof entry);
@@ -1189,15 +1182,15 @@ int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line)
  * binary. The duplication is the point of comparison: if these two ever stop
  * matching line for line, one of them has been misread.
  */
-void __cdecl AddNameRecord(const void *record)
+void __cdecl AddNameRecord(const AM2_NameRec *record)
 {
-    uint8_t *table = g_nameTableBase;
+    AM2_NameRec *table = g_nameTableBase;
     int32_t  cap;
     int32_t  count;
 
     if (!table) {
-        table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
-                                      * AM2_NAME_RECORD_SIZE);
+        table = (AM2_NameRec *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
+                                          * AM2_NAME_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
         g_nameTableBase = table;
         g_nameTableCap   = cap;
@@ -1211,16 +1204,15 @@ void __cdecl AddNameRecord(const void *record)
         cap += AM2_LEVEL_TABLE_GROW;
         g_nameTableCap = cap;
 
-        table = (uint8_t *)am2_realloc(table,
-                                       (size_t)cap * AM2_NAME_RECORD_SIZE);
+        table = (AM2_NameRec *)am2_realloc(table,
+                                           (size_t)cap * AM2_NAME_RECORD_SIZE);
         g_nameTableBase = table;
 
         count = g_nameTableCount;
     }
 
     /* The count is read again for the copy and incremented in place. */
-    memcpy(table + (size_t)g_nameTableCount
-                       * AM2_NAME_RECORD_SIZE,
+    memcpy(&table[g_nameTableCount],
            record, AM2_NAME_RECORD_SIZE);
 
     (g_nameTableCount)++;

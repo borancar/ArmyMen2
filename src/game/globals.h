@@ -354,7 +354,7 @@
 #define g_levelStrB              ((char *)(uintptr_t)ADDR_LEVEL_STR_B)  /* 0x00511C88 */
 #define g_levelStrC              (*(char *)(uintptr_t)ADDR_LEVEL_STR_C)  /* 0x00511D18 */
 #define g_levelStrD              ((char *)(uintptr_t)ADDR_LEVEL_STR_D)  /* 0x00511CD8 */
-#define g_levelTable             (*(void **)(uintptr_t)ADDR_LEVEL_TABLE)  /* 0x00656338 */
+#define g_levelTable             (*(struct AM2_Level **)(uintptr_t)ADDR_LEVEL_TABLE)  /* 0x00656338 */
 #define g_levelTableCap          (*(int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_CAP)  /* 0x00656340 */
 #define g_listenerPos            (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  /* 0x00514E0C */
 #define g_listenerPosPrev        (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV)  /* 0x00514E10 */
@@ -482,7 +482,7 @@
 #define g_nameGreyteamwins       ((uint8_t *)(uintptr_t)ADDR_NAME_GREYTEAMWINS)  /* 0x00478824 */
 #define g_nameGreywins           ((uint8_t *)(uintptr_t)ADDR_NAME_GREYWINS)  /* 0x00478860 */
 #define g_nameScoreLimit         ((uint8_t *)(uintptr_t)ADDR_NAME_SCORE_LIMIT)  /* 0x00487C60 */
-#define g_nameTableBase          (*(uint8_t **)(uintptr_t)ADDR_NAME_TABLE_BASE)  /* 0x00656344 */
+#define g_nameTableBase          (*(struct AM2_NameRec **)(uintptr_t)ADDR_NAME_TABLE_BASE)  /* 0x00656344 */
 #define g_nameTableCap           (*(int32_t *)(uintptr_t)ADDR_NAME_TABLE_CAP)  /* 0x0065634C */
 #define g_nameTableCount         (*(int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT)  /* 0x00656348 */
 #define g_nameTanscore           ((uint8_t *)(uintptr_t)ADDR_NAME_TANSCORE)  /* 0x00487C68 */

@@ -2332,8 +2332,8 @@ void __cdecl MissionEnded(int32_t lost)
     char     path[AM2_LEVEL_PROBE_BUF];
     char     found[AM2_FIND_DATA_BYTES];
     int32_t  h;
-    uint8_t *rec;
-    uint8_t *next;
+    AM2_Level *rec;
+    AM2_Level *next;
     int32_t  movie;
 
     g_inputSuppress = 0;
@@ -2348,20 +2348,20 @@ void __cdecl MissionEnded(int32_t lost)
         if (h == -1) {
             movie = 0;
 
-            rec = (uint8_t *)FindLevelRecord(
+            rec = FindLevelRecord(
                       g_levelId);
             if (!rec)
                 goto no_next;
 
-            if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
+            if (rec->winMovie[0]) {
                 strcpy(&g_movieToPlay,
-                       (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
+                       rec->winMovie);
                 movie = 1;
             }
-            if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
+            if (rec->movieIndex
                 > g_movieCount) {
                 g_movieCount =
-                    *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
+                    rec->movieIndex;
                 SaveOptions();
             }
             if (!movie)
@@ -2390,23 +2390,23 @@ void __cdecl MissionEnded(int32_t lost)
         if (h == -1) {
             movie = 0;
 
-            rec = (uint8_t *)FindLevelRecord(
+            rec = FindLevelRecord(
                       g_levelId);
             if (rec) {
-                if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
+                if (rec->winMovie[0]) {
                     strcpy(&g_movieToPlay,
-                           (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
+                           rec->winMovie);
                     movie = 1;
                 }
-                if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
+                if (rec->movieIndex
                     > g_movieCount) {
                     g_movieCount =
-                        *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
+                        rec->movieIndex;
                     SaveOptions();
                 }
             }
 
-            next = (uint8_t *)FindLevelRecord(
+            next = FindLevelRecord(
                        g_levelId + 1);
             SaveDefaultCof();
 
@@ -2437,11 +2437,11 @@ no_next:
     }
 
     /* ---- lost, or no level in hand ---- */
-    rec = (uint8_t *)FindLevelRecord(
+    rec = FindLevelRecord(
               g_levelId);
     g_movieToPlay = '\0';
 
-    if (rec && strlen((const char *)(rec + LEVEL_OFF_LOSE_MOVIES))) {
+    if (rec && strlen(rec->loseMovies[0])) {
         do {
             /* The clock is read again on every pass -- the image does not
              * hoist it, so an empty pick waits for the clock to move on. */
@@ -2450,8 +2450,7 @@ no_next:
                 % AM2_LOSE_MOVIE_COUNT;
 
             strcpy(&g_movieToPlay,
-                   (const char *)(rec + LEVEL_OFF_LOSE_MOVIES
-                                  + pick * AM2_LEVEL_STR_BYTES));
+                   rec->loseMovies[pick]);
         } while (g_movieToPlay == '\0');
     }
 

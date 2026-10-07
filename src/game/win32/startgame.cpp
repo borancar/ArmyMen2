@@ -350,7 +350,7 @@ void __cdecl OnMovies(void)
 
 void __cdecl OnBootCamp(void)
 {
-    void *level;
+    AM2_Level *level;
 
     PlaySoundAt(2, 0, 0, 0, 0);
 
@@ -371,7 +371,7 @@ void __cdecl OnBootCamp(void)
 
     PlaySoundAt(2, 0, 0, 0, 0);          /* a second one, and deliberate */
     SelectLevel(level);
-    g_levelId    = *(int32_t *)((uint8_t *)level + LEVEL_OFF_ID);
+    g_levelId    = level->id;
     g_levelIndex = 1;
     RequestState(2);
 }
@@ -429,14 +429,14 @@ void __cdecl OnEnterNameOk(void)
     const char *name;
     char        path[0x100];
     uint8_t     find[0x118];            /* a _finddata_t */
-    void       *level;
+    AM2_Level       *level;
     int32_t     handle;
 
     if ((dlg = (g_paintObject)) == (uint8_t *)0)
         return;
 
     name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
-    level = strlen(name) < 1 ? (void *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
+    level = strlen(name) < 1 ? (AM2_Level *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
     if (level == (void *)0) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;

@@ -9728,25 +9728,23 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         for (i = 0;
              i < g_nameTableCount; i++) {
-            uint8_t *rec = g_nameTableBase
-                         + (uint32_t)i * AM2_NAME_RECORD_SIZE;
+            AM2_NameRec *rec = &g_nameTableBase[i];
 
             if (!rec)
                 continue;
-            ((AM2_Rec *)rows)->ListAdd((const char *)(rec + NAMEREC_OFF_NAME3), rec);
-            if (strcmp((const char *)(rec + NAMEREC_OFF_NAME),
+            ((AM2_Rec *)rows)->ListAdd(rec->name3, rec);
+            if (strcmp(rec->name,
                        &g_mpScriptName) == 0)
                 sel = i;
         }
 
         if (g_nameTableCount != 0) {
-            uint8_t *rec = g_nameTableBase
-                         + (uint32_t)sel * AM2_NAME_RECORD_SIZE;
+            AM2_NameRec *rec = &g_nameTableBase[sel];
 
             strcpy(&g_mpScriptName,
-                   (const char *)(rec + NAMEREC_OFF_NAME));
+                   rec->name);
             am2_sprintf(path, "%s.txt",
-                        (const char *)(rec + NAMEREC_OFF_NAME2));
+                        rec->name2);
         }
         /* OUTSIDE the test, as the image has it (`je` straight to this
          * call): with no scripts listed, the rules are read from whatever
@@ -9827,27 +9825,26 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         rows = new AM2_Rec(0);
 
         {
-            const uint8_t *maps = (const uint8_t *)ScriptListFind(
+            const AM2_NameRec *maps = ScriptListFind(
                 &g_mpScriptName);
 
-            if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
-                const char *names = *(const char *const *)
-                                        (maps + NAMEREC_OFF_MAPS);
+            if (maps && maps->count > 0) {
+                const char *names = maps->maps[0];
 
-                for (i = 0; i < *(const int32_t *)(maps + NAMEREC_OFF_COUNT); i++) {
-                    uint8_t *lvl = (uint8_t *)FindLevelByName(
+                for (i = 0; i < maps->count; i++) {
+                    AM2_Level *lvl = FindLevelByName(
                         (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
 
                     if (!lvl)
                         continue;
-                    ((AM2_Rec *)rows)->ListAdd((const char *)(lvl + LEVEL_OFF_NAME), lvl);
-                    if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
+                    ((AM2_Rec *)rows)->ListAdd(lvl->name, lvl);
+                    if (strcmp(lvl->mapName,
                                &g_mapName_) == 0)
                         sel = i;
                 }
 
                 {
-                    void *lvl = FindLevelByName(
+                    AM2_Level *lvl = FindLevelByName(
                         (char *)names + (uint32_t)sel * AM2_MPMAP_STRIDE);
 
                     if (lvl)
@@ -10199,7 +10196,7 @@ void __cdecl MpLeaveSession(void)
 void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 {
     uint8_t       *panel;
-    const uint8_t *rec;
+    const AM2_NameRec *rec;
     uint8_t       *maps;
     char           path[AM2_MP_GAMETYPE_PATH];
     int32_t        i;
@@ -10212,7 +10209,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     panel = (uint8_t *)w->parent;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    rec = *(const uint8_t *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
+    rec = *(const AM2_NameRec *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
                                     + AM2_LIST_ROW_VALUE);
     if (!rec)
         return;
@@ -10221,8 +10218,8 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
      * after it survives the null test. Reproduced. */
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    strcpy(&g_mpScriptName, (const char *)rec);
-    am2_sprintf(path, "%s.txt", (const char *)(rec + MP_GAMETYPE_OFF_RULES));
+    strcpy(&g_mpScriptName, rec->name);
+    am2_sprintf(path, "%s.txt", rec->name2);
     FillListFromRules(path, panel);
 
     {
@@ -10242,17 +10239,16 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 
     row = 0;
     /* The name is recomputed from the record at each use. */
-#define NM (*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS) \
-            + (size_t)i * AM2_MP_MAP_NAME_BYTES)
-    for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
-        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)NM);
+#define NM (rec->maps[i])
+    for (i = 0; i < rec->count; i++) {
+        AM2_Level    *lvl = FindLevelByName((char *)NM);
 
         if (!lvl)
             continue;
 
         maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
         ((AM2_Rec *)*(void **)(maps + LIST_OFF_ROWS))->ListAdd(
-                (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+                lvl->name, lvl);
 
         if (strcmp(NM, &g_mapName_) == 0)
             row = i;
@@ -10260,9 +10256,8 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 #undef NM
 
     {
-        uint8_t *lvl = (uint8_t *)FindLevelByName(
-            (char *)(*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
-                     + (size_t)row * AM2_MP_MAP_NAME_BYTES));
+        AM2_Level *lvl = FindLevelByName(
+            (char *)rec->maps[row]);
 
         /* The INDEX goes in the list, not the level -- espmap puts the
          * stored value in the same frame slot the loop wrote `row` to,
@@ -10349,7 +10344,7 @@ void __cdecl ClearMenuMsgs(void)
  * Verified by reading and offset check. */
 void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 {
-    const void *lvl;
+    const AM2_Level *lvl;
 
     (void)w;
     if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
@@ -10360,7 +10355,7 @@ void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
     g_levelId = 0;
 
-    lvl = *(const void *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
+    lvl = *(const AM2_Level *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
                                  + AM2_LIST_ROW_VALUE);
     if (!lvl)
         return;
@@ -10413,7 +10408,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
                               uint32_t mapSum)
 {
     uint8_t       *panel = (uint8_t *)0;
-    const uint8_t *rec;
+    const AM2_NameRec *rec;
     char           path[0x40];
     char           amm[AM2_MP_COMPLAINT_BYTES];
     char           bmp[AM2_MP_COMPLAINT_BYTES];
@@ -10426,7 +10421,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     if (g_subState == AM2_MENU_MODE_MP_PANEL)
         panel = g_paintObject;
 
-    rec = (const uint8_t *)ScriptListFind(
+    rec = ScriptListFind(
               &g_mpScriptName);
     if (!rec) {
         MpComplain(panel, "%s does not have rules.", path);
@@ -10450,7 +10445,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         }
 
         am2_sprintf(path, "%s.txt",
-                    (const char *)(rec + MP_GAMETYPE_OFF_RULES));
+                    rec->name2);
         FillListFromRules(path, panel);
 
         type = *(AM2_Widget **)(panel + MP_PANEL_OFF_TYPE_BOX);
@@ -10468,10 +10463,9 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     /* -1, NOT 0 -- see above. */
     chosen = -1;
     /* The name is recomputed from the record at each use, as OnMpGameType's. */
-#define NM (*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS) \
-            + (size_t)i * AM2_MP_MAP_NAME_BYTES)
-    for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
-        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)NM);
+#define NM (rec->maps[i])
+    for (i = 0; i < rec->count; i++) {
+        AM2_Level    *lvl = FindLevelByName((char *)NM);
 
         if (!lvl)
             continue;
@@ -10480,7 +10474,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
             uint8_t *box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
 
             ((AM2_Rec *)*(void **)(box + LIST_OFF_ROWS))->ListAdd(
-                    (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+                    lvl->name, lvl);
         }
 
         if (strcmp(NM, &g_mapName_) == 0)
@@ -11569,14 +11563,14 @@ AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
     *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
 
 for (i = 0; i < LevelCount(); i++) {
-        uint8_t *rec = (uint8_t *)FindLevelRecord(i + 1);
+        AM2_Level *rec = FindLevelRecord(i + 1);
 
         if (rec) {
             int32_t *id = (int32_t *)am2_malloc(sizeof *id);
 
             *id = i + 1;
             ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(
-                    (const char *)(rec + LEVEL_OFF_NAME), id);
+                    rec->name, id);
         }
     }
 
@@ -11618,7 +11612,7 @@ AM2_SelectMapScreen::~AM2_SelectMapScreen()
 void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
                           int32_t selected)
 {
-    void          *level;
+    AM2_Level          *level;
 
     (void)list;
     if (!rows || selected < 0 || selected >= rows->count)
@@ -13105,7 +13099,7 @@ void __cdecl OnDeletePlayer(AM2_Widget *w)
  * differs from the Boot Camp button. */
 void __cdecl OnSelectPlayer(AM2_Widget *w)
 {
-    void *level = (void *)0;
+    AM2_Level *level = (AM2_Level *)0;
 
     (void)w;
     if (strlen(g_currentPlayer) >= 1)
@@ -13331,7 +13325,7 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w)
  * own id rather than the literal 1. */
 void __cdecl OnLoadGameNew(AM2_Widget *w)
 {
-    void *level;
+    AM2_Level *level;
 
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);

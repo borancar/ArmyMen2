@@ -69,9 +69,40 @@ AM2_Point __cdecl PointOfTile(int32_t tile);
  * rather than packed into one dword. */
 void __cdecl TileToXY(uint16_t tile, int32_t *x, int32_t *y);
 
+/* One map of the level table (ADDR_LEVEL_TABLE, AM2_LEVEL_RECORD_SIZE):
+ * a line of campaign.txt, bootcamp.txt or mpmaps.txt, whose header comment
+ * names the columns. Every string is 0x40 bytes (AM2_LEVEL_STR_BYTES). */
+typedef struct AM2_Level {
+    int32_t id;                     /* +0x000 LEVEL_OFF_ID, the bsearch key */
+    char    mapName[0x40];          /* +0x004 LEVEL_OFF_MAP_NAME, map_name */
+    char    name[0x40];             /* +0x044 LEVEL_OFF_NAME, map_text: the
+                                     *        display name */
+    char    folder[0x40];           /* +0x084 LEVEL_OFF_FOLDER */
+    char    winMovie[0x40];         /* +0x0C4 LEVEL_OFF_WIN_MOVIE, victorycin */
+    char    loseMovies[3][0x40];    /* +0x104 LEVEL_OFF_LOSE_MOVIES */
+    char    loadMusic[0x40];        /* +0x1C4 LEVEL_OFF_LOAD_MUSIC */
+    char    loadScreen[0x40];       /* +0x204 LEVEL_OFF_LOAD_SCREEN */
+    int32_t cycle;                  /* +0x244 LEVEL_OFF_CYCLE, `cycle?` */
+    char    briefing[0x40];         /* +0x248 LEVEL_OFF_BRIEFING */
+    char    briefSfx[0x40];         /* +0x288 LEVEL_OFF_BRIEF_SFX */
+    char    stratMap[0x40];         /* +0x2C8 LEVEL_OFF_STRAT_MAP */
+    int32_t movieIndex;             /* +0x308 LEVEL_OFF_MOVIE_INDEX */
+} AM2_Level;
+
+/* One `rules` record of the name registry (AM2_NAME_RECORD_SIZE): three names
+ * and the `rulemap` list of map names appended to it. */
+typedef struct AM2_NameRec {
+    char    name[0x40];             /* +0x00 NAMEREC_OFF_NAME, the searched one */
+    char    name2[0x40];            /* +0x40 NAMEREC_OFF_NAME2 */
+    char    name3[0x40];            /* +0x80 NAMEREC_OFF_NAME3, title-cased */
+    int32_t cap;                    /* +0xC0 NAMEREC_OFF_CAP */
+    int32_t count;                  /* +0xC4 NAMEREC_OFF_COUNT */
+    char  (*maps)[0x40];            /* +0xC8 NAMEREC_OFF_MAPS */
+} AM2_NameRec;
+
 /* 0x0043E900. Find a record by name in the name registry; the first search is
  * also the load. */
-void *__cdecl ScriptListFind(char *name);
+AM2_NameRec *__cdecl ScriptListFind(char *name);
 
 /* 0x0042D3D0, two callers -- the level teardown and the map loader, which
  * clears before it fills. Free every per-map allocation: the region array with
@@ -102,13 +133,13 @@ uint32_t __cdecl MapChecksum(void);
 /* 0x0043ED50. Copy the seven strings and one flag out of a level record into
  * the globals the loader reads. Unbounded strcpy, as the original writes it;
  * a null record is the only refusal. */
-void __cdecl SelectLevel(const void *record);
+void __cdecl SelectLevel(const AM2_Level *record);
 
 /* The level table and the name registry beside it: empty both, look one up by
  * id, and the three readers that fill them from campaign.txt, mpmaps.txt and
  * bootcamp.txt. */
 void  __cdecl FreeLevelTables(void);
-void *__cdecl FindLevelRecord(int32_t id);
+AM2_Level *__cdecl FindLevelRecord(int32_t id);
 void  __cdecl ReadCampaignLevels(void);
 void  __cdecl ReadMpMapList(void);
 void  __cdecl ReadBootcampLevels(void);
@@ -119,12 +150,12 @@ void __cdecl FreeScenarios(void);
 
 /* 0x0043E160, one caller. Append one level record, allocating the table on
  * first use and growing it when full. */
-void __cdecl AddLevelRecord(const void *record);
+void __cdecl AddLevelRecord(const AM2_Level *record);
 
 /* 0x0043E230, six callers. The LEVEL table's by-name search: lower-cases its
  * argument in place, then walks the 0x30C records comparing LEVEL_OFF_MAP_NAME.
  * Linear, because the table is sorted by id and not by name. */
-void *__cdecl FindLevelByName(char *name);
+AM2_Level *__cdecl FindLevelByName(char *name);
 
 /* 0x0043E2C0. The parser table's handler for the `MAP` command: one line of
  * campaign.txt, bootcamp.txt or mpmaps.txt into a level record. Returns 0, or
@@ -133,7 +164,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line);
 
 /* 0x0043E9A0, one caller. AddLevelRecord's twin over the 0xCC-byte name
  * records. */
-void __cdecl AddNameRecord(const void *record);
+void __cdecl AddNameRecord(const AM2_NameRec *record);
 
 /* The `rules` / `rulemap` trio, originals 0x0043EA30, 0x0043EAC0 and
  * 0x0043EBD0 -- one 592-byte entry. The two line handlers are named from the
@@ -141,7 +172,7 @@ void __cdecl AddNameRecord(const void *record);
  * appender extends the list a name record carries at +0xC0. Both handlers
  * take the line as their SECOND argument and ignore the first, like every
  * other handler in that table. */
-void __cdecl NameRecAddMap(void *rec, const void *entry);
+void __cdecl NameRecAddMap(AM2_NameRec *rec, const char *entry);
 int32_t __cdecl DefRulesLine(int32_t cmd, char *line);
 int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line);
 

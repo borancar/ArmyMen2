@@ -1258,11 +1258,11 @@ void __cdecl ApplyGameSettings(void)
     }
 
     if (g_nameTableCount != 0) {
-        const uint8_t *rec = g_nameTableBase;
+        const AM2_NameRec *rec = g_nameTableBase;
 
-        strcpy(&g_mpScriptName, (const char *)rec);
+        strcpy(&g_mpScriptName, rec->name);
         strcpy(&g_mapName_,
-                   *(const char *const *)(rec + NAMEREC_OFF_MAPS));
+                   rec->maps[0]);
     } else {
         /* THE ELSE ARM WAS MISSING. `mov byte [0x511c08], bl` and
          * `mov byte [0x511a88], bl` at 0x0042F273 and 0x0042F279 -- with the
