@@ -75,7 +75,7 @@ void __cdecl BuildAaiBuiltins(void);
 
 /* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds. Its
  * argument is the sub-list header, not the object. */
-void __cdecl SubrecHideRows(void *subrec);
+void __cdecl SubrecHideRows(struct AM2_RowSet *subrec);
 
 /* Original: 0x00457470. */
 int32_t __cdecl ObjIsType2(const AM2_Object *obj);

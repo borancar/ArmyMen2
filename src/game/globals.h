@@ -698,7 +698,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_secondRectPrev         (*(AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT_PREV)  /* 0x00514E44 */
 #define g_selectedCount          (*(int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)  /* 0x0051230C */
 #define g_selectedItems          (*(uint32_t **)(uintptr_t)ADDR_SELECTED_ITEMS)  /* 0x00512310 */
-#define g_selectedUids           ((void *)(uintptr_t)ADDR_SELECTED_UIDS)  /* 0x00512308 */
+#define g_selectedUids           ((struct AM2_UidList *)(uintptr_t)ADDR_SELECTED_UIDS)  /* 0x00512308 */
 #define g_sendRoll               (*(int32_t *)(uintptr_t)ADDR_SEND_ROLL)  /* 0x004F8BA8 */
 #define g_seqAdvanceMs           (*(uint32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS)  /* 0x0048CB94 */
 #define g_seqCtxA                ((struct AM2_SeqCtx *)(uintptr_t)ADDR_SEQ_CTX_A)  /* 0x00664580 */

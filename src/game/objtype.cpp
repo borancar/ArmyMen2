@@ -227,15 +227,14 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
  * sub-list's side. The third does not, which is why the name says what it does
  * rather than why.
  */
-void __cdecl SubrecHideRows(void *subrec)
+void __cdecl SubrecHideRows(AM2_RowSet *subrec)
 {
     int32_t  i;
 
-    /* The parameter itself, cast at each use: a local copy of it turns the
-     * row address into `i*stride + rows` rather than `rows + i*stride`. */
-    for (i = 0; i < *(const int32_t *)((uint8_t *)subrec + SUBREC_OFF_COUNT); i++)
-        ObjFlagClear0((AM2_MapRow *)(*(uint8_t **)((uint8_t *)subrec + SUBREC_OFF_ROWS)
-                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE));
+    /* The parameter itself at each use: a local copy of it turns the row
+     * address into `i*stride + rows` rather than `rows + i*stride`. */
+    for (i = 0; i < subrec->count; i++)
+        ObjFlagClear0(&subrec->rows[i]);
 }
 
 /* 0x00434060, eight callers. Make a list: a 0x30-byte header carrying an

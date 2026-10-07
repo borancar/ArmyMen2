@@ -7877,7 +7877,7 @@ void __cdecl SetUnitPose(AM2_Object *obj, int32_t pose)
  */
 void __cdecl DeselectAll(void)
 {
-    uint8_t *sel = (uint8_t *)g_selectedUids;
+    AM2_UidList *sel = g_selectedUids;
     int32_t  i   = 0;
 
     while (i < g_selectedCount) {
@@ -7885,7 +7885,7 @@ void __cdecl DeselectAll(void)
 
         /* LookupByUID's body inline, twice, each with an out-slot of its own. */
         obj = LookupByUIDInline(
-                  (*(const uint32_t *const *)(sel + 8))[i]);
+                  sel->uids[i]);
 
         if (!obj) {
             ((AM2_Rec *)sel)->ListRemoveAt(i);       /* and do NOT advance i */
@@ -11261,7 +11261,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
  * loses the sharing entirely -- the SpriteKeyForKind trap. */
 void __cdecl OnSelectionChanged(uint32_t unusedPoint)
 {
-    uint8_t  *list = (uint8_t *)g_selectedUids;
+    AM2_UidList *list = g_selectedUids;
     AM2_Object  *local;
     AM2_Object  *leader;
     int32_t   leaderIdx;
@@ -11277,15 +11277,15 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
     mode   = 1;
     aiMode = 8;
 
-    if (*(const int32_t *)(list + SUBREC_OFF_COUNT) <= 0)
+    if (list->count <= 0)
         return;
 
     leaderIdx = 0;
     leader    = 0;
     maxRank   = -1;
 
-    for (i = 0; i < *(const int32_t *)(list + SUBREC_OFF_COUNT); ) {
-        const uint32_t *uids = *(const uint32_t **)(list + SUBREC_OFF_ROWS);
+    for (i = 0; i < list->count; ) {
+        const uint32_t *uids = list->uids;
         AM2_Object        *obj = LookupByUIDInline(uids[i]);
 
         if (obj == 0) {
@@ -11350,12 +11350,12 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
      * as a vehicle is exited) left the list with a repeated uid, and the
      * matching DeselectUnit then removed every copy. */
     {
-        uint32_t *uids      = *(uint32_t **)(list + SUBREC_OFF_ROWS);
+        uint32_t *uids      = list->uids;
         uint32_t  first     = uids[0];
         uint32_t  leaderUid = uids[leaderIdx];
 
         uids[leaderIdx] = first;
-        uids = *(uint32_t **)(list + SUBREC_OFF_ROWS);
+        uids = list->uids;
         uids[0] = leaderUid;
     }
 

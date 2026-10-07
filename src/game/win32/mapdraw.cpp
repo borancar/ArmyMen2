@@ -619,10 +619,10 @@ typedef struct AM2_DepthNode {
  * and palette are written INTO the sprite immediately before the draw --
  * the sprite is shared, so it carries whichever object drew last, and the
  * pair has to be set every time rather than once at load. */
-void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
+void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
 {
-    uint8_t        *o      = (uint8_t *)obj;
-#define bounds ((const AM2_Rect *)(o + OBJ_OFF_BOUNDS))
+    AM2_MapRow     *o      = obj;
+#define bounds (&o->rect)
     RECT            clip;
     AM2_Rect        src;
     AM2_Sprite     *spr;
@@ -630,7 +630,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
 
     if (!IntersectRect(&clip, (const RECT *)bounds, (const RECT *)world))
         return;
-    if (!(*(const uint8_t *)(o + MAPOBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
+    if (!(o->flags & MAPOBJ_FLAG_VISIBLE))
         return;
 
     /* The screen position is worked out before the empty tests. */
@@ -647,9 +647,9 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
     if (src.left == src.right)
         return;
 
-    spr = *(AM2_Sprite **)(o + MAPOBJ_OFF_SPRITE);
-    spr->lut     = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
-    spr->palette = *(void **)(o + MAPOBJ_OFF_PALETTE);
+    spr = o->sprite;
+    spr->lut     = (uint8_t *)o->lut;
+    spr->palette = o->palette;
 
 #if !defined(AM2_RELINK)   /* harness trace, not the original's */
     {
@@ -875,7 +875,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     int32_t        last;
     int32_t        l, t, r, b, l0, t0;
     int32_t        row, col, stride;
-    const uint8_t *const *cell;
+    AM2_CellEntry *const *cell;
 
     g_depthCount = 0;
     g_depthHead  = -1;
@@ -905,8 +905,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     if (b >= last)          /* cols - 1, as the original has it */
         b = last;
 
-    cell = (const uint8_t *const *)
-           (((const uint8_t *)d->cells))
+    cell = d->cells
            + ((t0 << d->shift) + l0);
     stride = cols - r + l0 - 1;
 
@@ -915,10 +914,10 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
         while (1) {
             if (col > r)
                 break;
-            const uint8_t *node = *cell++;
+            const AM2_CellEntry *node = *cell++;
 
             while (node) {
-                AM2_MapRow *obj = *(AM2_MapRow *const *)(node + CELL_NODE_OFF_OBJ);
+                AM2_MapRow *obj = node->obj;
 
                 /* An empty node is skipped, not the end of the cell: the
                  * image's `je` lands on the advance to the next node. */
@@ -942,7 +941,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
                     break;      /* abandon the rest of this cell's list */
                 }
             nextNode:
-                node = *(const uint8_t *const *)(node + CELL_NODE_OFF_NEXT);
+                node = node->next;
             }
             col++;
         }
@@ -950,12 +949,11 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     }
 
     if (g_depthHead != -1) {
-        const uint8_t *n = (const uint8_t *)g_depthNodes
-                           + (uint32_t)g_depthHead * AM2_DEPTH_NODE_SIZE;
+        const AM2_DepthNode *n = &g_depthNodes[g_depthHead];
 
         while (n) {
-            DrawMapObject(*(void *const *)(n + DEPTH_OFF_OBJ), world);
-            n = *(const uint8_t *const *)(n + DEPTH_OFF_NEXT);
+            DrawMapObject(n->obj, world);
+            n = n->next;
         }
     }
     return;

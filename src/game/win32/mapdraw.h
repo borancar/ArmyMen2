@@ -78,7 +78,7 @@ int32_t __cdecl DepthInsert(struct AM2_MapRow *obj, const AM2_Rect *world);
 /* 0x0040A090. Draw one map object: clip, convert the clipped rectangle into a
  * destination position and a source rectangle inside the sprite, put the
  * object's own remap table and palette into the sprite, and blit. */
-void __cdecl DrawMapObject(void *obj, const AM2_Rect *world);
+void __cdecl DrawMapObject(struct AM2_MapRow *obj, const AM2_Rect *world);
 
 /* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
  * the clipped intersection, not the whole record. */
