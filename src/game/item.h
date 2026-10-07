@@ -417,7 +417,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
  * ADDR_ROACH_REACH along the facing, play a sound there, and damage every
  * object in ADDR_ROACH_BITE_BOX around that point which is not on the roach's
  * side. The name is descriptive; nothing in the image names this function. */
-void __cdecl RoachBite(void *roach);
+void __cdecl RoachBite(AM2_Object *o);
 
 /* 0x00448280, eight callers. When a weapon leaves the map in a multiplayer
  * game the HOST puts another one back where it was, once. Four gates, the
@@ -433,7 +433,8 @@ void __cdecl PortalSpawn(void);
  * says? Compute the speed, the turn and the direction it would face, and
  * answer whether the mask weight where it would land is at least what it is
  * here. Writes the turn through its third argument. */
-int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn);
+int32_t __cdecl RoachStepAllowed(AM2_Object *o, const AM2_RoachOut *ctrl,
+                                 int32_t *turn);
 
 /* 0x0043D750, four callers. The committing twin of RoachStepAllowed: bite if
  * the roach is in the biting state, work out the speed and turn, refuse the
@@ -441,12 +442,12 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn);
  * the speed and the row heading and move. Turns +-6 where the predicate
  * allows +-1, and compiles the four physics constants in where the predicate
  * reads them from the image. */
-void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl);
+void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c);
 
 /* 0x0043D5B0, one caller -- StepType8's alive path. Find a direction the roach
  * can move in by fanning out from ROACH_OFF_BASE_DIR: straight ahead, one step
  * clockwise, one anticlockwise, and so on to AM2_ROACH_FAN_LIMIT. */
-void __cdecl RoachAliveStepB(void *obj, uint8_t *step);
+void __cdecl RoachAliveStepB(AM2_Object *o, AM2_RoachOut *step);
 
 /* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
  * pair, of which the roach pair is the special case. Lay an object's mask over

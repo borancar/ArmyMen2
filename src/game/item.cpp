@@ -2345,31 +2345,29 @@ mark:
  * different `lea` displacements in the original are three stack depths, not
  * three variables, and reading them as separate locals would invent two.
  */
-void __cdecl RoachAliveStepB(void *obj, uint8_t *step)
+void __cdecl RoachAliveStepB(AM2_Object *o, AM2_RoachOut *step)
 {
-    uint8_t *o = (uint8_t *)obj;
     int32_t  turn;
     uint32_t now;
     int32_t  tries;
     int32_t  n;
     int32_t  dir;
 
-    if (step[ROACHSTEP_OFF_FACING] == *(const uint8_t *)(o + OBJ_OFF_FACING)
-        && *(const int32_t *)(step + ROACHSTEP_OFF_STATE) == 1)
+    if (step->heading == o->facing && step->state == 1)
         goto reset;
 
     /* The fan: alternate either side of the base direction, one step wider
      * each time. Written out in both branches, as the image has it. */
 #define FAN_DIR(n) ((n) & 1                                                  \
-        ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - ((n) >> 1)) & 7)    \
-        : ((((n) >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7))
+        ? ((o->roachBaseDir - ((n) >> 1)) & 7)                               \
+        : ((((n) >> 1) + o->roachBaseDir) & 7))
 #define FAN_LOOP()                                                           \
     tries = 0;                                                               \
     while (1) {                                                              \
-        n   = ++*(int32_t *)(o + ROACH_OFF_FAN);                             \
+        n   = ++o->roachFan;                                                 \
         dir = FAN_DIR(n);                                                    \
-        SetFacing14(dir, obj, step);                                         \
-        if (!RoachStepAllowed(obj, step, &turn))                             \
+        SetFacing14(dir, o, step);                                         \
+        if (!RoachStepAllowed(o, step, &turn))                             \
             return;                                                          \
         tries++;                                                             \
         if (tries >= AM2_ROACH_FAN_LIMIT)                                    \
@@ -2377,37 +2375,33 @@ void __cdecl RoachAliveStepB(void *obj, uint8_t *step)
     }
     now = g_gameClockMs;
 
-    if (now - *(const uint32_t *)(o + ROACH_OFF_STAMP)
-        < (uint32_t)AM2_ROACH_BLOCKED_MS) {
-        n   = *(const int32_t *)(o + ROACH_OFF_FAN);
+    if (now - o->roachStamp < (uint32_t)AM2_ROACH_BLOCKED_MS) {
+        n   = o->roachFan;
         dir = FAN_DIR(n);
-        SetFacing14(dir, obj, step);
-        if (!RoachStepAllowed(obj, step, &turn))
+        SetFacing14(dir, o, step);
+        if (!RoachStepAllowed(o, step, &turn))
             return;
 
-        *(uint32_t *)(o + ROACH_OFF_STAMP) =
-            g_gameClockMs;
+        o->roachStamp = g_gameClockMs;
         FAN_LOOP();
     } else {
-        *(uint32_t *)(o + ROACH_OFF_STAMP) = now;
+        o->roachStamp = now;
 
-        if (!RoachStepAllowed(obj, step, &turn))
+        if (!RoachStepAllowed(o, step, &turn))
             goto reset;
 
-        *(uint32_t *)(o + ROACH_OFF_STAMP) =
-            g_gameClockMs;
+        o->roachStamp = g_gameClockMs;
 
-        if (*(const int32_t *)(o + ROACH_OFF_BASE_DIR) == 0)
-            *(int32_t *)(o + ROACH_OFF_BASE_DIR) =
-                FacingFromDelta14(step, turn);
+        if (o->roachBaseDir == 0)
+            o->roachBaseDir = FacingFromDelta14(step, turn);
         FAN_LOOP();
     }
 #undef FAN_LOOP
 #undef FAN_DIR
 
 reset:
-    *(int32_t *)(o + ROACH_OFF_BASE_DIR) = 0;
-    *(int32_t *)(o + ROACH_OFF_FAN)      = 0;
+    o->roachBaseDir = 0;
+    o->roachFan     = 0;
 }
 
 /* RoachStepAllowed -- original 0x0043D0F0, four callers. May the roach step
@@ -2449,18 +2443,18 @@ reset:
  * has been written through the third argument. So the caller still gets a
  * turn out of a call that answers no.
  */
-int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
+int32_t __cdecl RoachStepAllowed(AM2_Object *o, const AM2_RoachOut *ctrl,
+                                 int32_t *turn)
 {
-    const uint8_t  *c = (const uint8_t *)ctrl;
-#define o ((uint8_t *)obj)
-    const uint8_t  *rows;
+    const AM2_RoachOut *c = ctrl;   /* a local copy, as the original has */
+    const AM2_MapRow *rows;
     int32_t         speed = 0;
     int32_t         cur, next, here;
     uint8_t         facing;
     AM2_Point        at;
 
-    if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
-        int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
+    if (c->state != 1) {
+        int32_t reverse = c->flag18;
         /* The cap is chosen before the direction is tested again, and the
          * frame's delta is multiplied straight out of its float. */
         int32_t cap = reverse
@@ -2468,7 +2462,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
             : g_roachForvel;
 
         if (reverse) {
-            int32_t v = (int32_t)((double)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+            int32_t v = (int32_t)((double)o->field44
                                   - g_roachRevacc
                                     * g_frameDeltaSec);
 
@@ -2476,51 +2470,51 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
         } else {
             int32_t v = (int32_t)(g_roachForacc
                                     * g_frameDeltaSec
-                                  + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
+                                  + (double)o->field44);
 
             speed = (cap < v) ? cap : v;
         }
     }
 
-    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    rows = o->rowSet.rows;
     /* The playing animation is read through the row at every use. */
-#define anim (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
+#define anim (rows->animPlaying)
     if (!anim)
         return 0;
 
-    *turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                       *(const uint8_t *)(c + ROACHSTEP_OFF_FACING));
+    *turn = AngleDelta(o->facing,
+                       c->heading);
     *turn = Clamp(*turn, -1, 1);
 
-    cur = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+    cur = RoundTo8((rows->headingBias
+                    + rows->heading) & 0xFF,
                    anim->directionBits) & 0xFF;
-    next = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)
+    next = RoundTo8((rows->headingBias
+                     + rows->heading
                      + *turn) & 0xFF,
                     anim->directionBits) & 0xFF;
 
     if (cur != next
         && g_gameClockMs
-           - *(const uint32_t *)(rows + ROW_OFF_TURN_STAMP)
+           - rows->turnStamp
            <= AM2_ROACH_TURN_HOLD_MS)
         *turn = 0;
 
-    facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+    facing = (uint8_t)(o->facing
                        + (int8_t)*turn);
 
     if (speed == 0)
         return 0;
 
-    here = RoachMaskWeight(obj, cur, *(const uint32_t *)(o + OBJ_OFF_POS), 0);
+    here = RoachMaskWeight(o, cur, *(const uint32_t *)&o->pos, 0);
     if (here < AM2_ROACH_WEIGHT_FLOOR)
         here = AM2_ROACH_WEIGHT_FLOOR;
 
-    MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
+    MoveStepPoint(o, facing, 0, speed, 0, 0, &at);
 
-    return RoachMaskWeight(obj, next, *(const uint32_t *)&at, 0) >= here;
+    return RoachMaskWeight(o, next, *(const uint32_t *)&at, 0) >= here;
 #undef anim
-#undef o
+
 }
 
 /* RoachStepTailA -- original 0x0043D750, four callers. Commit one roach step:
@@ -2560,25 +2554,26 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
  * been refused ten times asks for ten times the speed and still gets no more
  * than the cap. The guard is `!= 0`, not `> 0` -- the original tests it with
  * `jbe` after `test`, which on a self-test is exactly equality with zero. */
-void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
+void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c)
 {
-    uint8_t        *o = (uint8_t *)obj;
-#define c ((const uint8_t *)ctrl)
-    uint8_t        *rows;
+    /* A local copy, as the original works on: VC6 gives it a register
+     * the parameter itself would not get. */
+    AM2_Object     *o = obj;
+    AM2_MapRow     *rows;
     int32_t         speed;
     int32_t         cap   = 0;
     int32_t         turn, cur, next, here;
     uint8_t         facing;
     AM2_Point        at;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) == 4
-        && *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+    if (o->field530 == 4
+        && o->deadline58
            > g_gameClockMs)
-        RoachBite(obj);
+        RoachBite(o);
 
     speed = 0;
-    if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
-#define reverse (*(const int32_t *)(c + ROACHSTEP_OFF_FLAG18))
+    if (c->state != 1) {
+#define reverse (c->flag18)
         uint32_t stuck;
 
         cap = reverse ? 80 : 130;
@@ -2586,7 +2581,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
         /* The frame's delta is multiplied by FLOAT constants straight out
          * of its float, `fld dword; fmul dword`. */
         if (reverse) {
-            int32_t v = (int32_t)(*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+            int32_t v = (int32_t)(o->field44
                                   - g_frameDeltaSec
                                     * 80.0f);
 
@@ -2594,12 +2589,12 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
         } else {
             int32_t v = (int32_t)(g_frameDeltaSec
                                     * 100.0f
-                                  + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
+                                  + (double)o->field44);
 
             speed = (cap < v) ? cap : v;
         }
 
-        stuck = *(const uint32_t *)(o + OBJ_OFF_STUCK_COUNT);
+        stuck = (uint32_t)o->stuckCount;
         if (stuck > 0 && speed != 0) {
             /* The product is formed in each arm. */
             if (reverse)
@@ -2611,67 +2606,63 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
         }
     }
 
-    rows = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
-#define anim (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
+    rows = o->rowSet.rows;
+#define anim (rows->animPlaying)
     if (!anim)
         return;
 
-    turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                      *(const uint8_t *)(c + ROACHSTEP_OFF_FACING));
+    turn = AngleDelta(o->facing,
+                      c->heading);
     turn = Clamp(turn, -6, 6);
 
-    cur = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
-                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+    cur = RoundTo8((rows->headingBias
+                    + rows->heading) & 0xFF,
                    anim->directionBits) & 0xFF;
-    next = RoundTo8((turn + *(const uint8_t *)(rows + ROW_OFF_HEADING)
-                     + *(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)) & 0xFF,
+    next = RoundTo8((turn + rows->heading
+                     + rows->headingBias) & 0xFF,
                     anim->directionBits) & 0xFF;
 
     if (cur != next) {
         uint32_t now = g_gameClockMs;
 
-        if (now - *(const uint32_t *)(rows + ROW_OFF_TURN_STAMP)
+        if (now - rows->turnStamp
             > AM2_ROACH_TURN_HOLD_MS)
-            *(uint32_t *)(rows + ROW_OFF_TURN_STAMP) = now;
+            rows->turnStamp = now;
         else
             turn = 0;
     }
 
-    facing = (uint8_t)(turn + *(const uint8_t *)(o + OBJ_OFF_FACING));
+    facing = (uint8_t)(turn + o->facing);
 
-    here = RoachMaskWeight(obj, cur, *(const uint32_t *)(o + OBJ_OFF_POS), 0);
+    here = RoachMaskWeight(o, cur, *(const uint32_t *)&o->pos, 0);
     if (here < AM2_ROACH_WEIGHT_FLOOR)
         here = AM2_ROACH_WEIGHT_FLOOR;
 
-    MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
+    MoveStepPoint(o, facing, 0, speed, 0, 0, &at);
 
-    if (((const AM2_Point *)&at)->x != ((const AM2_Point *)(o + OBJ_OFF_POS))->x
-        || ((const AM2_Point *)&at)->y
-           != ((const AM2_Point *)(o + OBJ_OFF_POS))->y) {
+    if (at.x != o->pos.x || at.y != o->pos.y) {
         int32_t n;
 
-        if (RoachMaskWeight(obj, next, *(const uint32_t *)&at, 1) >= here) {
+        if (RoachMaskWeight(o, next, *(const uint32_t *)&at, 1) >= here) {
             speed = 0;
-            if (*(const uint32_t *)(o + OBJ_OFF_STUCK_SINCE) == 0)
-                *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) =
+            if (o->roachStamp == 0)
+                o->roachStamp =
                     g_gameClockMs;
-            n = *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT) + 1;
+            n = o->stuckCount + 1;
         } else {
             n = 0;
-            *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) = n;
+            o->roachStamp = n;
         }
-        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = n;
+        o->stuckCount = n;
     }
 
-    *(uint8_t *)(o + OBJ_OFF_FACING) = facing;
-    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
-    SetObjField530(obj, *(const int32_t *)(c + ROACHSTEP_OFF_STATE));
-    (*(uint8_t *const *)(o + OBJ_OFF_ROWS))[ROW_OFF_HEADING] =
-        *(const uint8_t *)(o + OBJ_OFF_FACING);
-    StepObjRows((AM2_Object *)obj);
-    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
-    ObjMoveAlongFacing((AM2_Object *)obj, 0, 0, 0);
-#undef c
+    o->facing = facing;
+    o->field44 = speed;
+    SetObjField530(o, c->state);
+    o->rowSet.rows->heading = o->facing;
+    StepObjRows(o);
+    o->field44 = speed;
+    ObjMoveAlongFacing(o, 0, 0, 0);
 #undef anim
 #undef reverse
 }
@@ -2701,21 +2692,20 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
  * bytes into it as `y`, which is what VC6 does with an int16 argument; the
  * callee truncates both, so the upper halves never matter.
  */
-void __cdecl RoachBite(void *roach)
+void __cdecl RoachBite(AM2_Object *o)
 {
-    uint8_t   *o = (uint8_t *)roach;
     AM2_Point  at;
     AM2_Rect   box;
     uint8_t    back;
-    uint8_t   *hit;
+    AM2_Object *hit;
 
 #define REACH  (g_roachReach)
 #define BOX    (g_roachBiteBox)
-    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
-    at = *(const AM2_Point *)(o + OBJ_OFF_POS);
+    o->deadline58 = 0;
+    at = o->pos;
 
-    at.x = (int16_t)(Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * REACH + at.x);
-    at.y = (int16_t)(Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * REACH + at.y);
+    at.x = (int16_t)(Cos8(o->facing) * REACH + at.x);
+    at.y = (int16_t)(Sin8(o->facing) * REACH + at.y);
 
     PlaySoundAt(AM2_ROACH_BITE_SOUND, 0, 0, at.x, at.y);
 
@@ -2723,16 +2713,15 @@ void __cdecl RoachBite(void *roach)
     box.right  = at.x + BOX.right;
     box.top    = at.y + BOX.top;
     box.bottom = at.y + BOX.bottom;
-    back = *(const uint8_t *)(o + OBJ_OFF_FACING) + 0x80;
+    back = o->facing + 0x80;
 
-    for (hit = (uint8_t *)AllObjectsInRect(
-                   &box, g_objMapDesc);
-         hit; hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
-        if (!ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)hit, 0))
+    for (hit = (AM2_Object *)AllObjectsInRect(&box, g_objMapDesc);
+         hit; hit = hit->queryNext) {
+        if (!ObjsAreAllied(o, hit, 0))
             DamageObject(hit,
                          g_roachDamage,
                          AM2_ROACH_DAMAGE_KIND,
-                         *(const uint32_t *)(o + 4),
+                         o->uid,
                          back, 0);
     }
 #undef REACH
@@ -6264,55 +6253,54 @@ typedef void (__cdecl *AM2_StepFn)(void *obj);
  * A per-frame call only makes sense under the second reading; the flag's
  * meaning is not settled here and the call is reproduced either way.
  */
-void __cdecl StepType8(void *obj)
+void __cdecl StepType8(AM2_Object *o)
 {
-    uint8_t *o      = (uint8_t *)obj;
-    uint8_t *facing;
-    void    *row;
+    AM2_RoachOut *facing;
+    void         *row;
 
-    ObjClearRoachFootprint(obj);
-    *(o + OBJ_OFF_FIELD_540) = *(const uint8_t *)(o + OBJ_OFF_FACING);
-    facing = o + OBJ_OFF_FIELD_540;
+    ObjClearRoachFootprint(o);
+    o->roachCtl.heading = o->facing;
+    facing = &o->roachCtl;
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
-        switch (*(const int32_t *)(o + OBJ_OFF_FIELD_530)) {
+    if (o->health == 0) {
+        switch (o->field530) {
         case 0:
-            DestroyByType(obj);
+            DestroyByType(o);
             break;
 
         case 5:
-            row = *(void **)(o + OBJ_OFF_ROWS);
+            row = o->rowSet.rows;
             if (!RowAnimFinished(row))
                 break;
-            *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 6;
+            o->roachCtl.state = 6;
             break;
 
         case 6:
-            row = *(void **)(o + OBJ_OFF_ROWS);
+            row = o->rowSet.rows;
             if (!RowAnimFinished(row))
                 break;
             RowFaceSprite(row);
             LeaveRemainsRow(row);
-            DestroyByType(obj);
+            DestroyByType(o);
             break;
 
         default:
             break;
         }
     } else {
-        *(int32_t *)(o + OBJ_OFF_DEATH_STATE)     = 1;
-        *(int32_t *)(o + OBJ_OFF_DEATH_STATE + 4) = 0;
+        o->roachCtl.state     = 1;
+        o->roachCtl.flag18 = 0;
 
         PlaySoundAt(AM2_ROACH_ALIVE_SOUND, 1, 0,
-                    *(const int16_t *)(o + OBJ_OFF_POS),
-                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                    o->pos.x,
+                    o->pos.y);
 
-        RoachAliveStepA((AM2_Object *)obj, (AM2_RoachOut *)facing);
-        RoachAliveStepB(obj, facing);
+        RoachAliveStepA(o, facing);
+        RoachAliveStepB(o, facing);
     }
 
-    RoachStepTailA(obj, facing);
-    ObjSetRoachFootprint(obj);
+    RoachStepTailA(o, facing);
+    ObjSetRoachFootprint(o);
 }
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
@@ -6386,7 +6374,7 @@ void __cdecl ObjFrameStep(AM2_Object *o)
     case 5: if (LIVE) StepType5(obj);        break;
     case 6: if (LIVE) StepType6(obj);        break;
     case 7: if (LIVE) ObjMarkIfOverdue(obj); break;
-    case 8: if (LIVE) StepType8(obj);        break;
+    case 8: if (LIVE) StepType8(o);          break;
     }
 #undef LIVE
 }

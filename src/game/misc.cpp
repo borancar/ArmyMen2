@@ -266,73 +266,71 @@ int32_t __cdecl TypesCompatible(int32_t a, int32_t b)
     return 0;
 }
 
-/* Shared body: `mode` is the value written for the wide facings, `narrow` for
- * the two that use the other one, and the offsets say which record. */
-static inline void SetFacing(int32_t facing, const void *src, void *out,
-                      uint32_t off_mode, uint32_t off_flag,
-                      int32_t wide, int32_t narrow)
-{
-/* The read of src+0x40 belongs INSIDE the arms. Hoisting it is the obvious
- * tidy-up and it is wrong: for a facing above 7 the original never touches
- * src at all, so a null src is harmless there and fatal if the read has been
- * lifted. The vectors found it immediately -- a page fault reading 0x40.
- * `out` is likewise read in each arm. */
-#define BASE (*((const uint8_t *)src + 0x40))
-#define O    ((uint8_t *)out)
-    switch (facing) {
-    case 0:
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = BASE;
-        break;
-    /* 1 is NOT grouped with 3. The image sends facing 1 into 3's tail past
-     * the off_flag store -- the compiler merging two identical endings --
-     * so 1 mirrors 7 and 3 mirrors 5. Folding 1 in with 3 writes one dword
-     * the original never writes. */
-    case 1:
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = (uint8_t)(BASE + 0x20);
-        break;
-    case 2:
-        *(int32_t *)(O + off_mode) = narrow;
-        O[0] = (uint8_t)(BASE + 0x20);
-        break;
-    case 3:
-        *(int32_t *)(O + off_flag) = 1;
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = (uint8_t)(BASE + 0x20);
-        break;
-    case 4:
-        *(int32_t *)(O + off_flag) = 1;
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = BASE;
-        break;
-    case 5:
-        *(int32_t *)(O + off_flag) = 1;
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = (uint8_t)(BASE - 0x20);
-        break;
-    case 6:
-        *(int32_t *)(O + off_mode) = narrow;
-        O[0] = (uint8_t)(BASE - 0x20);
-        break;
-    case 7:
-        *(int32_t *)(O + off_mode) = wide;
-        O[0] = (uint8_t)(BASE - 0x20);
-        break;
+/* Shared body, over either record: `FLAG` names the record's flag member,
+ * `wide` is the mode written for the wide facings and `narrow` for the two
+ * that use the other one. A macro rather than an inline over field
+ * pointers: the original addresses each field off the record pointer, and
+ * VC6 keeps that only when the body names the members.
+ *
+ * The read of src->facing belongs INSIDE the arms. Hoisting it is the
+ * obvious tidy-up and it is wrong: for a facing above 7 the original never
+ * touches src at all, so a null src is harmless there and fatal if the read
+ * has been lifted. The vectors found it immediately -- a page fault reading
+ * 0x40. The record is likewise written in each arm.
+ *
+ * 1 is NOT grouped with 3. The image sends facing 1 into 3's tail past the
+ * flag store -- the compiler merging two identical endings -- so 1 mirrors
+ * 7 and 3 mirrors 5. Folding 1 in with 3 writes one dword the original never
+ * writes. */
+#define AM2_SET_FACING(FLAG, wide, narrow)                                    \
+    switch (facing) {                                                         \
+    case 0:                                                                   \
+        out->state   = (wide);                                                \
+        out->heading = src->facing;                                           \
+        break;                                                                \
+    case 1:                                                                   \
+        out->state   = (wide);                                                \
+        out->heading = (uint8_t)(src->facing + 0x20);                         \
+        break;                                                                \
+    case 2:                                                                   \
+        out->state   = (narrow);                                              \
+        out->heading = (uint8_t)(src->facing + 0x20);                         \
+        break;                                                                \
+    case 3:                                                                   \
+        out->FLAG    = 1;                                                     \
+        out->state   = (wide);                                                \
+        out->heading = (uint8_t)(src->facing + 0x20);                         \
+        break;                                                                \
+    case 4:                                                                   \
+        out->FLAG    = 1;                                                     \
+        out->state   = (wide);                                                \
+        out->heading = src->facing;                                           \
+        break;                                                                \
+    case 5:                                                                   \
+        out->FLAG    = 1;                                                     \
+        out->state   = (wide);                                                \
+        out->heading = (uint8_t)(src->facing - 0x20);                         \
+        break;                                                                \
+    case 6:                                                                   \
+        out->state   = (narrow);                                              \
+        out->heading = (uint8_t)(src->facing - 0x20);                         \
+        break;                                                                \
+    case 7:                                                                   \
+        out->state   = (wide);                                                \
+        out->heading = (uint8_t)(src->facing - 0x20);                         \
+        break;                                                                \
     }
-#undef BASE
-#undef O
+
+void __cdecl SetFacing14(int32_t facing, const AM2_Object *src, AM2_RoachOut *out)
+{
+    AM2_SET_FACING(flag18, 2, 1)
 }
 
-void __cdecl SetFacing14(int32_t facing, const void *src, void *out)
+void __cdecl SetFacing08(int32_t facing, const AM2_Object *src, AM2_SteerOut *out)
 {
-    SetFacing(facing, src, out, 0x14, 0x18, 2, 1);
+    AM2_SET_FACING(field0C, 4, 1)
 }
-
-void __cdecl SetFacing08(int32_t facing, const void *src, void *out)
-{
-    SetFacing(facing, src, out, 0x08, 0x0C, 4, 1);
-}
+#undef AM2_SET_FACING
 
 int32_t __cdecl IsKind10To17(int32_t kind)
 {
@@ -1075,13 +1073,11 @@ void __cdecl ConsumePendingByte(AM2_Object *o, AM2_RoachOut *out,
 /* Inline, and in the original's branch order. VC6 materialises each ternary
  * with the set-instruction of its condition's INVERSE, so the two written
  * `<=`/`>=` forms are what give the image's setg/setl. */
-static inline int32_t FacingFromDelta(const void *rec, int32_t delta,
-                                      uint32_t off_mode, uint32_t off_flag)
+static inline int32_t FacingFromDelta(const int32_t *mode, const int32_t *flag,
+                                      int32_t delta)
 {
-    const uint8_t *r = (const uint8_t *)rec;
-
-    if (*(const int32_t *)(r + off_mode) != 1) {
-        if (*(const int32_t *)(r + off_flag) != 0) {
+    if (*mode != 1) {
+        if (*flag != 0) {
             if (delta >= 0x10)
                 return 5;
             return (delta > -0x10) ? 4 : 3;
@@ -1093,14 +1089,14 @@ static inline int32_t FacingFromDelta(const void *rec, int32_t delta,
     return (delta >= 0) ? 2 : 7;
 }
 
-int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta)
+int32_t __cdecl FacingFromDelta08(const AM2_SteerOut *rec, int32_t delta)
 {
-    return FacingFromDelta(rec, delta, 0x08, 0x0C);
+    return FacingFromDelta(&rec->state, &rec->field0C, delta);
 }
 
-int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta)
+int32_t __cdecl FacingFromDelta14(const AM2_RoachOut *rec, int32_t delta)
 {
-    return FacingFromDelta(rec, delta, 0x14, 0x18);
+    return FacingFromDelta(&rec->state, &rec->flag18, delta);
 }
 
 /* Read out of the index table at 0x00406A94 and the five arms at 0x00406A7C.

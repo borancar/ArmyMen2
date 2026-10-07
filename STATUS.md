@@ -242,6 +242,18 @@ main result so far (details in `src/vc6/README.md`):
     straight to the call. It used to sit inside the test. The native build
     clears the path buffer first, so that case reads an empty name rather
     than stack garbage.
+  - **Typed vehicle and roach steps** (2026-10-07), 1548 held, nothing lost.
+    Step3ChooseFacing/TurnState/TurnBlocked/Drive/Input, Type2PlayerInput,
+    and the roach step family (RoachAliveStepB, RoachStepAllowed,
+    RoachStepTailA, RoachBite, StepType8) take AM2_Object and their record
+    types. AM2_Object's tail 0x538..0x5AC is now one union with a unit, a
+    vehicle and a roach arm, so vehicle code reads vehicle names.
+    - A typed LOCAL COPY of a pointer parameter (`AM2_Object *o = obj;`) is
+      kept where the original had one: VC6 enregisters the copy and not the
+      parameter (RoachStepTailA, RoachStepAllowed).
+    - SetFacing08/14 share a macro body that names the members; an inline
+      over field pointers did not match.
+    - KEEP_DECLS: the 0x00511BC8 block and the sprite list.
   - **Typed AI records and point parameters** (2026-10-07), 1547 -> 1548,
     nothing lost. The vehicle, trooper and roach AI families take typed
     records instead of `void *`: AM2_AiCtx (0x44, AiBuildContext),

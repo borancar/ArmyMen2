@@ -191,11 +191,8 @@ void __cdecl RoachAliveStepA(struct AM2_Object *o, struct AM2_RoachOut *out);
  * wants, and drag every other selected unit along. */
 /* 0x0044A420. The input half of the player trooper's frame: keys and mouse
  * into the same record Type2PlayerStep then acts on. */
-void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
-
-/* 0x0044A420. The input half of the player trooper's frame: keys and mouse
- * into the same record Type2PlayerStep then acts on. */
-void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
+void __cdecl Type2PlayerInput(struct AM2_Object *o, struct AM2_Object *weapon,
+                              struct AM2_SightOut *out);
 
 void __cdecl Type2PlayerStep(struct AM2_Object *o, struct AM2_SightOut *out);
 
@@ -416,18 +413,18 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at);
 /* 0x0045C6E0. Choose the vehicle's turn for this frame and answer whether the
  * step it implies is blocked. THREE arguments -- the call site's
  * `add esp, 0x18` is cleaning a neighbour's as well. */
-int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan,
+int32_t __cdecl Step3TurnBlocked(struct AM2_Object *o, const struct AM2_SteerOut *p,
                                  int32_t *out);
 
 /* 0x0045C8D0. Choose the vehicle's facing for the frame: propose a candidate
  * heading, ask Step3TurnBlocked whether the step is walkable, and fan out
  * alternately either side of the base heading for up to seven attempts. */
-void __cdecl Step3ChooseFacing(void *obj, void *out);
+void __cdecl Step3ChooseFacing(struct AM2_Object *o, struct AM2_SteerOut *out);
 
 /* 0x0045CAB0. Turn the facing gap into a turn state -- 7 one way, 6 the
  * other, nothing inside the tolerance, which is 1 while a turn key is held
  * and 16 otherwise. */
-void __cdecl Step3TurnState(void *obj, void *rec);
+void __cdecl Step3TurnState(struct AM2_Object *o, struct AM2_SteerOut *r);
 
 /* 0x0045D4B0. Route the vehicle toward its destination, correct the heading
  * against a distance-scaled tolerance, snap the view, and board selected
@@ -437,11 +434,11 @@ void __cdecl Step3RouteAndBoard(struct AM2_Object *o, struct AM2_SteerOut *r);
 /* 0x0045CB30. The whole per-frame step of a driven vehicle: aim the turret,
  * pick a target point, choose a speed, take the step, fire, sound the
  * engine, drag the passengers along and pick up what is underneath. */
-void __cdecl Step3Drive(void *obj, void *rec);
+void __cdecl Step3Drive(struct AM2_Object *o, struct AM2_SteerOut *r);
 
 /* 0x0045C050. The vehicle's driving interface: seven action keys and the
  * mouse, turned into the heading, destination and turret aim Step3Drive
  * acts on. The sibling of Type2PlayerInput, and not that code adapted. */
-void __cdecl Step3Input(void *obj, void *rec);
+void __cdecl Step3Input(struct AM2_Object *o, struct AM2_SteerOut *r);
 
 #endif /* AM2_REGION_H */

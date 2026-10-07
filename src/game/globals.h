@@ -65,6 +65,7 @@
 #define g_aimStampA              ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)  /* 0x004FC900 */
 #define g_aimStampB              ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)  /* 0x004FC974 */
 #define g_aimX                   (*(uint32_t *)(uintptr_t)ADDR_AIM_X)  /* 0x00512568 */
+#define g_aimSpot                (*(AM2_FireSpot *)(uintptr_t)ADDR_AIM_X)  /* 0x00512568, x/y and the ground height */
 #define g_aimY                   (*(int16_t *)(uintptr_t)ADDR_AIM_Y)  /* 0x0051256A */
 #define g_aimZ                   (*(uint16_t *)(uintptr_t)ADDR_AIM_Z)  /* 0x0051256C */
 #define g_airCycleMs             (*(int32_t *)(uintptr_t)ADDR_AIR_CYCLE_MS)  /* 0x00473F38 */

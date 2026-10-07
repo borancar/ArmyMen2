@@ -415,8 +415,10 @@ int32_t __cdecl TypesCompatible(int32_t a, int32_t b);
  * Selector 1 jumps into selector 3's body past its first instruction, so those
  * two arms are the same and are written that way. Above 7 nothing is written
  * at all -- the out record is left as it was, not zeroed. */
-void __cdecl SetFacing14(int32_t facing, const void *src, void *out);
-void __cdecl SetFacing08(int32_t facing, const void *src, void *out);
+void __cdecl SetFacing14(int32_t facing, const struct AM2_Object *src,
+                         struct AM2_RoachOut *out);
+void __cdecl SetFacing08(int32_t facing, const struct AM2_Object *src,
+                         struct AM2_SteerOut *out);
 
 /* 0x0044BBF0 and 0x00433500. Two membership tests over the same kind of code
  * the ObjIsTypeN predicates compare against: 10 through 17 inclusive, and
@@ -778,8 +780,8 @@ void __cdecl ConsumePendingByte(struct AM2_Object *o, struct AM2_RoachOut *out,
  * is 0 or -1, so the -1 case comes back as 0xFFFFFFFB and the following add
  * wraps to 2. Written out as the values it produces, which is what a caller
  * sees. */
-int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta);
-int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta);
+int32_t __cdecl FacingFromDelta08(const struct AM2_SteerOut *rec, int32_t delta);
+int32_t __cdecl FacingFromDelta14(const struct AM2_RoachOut *rec, int32_t delta);
 
 /* 0x00406A40. Maps a code in 0x18..0x28 to a small constant, everything else
  * to zero: 0x18 gives 8, 0x19 gives 2, 0x1A gives 1, 0x27 gives 4, 0x28 gives

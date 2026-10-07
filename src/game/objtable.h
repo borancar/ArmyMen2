@@ -45,16 +45,7 @@ typedef struct {
     int32_t            capacity;  /* +0x0C */
 } AM2_RowSet;
 
-/* 0x0045F460's argument 5 and 6, which the original passes as ONE six-byte
- * structure -- three words, pushed as eight: every caller copies it with
- * `sub esp, 8; mov ecx, esp; mov [ecx], dword; mov [ecx+4], word`, so the top
- * two bytes of the pushed copy are whatever was on the stack. Both fields
- * have a fallback inside the callee: a zero point is filled from the target
- * object's position and a zero ground height from the shooter's own. */
-typedef struct {
-    AM2_Point at;
-    int16_t   ground;
-} AM2_FireSpot;
+/* AM2_FireSpot is in point.h, beside AM2_Point. */
 
 /* An item's type record, what OBJ_OFF_FIELD_C0 points at on a weapon. */
 typedef struct AM2_ItemType {
@@ -64,6 +55,8 @@ typedef struct AM2_ItemType {
     int32_t  range;                 /* +0x10 ITEMTYPE_OFF_RANGE */
     int32_t  damage;                /* +0x14 ITEMTYPE_OFF_DAMAGE */
     int32_t  capacity;              /* +0x18 ITEMTYPE_OFF_CAPACITY */
+    uint8_t  _pad1c[8];             /* +0x1C */
+    int32_t  automatic;             /* +0x24 non-zero: repeats while held */
 } AM2_ItemType;
 
 /* The sight record (SIGHTCOUT_OFF_*): what a trooper's sight scan saw and
@@ -109,7 +102,7 @@ typedef struct AM2_RoachOut {
     AM2_FireSpot spot;              /* +0x0C SIGHTBOUT_OFF_X / _Y / _YADJ */
     uint8_t      _pad12[2];
     int32_t      state;             /* +0x14 SIGHTBOUT_OFF_STATE: 1 arrived, 2 heading, 4 bite */
-    uint8_t      _pad18[4];
+    int32_t      flag18;            /* +0x18 ROACHSTEP_OFF_FLAG18, picks the arm */
     uint32_t     uid;               /* +0x1C SIGHTBOUT_OFF_UID, the target */
 } AM2_RoachOut;
 
@@ -335,60 +328,62 @@ typedef struct AM2_Object {
         int32_t    field530;        /*   ObjConceal compares to 5 */
         uint8_t    turretFacing;    /*   a vehicle's gun facing, its low byte */
     };
-    const uint8_t *tableRec3;       /* +0x534 SAVED_OFF_TABLE_REC3, a type 3's record */
-    union {                         /* +0x538..+0x564, by object type: */
-        struct {
-            union {                         /* +0x538, by object type: */
-                struct {
-                    int32_t   pose;         /*   OBJ_OFF_POSE */
-                    int32_t   posePending;  /*   OBJ_OFF_POSE_PENDING */
-                    int32_t   field540;     /*   OBJ_OFF_FIELD_540 */
-                };
-                struct {                    /*   VEHICLE_OFF_PTR_LIST, a vehicle's riders, */
-                    int32_t   capacity;     /*   a pointer list */
-                    int32_t   count;        /*   so OBJ_OFF_POSE_PENDING is its seats used */
-                    uint32_t *uids;
-                } riders;
-            };
-            int32_t        soldierKind;     /* +0x544 OBJ_OFF_SOLDIER_KIND */
-            union {                         /* +0x548 */
-                int32_t    sarge;           /*   OBJ_OFF_SARGE, a trooper's */
-                int32_t    field548;        /*   a vehicle's; 0 drags the turret onto the hull */
-            };
-            union {                         /* +0x54C, by object type: */
-                uint32_t   inventory[6];    /*   UNIT_OFF_INVENTORY, a unit's weapon uids */
-                struct {
-                    uint8_t  _pad54c[4];
-                    uint32_t weaponUid;     /*   VEHICLE_OFF_WEAPON_UID (+0x550), a vehicle's gun */
-                    int32_t  seats;         /*   VEHICLE_OFF_SEATS (+0x554), a vehicle's */
-                };
-            };
+    union {                         /* +0x534, by object type: */
+        const uint8_t *tableRec3;   /*   SAVED_OFF_TABLE_REC3, a type 3's record */
+        uint32_t   roachStamp;      /*   ROACH_OFF_STAMP, a roach's: when its fan began */
+    };
+    union {                         /* +0x538..+0x5AC, by object type: */
+        struct {                    /* a unit's (types 2 and 8) */
+            int32_t   pose;         /* +0x538 OBJ_OFF_POSE */
+            int32_t   posePending;  /* +0x53C OBJ_OFF_POSE_PENDING */
+            int32_t   field540;     /* +0x540 OBJ_OFF_FIELD_540 */
+            int32_t   soldierKind;  /* +0x544 OBJ_OFF_SOLDIER_KIND */
+            int32_t   sarge;        /* +0x548 OBJ_OFF_SARGE */
+            uint32_t  inventory[6]; /* +0x54C UNIT_OFF_INVENTORY, weapon uids */
+            uint32_t  heldWeaponUid;/* +0x564 OBJ_OFF_HELD_WEAPON_UID */
+            int32_t   inventorySel; /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
+            uint32_t  uid56C;       /* +0x56C OBJ_OFF_UID_56C, a uid the menu row 8 order targets */
+            uint32_t  riding;       /* +0x570 OBJ_OFF_RIDING, the uid ridden */
+            int16_t   field574;     /* +0x574 OBJ_OFF_FIELD_574, the facing widened */
+            uint8_t   _pad576[2];
+            int32_t   field578;     /* +0x578 OBJ_OFF_FIELD_578 */
+            AM2_SightOut sight;     /* +0x57C OBJ_OFF_SIGHT_OUT_T2 */
+            uint32_t  fireStamp;    /* +0x5A0 UNIT_OFF_FIRE_STAMP */
+            int32_t   field5A4;     /* +0x5A4 OBJ_OFF_FIELD_5A4 */
+            int32_t   field5A8;     /* +0x5A8 OBJ_OFF_FIELD_5A8, the random name index */
         };
-        struct {
-            uint8_t      _r538[8];
-            AM2_RoachOut roachCtl; /* +0x540, a roach's steering record */
+        struct {                    /* a vehicle's (type 3) */
+            struct {                /* +0x538 VEHICLE_OFF_PTR_LIST, its riders: */
+                int32_t   capacity; /*   a pointer list */
+                int32_t   count;
+                uint32_t *uids;
+            } riders;
+            int32_t   deathKind;    /* +0x544 0 destroyed outright, 5 the burn-out */
+            int32_t   field548;     /* +0x548 0 drags the turret onto the hull */
+            int32_t   field54C;     /* +0x54C */
+            uint32_t  weaponUid;    /* +0x550 VEHICLE_OFF_WEAPON_UID, its gun */
+            int32_t   seats;        /* +0x554 VEHICLE_OFF_SEATS */
+            int32_t   field558;     /* +0x558 VEHICLE_OFF_FIELD_558 */
+            int32_t   field55C;     /* +0x55C VEHICLE_OFF_FIELD_55C */
+            int32_t   accelRate;    /* +0x560 VEHICLE_OFF_ACCEL_RATE, per second */
+            uint32_t  turnInterval; /* +0x564 VEHICLE_OFF_TURN_INTERVAL, ms */
+            int32_t   field568;     /* +0x568 */
+            uint32_t  blockedSince; /* +0x56C the clock when a turn was first refused */
+            int32_t   searchBase;   /* +0x570 the facing the turn search fans out from */
+            int32_t   searchTries;  /* +0x574 the search's attempts, kept across frames */
+            AM2_SteerOut ctl;       /* +0x578 its steering record */
+            int32_t   gate;         /* +0x59C OBJ_OFF_FIELD_59C: 0 seeds the record */
+            uint32_t  field5A0;     /* +0x5A0 */
+            uint8_t   turnCommitted;/* +0x5A4 the row facing last committed */
+            uint8_t   _pad5a5[3];
+            int32_t   turnRecommit; /* +0x5A8 non-zero: commit whatever the row reads */
+        };
+        struct {                    /* a roach's (type 8) */
+            int32_t      roachBaseDir; /* +0x538 ROACH_OFF_BASE_DIR, 0..7 */
+            int32_t      roachFan;     /* +0x53C ROACH_OFF_FAN, the search counter */
+            AM2_RoachOut roachCtl;     /* +0x540 its steering record */
         };
     };
-    uint32_t       heldWeaponUid;   /* +0x564 OBJ_OFF_HELD_WEAPON_UID */
-    int32_t        inventorySel;    /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
-    uint32_t       uid56C;          /* +0x56C OBJ_OFF_UID_56C, a uid the menu row 8 order targets */
-    uint32_t       riding;          /* +0x570 OBJ_OFF_RIDING, the uid ridden */
-    int16_t        field574;        /* +0x574 OBJ_OFF_FIELD_574, the facing widened */
-    uint8_t        _pad576[2];      /* +0x576 */
-    union {                         /* +0x578, by object type: */
-        struct {
-            int32_t      field578;  /*   OBJ_OFF_FIELD_578 */
-            AM2_SightOut sight;     /*   +0x57C OBJ_OFF_SIGHT_OUT_T2, a trooper's */
-        };
-        struct {
-            AM2_SteerOut ctl;       /*   a vehicle's steering record */
-            int32_t  gate;          /*   +0x59C OBJ_OFF_FIELD_59C, a vehicle's: 0 seeds
-                                     *   the record and lets its AI or player steer */
-        };
-    };
-    uint32_t       fireStamp;       /* +0x5A0 UNIT_OFF_FIRE_STAMP */
-    int32_t        field5A4;        /* +0x5A4 OBJ_OFF_FIELD_5A4 */
-    int32_t        field5A8;        /* +0x5A8 OBJ_OFF_FIELD_5A8, the random name index */
     int32_t        nameIndex;       /* +0x5AC OBJ_OFF_NAME_INDEX */
     uint32_t       field5B0;        /* +0x5B0 OBJ_OFF_FIELD_5B0, game-clock ms */
     AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */
@@ -488,6 +483,10 @@ static_assert(offsetof(AM2_Object, sentPos)       == 0x5B4, "sentPos");
 static_assert(offsetof(AM2_Object, lastSeq)       == 0x5CC, "lastSeq");
 static_assert(offsetof(AM2_Object, posePending)   == 0x53C, "posePending");
 static_assert(offsetof(AM2_Object, riders.count)  == 0x53C, "riders.count");
+static_assert(offsetof(AM2_Object, searchTries)   == 0x574, "searchTries");
+static_assert(offsetof(AM2_Object, gate)          == 0x59C, "gate");
+static_assert(offsetof(AM2_Object, turnRecommit)  == 0x5A8, "turnRecommit");
+static_assert(offsetof(AM2_Object, nameIndex)     == 0x5AC, "nameIndex");
 static_assert(offsetof(AM2_Object, field540)      == 0x540, "field540");
 static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
