@@ -311,7 +311,7 @@ void __cdecl PausedFrameStep(void);
  * caller calls under is not the same as OBSERVING that it holds. */
 void __cdecl MissionPausedFrame(void)
 {
-    void *bmp;
+    AM2_Sprite *bmp;
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
         RequestState(1);
@@ -335,11 +335,11 @@ void __cdecl MissionPausedFrame(void)
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)&g_primarySurface);
 
     bmp = g_currentBitmap;
-    DrawSprite((AM2_Sprite *)bmp,
+    DrawSprite(bmp,
                (g_bitmapAreaW
-                - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_W)) >> 1,
+                - bmp->bounds.right) >> 1,
                (g_bitmapAreaH
-                - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_H)) >> 1,
+                - bmp->bounds.bottom) >> 1,
                0);
 
     FreeBitmap(&g_currentBitmap);
@@ -885,7 +885,7 @@ void __cdecl State2Enter(void)
                     - splash->bounds.bottom) / 2,
                    0);
     }
-    FreeBitmap((void **)&splash);
+    FreeBitmap(&splash);
 
     ResetLevelState();
     BuildFontAlias(0);
@@ -1370,15 +1370,15 @@ void __cdecl Substate22(void)
 
     if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
-#define BMP ((uint8_t *)g_currentBitmap)
+#define BMP (g_currentBitmap)
         g_overlayDirty = 0;
         if (BMP) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            DrawSprite((AM2_Sprite *)BMP,
+            DrawSprite(BMP,
                        (g_screenW
-                        - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
+                        - BMP->bounds.right) >> 1,
                        (g_screenH
-                        - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
+                        - BMP->bounds.bottom) >> 1,
                        0);
         }
 #undef BMP
@@ -1492,7 +1492,7 @@ void __cdecl ShowMpResult(int32_t result)
  * of this file keeps saying. */
 void __cdecl RefreshDraw(void)
 {
-    void *bmp;
+    AM2_Sprite *bmp;
 
     SetDrawTarget(g_backBuffer);
     CyclePalette();
@@ -1516,10 +1516,10 @@ void __cdecl RefreshDraw(void)
         && g_menuRequest != AM2_SUBSTATE_BITMAP
         && g_menuRequest != AM2_SUBSTATE_ESCAPE
         && !g_overlayDirty) {
-        int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
-        int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
+        int32_t w = bmp->bounds.right;
+        int32_t h = bmp->bounds.bottom;
 
-        DrawSprite((AM2_Sprite *)bmp,
+        DrawSprite(bmp,
                    (g_bitmapAreaW - w) >> 1,
                    (g_bitmapAreaH - h) >> 1,
                    0);
@@ -1590,15 +1590,15 @@ void __cdecl Substate34Escape(void)
 
     if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
-#define BMP ((uint8_t *)g_currentBitmap)
+#define BMP (g_currentBitmap)
         g_overlayDirty = 0;
         if (BMP) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            DrawSprite((AM2_Sprite *)BMP,
+            DrawSprite(BMP,
                        (g_bitmapAreaW
-                        - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
+                        - BMP->bounds.right) >> 1,
                        (g_bitmapAreaH
-                        - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
+                        - BMP->bounds.bottom) >> 1,
                        0);
         }
 #undef BMP

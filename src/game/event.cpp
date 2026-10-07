@@ -433,7 +433,7 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
  * LPDIRECTDRAWSURFACE and this module is on the flat side. FreeBitmap's own
  * signature does not, which is what makes the declaration legal here -- the
  * same reason script.cpp forward-declares PreloadSprite. */
-void __cdecl FreeBitmap(void **pp);
+void __cdecl FreeBitmap(struct AM2_Sprite **pp);
 
 #define orig_fwrite (*(am2_fwrite_fn)ADDR_FWRITE)
 
@@ -2180,7 +2180,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 
 /* --------------------------------------------------- bitmaps ---- */
 
-typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
+typedef void (__cdecl *AM2_FreeBitmapFn)(struct AM2_Sprite **slot);
 /* Forward-declared rather than reached through win32/sprite.h, the same way
    commmsg.cpp declares HudMessage: this module is flat and that header names
    Win32 types. The return type is spelled as the definition's, AM2_Sprite *,

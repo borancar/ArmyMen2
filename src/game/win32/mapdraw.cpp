@@ -2238,9 +2238,8 @@ void __cdecl AirFrameDraw(void)
                     f = 0;
 
                 ChangeObjectFrame(obj, f, 1);
-                *(int32_t *)(((uint8_t *)obj->rowSet.rows)
-                             + ROW_OFF_STAMP_54) =
-                    *(const int32_t *)&g_gameClockMs;
+                obj->rowSet.rows->stamp54 =
+                    g_gameClockMs;
 
                 if (f == 2)
                     PlaySoundAt(AM2_AIR_CYCLE_SOUND, 0, 0,

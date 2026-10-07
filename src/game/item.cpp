@@ -8394,16 +8394,15 @@ int32_t __cdecl ObjOverlayY(const AM2_Object *obj)
         return 0;
 
     /* The animation is re-read from the row after the call. */
-    row = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
-#define ANIM (((const AM2_Anim *)row->animPlaying))
+    row = o->rowSet.rows;
+#define ANIM (row->animPlaying)
     if (!ANIM)
         return 0;
 
     dir = RoundTo8(o->facing,
                    ANIM->directionBits) & 0xFF;
 
-    return -(int32_t)*(const int16_t *)
-        ((const uint8_t *)kSpriteList[ANIM->cells[dir].sprite] + SPR_OFF_OVY);
+    return -(int32_t)kSpriteList[ANIM->cells[dir].sprite]->attachY;
 #undef ANIM
 }
 
@@ -10977,11 +10976,10 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
         AM2_MapRow       *r = &o->rowSet.rows[i];
 
         /* The sprite is read through the object's rows at each use. */
-#define SPR0 (*(const uint8_t *const *)(((uint8_t *)o->rowSet.rows) \
-                                       + ROW_OFF_SPRITE))
+#define SPR0 (o->rowSet.rows->sprite)
         r->pos = o->pos;
-        r->pos.x += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
-        r->pos.y += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
+        r->pos.x += SPR0->attachX;
+        r->pos.y += SPR0->attachY;
 #undef SPR0
         ObjFlagSet0(r);
         RowUpdate(r, 0, g_mapDesc);

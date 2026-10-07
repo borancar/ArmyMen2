@@ -227,7 +227,7 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
  * written out, and they agree exactly. */
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a, int32_t b);
 
-void __cdecl FreeBitmap(void **pp);
+void __cdecl FreeBitmap(AM2_Sprite **pp);
 
 void __cdecl FreeMenuSprites(void);
 

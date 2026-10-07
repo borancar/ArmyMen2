@@ -173,7 +173,7 @@
 #define g_cpunormspeed           (*(am2_cpuspeed_fn *)(uintptr_t)ADDR_CPUNORMSPEED_FN)  /* 0x004F9FE8 */
 #define g_createWatchedKind      (*(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)  /* 0x00516160 */
 #define g_curKeys                (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)  /* 0x005127C8 */
-#define g_currentBitmap          (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)  /* 0x005122C4 */
+#define g_currentBitmap          (*(struct AM2_Sprite **)(uintptr_t)ADDR_CURRENT_BITMAP)  /* 0x005122C4 */
 #define g_currentObjScript       (*(int32_t *)(uintptr_t)ADDR_CURRENT_OBJ_SCRIPT)  /* 0x0051618C */
 #define g_cursorA                (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_A)  /* 0x004FA450 */
 #define g_cursorB                (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_B)  /* 0x004FA44C */
@@ -751,7 +751,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_spriteGroupsC          ((struct AM2_SpriteGroupC *)(uintptr_t)ADDR_SPRITE_GROUPS_C)  /* 0x0048CA08 */
 #define g_spriteGroupsCEnd       ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END)  /* 0x0048CA38 */
 #define g_spriteGroupsEnd        ((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END)  /* 0x0048C8D0 */
-#define g_spriteList             (*(void ***)(uintptr_t)ADDR_SPRITE_LIST)  /* 0x004F96C8 */
+#define g_spriteList             (*(struct AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)  /* 0x004F96C8 */
 #define g_spriteListCap          (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)  /* 0x004F96C0 */
 #define g_spriteListN            (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)  /* 0x004F96C4 */
 #define g_spriteRegCap           (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP)  /* 0x006598BC */

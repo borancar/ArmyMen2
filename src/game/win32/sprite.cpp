@@ -1995,21 +1995,20 @@ void __cdecl BuildVehicleMask(int32_t kind)
     }
 }
 
-#define SPRITE_OFF_EXTRA 0x3Cu   /* the block freed beside the sprite */
 
-void __cdecl FreeBitmap(void **pp)
+void __cdecl FreeBitmap(AM2_Sprite **pp)
 {
-    AM2_Sprite *spr = (AM2_Sprite *)*pp;
-    uint8_t    *extra;
+    AM2_Sprite *spr = *pp;
+    char       *extra;
 
     if (!spr)
         return;
     ClearSprite(spr);
     /* Re-read: ClearSprite could have dropped it. */
-    spr = (AM2_Sprite *)*pp;
+    spr = *pp;
     if (!spr)
         return;
-    extra = *(uint8_t **)((uint8_t *)spr + SPRITE_OFF_EXTRA);
+    extra = spr->source;
     if (extra)
         am2_free(extra);
     am2_free(*pp);

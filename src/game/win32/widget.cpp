@@ -5358,11 +5358,11 @@ AM2_HudRadar::~AM2_HudRadar()
 {
     AM2_Widget *w = this;
 
-    void **slot = (void **)((uint8_t *)w + HUD_OFF_SPRITE0);
+    AM2_Sprite **slot = (AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0);
 
     AM2_CTOR_VTABLE(w, VTABLE_HUD_RADAR);
     FreeBitmap(slot);
-    *slot = (void *)0;
+    *slot = (AM2_Sprite *)0;
 }
 
 void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
@@ -8793,11 +8793,11 @@ void __cdecl OnAppActivated(void)
 
         SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
         x = (g_bitmapAreaW
-             - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_W)) >> 1;
+             - g_currentBitmap->bounds.right) >> 1;
         y = (g_bitmapAreaH
-             - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_H)) >> 1;
-        DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
-        DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
+             - g_currentBitmap->bounds.bottom) >> 1;
+        DrawSprite(g_currentBitmap, x, y, 0);
+        DrawSprite(g_currentBitmap, x, y, 0);
     }
 }
 
