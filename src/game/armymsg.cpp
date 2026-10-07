@@ -1519,9 +1519,10 @@ void __cdecl RecvTrooperWantItem(void *msg)
             return;
         }
 
-        give = *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
-        if (give >= *(const int32_t *)(w + OBJ_OFF_TARGET_UID))
+        if (*(const int32_t *)(m + MSG_DROP_OFF_QUANT) >= *(const int32_t *)(w + OBJ_OFF_TARGET_UID))
             give = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
+        else
+            give = *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
 
         at = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
         if (at != -1

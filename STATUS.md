@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1535 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1536 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,15 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **RecvTrooperWantItem matched** (2026-10-07), 1535 -> 1536.
+    - The give amount is one if/else between the quantity and the
+      target's count. The original was not `give = quant` and then a
+      clamp.
+    - Found by `ablate2.py` (session tmp directory). It deletes each
+      statement in turn and reports the ones whose removal makes our code
+      contain the image's first differing instruction. Run over every
+      unmatched function, it listed more leads (STATUS keeps the method,
+      not the list).
   - **BuildVehicleMask and BuildRoachMask matched** (2026-10-07), 1533 ->
     1535.
     - Same method: ablate each statement and look for the image's exact
