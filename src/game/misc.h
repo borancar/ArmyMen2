@@ -203,10 +203,11 @@ void __cdecl MovieBuildName(char *dst, const char *name);
 
 /* 0x00461870, two callers. Walk one seq context and step every live record;
  * the walk is index-chained through SEQ_OFF_NEXT rather than sequential. */
-void __cdecl SeqRun(void *ctx);
+void __cdecl SeqRun(struct AM2_SeqCtx *ctx);
 
 /* 0x00461310, and both kinds 2 and 3 reach it: a two-frame life. */
-int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind2(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 /* 0x00461350. The fourth adder -- kind 4, into the OTHER context, shaded
  * through ROW_OFF_FIELD_2C, and what a kind 5 emits every 300 ms. */
@@ -214,11 +215,13 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust);
 
 /* 0x004613E0. Kind 4's stepper: a four-cell shaded sprite that drifts and
  * retires, either on its last cell or on leaving the map. */
-int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind4(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 /* 0x004614D0. Kind 5's stepper: an emitter that adds a kind 4 into the other
  * context every 300 ms until its life runs out. */
-int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind5(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 /* 0x00461660. The third adder -- kind 6, whose sprite is a VARIANT of eight
  * frames rather than a frame, and whose depth key carries the terrain. */
@@ -1072,16 +1075,19 @@ uint32_t __cdecl Ticks(void);
 
 /* 0x00461560. Sequence stepper kind 6: cycle a sprite variant until the last
  * 100 ms of the life, then ramp through the tail frames instead. */
-int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind6(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 /* 0x00461700. Sequence stepper kind 7: a FLAME. Every 300 ms it puffs a
  * kind-6 sequence and burns what is in a box around its row -- 1 to a
  * type-2/3/8 every puff, 15 to anything else once every ten. */
-int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind7(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 /* 0x00461150. Sequence stepper kind 0: a ballistic particle. Flies, falls
  * under gravity, then bounces or settles into a decal. Its +0x14 is a
  * VELOCITY, not the life the other kinds keep there. */
-int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx);
+int32_t __cdecl SeqStepKind0(int32_t at, struct AM2_Seq *rec,
+                             struct AM2_SeqCtx *ctx);
 
 #endif /* AM2_MISC_H */

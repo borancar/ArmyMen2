@@ -1810,7 +1810,7 @@ typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 
 /* The seven steppers SeqRun dispatches to. All take (index, record, context)
  * and answer the next index; kinds 2 and 3 share one. Still original. */
-typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
+typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx);
 /* SeqRetire is reconstructed and declared in maprow.h; this typedef and the
  * macro under it reached it through the image, which checkseams now refuses. */
 /* Reconstructed now -- maprow.h declares it. */
@@ -2168,16 +2168,16 @@ void __cdecl MovieBuildName(char *dst, const char *name)
  * row is put back into the map every frame it is alive, whether it moved or
  * not.
  */
-int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind2(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+    AM2_MapRow *row = rec->row;
 
     (void)at;
     if (++row->stamp54 > 1)
         return SeqRetire(ctx, rec);
 
     RowUpdate(row, 1, g_mapDesc);
-    return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
+    return rec->next;
 }
 
 /* Kind 3's stepper: SeqStepKind2's twin, body for body. The image has one
@@ -2186,16 +2186,16 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
  * does for two identical functions the linker then folds (/OPT:ICF). So the
  * source had two, and this is the second. Not installed: it has no address of
  * its own. */
-static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
+static int32_t __cdecl SeqStepKind3(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+    AM2_MapRow *row = rec->row;
 
     (void)at;
     if (++row->stamp54 > 1)
         return SeqRetire(ctx, rec);
 
     RowUpdate(row, 1, g_mapDesc);
-    return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
+    return rec->next;
 }
 
 /* SeqAddKind6 -- original 0x00461660, two callers, and the third of the
@@ -2222,23 +2222,23 @@ static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
  */
 void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
 {
-    uint8_t *seq;
+    AM2_Seq *seq;
     AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
-    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
+    seq = SeqAlloc(g_seqCtxA);
 
-    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND6;
-    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = (uint8_t)variant;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE6;
-    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+    seq->kind     = AM2_SEQ_KIND6;
+    seq->flag4    = (uint8_t)variant;
+    seq->field0C = 0;
+    seq->field10 = 0;
+    seq->owner    = 0;
+    seq->life     = AM2_SEQ_LIFE6;
+    seq->gate     = 1;
 
-    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
+    row = seq->row;
     row->cell     = 0;
     row->stamp54 = 0;
     row->flags                = 1;
@@ -2285,26 +2285,26 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
  */
 void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
 {
-    uint8_t *seq;
+    AM2_Seq *seq;
     AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
-    seq = (uint8_t *)SeqAlloc(g_seqCtxB);
+    seq = SeqAlloc(g_seqCtxB);
 
-    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
-    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) =
+    seq->kind     = AM2_SEQ_KIND4;
+    seq->flag4    = 0;
+    seq->field0C =
         g_seqK4DriftX;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
+    seq->field10 =
         g_seqK4DriftY;
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     =
+    seq->owner    = 0;
+    seq->life     =
         g_seqK4StepMs;
-    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+    seq->gate     = 1;
 
-    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);   /* taken after the seq fields */
+    row = seq->row;   /* taken after the seq fields */
     row->cell     = 0;
     row->stamp54 = 0;
     row->flags                = 1;
@@ -2347,16 +2347,16 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
  *
  * The relink passes force 0 where kind 2 passes 1; this row really has moved.
  */
-int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind4(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    uint8_t *r   = (uint8_t *)rec;
-    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_Seq *r   = rec;
+    AM2_MapRow *row = r->row;
 
     (void)at;
 
     if (row->stamp54
-            > *(const uint32_t *)(r + SEQ_OFF_LIFE)) {
-#define GATE (*(uint32_t *)(r + SEQ_OFF_GATE))
+            > (uint32_t)r->life) {
+#define GATE (r->gate)
 #define CELL (row->cell)
         if (++GATE > (g_seqK4Hold)[CELL]) {
             if (++CELL >= AM2_SEQ_K4_CELLS)
@@ -2375,9 +2375,9 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
         row->yAdjust +=
             g_seqK4Rise;
         row->pos.x +=
-            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
+            (int16_t)r->field0C;
         row->pos.y +=
-            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
+            (int16_t)r->field10;
 
         row->stamp54 = 0;
 
@@ -2391,7 +2391,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
     row->stamp54 +=
         g_frameDeltaMs;
 
-    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+    return r->next;
 }
 
 /* SeqStepKind5 -- original 0x004614D0, one caller.
@@ -2418,32 +2418,32 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
  * into a stack copy of the point -- an argument slot it reuses as a local.
  * Written as a local; the reuse is the compiler's.
  */
-int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind5(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    uint8_t *r    = (uint8_t *)rec;
-    AM2_MapRow *row  = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_Seq *r    = rec;
+    AM2_MapRow *row  = r->row;
 
     (void)at;
 
     if (row->stamp54
-            > *(const uint32_t *)(r + SEQ_OFF_LIFE))
+            > (uint32_t)r->life)
         return SeqRetire(ctx, rec);
 
-    if (*(const uint32_t *)(r + SEQ_OFF_GATE)
+    if (r->gate
             > g_seqEmitMs) {
         AM2_Point pt = row->pos;
 
         pt.x = (int16_t)(pt.x + (orig_seq_rand() % 3) * 4 - 4);
         SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
 
-        *(int32_t *)(r + SEQ_OFF_GATE) -=
+        r->gate -=
             *(const int32_t *)&g_seqEmitMs;
     }
 
     row->stamp54 += g_frameDeltaMs;
-    *(int32_t *)(r + SEQ_OFF_GATE)       += g_frameDeltaMs;
+    r->gate       += g_frameDeltaMs;
 
-    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+    return r->next;
 }
 
 /* SeqRun -- original 0x00461870, two callers.
@@ -2487,17 +2487,16 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
  * "there are no records", and the two are worth separating. The chain, the
  * gate and the dispatch stand on the disassembly.
  */
-void __cdecl SeqRun(void *ctx)
+void __cdecl SeqRun(AM2_SeqCtx *ctx)
 {
-    uint8_t *recs = *(uint8_t **)((uint8_t *)ctx + SEQ_CTX_OFF_RECORDS);
-    int32_t  at   = *(const int16_t *)(recs + SEQ_OFF_NEXT);
+    AM2_Seq *recs = ctx->records;
+    int32_t  at   = recs->next;
 
     while (at > 0) {
-        uint8_t *rec = *(uint8_t **)((uint8_t *)ctx + SEQ_CTX_OFF_RECORDS)
-                       + at * AM2_SEQ_RECORD_SIZE;
+        AM2_Seq *rec = &ctx->records[at];
 
-        if (*(const uint32_t *)(rec + SEQ_OFF_GATE) > 0) {
-            switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
+        if (rec->gate > 0) {
+            switch (rec->kind) {
             case 0: at = SeqStepKind0(at, rec, ctx); break;
             case 1: break;   /* hangs; see above */
             case 2: at = SeqStepKind2(at, rec, ctx); break;
@@ -2507,11 +2506,11 @@ void __cdecl SeqRun(void *ctx)
             case 6: at = SeqStepKind6(at, rec, ctx); break;
             case 7: at = SeqStepKind7(at, rec, ctx); break;
             default:
-                at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
+                at = rec->next;
                 break;
             }
         } else {
-            at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
+            at = rec->next;
         }
     }
 
@@ -2550,25 +2549,25 @@ void __cdecl SeqRun(void *ctx)
  */
 void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
 {
-    uint8_t *seq;
+    AM2_Seq *seq;
     AM2_MapRow *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
-    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
+    seq = SeqAlloc(g_seqCtxA);
 
-    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND5;
-    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE5;
+    seq->kind     = AM2_SEQ_KIND5;
+    seq->flag4    = 0;
+    seq->owner    = owner;
+    seq->field0C = 0;
+    seq->field10 = 0;
+    seq->life     = AM2_SEQ_LIFE5;
     if (life > 0)
-        *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
-    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+        seq->life = life;
+    seq->gate     = 1;
 
-    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
+    row = seq->row;
 
     row->cell      = 0;
     row->stamp54  = 0;
@@ -2584,7 +2583,7 @@ void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
 void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
                          int32_t c, int32_t life)
 {
-    uint8_t *seq;
+    AM2_Seq *seq;
     AM2_MapRow *row;
 
     (void)b;
@@ -2594,18 +2593,18 @@ void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
                      at))
         return;
 
-    seq = (uint8_t *)SeqAlloc(g_seqCtxA);
+    seq = SeqAlloc(g_seqCtxA);
 
-    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND7;
-    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE7;
-    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
+    seq->kind     = AM2_SEQ_KIND7;
+    seq->flag4    = 0;
+    seq->owner    = owner;
+    seq->life     = AM2_SEQ_LIFE7;
+    seq->field0C = 0;
     if (life > 0)
-        *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
-    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+        seq->life = life;
+    seq->gate     = 1;
 
-    row = (AM2_MapRow *)*(uint8_t **)(seq + SEQ_OFF_ROW);
+    row = seq->row;
 
     row->flags                 = 0;
     row->cell      = 0;
@@ -2919,11 +2918,11 @@ int misc_install(void)
  *
  * ADDR_SEQ_SPRITES_7 is named for kind 7 and kind 6 reads the same array.
  * One array with two users is not two concepts; the name is left alone. */
-int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind6(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    uint8_t *r     = (uint8_t *)rec;
-    AM2_MapRow *row   = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
-    uint32_t life  = *(const uint32_t *)(r + SEQ_OFF_LIFE);
+    AM2_Seq *r     = rec;
+    AM2_MapRow *row   = r->row;
+    uint32_t life  = (uint32_t)r->life;
     uint32_t stamp = row->stamp54;
 
     /* The tail count, the stride, the advance and the frame delta are
@@ -2939,8 +2938,8 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
     if (stamp > life)
         return SeqRetire(ctx, rec);
 
-    if (*(const uint32_t *)(r + SEQ_OFF_GATE) > ADVANCE) {
-        int32_t variant = *(const uint8_t *)(r + SEQ_OFF_FLAG4) * STRIDE;
+    if (r->gate > ADVANCE) {
+        int32_t variant = r->flag4 * STRIDE;
 
         if ((int32_t)stamp > (int32_t)life - 100) {
             int32_t per = 100 / TAIL;
@@ -2959,13 +2958,13 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
             g_seqSprites7[variant];
         RowUpdate(row, 0, g_mapDesc);
 
-        *(uint32_t *)(r + SEQ_OFF_GATE) -= ADVANCE;
+        r->gate -= ADVANCE;
     }
 
     row->stamp54 += DELTA;
-    *(uint32_t *)(r + SEQ_OFF_GATE) += DELTA;
+    r->gate += DELTA;
 
-    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+    return r->next;
 #undef TAIL
 #undef STRIDE
 #undef ADVANCE
@@ -3011,18 +3010,18 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
  * The point is copied into a stack local first and the puff is spawned from
  * the COPY, so the row itself never moves -- the flame licks around a fixed
  * origin rather than wandering. */
-int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
-    uint8_t *r   = (uint8_t *)rec;
-    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_Seq *r   = rec;
+    AM2_MapRow *row = r->row;
 
     (void)at;
 
     if (row->stamp54
-            > *(const uint32_t *)(r + SEQ_OFF_LIFE))
+            > (uint32_t)r->life)
         return SeqRetire(ctx, rec);
 
-    if (*(const uint32_t *)(r + SEQ_OFF_GATE) > 0x12Cu) {
+    if (r->gate > 0x12Cu) {
         AM2_Point pt = row->pos;
         int32_t   variant = orig_seq_rand() % 3;
         int32_t   skip = 0;
@@ -3031,11 +3030,11 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
         pt.x = (int16_t)(pt.x + ((orig_seq_rand() % 16) - 8) * variant);
 
         SeqAddKind6(&pt, variant);
-        *(int32_t *)(r + SEQ_OFF_FIELD_0C) += 1;
+        r->field0C += 1;
 
         if (g_mpSession != 0
             && !AM2_THE_COMM->CommMustBroadcast(
-                    (int16_t)UidArmy(*(const uint32_t *)(r + SEQ_OFF_OWNER))))
+                    (int16_t)UidArmy(r->owner)))
             skip = 1;
 
         if (!skip) {
@@ -3052,25 +3051,25 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
             while (obj != 0) {
                 if (ObjIsTypeIn238((const AM2_Object *)obj))
                     DamageObject((AM2_Object *)obj, 1, 1,
-                                 *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
-                else if (*(const int32_t *)(r + SEQ_OFF_FIELD_0C) > 9)
+                                 r->owner, 0, 0);
+                else if (r->field0C > 9)
                     DamageObject((AM2_Object *)obj, 0x0F, 1,
-                                 *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
+                                 r->owner, 0, 0);
                 obj = *(uint8_t **)(obj + 0x68u);
             }
         }
 
-        *(int32_t *)(r + SEQ_OFF_GATE) -= 0x12C;
-        if (*(const int32_t *)(r + SEQ_OFF_FIELD_0C) > 9)
-            *(int32_t *)(r + SEQ_OFF_FIELD_0C) = 0;
+        r->gate -= 0x12C;
+        if (r->field0C > 9)
+            r->field0C = 0;
     }
 
     row->stamp54 +=
         *(const uint32_t *)&g_frameDeltaMs;
-    *(int32_t *)(r + SEQ_OFF_GATE) +=
+    r->gate +=
         g_frameDeltaMs;
 
-    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+    return r->next;
 }
 
 /* SeqStepKind0 -- original 0x00461150, the last of the seven steppers. A
@@ -3104,25 +3103,25 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
  * base SpawnParticle appeared to use -- so that function's "field +0" is
  * really field +4, and the record is {count, sprites, dx, dz, ...}. The
  * comment there flagged this as undecided; a second toucher decided it. */
-int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
+int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 {
     AM2_Point pt;
     /* The particle kind's record is re-indexed, and the fields re-read, at
      * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
 #define KIND  ((g_particleKinds) \
-               [*(const int32_t *)(r + SEQ_OFF_FLAG4)])
-#define LIFE  (*(int32_t *)(r + SEQ_OFF_LIFE))
+               [r->param])
+#define LIFE  (r->life)
 #define STAMP (row->stamp54)
 #define PHASE (row->cell)
 #define Z     (row->yAdjust)
-    uint8_t *r   = (uint8_t *)rec;
-    AM2_MapRow *row = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+    AM2_Seq *r   = rec;
+    AM2_MapRow *row = r->row;
 
     (void)at;
 
     STAMP += *(const uint32_t *)&g_frameDeltaMs;
 
-    if (STAMP > *(const uint32_t *)(r + SEQ_OFF_GATE)) {
+    if (STAMP > r->gate) {
         int32_t   tile;
         char      ground;
 
@@ -3133,9 +3132,9 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         }
 
         row->pos.x +=
-            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
+            (int16_t)r->field0C;
         row->pos.y +=
-            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
+            (int16_t)r->field10;
         Z += (int16_t)LIFE;
 
         /* The bounds test is on the DRAWN point -- the row's position with
@@ -3149,8 +3148,8 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
         tile = TileOfPoint(row->pos) & 0xFFFF;
         ground = (*(const char *const *)&g_tileAttrs)[tile];
 
-        if (Z + *(const int32_t *)(r + 0x18u) <= ground) {
-            Z = (int16_t)((int16_t)ground - *(const int16_t *)(r + 0x18u));
+        if (Z + r->height <= ground) {
+            Z = (int16_t)((int16_t)ground - (int16_t)r->height);
 
             if ((g_tileFlags)[tile] & 1) {
                 CreateExplosion(row->pos.x,
@@ -3164,7 +3163,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
                 STAMP = 0;
             } else {
                 /* The row is read again for the copy. */
-                AM2_MapRow *old  = (AM2_MapRow *)*(uint8_t **)(r + SEQ_OFF_ROW);
+                AM2_MapRow *old  = r->row;
                 AM2_MapRow *rest = (AM2_MapRow *)*(uint8_t **)RowPoolAAlloc();
 
                 *(int32_t *)rest = 1;
@@ -3186,7 +3185,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
     }
 
     RowUpdate(row, 0, g_mapDesc);
-    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+    return r->next;
 #undef KIND
 #undef LIFE
 #undef STAMP

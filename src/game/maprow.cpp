@@ -586,11 +586,6 @@ static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
  * slots above their capacity; a context carries none, and its margin is
  * subtracted from the eviction threshold instead. Writing this from the
  * hardcoded version's outline would overrun the array. */
-static inline uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
-{
-    return *(uint8_t **)(uintptr_t)(ctx + SEQ_CTX_OFF_RECORDS)
-           + (int32_t)(i * AM2_SEQ_RECORD_SIZE);
-}
 
 
 
@@ -1747,33 +1742,32 @@ void *__cdecl RowPoolBAlloc(void)
  *
  * The loop runs to CAPACITY, which espmap settles: the bound at 0x00460E15
  * and `capacity` at 0x00460D9B read the same frame slot. */
-void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
+void __cdecl SeqCtxInit(AM2_SeqCtx *ctxv, int32_t capacity, int32_t margin,
                         int32_t w, int32_t h)
 {
-    uint8_t *ctx = (uint8_t *)ctxv;
+    AM2_SeqCtx *ctx = ctxv;
     int32_t  i;
-    uint8_t *row;
+    AM2_MapRow *row;
 
-    *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = capacity;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN) = margin;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = 0;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = 0;
-    *(void **)(ctx + SEQ_CTX_OFF_RECORDS) =
+    ctx->capacity = capacity;
+    ctx->margin = margin;
+    ctx->tail = 0;
+    ctx->count = 0;
+    ctx->records = (AM2_Seq *)
         am2_malloc((size_t)(capacity * AM2_SEQ_RECORD_SIZE));
 
     /* The record is re-indexed and its row re-read at every use. */
-#define REC ((uint32_t)i * AM2_SEQ_RECORD_SIZE \
-             + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
-#define ROW (*(uint8_t **)(REC + SEQ_OFF_ROW))
+#define REC (&ctx->records[i])
+#define ROW (REC->row)
     for (i = 0; i < capacity; i++) {
-        *(int16_t *)(REC + SEQ_OFF_ID) = (int16_t)i;
-        *(int16_t *)(REC + SEQ_OFF_NEXT) = -1;
-        *(int16_t *)(REC + SEQ_OFF_PREV) = -1;
+        REC->id = (int16_t)i;
+        REC->next = -1;
+        REC->prev = -1;
 
-        ROW = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        ROW = (AM2_MapRow *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         row = ROW;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(w, h, (AM2_MapRow *)row, g_mapDesc);
+        RowAlloc(w, h, row, g_mapDesc);
     }
 #undef REC
 #undef ROW
@@ -1796,32 +1790,31 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
  * which a pointer tie-break downstream then resolved the other way. Found by
  * diffing AM2_TRACE_HEAP: the original's `am2_free([esi+0x10])` at 0x460e9f had
  * no counterpart here. */
-void __cdecl SeqCtxFree(void *ctxv)
+void __cdecl SeqCtxFree(AM2_SeqCtx *ctxv)
 {
-    uint8_t *ctx = (uint8_t *)ctxv;
+    AM2_SeqCtx *ctx = ctxv;
     int32_t  i;
 
     /* The record is re-indexed and its row re-read at every use. */
-#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
-                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
-#define ROW(n) (*(void **)(REC(n) + SEQ_OFF_ROW))
-    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) != 0) {
-        for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
+#define REC(n) (&ctx->records[n])
+#define ROW(n) (REC(n)->row)
+    if (ctx->records != 0) {
+        for (i = 0; i < ctx->capacity; i++) {
             if (ROW(i) != 0) {
-                RowRelease((AM2_MapRow *)ROW(i), g_mapDesc);
+                RowRelease(ROW(i), g_mapDesc);
                 am2_free(ROW(i));
                 ROW(i) = 0;
             }
-            *(int16_t *)(REC(i) + SEQ_OFF_NEXT) = -1;
-            *(int16_t *)(REC(i) + SEQ_OFF_PREV) = -1;
+            REC(i)->next = -1;
+            REC(i)->prev = -1;
         }
 
-        am2_free(*(void **)(ctx + SEQ_CTX_OFF_RECORDS));
-        *(void **)(ctx + SEQ_CTX_OFF_RECORDS)  = 0;
-        *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL)     = 0;
-        *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT)    = 0;
-        *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN)   = 0;
-        *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = 0;
+        am2_free(ctx->records);
+        ctx->records  = 0;
+        ctx->tail     = 0;
+        ctx->count    = 0;
+        ctx->margin   = 0;
+        ctx->capacity = 0;
     }
 #undef REC
 #undef ROW
@@ -1835,25 +1828,24 @@ void __cdecl SeqCtxFree(void *ctxv)
  * Same four roles as the hardcoded release: clear the row's bit 0 and
  * RowUpdate, unlink both ways, compact by swapping the last record into the
  * hole, and answer the next index corrected for that swap. */
-int32_t __cdecl SeqRetire(void *ctxv, void *recv)
+int32_t __cdecl SeqRetire(AM2_SeqCtx *ctxv, AM2_Seq *recv)
 {
-    uint8_t *ctx = (uint8_t *)ctxv;
-    uint8_t *rec = (uint8_t *)recv;
-    void    *row = *(void **)(rec + SEQ_OFF_ROW);
+    AM2_SeqCtx *ctx = ctxv;
+    AM2_Seq    *rec = recv;
+    AM2_MapRow *row = rec->row;
     int32_t  next;
-    uint8_t *last;
+    AM2_Seq    *last;
 
     /* The records are re-indexed, and the links re-read, at every use. */
-#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
-                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
-#define ID(p)   (*(int16_t *)((p) + SEQ_OFF_ID))
-#define NEXT(p) (*(int16_t *)((p) + SEQ_OFF_NEXT))
-#define PREV(p) (*(int16_t *)((p) + SEQ_OFF_PREV))
-#define TAIL    (*(int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
-#define COUNT   (*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT))
-    if ((*(uint32_t *)row & 1) != 0) {
-        *(uint32_t *)row &= ~1u;
-        RowUpdate((AM2_MapRow *)row, 0, g_mapDesc);
+#define REC(n) (&ctx->records[n])
+#define ID(p)   ((p)->id)
+#define NEXT(p) ((p)->next)
+#define PREV(p) ((p)->prev)
+#define TAIL    (ctx->tail)
+#define COUNT   (ctx->count)
+    if ((row->flags & 1) != 0) {
+        row->flags &= ~1u;
+        RowUpdate(row, 0, g_mapDesc);
     }
 
     next = NEXT(rec);
@@ -1875,7 +1867,7 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
             next = freed;
 
         memcpy(rec, last, AM2_SEQ_RECORD_SIZE);
-        *(void **)(last + SEQ_OFF_ROW) = row;
+        last->row = row;
         ID(rec) = (int16_t)freed;
         if (TAIL == COUNT)
             TAIL = freed;
@@ -1896,10 +1888,10 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
 
 /* 0x00460FD0. Same two loops as the hardcoded evictor -- drop what the view
  * no longer meets, then drop from the head regardless if that freed too few. */
-void __cdecl SeqEvict(void *ctxv)
+void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
 {
-#define ctx ((uint8_t *)ctxv)
-    int32_t  left = *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN);
+#define ctx (ctxv)
+    int32_t  left = ctx->margin;
     int32_t  i;
 
     /* IT RE-TESTS THE THRESHOLD SeqAlloc ALREADY TESTED, and that is the only
@@ -1911,34 +1903,31 @@ void __cdecl SeqEvict(void *ctxv)
      * It was written from the hardcoded evictor's shape from memory, two
      * commits after recording that these five are a REWRITE and that nothing
      * carries over but the outline. Verified against 0x00460FD3 now. */
-    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT)
-        <= *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY)
-           - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
+    if (ctx->count
+        <= ctx->capacity
+           - ctx->margin)
         return;
 
     /* The record is addressed afresh at each use, and the walk is a
      * do-while: the head's first link is taken without a test. */
-#define RECB(n) (*(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS) \
-                 + (uint32_t)(n) * AM2_SEQ_RECORD_SIZE)
-#define RECO(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
-                 + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
-    i = *(int16_t *)(RECB(0) + SEQ_OFF_NEXT);
+#define RECB(n) (&ctx->records[n])
+#define RECO(n) (&ctx->records[n])
+    i = RECB(0)->next;
     do {
         uint8_t scratch[16];
 
         if (!orig_intersect_rect(scratch,
                                  (const void *)&g_viewX,
-                                 *(uint8_t **)(RECB(i) + SEQ_OFF_ROW)
-                                     + ROW_OFF_RECT)) {
+                                 &RECB(i)->row->rect)) {
             i = SeqRetire(ctx, RECB(i));
             if (--left <= 0)
                 break;
         } else {
-            i = *(int16_t *)(RECB(i) + SEQ_OFF_NEXT);
+            i = RECB(i)->next;
         }
     } while (i > 0);
 
-    i = *(int16_t *)(RECB(0) + SEQ_OFF_NEXT);
+    i = RECB(0)->next;
     while (left > 0) {
         i = SeqRetire(ctx, RECO(i));
         left--;
@@ -1953,28 +1942,26 @@ void __cdecl SeqEvict(void *ctxv)
  * shape's slack: subtracted from the threshold, where the hardcoded pools add
  * it to the array as spare slots. Writing this from their outline would run
  * the array off its end. */
-void *__cdecl SeqAlloc(void *ctxv)
+AM2_Seq *__cdecl SeqAlloc(AM2_SeqCtx *ctxv)
 {
-    uint8_t *ctx = (uint8_t *)ctxv;
+    AM2_SeqCtx *ctx = ctxv;
     int32_t  i;
 
-    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT)
-        > *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY)
-          - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
+    if (ctx->count
+        > ctx->capacity
+          - ctx->margin)
         SeqEvict(ctx);
 
-    i = ++*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT);
+    i = ++ctx->count;
 
     /* Each record is re-indexed from the records base at every use. */
-#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
-                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
-    *(int16_t *)(REC(i) + SEQ_OFF_ID) = (int16_t)i;
-    *(int16_t *)(REC(i) + SEQ_OFF_PREV) =
-        (int16_t)*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL);
-    *(int16_t *)(REC(i) + SEQ_OFF_NEXT) = -1;
-    *(int16_t *)(REC(*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
-                 + SEQ_OFF_NEXT) = (int16_t)i;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = i;
+#define REC(n) (&ctx->records[n])
+    REC(i)->id = (int16_t)i;
+    REC(i)->prev =
+        (int16_t)ctx->tail;
+    REC(i)->next = -1;
+    REC(ctx->tail)->next = (int16_t)i;
+    ctx->tail = i;
 
     return REC(i);
 #undef REC
@@ -2110,7 +2097,7 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
                            int32_t kind, int32_t speed, int32_t height,
                            int32_t angle)
 {
-    uint8_t       *ctx;
+    AM2_Seq       *ctx;
     /* The kind's record, indexed in place. */
 #define KIND ((g_particleKinds)[kind])
     int32_t        half;
@@ -2120,35 +2107,35 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
                      at))
         return;
 
-    ctx = (uint8_t *)SeqAlloc(g_seqCtxA);
+    ctx = SeqAlloc(g_seqCtxA);
 
     /* The row is read through the record at every use. */
-#define ROW (*(AM2_MapRow **)(ctx + 0x1C))
-    *(int32_t *)ctx       = 0;
-    *(int32_t *)(ctx + 4) = kind;
+#define ROW (ctx->row)
+    ctx->kind       = 0;
+    ctx->param = kind;
     ROW->cell = 0;
     ROW->stamp54 = 0;
 
     half = speed >> 1;
     if (angle < 0) {
-        *(int32_t *)(ctx + 0x0C) = (orig_game_rand() % speed) - half;
-        *(int32_t *)(ctx + 0x10) = (orig_game_rand() % speed) - half;
+        ctx->field0C = (orig_game_rand() % speed) - half;
+        ctx->field10 = (orig_game_rand() % speed) - half;
     } else {
         /* The speed as a float, once. */
         float f = (float)speed;
 
-        *(int32_t *)(ctx + 0x0C) = (int32_t)(Cos8(angle) * f);
-        *(int32_t *)(ctx + 0x10) = (int32_t)(Sin8(angle) * f);
+        ctx->field0C = (int32_t)(Cos8(angle) * f);
+        ctx->field10 = (int32_t)(Sin8(angle) * f);
     }
 
-    *(int32_t *)(ctx + 0x14) = (orig_game_rand() % half) + half;
+    ctx->life = (orig_game_rand() % half) + half;
     {
         int32_t r = orig_game_rand() % 0x4B;
 
-        *(int32_t *)(ctx + 0x18) = height;
-        *(int32_t *)(ctx + 8)    = r + 0x19;
+        ctx->height = height;
+        ctx->gate    = r + 0x19;
     }
-    *(int32_t *)(ctx + 0x24) = 0;
+    ctx->owner = 0;
 
 
     /* The row read once more, for the rest. */
@@ -2350,25 +2337,25 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
 {
     /* The group's record, indexed afresh at each use as the image does. */
 #define GRP (g_spriteGroupsC[group])
-    uint8_t *ctx = (uint8_t *)SeqAlloc(g_seqCtxB);
+    AM2_Seq *ctx = SeqAlloc(g_seqCtxB);
     int32_t  step;
     int32_t  frame;
     AM2_MapRow *row;
 
-    *(uint8_t *)(ctx + 4)     = (uint8_t)group;
-    *(uint32_t *)(ctx + 0x24) = ownerUid;
-    *(int32_t *)ctx           = 2;
-    *(int32_t *)(ctx + 0x0C)  = 0;
-    *(int32_t *)(ctx + 0x10)  = 0;
+    ctx->flag4     = (uint8_t)group;
+    ctx->owner = ownerUid;
+    ctx->kind           = 2;
+    ctx->field0C  = 0;
+    ctx->field10  = 0;
 
     step  = 0x100 / GRP.count;
     frame = ((step >> 1) + angle) / step;
     if (frame >= GRP.count)
         frame -= GRP.count;
-    *(int32_t *)(ctx + 0x14) = frame;
-    *(int32_t *)(ctx + 8)    = GRP.field8;
+    ctx->life = frame;
+    ctx->gate    = GRP.field8;
 
-    row = *(AM2_MapRow **)(ctx + 0x1C);
+    row = ctx->row;
     row->cell  = 0;
     row->stamp54 = 0;
     row->flags           = 1;

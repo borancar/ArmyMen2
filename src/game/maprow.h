@@ -187,22 +187,60 @@ void *__cdecl RowPoolAAlloc(void);
 /* 0x00460D30. The same for pool B. */
 void *__cdecl RowPoolBAlloc(void);
 
+/* A seq: one 48-byte effect record (AM2_SEQ_RECORD_SIZE), linked into its
+ * context's list by index. Records are ONE-BASED; entry 0 is the list head.
+ * The fields are named in orig.h's SEQ_OFF_* notes. */
+typedef struct AM2_Seq {
+    uint32_t    kind;            /* +0x00 SEQ_OFF_KIND, an 8-arm jump table */
+    union {                      /* +0x04 */
+        uint8_t flag4;           /*   SEQ_OFF_FLAG4, zeroed by kinds 5 and 7 */
+        int32_t param;           /*   the particle kind, read as a dword */
+    };
+    uint32_t    gate;            /* +0x08 SEQ_OFF_GATE, milliseconds */
+    int32_t     field0C;         /* +0x0C SEQ_OFF_FIELD_0C */
+    int32_t     field10;         /* +0x10 SEQ_OFF_FIELD_10 */
+    int32_t     life;            /* +0x14 SEQ_OFF_LIFE, signed: kind 0 tests < -4 */
+    int32_t     height;          /* +0x18 a particle's floor offset, SpawnParticle's */
+    AM2_MapRow *row;             /* +0x1C SEQ_OFF_ROW, the row it draws through */
+    int32_t     field20;         /* +0x20 */
+    uint32_t    owner;           /* +0x24 SEQ_OFF_OWNER: an army or a uid */
+    int16_t     id;              /* +0x28 SEQ_OFF_ID */
+    int16_t     prev;            /* +0x2A SEQ_OFF_PREV, -1 terminating */
+    int16_t     next;            /* +0x2C SEQ_OFF_NEXT */
+    uint8_t     _pad2E[2];       /* +0x2E */
+} AM2_Seq;
+
+/* A SEQ context: the generic pool SeqAlloc draws from. */
+typedef struct AM2_SeqCtx {
+    int32_t     count;           /* +0x00 SEQ_CTX_OFF_COUNT */
+    int32_t     tail;            /* +0x04 SEQ_CTX_OFF_TAIL */
+    int32_t     capacity;        /* +0x08 SEQ_CTX_OFF_CAPACITY */
+    int32_t     margin;          /* +0x0C SEQ_CTX_OFF_MARGIN */
+    AM2_Seq    *records;         /* +0x10 SEQ_CTX_OFF_RECORDS */
+} AM2_SeqCtx;
+#if defined(__cplusplus) && !defined(_MSC_VER)
+static_assert(sizeof(AM2_Seq) == AM2_SEQ_RECORD_SIZE, "seq record");
+static_assert(offsetof(AM2_Seq, row)  == SEQ_OFF_ROW,  "seq row");
+static_assert(offsetof(AM2_Seq, next) == SEQ_OFF_NEXT, "seq next");
+static_assert(offsetof(AM2_SeqCtx, records) == SEQ_CTX_OFF_RECORDS, "seq records");
+#endif
+
 /* 0x00460D90. Initialise a SEQ context: capacity records of 48 bytes, each
  * owning a 0x60-byte row registered at w x h. FIVE arguments -- read off the
  * call site, not the body. */
-void __cdecl SeqCtxInit(void *ctx, int32_t capacity, int32_t margin,
+void __cdecl SeqCtxInit(AM2_SeqCtx *ctx, int32_t capacity, int32_t margin,
                         int32_t w, int32_t h);
 /* 0x00460E30. Free every record's row; harmless on an unallocated context. */
-void __cdecl SeqCtxFree(void *ctx);
+void __cdecl SeqCtxFree(AM2_SeqCtx *ctx);
 /* 0x00460EC0. Release a record. CONTEXT FIRST. Answers the next index,
  * corrected for the compaction; only the evictor uses the answer. */
-int32_t __cdecl SeqRetire(void *ctx, void *rec);
+int32_t __cdecl SeqRetire(AM2_SeqCtx *ctx, AM2_Seq *rec);
 /* 0x00460FD0. Drop off-screen records, then drop from the head regardless. */
-void __cdecl SeqEvict(void *ctx);
+void __cdecl SeqEvict(AM2_SeqCtx *ctx);
 /* 0x00461070. Take a record, evicting first when count exceeds
  * capacity MINUS margin -- not capacity, which is what the hardcoded
  * allocators test. Always returns a record. */
-void *__cdecl SeqAlloc(void *ctx);
+AM2_Seq *__cdecl SeqAlloc(AM2_SeqCtx *ctx);
 
 /* 0x004600F0. May this weapon kind respawn? Permissive on three of four
  * paths; the refusing one needs a multiplayer session and cannot run here. */

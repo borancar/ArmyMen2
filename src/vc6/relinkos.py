@@ -103,9 +103,10 @@ def _aggregated(va):
 # vehicle's last-sent fields bring back the 0x00515FD8 block; the typed
 # object and tile masks settle on the 0x004F96C0 block alone; the typed
 # record lists and row sets settle it with none kept; the typed army
-# object lists settle on the 0x004FC8C8 block alone.
+# object lists settle on the 0x004FC8C8 block alone; the typed seq
+# records settle it with none kept.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004FC8C8, 0x004FC994),)
+KEEP_DECLS = ()
 
 
 def _kept(va):
