@@ -74,6 +74,28 @@ typedef struct AM2_Sprite {
                                   *        in the failure message. */
 } AM2_Sprite;
 
+/* One entry of a sprite set's directory: the key, and where in the archive
+ * that sprite starts. Sorted by key. */
+typedef struct AM2_SpriteDirEntry {
+    uint32_t key;
+    uint32_t offset;
+} AM2_SpriteDirEntry;
+
+/* One of the three packed sprite archives (title, shared, the map's own):
+ * the names it is opened from, the open file, its directory, and the
+ * palette it was loaded with with the two remap tables built from it. The
+ * second remap keeps entries 0..9 as the identity. 0x80C bytes. */
+typedef struct AM2_SpriteSet {
+    char                folder[0x100]; /* +0x000 SPRITE_SET_OFF_FOLDER */
+    char                name[0x100];   /* +0x100 SPRITE_SET_OFF_NAME */
+    struct am2_FILE    *file;          /* +0x200 SPRITE_SET_OFF_FILE */
+    int32_t             dirCount;      /* +0x204 SPRITE_SET_OFF_DIR_COUNT */
+    AM2_SpriteDirEntry *dir;           /* +0x208 SPRITE_SET_OFF_DIR */
+    uint32_t            palette[256];  /* +0x20C SPRITE_SET_OFF_PALETTE */
+    uint8_t             remap[256];    /* +0x60C SPRITE_SET_OFF_REMAP */
+    uint8_t             remap10[256];  /* +0x70C SPRITE_SET_OFF_REMAP10 */
+} AM2_SpriteSet;
+
 /* One record of ADDR_SPRITE_GROUPS_C: a count and the sprites loaded for
  * it, AM2_SPRITEGRP_C_BYTES apart. */
 typedef struct AM2_SpriteGroupC {

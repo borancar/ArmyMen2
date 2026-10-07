@@ -470,8 +470,8 @@ extern "C" void *__cdecl LoadDibFlipped(const char *path, void *hdr,
  * reason script.cpp forward-declares PreloadSprite.
  *
  * C++ linkage, matching sprite.h (which has no extern "C" block). */
-void *__cdecl SpriteSetForKey(uint32_t key);
-int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
+struct AM2_SpriteSet *__cdecl SpriteSetForKey(uint32_t key);
+int32_t __cdecl SpriteDirIndex(const struct AM2_SpriteSet *set, uint32_t key);
 #define orig_fread_m (*(am2_fread_fn)((void *)(uintptr_t)(ADDR_FREAD)))
 #define orig_fseek_m (*(am2_fseek_fn)((void *)(uintptr_t)(ADDR_FSEEK)))
 #define orig_log_m   (*(am2_log_fn)((void *)(uintptr_t)(ADDR_LOG)))
@@ -509,7 +509,7 @@ int32_t __cdecl LoadMaskPacked(AM2_ObjMask *out, int32_t set, int32_t index,
                                int32_t frame)
 {
     AM2_ObjMask *rec = out;
-    uint8_t *ss;
+    struct AM2_SpriteSet *ss;
     uint32_t key;
     uint32_t got;
     int32_t  dir;
@@ -519,7 +519,7 @@ int32_t __cdecl LoadMaskPacked(AM2_ObjMask *out, int32_t set, int32_t index,
     rec->bits = (uint8_t *)0;
 
     key = (uint32_t)PackKey(set, index, frame);
-    ss  = (uint8_t *)SpriteSetForKey(key);
+    ss  = SpriteSetForKey(key);
     if (!ss)
         return 0;
 
@@ -528,13 +528,11 @@ int32_t __cdecl LoadMaskPacked(AM2_ObjMask *out, int32_t set, int32_t index,
         return 0;
 
     /* The file is re-read from the sprite set at every call. */
-#define fp (*(am2_FILE **)(ss + SPRITE_SET_OFF_FILE))
+#define fp (ss->file)
 
-    if (orig_fseek_m(fp, ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
-                       [dir * 2 + 1], 0) != 0) {
+    if (orig_fseek_m(fp, (int32_t)ss->dir[dir].offset, 0) != 0) {
         orig_log_m("Error seeking to location %d in data file.\n",
-                 ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
-                     [dir * 2 + 1]);
+                 (int32_t)ss->dir[dir].offset);
         goto fail;
     }
 

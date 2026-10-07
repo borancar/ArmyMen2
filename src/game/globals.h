@@ -758,9 +758,9 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_spriteRegCount         (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT)  /* 0x006598C0 */
 #define g_spriteRegPairs         (*(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS)  /* 0x006598C8 */
 #define g_spriteSetDirs          ((char **)(uintptr_t)ADDR_SPRITE_SET_DIRS)  /* 0x00489554 */
-#define g_spriteSetShared        ((void *)(uintptr_t)ADDR_SPRITE_SET_SHARED)  /* 0x00510230 */
-#define g_spriteSetThird         ((void *)(uintptr_t)ADDR_SPRITE_SET_THIRD)  /* 0x00511250 */
-#define g_spriteSetTitle         ((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE)  /* 0x00510A40 */
+#define g_spriteSetShared        ((struct AM2_SpriteSet *)(uintptr_t)ADDR_SPRITE_SET_SHARED)  /* 0x00510230 */
+#define g_spriteSetThird         ((struct AM2_SpriteSet *)(uintptr_t)ADDR_SPRITE_SET_THIRD)  /* 0x00511250 */
+#define g_spriteSetTitle         ((struct AM2_SpriteSet *)(uintptr_t)ADDR_SPRITE_SET_TITLE)  /* 0x00510A40 */
 #define g_spriteTable            (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)  /* 0x006598C4 */
 #define g_startupColours         ((uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS)  /* 0x00512340 */
 #define g_startupColoursB        ((uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS_B)  /* 0x006645A4 */

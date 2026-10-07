@@ -1039,10 +1039,9 @@ int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
  * The key is the sprite id, and that is what identifies PackKey's three fields
  * as {set, index, frame}. See packkey.h.
  */
-#define SET_FILE(s)  (*(am2_FILE **)((uint8_t *)(s) + SPRITE_SET_OFF_FILE))
-#define SET_DIR(s)   (*(AM2_SpriteDirEntry **)((uint8_t *)(s) + \
-                                               SPRITE_SET_OFF_DIR))
-#define SET_COUNT(s) (*(int32_t *)((uint8_t *)(s) + SPRITE_SET_OFF_DIR_COUNT))
+#define SET_FILE(s)  ((s)->file)
+#define SET_DIR(s)   ((s)->dir)
+#define SET_COUNT(s) ((s)->dirCount)
 
 /* 0x00423940. Which of the three sets holds a key.
  *
@@ -1050,16 +1049,16 @@ int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
  * else -- 0, and 10..19 -- the shared one. The same bands ADDR_SPRITE_SET_DIRS
  * splits on: one directory name per set on the loose side, one open archive
  * per BAND on this one. */
-void *__cdecl SpriteSetForKey(uint32_t key)
+AM2_SpriteSet *__cdecl SpriteSetForKey(uint32_t key)
 {
     int32_t set = (int32_t)KeyFieldA(key);
 
     if (set < 20) {
         if (set >= 1 && set <= 9)
-            return (void *)(g_spriteSetTitle);
-        return (void *)(g_spriteSetShared);
+            return g_spriteSetTitle;
+        return g_spriteSetShared;
     }
-    return (void *)(g_spriteSetThird);
+    return g_spriteSetThird;
 }
 
 /* 0x00423D50. The directory index for a key, or -1.
@@ -1069,7 +1068,7 @@ void *__cdecl SpriteSetForKey(uint32_t key)
  * holding the same kind of id, disagreeing about it. Reproduced: a key with
  * bit 31 set would be searched differently by the two, and PackKey only
  * produces 26 bits, so nothing can tell them apart. */
-int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
+int32_t __cdecl SpriteDirIndex(const AM2_SpriteSet *set, uint32_t key)
 {
     int32_t lo = 0;
     int32_t hi = SET_COUNT(set);
@@ -1090,8 +1089,8 @@ int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
     return -1;
 }
 
-#define SET_FOLDER(s) ((char *)((uint8_t *)(s) + SPRITE_SET_OFF_FOLDER))
-#define SET_NAME(s)   ((char *)((uint8_t *)(s) + SPRITE_SET_OFF_NAME))
+#define SET_FOLDER(s) ((s)->folder)
+#define SET_NAME(s)   ((s)->name)
 
 /* 0x004236A0. Which record a set name means, and what its archive must be.
  *
@@ -1110,13 +1109,13 @@ int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
  * The fixed arms also clear the folder, which is how their archives end up
  * being opened from the game root rather than from wherever the last map
  * left the current directory. */
-int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
+int32_t __cdecl SpriteSetResolve(const char *name, AM2_SpriteSet **set, uint32_t *id)
 {
     char folder[0x40];
     char file[0x40];
 
     if (strcmp(name, "title") == 0) {
-        void *rec = g_spriteSetTitle;
+        AM2_SpriteSet *rec = g_spriteSetTitle;
 
         *set = rec;
         *id  = AM2_DAT_ID_TITLE;
@@ -1129,7 +1128,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     if (strcmp(name, "shared") == 0) {
-        void *rec = g_spriteSetShared;
+        AM2_SpriteSet *rec = g_spriteSetShared;
 
         *set = rec;
         *id  = AM2_DAT_ID_SHARED;
@@ -1142,7 +1141,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     {
-        void *rec = g_spriteSetThird;
+        AM2_SpriteSet *rec = g_spriteSetThird;
 
         *set = rec;
         *id  = AM2_DAT_ID_OBJECTS;
@@ -1167,7 +1166,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
  * shutdown. And it clears four bytes at the front of the FOLDER rather than
  * one, which is a dword store where a terminator would have done; kept as a
  * dword so the record compares byte for byte. */
-void __cdecl SpriteSetFree(void *set)
+void __cdecl SpriteSetFree(AM2_SpriteSet *set)
 {
     am2_FILE *fp = SET_FILE(set);
 
@@ -1177,7 +1176,9 @@ void __cdecl SpriteSetFree(void *set)
     orig_fclose(fp);
     if (SET_DIR(set))
         orig_free(SET_DIR(set));
-    *(uint32_t *)set = 0;
+    /* A DWORD store over the folder's first four bytes, as the image has
+     * it -- not a byte, not the name. */
+    *(uint32_t *)set->folder = 0;
 }
 
 /* 0x004239B0. Open a set's archive and read everything but the sprites.
@@ -1199,7 +1200,7 @@ void __cdecl SpriteSetFree(void *set)
  * cannot be observed either. Also reproduced. */
 int32_t __cdecl SpriteSetLoad(const char *name)
 {
-    uint8_t  *set;
+    AM2_SpriteSet *set;
     uint32_t  want;
     uint32_t  id = 0;
     char      file[0x100];
@@ -1207,7 +1208,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
 
     SetGameDir(g_dirScratch);
 
-    if (SpriteSetResolve(name, (void **)&set, &want))
+    if (SpriteSetResolve(name, &set, &want))
         return SET_FILE(set) != 0;
 
     SetGameDir(SET_FOLDER(set));
@@ -1232,11 +1233,11 @@ int32_t __cdecl SpriteSetLoad(const char *name)
         return 0;
     }
 
-    orig_fread(set + SPRITE_SET_OFF_PALETTE, 4, 0x100, fp);
+    orig_fread(set->palette, 4, 0x100, fp);
 
     {
-#define pal ((const uint32_t *)(set + SPRITE_SET_OFF_PALETTE))
-#define remap (set + SPRITE_SET_OFF_REMAP)
+#define pal (set->palette)
+#define remap (set->remap)
 #define display (g_activePalette)
 
         if (display) {
@@ -1256,12 +1257,12 @@ int32_t __cdecl SpriteSetLoad(const char *name)
         }
 
         for (i = 0; i < AM2_PALETTE_RESERVED; i++)
-            set[SPRITE_SET_OFF_REMAP10 + i] = (uint8_t)i;
+            set->remap10[i] = (uint8_t)i;
         for (i = AM2_PALETTE_RESERVED; i < 256; i++)
-            set[SPRITE_SET_OFF_REMAP10 + i] = remap[i];
+            set->remap10[i] = remap[i];
     }
 
-    orig_fread(set + SPRITE_SET_OFF_DIR_COUNT, 4, 1, fp);
+    orig_fread(&set->dirCount, 4, 1, fp);
 #define count SET_COUNT(set)
     if (count > 0) {
         SET_DIR(set) = (AM2_SpriteDirEntry *)
@@ -1317,7 +1318,7 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
                                        int32_t index, int32_t frame,
                                        int32_t flags)
 {
-    uint8_t  *sset;
+    AM2_SpriteSet *sset;
     uint32_t  key;
     int32_t   slot;
     int32_t   got;
@@ -1328,7 +1329,7 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     spr->overlay     = 0;
 
     key  = PackKey((uint32_t)set, (uint32_t)index, (uint32_t)frame);
-    sset = (uint8_t *)SpriteSetForKey(key);
+    sset = SpriteSetForKey(key);
     if (!sset)
         return 0;
 
@@ -1397,18 +1398,18 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
             spr->image.surface =
                 CreateBitmapSurface(fp, (uint32_t)value, spr->bounds.right,
                                     spr->bounds.bottom,
-                                    sset + SPRITE_SET_OFF_REMAP,
+                                    sset->remap,
                                     (uint32_t)flags);
         } else {
             spr->image.rle16 = (AM2_Rle16 *)orig_malloc((size_t)value);
             orig_fread(spr->image.rle16, (size_t)value, 1, fp);
             if (spr->format == 3)
                 RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)value, 3,
-                             sset + SPRITE_SET_OFF_REMAP10);
+                             sset->remap10);
             else
                 RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)value,
                              (int32_t)spr->format,
-                             sset + SPRITE_SET_OFF_REMAP);
+                             sset->remap);
         }
     }
 
@@ -1496,7 +1497,7 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
  * and the response is to free both blocks and zero them. Reproduced. */
 int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
 {
-    uint8_t  *sset;
+    AM2_SpriteSet *sset;
     int32_t   slot;
     int32_t   value;
     /* The header is read and thrown away into two scratch words -- the
@@ -1511,7 +1512,7 @@ int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
                                       (int32_t)KeyFieldC(spr->id), flags);
 
     /* Nested onto the one `return 0` the image shares. */
-    sset = (uint8_t *)SpriteSetForKey(spr->id);
+    sset = SpriteSetForKey(spr->id);
     if (sset) {
         slot = SpriteDirIndex(sset, spr->id);
         if (slot >= 0) {
@@ -1552,7 +1553,7 @@ read:
                                (uint32_t)len,
                                spr->bounds.right,
                                spr->bounds.bottom,
-                               sset + SPRITE_SET_OFF_REMAP,
+                               sset->remap,
                                (uint32_t)flags);
 }
 

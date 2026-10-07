@@ -35,15 +35,9 @@ void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id);
 int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
                                  int32_t frame, int32_t flags);
 
-/* One entry of a sprite set's directory: the key, and where in the archive
- * that sprite starts. Sorted by key. */
-typedef struct {
-    uint32_t key;
-    uint32_t offset;
-} AM2_SpriteDirEntry;
-
+/* AM2_SpriteDirEntry and AM2_SpriteSet are in spritetype.h. */
 /* 0x00423940. Which of the three sets holds a key. */
-void *__cdecl SpriteSetForKey(uint32_t key);
+AM2_SpriteSet *__cdecl SpriteSetForKey(uint32_t key);
 
 /* 0x004230F0. Fill a 0x1C-byte bitmap record from a file NAME: open it, read
  * one DIB chunk, hand it to MakeBitmap, free the pixels. Zero if any step
@@ -62,17 +56,17 @@ AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags);
 /* 0x004236A0. Point `set` at the record a set name means and `id` at the file
  * id its archive must carry. Nonzero when the record is already pointing at
  * that file and there is nothing to open. */
-int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id);
+int32_t __cdecl SpriteSetResolve(const char *name, AM2_SpriteSet **set, uint32_t *id);
 
 /* 0x004239B0. Open a set's archive: header, palette, remap tables and the
  * directory. Zero if it could not be opened or the id is wrong. */
 int32_t __cdecl SpriteSetLoad(const char *name);
 
 /* 0x00423970. Close a set's archive and free its directory. */
-void __cdecl SpriteSetFree(void *set);
+void __cdecl SpriteSetFree(AM2_SpriteSet *set);
 
 /* 0x00423D50. The directory index for a key, or -1. */
-int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
+int32_t __cdecl SpriteDirIndex(const AM2_SpriteSet *set, uint32_t key);
 
 /* 0x004243B0. Put a lost sprite's pixels back from the packed data file, and
  * 0x00445C00, the same from loose files. Both take the key from spr->id. */

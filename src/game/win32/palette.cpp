@@ -38,6 +38,7 @@
 #include "../gamedir.h"  /* SetGameDir -- the chdir, reconstructed */
 #include "../image.h"  /* AM2_IMAGE */
 #include "../misc.h"   /* ColourDistance -- pure, so it lives in the flat half */
+#include "../spritetype.h" /* AM2_SpriteSet */
 #include "surface.h"
 #include "mapdraw.h"
 #include "../../inject/patch.h"
@@ -646,33 +647,32 @@ void __cdecl CyclePalette(void)
 void __cdecl PaletteLoaded(void)
 {
     /* The three sets are a table on the stack, walked by pointer. */
-    uintptr_t sets[3] = {
-        ((uintptr_t)g_spriteSetTitle), ((uintptr_t)g_spriteSetShared), ((uintptr_t)g_spriteSetThird)
+    AM2_SpriteSet *sets[3] = {
+        g_spriteSetTitle, g_spriteSetShared, g_spriteSetThird
     };
     int32_t n;
 
     for (n = 0; n < 3; n++) {
-        uint8_t *set = (uint8_t *)sets[n];
+        AM2_SpriteSet *set = sets[n];
         int32_t  i;
 
         /* The active palette is re-read at each use. */
         if (g_activePalette) {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
-                uint32_t c = SwapColourBytes(((const uint32_t *)
-                                 (set + SPRITE_SET_OFF_PALETTE))[i]);
+                uint32_t c = SwapColourBytes(set->palette[i]);
 
-                set[SPRITE_SET_OFF_REMAP + i] =
+                set->remap[i] =
                     NearestPalIndex(g_activePalette, *(PALETTEENTRY *)&c, 0);
             }
         } else {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
-                set[SPRITE_SET_OFF_REMAP + i] = (uint8_t)i;
+                set->remap[i] = (uint8_t)i;
         }
 
         for (i = 0; i < AM2_PALETTE_RESERVED; i++)
-            set[SPRITE_SET_OFF_REMAP10 + i] = (uint8_t)i;
+            set->remap10[i] = (uint8_t)i;
         for (i = AM2_PALETTE_RESERVED; i < AM2_PALETTE_ENTRIES; i++)
-            set[SPRITE_SET_OFF_REMAP10 + i] = set[SPRITE_SET_OFF_REMAP + i];
+            set->remap10[i] = set->remap[i];
     }
 }
 
