@@ -1551,9 +1551,7 @@ void __cdecl LatchKeyState(void)
  * field, and taking it for the base is what put that table 0x20 bytes late. */
 uint32_t __cdecl UnitTypeCost(int32_t type)
 {
-    return *(const uint32_t *)(((uintptr_t)g_unitTypes)
-                               + (uint32_t)type * AM2_UNIT_TYPE_STRIDE
-                               + UNIT_TYPE_OFF_COST);
+    return (uint32_t)g_unitTypes[type].cost;
 }
 
 

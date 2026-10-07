@@ -846,7 +846,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_uidRemapCount          (*(int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT)  /* 0x00513084 */
 #define g_unitClassNames         ((char **)(uintptr_t)ADDR_UNIT_CLASS_NAMES)  /* 0x00489B44 */
 #define g_unitNameSarge          (*(char **)(uintptr_t)ADDR_UNIT_NAME_SARGE)  /* 0x00489B40 */
-#define g_unitTypes              ((uint8_t *)(uintptr_t)ADDR_UNIT_TYPES)  /* 0x00487898 */
+#define g_unitTypes              ((struct AM2_UnitType *)(uintptr_t)ADDR_UNIT_TYPES)  /* 0x00487898 */
 #define g_unread50c34c           (*(int32_t *)(uintptr_t)ADDR_UNREAD_50C34C)  /* 0x0050C34C */
 #define g_unused662288           (*(int32_t *)(uintptr_t)ADDR_UNUSED_662288)  /* 0x00662288 */
 #define g_validBytes             (*(uint32_t *)(uintptr_t)ADDR_AUDIO_VALID_BYTES)  /* 0x004FA454 */

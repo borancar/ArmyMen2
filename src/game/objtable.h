@@ -139,6 +139,18 @@ typedef struct AM2_ItemType {
     int32_t  field30;               /* +0x30 MISSILEDEF_OFF_FIELD_30, RespawnKind's out */
 } AM2_ItemType;
 
+/* One of ADDR_UNIT_TYPES' AM2_UNIT_TYPE_COUNT records: what the placement
+ * screen offers -- a trooper, a vehicle or a building of `kind`, its name in
+ * the placement file, its cost and the game types it is offered in. */
+typedef struct AM2_UnitType {
+    int32_t  trooper;               /* +0x00 UNIT_TYPE_OFF_TROOPER */
+    int32_t  vehicle;               /* +0x04 UNIT_TYPE_OFF_VEHICLE */
+    int32_t  kind;                  /* +0x08 UNIT_TYPE_OFF_KIND */
+    char     name[0x14];            /* +0x0C UNIT_TYPE_OFF_NAME */
+    int32_t  cost;                  /* +0x20 UNIT_TYPE_OFF_COST */
+    uint32_t gameMask;              /* +0x24 UNIT_TYPE_OFF_GAME_MASK */
+} AM2_UnitType;
+
 /* The PARSED missile definition, as MissileDefFind finds it in the def table
  * (AM2_MISSILE_DEF_REC_SIZE). ADDR_MISSILE_DEFS is built from these with five
  * fields permuted -- +0x10 and +0x14 swap, and +0x1C -> +0x24 -> +0x20 -> +0x1C

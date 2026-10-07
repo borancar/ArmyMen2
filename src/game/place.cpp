@@ -84,8 +84,7 @@ extern "C" const uint8_t am2_unit_types[720] = {
 
 #define kSep         (" \t\n;,")
 
-#define kUnitType(i) (g_unitTypes \
-                      + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
+#define kUnitType(i) (&g_unitTypes[i])
 
 /* 0x0043B3D0. The three globals are cleared in the original's order --
  * pointer, capacity, count -- which nothing can observe, and reproduced
@@ -131,11 +130,11 @@ void __cdecl AddPlacement(const AM2_Placement *rec)
  * this game type does not allow is refused however many points are left. */
 int32_t __cdecl CanAffordUnit(int32_t type, int32_t points)
 {
-    if (!(*(const uint32_t *)(kUnitType(type) + UNIT_TYPE_OFF_GAME_MASK)
+    if (!(kUnitType(type)->gameMask
           & g_gameSetting22C))
         return 0;
 
-    return points >= *(const int32_t *)(kUnitType(type) + UNIT_TYPE_OFF_COST);
+    return points >= kUnitType(type)->cost;
 }
 
 /* 0x0043A560. The colour index is the comm slot's own army field, read inline
@@ -239,8 +238,7 @@ int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line)
     strcpy(typeName, tok);
 
     for (type = 0; type < AM2_UNIT_TYPE_COUNT; type++)
-        if (!strcmp(typeName, (const char *)(kUnitType(type)
-                                             + UNIT_TYPE_OFF_NAME)))
+        if (!strcmp(typeName, kUnitType(type)->name))
             goto found;
     /* Always true here, and VC6 folds it against the loop test -- but a
      * conditional return is not merged with the other `return 2`s, which
@@ -619,8 +617,7 @@ int32_t __cdecl IsPlacedUnit(AM2_Object *obj, int32_t army)
      * image has a `mov eax, 1` epilogue per arm and still returns the
      * register at the end. Nested positively, the kinds laid out 3, 2, 1,
      * and the type table walked by index (a signed `jl`). */
-#define TYPE(i, off) (((const int32_t (*)[AM2_UNIT_TYPE_STRIDE / 4]) \
-                       ((uintptr_t)g_unitTypes))[i][(off) / 4])
+#define TYPE(i, member) (g_unitTypes[i].member)
     AM2_Object *o = (AM2_Object *)(uint8_t *)obj;
     int32_t  found = 0;
     int32_t  slot;
@@ -644,12 +641,12 @@ int32_t __cdecl IsPlacedUnit(AM2_Object *obj, int32_t army)
                 slot = AM2_THE_COMM->CommArmyOfSlot(army);
 
                 for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-                    if (!TYPE(i, UNIT_TYPE_OFF_TROOPER)
-                        && !TYPE(i, UNIT_TYPE_OFF_VEHICLE)
+                    if (!TYPE(i, trooper)
+                        && !TYPE(i, vehicle)
                         && UnitKindMatches(
                                *(const int32_t *)(o->field94
                                                   + TYPEREC_OFF_FIELD_08),
-                               TYPE(i, UNIT_TYPE_OFF_KIND), slot))
+                               TYPE(i, kind), slot))
                         found = 1;
                 }
                 break;
@@ -710,16 +707,15 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
-#define rec (g_unitTypes \
-             + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE)
-#define KIND (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
+#define rec (&g_unitTypes[type])
+#define KIND (rec->kind)
     AM2_Object       *made;
     AM2_Object       *weapon;
     AM2_MapRow       *rows;
 
-    *points -= *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+    *points -= rec->cost;
 
-    if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
+    if (rec->trooper) {
         made = (AM2_Object *)(uint8_t *)CreateTrooper(
                    (char *)name, where.x,
                    where.y,
@@ -749,7 +745,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         return;
     }
 
-    if (*(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE)) {
+    if (rec->vehicle) {
         int32_t n;
         int32_t i;
 
@@ -954,14 +950,14 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
     switch (*(const int32_t *)o) {
     case AM2_OBJ_TYPE_VEHICLE:
         for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-            const uint8_t *rec = kUnitType(i);
+            const AM2_UnitType *rec = kUnitType(i);
 
-            if (!*(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+            if (!rec->vehicle)
                 continue;
-            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND)
+            if (rec->kind
                 != o->vehicleKind)
                 continue;
-            cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+            cost = rec->cost;
         }
         break;
 
@@ -980,12 +976,12 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
             return;
 
         for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-            if (!*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER))
+            if (!kUnitType(i)->trooper)
                 continue;
-            if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND)
+            if (kUnitType(i)->kind
                 != w->typeRec->kind)
                 continue;
-            cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
+            cost = kUnitType(i)->cost;
         }
         break;
     }
@@ -998,14 +994,14 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
         /* `i` is still the zero it was declared with: the image counts from
          * the register it has held 0 in since entry. */
         for (; i < AM2_UNIT_TYPE_COUNT; i++) {
-            if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER)
-                || *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_VEHICLE))
+            if (kUnitType(i)->trooper
+                || kUnitType(i)->vehicle)
                 continue;
             if (UnitKindMatches(
                     *(const int32_t *)(
                         o->field94
                         + AAIREC_OFF_KEY),
-                    *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND), army))
+                    kUnitType(i)->kind, army))
                 goto found;
         }
         return;
@@ -1016,9 +1012,9 @@ found:
             o = LookupByUID(
                 (uint32_t)o->followers.capacity);
 
-        kind = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND);
+        kind = kUnitType(i)->kind;
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
-            cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
+            cost = kUnitType(i)->cost;
             break;
         }
 
@@ -1059,13 +1055,13 @@ found:
 
             /* The record is re-read through the table at each use. */
             for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
-                if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER)
-                    || *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_VEHICLE))
+                if (kUnitType(i)->trooper
+                    || kUnitType(i)->vehicle)
                     continue;
-                if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND) != want)
+                if (kUnitType(i)->kind != want)
                     continue;
 
-                cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
+                cost = kUnitType(i)->cost;
                 break;
             }
 
