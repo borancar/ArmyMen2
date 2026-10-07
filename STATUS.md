@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1528 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1529 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,18 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ObjAttachTo matched: one shared tail** (2026-10-07), 1528 -> 1529.
+    - Three arms each did `s->followUid = t->uid`. The image loads it
+      into eax in two of them and edx in the third. Ours rotated
+      eax/edx/ecx.
+    - Deleting either of the other two stores flipped the third's
+      register. So the choice follows how many copies of the statement
+      the source has, not the code around it.
+    - The aiMode 6 and aiMode 0 arms share one
+      `s->followUid = t->uid; return;` after an if/else. VC6 copies that
+      tail into both arms with the same register.
+    - Found by deleting statements one at a time and watching the one
+      register (`ablate.py` in the session tmp directory).
   - **MpPanelScreen builds its children with `new`** (2026-10-07), 339 ->
     260, still 1528.
     - Every child the image constructs carries an EH state store around

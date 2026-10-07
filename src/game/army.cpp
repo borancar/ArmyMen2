@@ -565,12 +565,15 @@ void __cdecl ObjAttachTo(AM2_Object *s, AM2_Object *t)
             goto attach_and_join;
         }
 
-        if (s->owner != (int32_t)g_defaultOwner) {
-            s->aiMode    = 6;
-            s->followUid = t->uid;
-            return;
-        }
-        goto own;
+        /* One store of the follow uid after the if/else: VC6 copies the tail
+         * into both arms, which is why the image loads it into eax in each
+         * (0x004581A2, 0x004582C4) where two separate stores rotate it. */
+        if (s->owner != (int32_t)g_defaultOwner)
+            s->aiMode = 6;
+        else
+            s->aiMode = 0;
+        s->followUid = t->uid;
+        return;
 
 attach_and_join:
         s->aiMode    = 3;
@@ -583,10 +586,6 @@ attach_and_join:
         }
         return;
 
-own:
-        s->aiMode    = 0;
-        s->followUid = t->uid;
-        return;
     } else {
         s->formationSlot = 0;
         s->followUid     = 0;
