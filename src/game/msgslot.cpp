@@ -89,8 +89,8 @@ void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key)
 {
     /* The search holds the count; the move re-reads it; the records shift
      * down as whole-struct copies. */
-#define RECS  (player->keyed)
-#define COUNT (player->keyedCount)
+#define RECS  (player->nacks)
+#define COUNT (player->nackCount)
     int32_t  n = COUNT;
     int32_t  i, j;
     uint32_t kind;
@@ -101,15 +101,15 @@ void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key)
         return;
 
     for (i = 0; i < n; i++) {
-        if (RECS[i].key == key) {
+        if (RECS[i].seq == key) {
             j    = i + 1;
-            kind = RECS[i].kind;
+            kind = RECS[i].count;
             if (kind > AM2_KEYED_TALLY_MAX)
                 kind = AM2_KEYED_TALLY_MAX;
-            player->keyedTally[kind] += 1;
+            player->nackTally[kind] += 1;
 
             for (; j < COUNT; j++) {
-                AM2_KeyedRec *src = &RECS[j];
+                AM2_NackRec *src = &RECS[j];
 
                 src[-1] = *src;
             }

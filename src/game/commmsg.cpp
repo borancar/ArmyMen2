@@ -2795,7 +2795,7 @@ int commmsg_install(void)
 void *__cdecl MsgListCopyByKey(AM2_MsgList *list, int32_t key, void *dst);
 extern "C" void __cdecl DumpMsgList(AM2_MsgList *list);
 void *__cdecl MsgListInsert(AM2_MsgList *list, AM2_MsgNode *node);
-int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
+int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq);
 
 /* 0x004014C0 -- the flow-control receive path. See orig.h for the full
  * reading; the short version is that this is called from the receive thread

@@ -81,12 +81,13 @@ typedef union AM2_FlowMsg {
     AM2_FlowNack nack;          /* AM2_FLOW_NACK */
 } AM2_FlowMsg;
 
-/* One keyed record of a flow, 12 bytes: what CommRemoveKeyed searches. */
-typedef struct AM2_KeyedRec {
-    uint32_t key;               /* +0x00 */
-    uint32_t second;            /* +0x04 */
-    uint32_t kind;              /* +0x08 AM2_KEYED_KIND, tallied by */
-} AM2_KeyedRec;
+/* One NACK record of a flow, 12 bytes: PeerShouldNack appends and bumps
+ * them, CommRemoveKeyed drops one when its sequence arrives. */
+typedef struct AM2_NackRec {
+    uint32_t seq;                /* +0x00 NACKREC_OFF_SEQ */
+    uint32_t time;               /* +0x04 NACKREC_OFF_TIME, when last NACKed */
+    uint32_t count;              /* +0x08 NACKREC_OFF_COUNT, NACKs sent for it */
+} AM2_NackRec;
 
 /* One player's flow queue, 0x7E0 bytes, six at ADDR_PLAYER_RECORDS:
  * FindPlayerById's answer. */
@@ -134,9 +135,9 @@ typedef struct AM2_Flow {
     int32_t     fieldAC;        /* +0x0AC */
     int32_t     lagMs;          /* +0x0B0 FLOW_OFF_LAG_MS */
     int32_t     lagSpread;      /* +0x0B4 FLOW_OFF_LAG_SPREAD */
-    int32_t     keyedCount;     /* +0x0B8 AM2_KEYED_COUNT, records in keyed[] */
-    AM2_KeyedRec keyed[60];     /* +0x0BC AM2_KEYED_FIRST */
-    int32_t     keyedTally[4];  /* +0x38C AM2_KEYED_TALLY, removals by kind */
+    int32_t     nackCount;      /* +0x0B8 PEER_OFF_NACK_COUNT, records in nacks[] */
+    AM2_NackRec nacks[60];      /* +0x0BC PEER_OFF_NACKS */
+    int32_t     nackTally[4];   /* +0x38C removals by NACK count, 3 and up together */
     int32_t     latencyAt;      /* +0x39C the latency ring's write index */
     int32_t     latency[32];    /* +0x3A0 ms samples CommMean32 averages */
     int32_t     ringA[120];     /* +0x420 PLAYER_REC_OFF_RING_A AM2_MSGSLOT_A_OFF */

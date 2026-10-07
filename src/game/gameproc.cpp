@@ -1536,7 +1536,8 @@ static inline void CopyTypeRecord(void *dst, const void *src, size_t n)
  * Only the list at OBJ_OFF_PTR_LIST is modelled; being a class member, it
  * is what makes the construction and destruction the compiler's. */
 struct AM2_Type8Obj {
-    uint8_t     pad_[0xA4];
+    uint8_t     head[0x94];             /* the part the loader does not read */
+    uint8_t     recStart[0x10];         /* +0x94 the saved record starts here and runs on */
     AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
     uint8_t     padB0_[0x52C - 0xB0];
     int32_t     kind;                   /* +0x52C, what CreateRoach is given */
@@ -1549,7 +1550,7 @@ static_assert(sizeof(AM2_Type8Obj) == 0x94 + AM2_TYPE8_RECORD_SIZE, "AM2_Type8Ob
 AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type8Obj   obj;
-    uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
+    uint8_t       *rec = obj.recStart;
     const AM2_Object *h   = (const AM2_Object *)hdr;
     AM2_Object       *o;
     float          part;
@@ -1637,7 +1638,8 @@ AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 /* The trooper's, likewise: the whole object on the stack, the record read
  * in at +0x94, the one list at OBJ_OFF_PTR_LIST a class member. */
 struct AM2_Type2Obj {
-    uint8_t     pad_[0xA4];
+    uint8_t     head[0x94];             /* the part the loader does not read */
+    uint8_t     recStart[0x10];         /* +0x94 the saved record starts here and runs on */
     AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST, TYPE2_REC_OFF_LIST */
     uint8_t     padB0_[4];
     int32_t     scriptState;            /* +0xB4 TYPE2_REC_OFF_SCRIPT */
@@ -1663,7 +1665,7 @@ static_assert(sizeof(AM2_Type2Obj) == 0x94 + AM2_TYPE2_RECORD_SIZE, "AM2_Type2Ob
 AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
     AM2_Type2Obj obj;
-    uint8_t *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
+    uint8_t *rec = obj.recStart;
     AM2_Object *h = (AM2_Object *)hdr;
     AM2_Object *o;
     int32_t  weaponCode;
@@ -1858,7 +1860,8 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
  */
 /* The vehicle's: both lists, so the compiler builds and tears down two. */
 struct AM2_Type3Obj {
-    uint8_t     pad_[0xA4];
+    uint8_t     head[0x94];             /* the part the loader does not read */
+    uint8_t     recStart[0x10];         /* +0x94 the saved record starts here and runs on */
     AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST, TYPE3_REC_OFF_LIST */
     uint8_t     padB0_[0x52C - 0xB0];
     int32_t     vehicleKind;            /* +0x52C TYPE3_REC_OFF_KIND */
@@ -1874,7 +1877,7 @@ static_assert(sizeof(AM2_Type3Obj) == 0x94 + AM2_TYPE3_RECORD_SIZE, "AM2_Type3Ob
 AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type3Obj   obj;
-    uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
+    uint8_t       *rec = obj.recStart;
     const AM2_Object *h = (const AM2_Object *)hdr;
     AM2_Object       *o;
     const AM2_VehicleDef *def;

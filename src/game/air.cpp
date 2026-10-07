@@ -190,9 +190,9 @@ typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
  * -- so a negative count skips the loop where the first test alone would not.
  * Written as the `> 0` the pair amounts to.
  */
-int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq)
+int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq)
 {
-    uint8_t  *p   = (uint8_t *)peer;
+    AM2_Flow *p   = peer;
     uint32_t  now = (uint32_t)orig_get_tick_count();
     uint32_t  n;
     uint32_t  interval;
@@ -201,55 +201,55 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq)
     int32_t   count;
     int32_t   i;
 
-    n = *(const uint32_t *)(p + PEER_OFF_INTERVAL_N);
-    interval = *(const uint32_t *)(p + PEER_OFF_INTERVAL_SUM)
+    n = p->nextExpected;
+    interval = p->gapTotal
                / (n < 2 ? 1u : n - 1u);
 
-    n = *(const uint32_t *)(p + PEER_OFF_LATENCY_N);
-    latency = *(const uint32_t *)(p + PEER_OFF_LATENCY_SUM) / (n < 1 ? 1u : n);
+    n = p->acksSeen;
+    latency = p->rttTotal / (n < 1 ? 1u : n);
     capped = latency > AM2_NACK_INTERVAL_CAP ? AM2_NACK_INTERVAL_CAP : latency;
 
     /* The records are addressed through the live count at every use; the
      * match is handled out of line, after the append, as the image lays it
      * out. */
-#define NCOUNT (*(int32_t *)(p + PEER_OFF_NACK_COUNT))
-#define NREC(k) (p + PEER_OFF_NACKS + (uint32_t)(k) * AM2_NACKREC_STRIDE)
+#define NCOUNT (p->nackCount)
+#define NREC(k) (&p->nacks[(uint32_t)(k)])
     count = NCOUNT;
     if (count) {
         for (i = 0; i < count; i++)
-            if (*(const uint32_t *)(NREC(i) + NACKREC_OFF_SEQ) == seq)
+            if (NREC(i)->seq == seq)
                 goto found;
     }
 
     {
-        int32_t first = *(const uint32_t *)(p + PEER_OFF_FIELD_40)
-                        < (*(const uint32_t *)(p + PEER_OFF_FIELD_38) >> 1);
+        int32_t first = p->duplicates
+                        < (p->nacksSent >> 1);
 
-        *(uint32_t *)(NREC(NCOUNT) + NACKREC_OFF_SEQ)  = seq;
-        *(uint32_t *)(NREC(NCOUNT) + NACKREC_OFF_TIME) = now;
-        *(int32_t *)(NREC(NCOUNT) + NACKREC_OFF_COUNT) = first ? 1 : 0;
+        NREC(NCOUNT)->seq   = seq;
+        NREC(NCOUNT)->time  = now;
+        NREC(NCOUNT)->count = first ? 1 : 0;
 
         if (++NCOUNT >= AM2_NACK_RECS_MAX) {
             NCOUNT--;
             am2_log(" Nack Rec Array full for ID %x, %d\n",
-                    *(const uint32_t *)(p + PEER_OFF_ID), NCOUNT);
+                    p->id, NCOUNT);
         }
         return first;
     }
 
 found:
     {
-        uint32_t *t = (uint32_t *)(NREC(i) + NACKREC_OFF_TIME);
+        uint32_t *t = &NREC(i)->time;
 
         if (now > *t + capped) {
             if (g_commObject->verbose)
                 am2_log("Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d count = %d nackinterval = %d\n",
-                        seq, *(const uint32_t *)(p + PEER_OFF_ID), now,
+                        seq, p->id, now,
                         *t + capped, now - *t - capped,
                         interval, latency,
-                        *(const int32_t *)(NREC(i) + NACKREC_OFF_COUNT), capped);
+                        (int32_t)NREC(i)->count, capped);
 
-            *(int32_t *)(NREC(i) + NACKREC_OFF_COUNT) += 1;
+            NREC(i)->count += 1;
             *t = now;
             return 1;
         }

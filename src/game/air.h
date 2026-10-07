@@ -283,7 +283,7 @@ void __cdecl RandomPointAhead(void *, const struct AM2_Object *obj, int32_t dist
 /* 0x00402C30, one caller. Should a NACK go out for this sequence number, or
  * has one gone recently enough? Rate-limited by the peer's own measured
  * latency, capped at three seconds. It names itself in its log lines. */
-int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
+int32_t __cdecl PeerShouldNack(struct AM2_Flow *peer, uint32_t seq);
 
 void __cdecl RandomPointToward(const struct AM2_Object *target, const struct AM2_Object *obj,
                                int32_t dist, AM2_Point *out);
