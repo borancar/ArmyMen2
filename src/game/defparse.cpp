@@ -464,13 +464,13 @@ int32_t __cdecl DefObjParse(int32_t token)
  * bsearch and the 450-byte `trooperlevel` line parser after it, which is
  * still original and which the keyword table points at.
  */
-void *__cdecl DefFindTrooperRec(int32_t level)
+AM2_TrooperDefRec *__cdecl DefFindTrooperRec(int32_t level)
 {
     int32_t key[AM2_DEF_TROOPER_REC_SIZE / 4];
 
     key[0] = level;
 
-    return orig_bsearch(key, kDefTrooperRecs, (uint32_t)kDefTrooperCount,
+    return (AM2_TrooperDefRec *)orig_bsearch(key, kDefTrooperRecs, (uint32_t)kDefTrooperCount,
                         AM2_DEF_TROOPER_REC_SIZE,
                         (const void *)CompareDword);
 }

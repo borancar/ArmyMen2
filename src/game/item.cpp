@@ -79,7 +79,7 @@ extern "C" const char *const am2_unit_name_sarge[1] = { "Sarge" };
 /* The 62 soldier names at 0x00489BF8 ({const char *name; int32 taken}).
  * NON-const: TakeSoldierName marks a name taken at runtime; the initial
  * taken is 0 and the names are literals, so the blob name strings drop. */
-struct AM2_SoldierName { const char *name; int32_t taken; };
+/* AM2_SoldierName is in objtable.h. */
 extern "C" AM2_SoldierName am2_soldier_names[62] = {
     {"D. DuBois", 0}, {"R. Pavey", 0}, {"D. Lee", 0},
     {"D. Fruin", 0}, {"A. Muolic", 0}, {"J. Wildblood", 0},
@@ -449,7 +449,7 @@ void __cdecl ObjDropAltRecord(AM2_Object *obj)
  */
 int32_t __cdecl TakeSoldierName(void)
 {
-    uint8_t *tab   = g_soldierNames;
+    AM2_SoldierName *tab = g_soldierNames;
     /* orig_rand's macro is defined further down this file, past here. */
     /* UNSIGNED, both: the wrap test is `jb`, of a piece with the unsigned
      * `div` the start comes from. A signed index compiles `jl`. */
@@ -458,16 +458,14 @@ int32_t __cdecl TakeSoldierName(void)
         % AM2_SOLDIER_NAMES;
     uint32_t i     = start;
 
-    while (*(const int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
-                              + SOLDIER_NAME_OFF_TAKEN)) {
+    while (tab[i].taken) {
         if (++i >= AM2_SOLDIER_NAMES)
             i = 0;
         if (i == start)
             return (int32_t)start;      /* all taken; not marked */
     }
 
-    *(int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
-                 + SOLDIER_NAME_OFF_TAKEN) = 1;
+    tab[i].taken = 1;
     return (int32_t)i;
 }
 
@@ -8224,9 +8222,7 @@ void __cdecl SoldierNameOf(const AM2_Object *obj, char *out)
     if (n < 0 || (uint32_t)n >= AM2_SOLDIER_NAMES)
         return;
 
-    strcpy(out, *(const char *const *)
-        (g_soldierNames
-         + (size_t)n * AM2_SOLDIER_NAME_BYTES + SOLDIER_NAME_OFF_NAME));
+    strcpy(out, g_soldierNames[n].name);
 }
 
 /* AwardOwnArmyXp -- original 0x00417B10, one caller, at the tail of it.

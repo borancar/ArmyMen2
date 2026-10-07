@@ -644,8 +644,7 @@ int32_t __cdecl IsPlacedUnit(AM2_Object *obj, int32_t army)
                     if (!TYPE(i, trooper)
                         && !TYPE(i, vehicle)
                         && UnitKindMatches(
-                               *(const int32_t *)(o->field94
-                                                  + TYPEREC_OFF_FIELD_08),
+                               (int32_t)o->aai->key,
                                TYPE(i, kind), slot))
                         found = 1;
                 }

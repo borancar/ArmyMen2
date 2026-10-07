@@ -468,33 +468,33 @@ void __cdecl LoadDefTables(void)
      * against the record base, which is the same addresses. */
     for (id = 0; id < AM2_RANK_COUNT; id++) {
         AM2_RankRec   *rec = &g_rankRecords[id];
-        const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
+        const AM2_TrooperDefRec *src = DefFindTrooperRec(id);
 
         if (src == 0)
             continue;
 
         /* In the parsed record's order, which scatters them. */
         rec->max_health =
-            *(const int32_t *)(src + RANK_SRC_OFF_MAX_HEALTH);
+            src->maxHealth;
         rec->field_04 =
-            *(const int32_t *)(src + RANK_SRC_OFF_FIELD_04);
+            src->field04;
         rec->sight_range =
-            *(const int32_t *)(src + RANK_SRC_OFF_SIGHT_RANGE);
+            src->sightRange;
         rec->field_08 =
-            *(const int32_t *)(src + RANK_SRC_OFF_FIELD_08);
+            src->field08;
 
         /* An integer percentage becomes a rate, with a floor of 1.0 -- and
          * this is the record's only float, which is what confirms the whole
          * permutation. */
         rec->fire_scale =
-            (float)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT) * 0.01f;
+            (float)src->firePct * 0.01f;
         if (rec->fire_scale < 1.0f)
             rec->fire_scale = 1.0f;
 
         rec->threshold =
-            *(const int32_t *)(src + RANK_SRC_OFF_THRESHOLD);
+            src->threshold;
         rec->xp =
-            *(const int32_t *)(src + RANK_SRC_OFF_XP);
+            src->xp;
     }
 }
 

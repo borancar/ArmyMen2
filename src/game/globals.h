@@ -729,10 +729,10 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_slotHeadings           ((uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)  /* 0x0065A068 */
 #define g_slotIsVehicle          ((int32_t *)(uintptr_t)ADDR_SLOT_IS_VEHICLE)  /* 0x0065A1A8 */
 #define g_slotPositions          ((AM2_Point *)(uintptr_t)ADDR_SLOT_POSITIONS)  /* 0x0065A0A8 */
-#define g_slotRecs               ((uint8_t *)(uintptr_t)ADDR_SLOT_RECS)  /* 0x0048BD90 */
+#define g_slotRecs               ((struct AM2_SlotRec *)(uintptr_t)ADDR_SLOT_RECS)  /* 0x0048BD90 */
 #define g_slowMachine            (*(int32_t *)(uintptr_t)ADDR_SLOW_MACHINE)  /* 0x005125C0 */
 #define g_soldierAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)  /* 0x00659F00 */
-#define g_soldierNames           ((uint8_t *)(uintptr_t)ADDR_SOLDIER_NAMES)  /* 0x00489BF8 */
+#define g_soldierNames           ((struct AM2_SoldierName *)(uintptr_t)ADDR_SOLDIER_NAMES)  /* 0x00489BF8 */
 #define g_soundReady             (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)  /* 0x006598A8 */
 #define g_soundSlots             ((struct AM2_SoundSlot *)(uintptr_t)ADDR_SOUND_SLOTS)  /* 0x004FA040 */
 #define g_soundSlotsEnd          ((struct AM2_SoundSlot *)(uintptr_t)ADDR_SOUND_SLOTS_END)  /* 0x004FA3C0 */

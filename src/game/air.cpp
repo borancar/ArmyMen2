@@ -1508,21 +1508,19 @@ void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, AM2_Object *o
         heading = AngleBetween(&o->pos,
                                &leaderPos);
     } else if (slot < 9) {
-        const uint8_t *rec = g_slotRecs
-                             + (uint32_t)slot * AM2_SLOT_REC_BYTES;
+        const AM2_SlotRec *rec = &g_slotRecs[slot];
 
         /* Each arm places the point itself, through `out`: fmul, then fiadd,
          * then ftol -- the parent's coordinate is added BEFORE the
          * truncation. The distance is rounded to float once on the way in
          * (fild then fstp dword). */
-        parent = *(const int32_t *)(rec + SLOT_REC_OFF_PARENT);
+        parent = rec->parent;
         *out = slotPos[parent];
-        dist = *(const int16_t *)(rec + SLOT_REC_OFF_DIST);
+        dist = rec->dist;
         if (isVehicle[parent] || isVehicle[slot])
             dist += dist;
         /* The angle is indexed off the table afresh, not through `rec`. */
-        heading = (uint8_t)((g_slotRecs)
-                                [slot * AM2_SLOT_REC_BYTES + SLOT_REC_OFF_ANGLE]
+        heading = (uint8_t)(g_slotRecs[slot].angle
                             + headings[parent]);
         fdist = (float)dist;
         out->x =

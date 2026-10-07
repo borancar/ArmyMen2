@@ -25,7 +25,7 @@ void __cdecl DefSortTrooperRecs(void);
 /* 0x0044CD70, one caller. The find half of that quartet: a bsearch of the
  * `trooperlevel` records on their level, with CompareDword on the first
  * dword. NULL when the .aai declared no such level. */
-void *__cdecl DefFindTrooperRec(int32_t level);
+struct AM2_TrooperDefRec *__cdecl DefFindTrooperRec(int32_t level);
 
 /* 0x0045EC20. One .aai vehicle line: the kind from the keyword's code, then
  * eight numbers. Answers 0, or the 1-based index of the field that failed. */

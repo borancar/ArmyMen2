@@ -20,6 +20,15 @@
 #include "../inject/orig.h"   /* am2_FILE */
 #include "objtable.h"         /* AM2_Object */
 
+/* One formation slot of ADDR_SLOT_RECS (slots 1..8): the slot it hangs off,
+ * the angle added to that slot's heading, and the distance. */
+typedef struct AM2_SlotRec {
+    int32_t parent;                 /* +0x00 SLOT_REC_OFF_PARENT */
+    uint8_t angle;                  /* +0x04 SLOT_REC_OFF_ANGLE */
+    uint8_t _pad05;
+    int16_t dist;                   /* +0x06 SLOT_REC_OFF_DIST */
+} AM2_SlotRec;
+
 /* The air-support state at ADDR_AIR_SAVE_BLOCK, saved whole
  * (AM2_AIR_SAVE_SIZE): a queue of up to 30 requests, a second queue of up to
  * AM2_AIR_PASS_SLOTS fly-overs, and two animation timers. */

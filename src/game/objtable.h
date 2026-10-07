@@ -202,6 +202,27 @@ typedef struct AM2_DefObjRec {
     uint8_t  _pad35[3];
 } AM2_DefObjRec;
 
+/* One parsed trooper (rank) definition, AM2_DEF_TROOPER_REC_SIZE, keyed by
+ * rank at +0. LoadDefTables projects it onto an AM2_RankRec in a different
+ * order, the fire percentage becoming a rate. */
+typedef struct AM2_TrooperDefRec {
+    int32_t rank;                   /* +0x00 the bsearch key */
+    int32_t maxHealth;              /* +0x04 RANK_SRC_OFF_MAX_HEALTH */
+    int32_t field04;                /* +0x08 RANK_SRC_OFF_FIELD_04 */
+    int32_t sightRange;             /* +0x0C RANK_SRC_OFF_SIGHT_RANGE */
+    int32_t field08;                /* +0x10 RANK_SRC_OFF_FIELD_08 */
+    int32_t firePct;                /* +0x14 RANK_SRC_OFF_FIRE_PCT */
+    int32_t threshold;              /* +0x18 RANK_SRC_OFF_THRESHOLD */
+    int32_t xp;                     /* +0x1C RANK_SRC_OFF_XP */
+} AM2_TrooperDefRec;
+
+/* One of ADDR_SOLDIER_NAMES' AM2_SOLDIER_NAMES entries: the name, and
+ * whether a trooper has it. */
+typedef struct AM2_SoldierName {
+    const char *name;               /* +0x00 SOLDIER_NAME_OFF_NAME */
+    int32_t     taken;              /* +0x04 SOLDIER_NAME_OFF_TAKEN */
+} AM2_SoldierName;
+
 /* One of ADDR_UNIT_TYPES' AM2_UNIT_TYPE_COUNT records: what the placement
  * screen offers -- a trooper, a vehicle or a building of `kind`, its name in
  * the placement file, its cost and the game types it is offered in. */
