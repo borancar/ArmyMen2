@@ -1270,7 +1270,7 @@ void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc)
 
             if (!PointInRect(&box, pt))
                 continue;
-        } else if (!ObjMaskBitAt(o, pt)) {
+        } else if (!ObjMaskBitAt((const AM2_Object *)o, pt)) {
             continue;
         }
 
@@ -1426,7 +1426,7 @@ void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
     *(o + OBJ_OFF_ARMY)             = (uint8_t)army;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
 
-    ObjInitCommon(o, g_dirScratch, 7, pt,
+    ObjInitCommon((AM2_Object *)o, g_dirScratch, 7, pt,
                          g_kind7Box, e, f);
 
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
@@ -1746,7 +1746,7 @@ void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc)
                          pt))
             continue;
         if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
-            && !ObjMaskBitAt(o, pt))
+            && !ObjMaskBitAt((const AM2_Object *)o, pt))
             continue;
 
         *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
@@ -2032,7 +2032,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
         g_gameConstants;
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
         *(const int16_t *)&g_roachHealth;
-    SetMaxHealth(o, g_roachHealth);
+    SetMaxHealth((AM2_Object *)o, g_roachHealth);
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
         *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
 
@@ -2041,7 +2041,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
         + *(const int32_t *)&g_gameClockMs;
     *(int32_t *)(o + OBJ_OFF_RANK) = 7;
 
-    ObjInitCommon(o, name, 8, at,
+    ObjInitCommon((AM2_Object *)o, name, 8, at,
                          g_roachBox, a7, uid);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 g_roachRowSpec, x, y,
@@ -2205,7 +2205,7 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 /* Its predicate-taking sibling, same file and same reason for being declared
  * here rather than included. */
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
-                            int32_t (__cdecl *keep)(void *obj));
+                            int32_t (__cdecl *keep)(AM2_Object *obj));
 
 /* CreateWeapon's typedef moved to item.h: place.cpp wants it too, and its
  * second argument was called `type` here on the strength of one call site
@@ -10371,7 +10371,7 @@ void __cdecl SetObjContext(AM2_Object *obj)
  * "the first hit" gets the last one added.
  */
 void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
-                              int32_t (__cdecl *keep)(void *obj))
+                              int32_t (__cdecl *keep)(AM2_Object *obj))
 {
     const uint8_t *d = (const uint8_t *)desc;
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
@@ -10396,10 +10396,10 @@ void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
         if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
                          pt))
             continue;
-        if (!keep(o))
+        if (!keep((AM2_Object *)o))
             continue;
         if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
-            && !ObjMaskBitAt(o, pt))
+            && !ObjMaskBitAt((const AM2_Object *)o, pt))
             continue;
 
         *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
@@ -11620,7 +11620,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
             *(const int32_t *)&g_gameClockMs + delay;
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
-    ObjInitCommon(o, g_dirScratch,
+    ObjInitCommon((AM2_Object *)o, g_dirScratch,
                   AM2_OBJ_TYPE_EXPLOSION, at,
                   g_explosionBox,
                   unused, uid);
@@ -11710,7 +11710,7 @@ void __cdecl StepType6(AM2_Object *obj)
             int32_t dmg = o->rank;
 
             if (ObjIsType2((const AM2_Object *)victim)
-                && ClassifyByCode74(victim) == 2)
+                && ClassifyByCode74((const AM2_Object *)victim) == 2)
                 dmg = o->rank >> 1;
 
             /* One call per kind, as the image has them; the direction is a
@@ -11861,12 +11861,12 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
      * on the wrong troopers, and bootcamp's object-state dump is what caught
      * it -- eight lines differing by exactly 0x800, with the log and the
      * pixels agreeing throughout. */
-    if (ObjIsFriendly(o))
+    if (ObjIsFriendly((const AM2_Object *)o))
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
 
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
         *(const int16_t *)&g_rankRecords[0].max_health;
-    SetMaxHealth(o, g_rankRecords[0].max_health);
+    SetMaxHealth((AM2_Object *)o, g_rankRecords[0].max_health);
     *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
     *(int16_t *)(o + OBJ_OFF_FIELD_574) =
         (int16_t)*(const uint8_t *)(o + TROOPER_OFF_FACING);
@@ -11877,7 +11877,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     if (army != (int32_t)g_defaultOwner)
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_THEIRS;
 
-    ObjInitCommon(o, name, AM2_OBJ_TYPE_TROOPER, where,
+    ObjInitCommon((AM2_Object *)o, name, AM2_OBJ_TYPE_TROOPER, where,
                   g_trooperBox, remote, uid);
 
     *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = AM2_TROOPER_HEIGHT_ADJ;
@@ -11923,7 +11923,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
         AM2_ROW_FIELD26_INIT;
 
-    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
+    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly((const AM2_Object *)o))
         ObjConceal(o, 0);
 
     SetUnitPose((AM2_Object *)o, 1);
@@ -12022,7 +12022,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
     *(int32_t *)(o + OBJ_OFF_RANK) = AM2_VEHICLE_RANK;
 
-    if (ObjIsFriendly(o))
+    if (ObjIsFriendly((const AM2_Object *)o))
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
 
     /* Not the player's own. Two different questions depending on the session:
@@ -12041,7 +12041,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)
         (g_vehicleHeightByKind)[kind];
 
-    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
+    ObjInitCommon((AM2_Object *)o, name, AM2_OBJ_TYPE_VEHICLE, at,
                   g_vehicleBox, remote, uid);
 
     *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
@@ -12078,7 +12078,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
         (int16_t)*(const int32_t *)(def + VEHDEF_OFF_HEALTH);
-    SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+    SetMaxHealth((AM2_Object *)o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
     /* Re-read AFTER the call, which is the original's order and the whole
      * reason the two stores are not one: SetMaxHealth scales it. */
     *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
@@ -12136,7 +12136,7 @@ no_weapon:
         *(uint32_t *)(ROWS + AM2_OBJ_ROW_STRIDE) |= ROW_FLAG_BIT5;
     }
 
-    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
+    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly((const AM2_Object *)o))
         ObjConceal(o, 0);
 
     SetKindFrames((AM2_Object *)o, 1);
@@ -12302,7 +12302,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
         o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
         memset(o, 0, AM2_ITEM_BYTES);
 
-        if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
+        if (!InitObjFromAai((AM2_Object *)o, name, army, slot, at, orFlags, remote,
                             (int32_t)uid)) {
             am2_free(o);
             return (void *)0;
@@ -14158,7 +14158,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     o = (uint8_t *)am2_malloc(AM2_WEAPON_BYTES);
     memset(o, 0, 0x35u * 4u);
 
-    if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid)) {
+    if (!InitObjFromAai((AM2_Object *)o, (char *)name, army, key, at, flags, remote, uid)) {
         if (*(const int32_t *)(g_commObject
                                + COMM_OFF_VERBOSE))
             am2_log("CreateWeapon\n");

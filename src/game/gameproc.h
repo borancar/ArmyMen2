@@ -33,7 +33,7 @@ void __cdecl TeardownDefTables(void);
  * object lists, and the pair that makes and unmakes those lists. */
 /* 0x0044A380. WalkCellWrapper's filter: keep the objects we are not allied
  * with. */
-int32_t __cdecl WalkCellKeepEnemy(void *obj);
+int32_t __cdecl WalkCellKeepEnemy(struct AM2_Object *obj);
 void __cdecl InitRemapsAndLists(void);
 void __cdecl InitStartupColours(void);
 void __cdecl InitStartupColoursB(void);

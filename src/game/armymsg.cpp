@@ -1201,7 +1201,7 @@ void __cdecl RecvItemCreate(void *msg)
                    (int32_t)*(const uint8_t *)(m + MSG_CREATE_OFF_E));
         if (*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE)
             == AM2_TROOPER_SUBTYPE_LEADS)
-            SetLeadsAndAct(made);
+            SetLeadsAndAct((AM2_Object *)made);
         return;
 
     case 3:
@@ -1795,7 +1795,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     /* Sarge's vehicle is sent every frame it moves, the same forcing
      * AppendTroopState applies to Sarge himself. */
     interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
-    if (ListFirstField548(o) && interval > 1)
+    if (ListFirstField548((const AM2_Object *)o) && interval > 1)
         interval = 1;
 
     {

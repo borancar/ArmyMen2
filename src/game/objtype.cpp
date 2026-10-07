@@ -847,11 +847,11 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  * writes the same constant into every row. Nothing in the loop can change
  * either; written as the plain loop that means.
  */
-int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
+int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
                                int32_t index, AM2_Point at, int32_t orFlags,
                                int32_t a7, int32_t a8)
 {
-#define o ((uint8_t *)obj)
+#define o (obj)
     const uint8_t *rec;
     int32_t        i;
 
@@ -862,35 +862,35 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
     if (!rec)
         return 0;
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
+    o->flags |=
         (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
-    *(uint8_t *)(o + OBJ_OFF_ARMY) = (uint8_t)army;
+    o->owner = (uint8_t)army;
 
     ObjInitCommon(o, name, 1, at,
                          (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
-    *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
+    o->field94 = rec;
 
-    *(int16_t *)(o + OBJ_OFF_HEALTH) =
-        *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+    o->health =
+        o->maxHealth =
         *(const int16_t *)(rec + AAI_OFF_HEALTH);
-    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
+    o->heightAdj =
         *(const int8_t *)(rec + AAI_OFF_HEIGHT_ADJ);
-    *(uint8_t *)(o + OBJ_OFF_RANK) =
+    o->itemFlag =
         *(const uint8_t *)(rec + AAI_OFF_RANK);
 
-    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
+    o->deadline58 =
         *(const int32_t *)&g_gameClockMs;
 
-    BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
+    BuildRowsFromDef(&o->rowSet,
                      (g_recordLists)
                          [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
                      (int32_t)at.x,
                      (int32_t)at.y,
-                     *(const uint32_t *)(o + OBJ_OFF_FLAGS));
+                     o->flags);
 
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        *(int32_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+    for (i = 0; i < o->rowSet.count; i++)
+        *(int32_t *)(((uint8_t *)o->rowSet.rows)
                      + (size_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
             *(const int32_t *)(rec + AAI_OFF_ROW_FIELD28);
 
@@ -1062,11 +1062,11 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
  * The four box offsets are emitted 0, 2, 1, 3 and the hit rect 0, 1, 2, 3;
  * that is scheduling, not meaning, and both are written in field order here.
  */
-int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
+int32_t __cdecl ObjInitCommon(AM2_Object *obj, char *name, int32_t type,
                               AM2_Point at, const int32_t *box,
                               int32_t unused, uint32_t uid)
 {
-    uint8_t        *o = (uint8_t *)obj;
+    AM2_Object        *o = obj;
     const AM2_Rect *b = (const AM2_Rect *)box;
     char            tried[AM2_SCRIPT_UNIQUE_BUF];
     int32_t         n;
@@ -1079,7 +1079,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
     AddToItemList((AM2_Object *)obj, uid);
 
     if (!name || !*name) {
-        *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = -1;
+        o->nameIdx = -1;
     } else {
         n = 1;
         orig_strlwr(name);
@@ -1090,18 +1090,18 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
 
             while (index >= 0) {
                 if (kScriptNames[index].value == 0) {
-                    *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = index;
+                    o->nameIdx = index;
                     kScriptNames[index].value =
-                        *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE);
+                        (int32_t)o->uid;
                     goto named;
                 }
                 am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
                             name, n++);
                 index = ScriptFindName(tried);
             }
-            *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) =
+            o->nameIdx =
                 AddNameTableName(tried, AM2_NAME_TYPE_REF,
-                                 *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE));
+                                 (int32_t)o->uid);
         }
 named:
         ;
@@ -1109,14 +1109,14 @@ named:
 
     x = at.x;
     y = at.y;
-    *(int16_t *)(o + OBJ_OFF_POS) = x;
-    *(int16_t *)(o + OBJ_OFF_POS + 2) = y;
-    *(uint16_t *)(o + OBJ_OFF_TILE) =
-        (uint16_t)TileOfPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
+    o->pos.x = x;
+    o->pos.y = y;
+    o->tile =
+        (uint16_t)TileOfPoint(o->pos);
 
     {
-#define keep ((AM2_Rect *)(o + OBJ_OFF_BOX_OFFSETS))
-#define hit  ((AM2_Rect *)(o + OBJ_OFF_HIT_RECT))
+#define keep (&o->box)
+#define hit  (&o->hit)
 
         keep->left   = b->left;
         keep->right  = b->right;
@@ -1137,7 +1137,7 @@ named:
      * two independent ifs with a shared tail linked every such object into the
      * map a second time, which cost a campaign A/B: the load never finished
      * and five log lines from "calculating region data..." on were missing. */
-    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+    if (!(o->flagsLo & OBJ_FLAG_BIT0))
         return 0;
 
     {
@@ -1158,14 +1158,14 @@ named:
             int8_t hc = (int8_t)((int8_t)h + 2);
             int8_t wc = (int8_t)((int8_t)w + 2);
 
-            *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = (uint8_t)(int8_t)(hc * wc);
+            o->cellCount = (uint8_t)(int8_t)(hc * wc);
         }
 
-        bytes = (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) * 0x10;
-        *(void **)(o + OBJ_OFF_CELL_ENTRIES) = am2_malloc((size_t)bytes);
+        bytes = (int32_t)o->cellCount * 0x10;
+        o->cellEntries = (AM2_CellEntry *)am2_malloc((size_t)bytes);
 
-#define cells (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES))
-        for (i = 0; i < *(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
+#define cells (((uint8_t *)o->cellEntries))
+        for (i = 0; i < o->cellCount; i++) {
             *(void **)(cells + i * 0x10) = obj;
             *(int32_t *)(cells + i * 0x10 + 8) = 0;
             *(int32_t *)(cells + i * 0x10 + 4) = 0;
@@ -1173,7 +1173,7 @@ named:
         }
     }
 
-    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+    if (!(o->flagsLo & OBJ_FLAG_DESTROYED))
         ItemLinkCells((AM2_Object *)obj, g_objMapDesc);
 
     return bytes;
@@ -1244,10 +1244,10 @@ named:
  * shows `add esp, 0x18` after a five-argument call. Stack accounting, not a
  * sixth argument.
  */
-int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
+int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
                               int32_t frame, int32_t flag)
 {
-    uint8_t  *o = (uint8_t *)obj;
+    AM2_Object  *o = obj;
     uint32_t  key;
     uint8_t  *rec;
     uint8_t  *sub;
@@ -1260,7 +1260,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
 
     {
         const uint8_t *cur =
-            *(const uint8_t *const *)(o + OBJ_OFF_SUBRECORD + SUBREC_OFF_LIST);
+            (const uint8_t *)o->rowSet.list;
 
         if (!cur)
             return 0;
@@ -1309,31 +1309,31 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
         slot = AddRecordList(list);
     }
 
-    sub = o + OBJ_OFF_SUBRECORD;
+    sub = (uint8_t *)&o->rowSet;
     FreeSubrecordRows((AM2_RowSet *)sub);
     BuildRowsFromDef(sub,
                      (g_recordLists)[slot],
-                     (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
-                     (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
-                     *(const uint32_t *)(o + OBJ_OFF_FLAGS));
+                     (int32_t)o->pos.x,
+                     (int32_t)o->pos.y,
+                     o->flags);
 
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        *(int32_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+    for (i = 0; i < o->rowSet.count; i++)
+        *(int32_t *)(((uint8_t *)o->rowSet.rows)
                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
             *(const int32_t *)(rec + DEF_OBJ_REC_OFF_ROW_FIELD28);
 
     /* ASSIGNED, not OR'd -- see the note above. */
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) =
+    o->flags =
         *(const uint32_t *)(rec + DEF_OBJ_REC_OFF_FLAGS);
 
     if (!flag)
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+        o->health =
+            o->maxHealth =
                 *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
 
-    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
+    o->heightAdj =
         *(const int8_t *)(rec + DEF_OBJ_REC_OFF_HEIGHT_ADJ);
-    *(uint8_t *)(o + OBJ_OFF_RANK) =
+    o->itemFlag =
         *(const uint8_t *)(rec + DEF_OBJ_REC_OFF_RANK);
 
     /* The original's own null test, kept -- it is scheduled AFTER the store
@@ -1343,17 +1343,17 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
 
         if (type == 1 || type == 4) {
             if (flag) {
-                *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
+                o->formationSlot = frame;
             } else {
-                *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = 0;
-                *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME)   = frame;
+                o->formationSlot = 0;
+                o->repairFrame   = frame;
             }
         }
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {
+    if (o->rowSet.count > 0) {
         const uint8_t *spr =
-            *(const uint8_t *const *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+            *(const uint8_t *const *)(((uint8_t *)o->rowSet.rows)
                                       + ROW_OFF_SPRITE);
 
         if (spr) {
@@ -1362,10 +1362,10 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
             int32_t r = *(const int32_t *)(spr + SPR_OFF_W) + l;
             int32_t b = *(const int32_t *)(spr + SPR_OFF_H) + t;
 
-            if (l != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)
-                || t != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)
-                || r != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)
-                || b != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12)) {
+            if (l != o->box.left
+                || t != o->box.top
+                || r != o->box.right
+                || b != o->box.bottom) {
                 AM2_Rect box;
 
                 box.left   = l;
@@ -1377,8 +1377,8 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
         }
 
         ApplyObjHeight((AM2_Object *)obj,
-                       (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
-        RowUpdate((AM2_MapRow *)(*(void **)(o + OBJ_OFF_ROWS)), 0,
+                       (int32_t)o->heightSet);
+        RowUpdate((AM2_MapRow *)(o->rowSet.rows), 0,
                   g_mapDesc);
     }
 
@@ -1405,28 +1405,28 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
  * object with no health bar at all is not treated as a corpse. And the seat
  * test applies to VEHICLES ONLY -- ObjIsType3 gates it -- which is why a full
  * transport cannot be selected while a full squad can. */
-int32_t __cdecl ObjIsSelectable(void *o)
+int32_t __cdecl ObjIsSelectable(AM2_Object *o)
 {
-    const uint8_t *obj = (const uint8_t *)o;
+    const AM2_Object *obj = o;
 
-    if (*(const int8_t *)(obj + OBJ_OFF_ARMY) != (int32_t)g_defaultOwner)
+    if (obj->owner != (int32_t)g_defaultOwner)
         return 0;
 
-    if (*(const int32_t *)(obj + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP)
+    if ((int32_t)obj->flags & AM2_SIGHT_DROP)
         return 0;
 
-    if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0
-            && *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) > 0)
+    if (obj->health == 0
+            && obj->maxHealth > 0)
         return 0;
 
     if (!ObjIsTypeIn238((const AM2_Object *)obj))
         return 0;
 
-    if (*(const int32_t *)(obj + OBJ_OFF_FIELD_94) != 0)
+    if (obj->aiDriven != 0)
         return 0;
 
     if (ObjIsType3((const AM2_Object *)obj)
-            && *(const int32_t *)(obj + OBJ_OFF_POSE_PENDING) <= 0)
+            && obj->posePending <= 0)
         return 0;
 
     return 1;

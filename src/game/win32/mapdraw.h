@@ -162,7 +162,7 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
  * item.cpp holds, with a block of cells to walk rather than one, and a
  * de-duplication rule on the object's home cell. See the definition. */
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
-                            int32_t (__cdecl *keep)(void *obj));
+                            int32_t (__cdecl *keep)(struct AM2_Object *obj));
 
 /* 0x0042A3D0, three callers. ObjectsInRect with no predicate, a stricter entry
  * clip -- the whole rectangle must be on the map -- and one arm fewer in the

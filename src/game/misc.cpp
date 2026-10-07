@@ -345,9 +345,9 @@ int32_t __cdecl IsKind14Or22(int32_t kind)
 /* A switch over codes 7..70 with three arms -- 1, 2, and 0 for the rest --
  * which VC6 compiles to the byte index table at 0x0040D820 and the jump
  * table at 0x0040D814. Written as the switch it is. */
-int32_t __cdecl ClassifyByCode74(const void *obj)
+int32_t __cdecl ClassifyByCode74(const AM2_Object *obj)
 {
-    const uint8_t *sub = *(const uint8_t *const *)((const uint8_t *)obj + 0x74);
+    const uint8_t *sub = ((const uint8_t *)obj->rowSet.rows);
 
     switch (*(const int16_t *)(sub + 0x4C)) {     /* movsx: signed */
     case 7: case 10: case 12: case 14: case 19: case 42: case 43: case 45:
@@ -695,21 +695,21 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
  * offsets that were here were a second spelling of OBJ_OFF_HIT_MASK and of
  * OBJ_OFF_HIT_RECT's first two edges. */
 
-int32_t __cdecl ObjMaskBitAt(const void *obj, const AM2_Point *at)
+int32_t __cdecl ObjMaskBitAt(const AM2_Object *obj, const AM2_Point *at)
 {
     /* The bit for each column within its byte, built on the stack. */
     uint8_t        bit[8] = { 0x80, 0x40, 0x20, 0x10, 8, 4, 2, 1 };
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
     const uint8_t *m;
     int32_t        x, y, w;
 
     if (o) {
-        m = *(const uint8_t *const *)(o + OBJ_OFF_HIT_MASK);
+        m = o->rowSet.hitMask;
         if (m) {
             x = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X)
-                - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->left + at->x;
+                - (&o->hit)->left + at->x;
             y = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y)
-                - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->top + at->y;
+                - (&o->hit)->top + at->y;
 
             /* Each bound is loaded only once its coordinate has passed the
              * zero test. */
@@ -840,9 +840,9 @@ int32_t __cdecl Field51MeetsMin(const void *p)
     return 0;
 }
 
-int32_t __cdecl ObjKind538In10To17(const void *obj)
+int32_t __cdecl ObjKind538In10To17(const AM2_Object *obj)
 {
-    int32_t v = *(const int32_t *)((const uint8_t *)obj + 0x538);
+    int32_t v = obj->pose;
 
     return (v >= 10 && v <= 17) ? 1 : 0;
 }
@@ -853,17 +853,14 @@ int32_t __cdecl ObjKind538In10To17(const void *obj)
 #define AM2_KIND538_ARM_OVERRIDE  1   /* 0x05, 0x08..0x0F */
 #define AM2_KIND538_ARM_NEITHER   2
 
-#define AM2_OBJ_KIND538   0x538
-#define AM2_OBJ_KIND53C   0x53C
-#define AM2_OBJ_SEQ       0x74        /* sub-record the readiness test reads */
 #define AM2_SEQ_FRAMES    0x44        /* pointer; its first int16 is a count */
 #define AM2_SEQ_POS       0x51        /* unsigned byte, the position */
 
-int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
+int32_t __cdecl ObjNextKind538(const AM2_Object *obj, int32_t want)
 {
-    const uint8_t *o    = (const uint8_t *)obj;
-    int32_t        cur  = *(const int32_t *)(o + AM2_OBJ_KIND538);
-    int32_t        over = *(const int32_t *)(o + AM2_OBJ_KIND53C);
+    const AM2_Object *o    = obj;
+    int32_t        cur  = o->pose;
+    int32_t        over = o->posePending;
     int32_t        alt  = over;
     int32_t        skip;
     const uint8_t *seq;
@@ -885,7 +882,7 @@ int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
         break;
     }
 
-    seq = *(const uint8_t *const *)(o + AM2_OBJ_SEQ);
+    seq = (const uint8_t *)o->rowSet.rows;
     if (!skip) {
         const uint8_t *frames = *(const uint8_t *const *)(seq + AM2_SEQ_FRAMES);
 
@@ -1130,10 +1127,10 @@ int32_t __cdecl MapCode18To28(int32_t code)
 /* The index table at 0x00449F24 selects between two arms, and its entries are
  * 0 and 1 -- the same values the arms return -- so the table IS the answer.
  * Read out of the image along with the two-entry jump table at 0x00449F1C. */
-int32_t __cdecl ObjCodeUnmapped(const void *obj)
+int32_t __cdecl ObjCodeUnmapped(const AM2_Object *obj)
 {
-    const uint8_t  *o    = (const uint8_t *)obj;
-    const uint32_t *link = *(const uint32_t *const *)(o + 0xC0);
+    const AM2_Object  *o    = obj;
+    const uint32_t *link = ((const uint32_t *)o->typeRec);
 
     switch (*link) {
     case 0x18:
@@ -1146,13 +1143,13 @@ int32_t __cdecl ObjCodeUnmapped(const void *obj)
     return 1;
 }
 
-int32_t __cdecl MeetsAllThree(const void *p)
+int32_t __cdecl MeetsAllThree(AM2_Object *p)
 {
-    const uint8_t *b = (const uint8_t *)p;
+    const AM2_Object *b = p;
 
-    if (!(b[8] & 4)
-        && *(const int32_t *)b == 1
-        && **(const int32_t *const *)(b + 0x94) == 0x1F)
+    if (!(b->flagsLo & 4)
+        && (int32_t)b->type == 1
+        && *((const int32_t *)b->field94) == 0x1F)
         return 1;
     return 0;
 }

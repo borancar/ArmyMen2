@@ -51,7 +51,7 @@ int32_t __cdecl ArmiesAllied(int32_t a, int32_t b)
     return AllyFlag(a, b);
 }
 
-int32_t __cdecl ObjIsFriendly(const void *obj)
+int32_t __cdecl ObjIsFriendly(const AM2_Object *obj)
 {
     const AM2_Object *o = (const AM2_Object *)obj;
     int8_t            owner;
@@ -89,7 +89,7 @@ void *__cdecl LookupOwnerObj(uint32_t owner)
             (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
 
         if (obj && obj->type == AM2_OBJ_TYPE_2
-            && *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS))
+            && obj->sarge)
             return obj;
         /* The list pointer is re-read from the global every iteration, as the
          * original does; nothing here can move it. */
@@ -128,7 +128,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(AM2_Object *obj))
  * bits, and nothing to mistype. The table is FLOATS and the share is a
  * DOUBLE, which is what `fmul dword` and `fmul qword` say. */
 
-void __cdecl SetMaxHealth(void *obj, int32_t amount)
+void __cdecl SetMaxHealth(AM2_Object *obj, int32_t amount)
 {
     AM2_Object *o   = (AM2_Object *)obj;
     int16_t    *max = (int16_t *)((uint8_t *)o + OBJ_OFF_MAX_HEALTH);
@@ -164,24 +164,24 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
 
 typedef void (__cdecl *AM2_Type238ActionFn)(void *obj, int32_t arg);
 
-void __cdecl SetLeadsAndAct(void *obj)
+void __cdecl SetLeadsAndAct(AM2_Object *obj)
 {
-    *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS) = 1;
+    obj->sarge = 1;
     Type238Action((AM2_Object *)obj, AM2_LEADS_ACTION_ARG);
 }
 
-void *__cdecl ListFirstObj(const void *obj)
+void *__cdecl ListFirstObj(const AM2_Object *obj)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
 
     if (!obj)
         return 0;
-    if (*(const int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) < 1)
+    if (o->posePending < 1)
         return 0;
-    return LookupByUID(**(const uint32_t **)(o + VEHICLE_OFF_PTR_LIST + 8));
+    return LookupByUID(*o->riders.uids);
 }
 
-uint32_t __cdecl ListFirstField548(const void *obj)
+uint32_t __cdecl ListFirstField548(const AM2_Object *obj)
 {
     return ObjType2Field548((const AM2_Object *)ListFirstObj(obj));
 }
@@ -239,10 +239,10 @@ extern "C" int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out);
  * occupied it is SetObjContext on the VEHICLE instead, which keeps the
  * selection where it was and just refreshes what the HUD is looking at.
  */
-int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
+int32_t __cdecl ExitOneFromVehicle(int32_t seat, AM2_Object *vehicle)
 {
-    uint8_t  *v = (uint8_t *)vehicle;
-    uint8_t  *occupant;
+    AM2_Object  *v = vehicle;
+    AM2_Object *occupant;
     AM2_Point  at;
 
     if (!vehicle)
@@ -250,66 +250,61 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
 
     if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
-                              *(const int8_t *)(v + OBJ_OFF_ARMY)))
+                              v->owner))
         return 0;
 
     /* The seat list is addressed from the vehicle at each use. */
-#define seats (v + VEHICLE_OFF_PTR_LIST)
-    if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) < seat)
+    if (v->riders.count < seat)
         return 0;
 
-    occupant = (uint8_t *)LookupByUID(
-        (*(uint32_t *const *)(seats + SUBREC_OFF_ROWS))[seat]);
+    occupant = LookupByUID(v->riders.uids[seat]);
     if (!occupant)
         return 0;
 
-    if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
-        && *(const int16_t *)(v + OBJ_OFF_HEALTH) != 0) {
+    if (v->vehicleKind == AM2_VEHICLE_KIND_BOAT
+        && v->health != 0) {
         if (!BoatExitPoint(v, &at)) {
             PlaySoundAt(3, 0, 0,
-                        *(const int16_t *)(v + OBJ_OFF_POS),
-                        *(const int16_t *)(v + OBJ_OFF_POS + 2));
+                        v->pos.x,
+                        v->pos.y);
             return 0;
         }
     } else {
         /* Two halfword stores into the point, as the image makes them. */
-        ((AM2_Point *)&at)->x = (int16_t)(*(const int16_t *)(v + OBJ_OFF_POS)
-                                          - AM2_VEHICLE_EXIT_OFFSET);
-        ((AM2_Point *)&at)->y = (int16_t)(*(const int16_t *)(v + OBJ_OFF_POS + 2)
-                                          - AM2_VEHICLE_EXIT_OFFSET);
+        at.x = (int16_t)(v->pos.x - AM2_VEHICLE_EXIT_OFFSET);
+        at.y = (int16_t)(v->pos.y - AM2_VEHICLE_EXIT_OFFSET);
     }
 
-    *(int32_t *)(occupant + OBJ_OFF_RIDING) = 0;
-    ((AM2_Rec *)seats)->ListRemoveAt(seat);
+    occupant->riding = 0;
+    ((AM2_Rec *)&v->riders)->ListRemoveAt(seat);
 
     if (AM2_THE_COMM->CommMustBroadcast(
-                          *(const int8_t *)(v + OBJ_OFF_ARMY)))
+                          v->owner))
         SendVehicleExit(v, occupant);
 
-    DeployItem((AM2_Object *)occupant, at, 0, 0);
+    DeployItem(occupant, at, 0, 0);
 
-    if (*(const uint32_t *)(v + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
-        if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) <= 0) {
+    if (v->flags & OBJ_FLAG_SELECTED) {
+        if (v->riders.count <= 0) {
             SelectUnit(occupant);
             DeselectUnit(v);
             return 1;
         }
-        SetObjContext((AM2_Object *)v);
+        SetObjContext(v);
     }
 
     return 1;
-#undef seats
 }
 
-void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
+void __cdecl ExitAllFromVehicle(AM2_Object *vehicle, uint32_t damageOwner)
 {
-    uint8_t *v = (uint8_t *)vehicle;
+    AM2_Object *v = vehicle;
     int32_t  seat;
 
-    for (seat = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4) - 1;
+    for (seat = v->riders.count - 1;
          seat >= 0; seat--) {
         void    *rider = LookupByUID(
-            (*(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[seat]);
+            (v->riders.uids)[seat]);
         int32_t  kind;
 
         if (!ExitOneFromVehicle(seat, vehicle)
@@ -319,19 +314,18 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
             /* Looked up a SECOND time, from a freshly re-read list pointer,
              * before the slot is removed. The original does not reuse the
              * pointer it already has. */
-            uint8_t *out = (uint8_t *)LookupByUID(
-                (*(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[seat]);
+            AM2_Object *out = LookupByUID((v->riders.uids)[seat]);
 
-            ((AM2_Rec *)(v + VEHICLE_OFF_PTR_LIST))->ListRemoveAt(seat);
+            ((AM2_Rec *)&v->riders)->ListRemoveAt(seat);
             if (out) {
-                *(int32_t *)(out + OBJ_OFF_RIDING) = 0;
+                out->riding = 0;
                 if (AM2_THE_COMM->CommMustBroadcast(
                                       (int16_t)((const AM2_Object *)v)->owner))
                     SendVehicleExit(vehicle, out);
             }
         }
 
-        kind = *(const int32_t *)(v + VEHICLE_OFF_KIND);
+        kind = v->vehicleKind;
         if (kind == 3 || kind == 2 || !rider)
             continue;
 
@@ -695,18 +689,18 @@ allied:
  * The army is sign-extended for the comparison against ADDR_DEFAULT_OWNER and
  * passed to AllyFlag as that same widened value.
  */
-int32_t __cdecl ObjIsOurs(void *obj, int32_t allies)
+int32_t __cdecl ObjIsOurs(AM2_Object *obj, int32_t allies)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
     int32_t  army;
     int32_t  mine;
 
     if (*(void *const *)&g_mpSession
         && ObjIsType2((const AM2_Object *)o)
-        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
+        && o->soldierKind == 7)
         return 0;
 
-    army = *(const int8_t *)(o + OBJ_OFF_ARMY);
+    army = o->owner;
     mine = (int32_t)g_defaultOwner;
 
     if (army == mine)
@@ -737,24 +731,24 @@ int32_t __cdecl ObjIsOurs(void *obj, int32_t allies)
  * one constant, which is a compiler folding and not a fact about either --
  * written out as the two constants they are.
  */
-int32_t __cdecl ObjIsLiveTarget(void *obj)
+int32_t __cdecl ObjIsLiveTarget(AM2_Object *obj)
 {
-    uint8_t *o     = (uint8_t *)obj;
-    uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    AM2_Object *o     = obj;
+    uint32_t flags = o->flags;
 
     if (flags & OBJ_FLAG_BIT8)
         return 1;
     if (*(const int32_t *)o == 7)
         return 1;
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+    if (o->health == 0)
         return 0;
     if (ObjIsItem((const AM2_Object *)o)
-        && *(const int16_t *)(o + OBJ_OFF_HEALTH) < 0)
+        && o->health < 0)
         return 0;
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (o->flagsLo & OBJ_FLAG_DESTROYED)
         return 0;
 
-    return *(const uint8_t *)(o + OBJ_OFF_ARMY) != AM2_ARMY_NEUTRAL;
+    return (uint8_t)o->owner != AM2_ARMY_NEUTRAL;
 }
 
 /* ObjIsHittable -- original 0x004036C0, and the shortest of the three.
@@ -774,13 +768,13 @@ int32_t __cdecl ObjIsLiveTarget(void *obj)
  * call would remove the log line -- which is one of the few things an A/B can
  * see.
  */
-int32_t __cdecl ObjIsHittable(void *obj)
+int32_t __cdecl ObjIsHittable(AM2_Object *obj)
 {
-    uint8_t *o     = (uint8_t *)obj;
-    uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    AM2_Object *o     = obj;
+    uint32_t flags = o->flags;
 
     if (!(flags & OBJ_FLAG_BIT8)) {
-        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        if (o->health == 0)
             return 0;
         if (flags & OBJ_FLAG_DESTROYED)
             return 0;
@@ -849,7 +843,7 @@ int army_install(void)
  *
  * No bounds check, deliberately: a kind outside 0..5 reads past the table,
  * which is the original's behaviour. */
-const char *__cdecl VehicleKindName(const void *vehicle)
+const char *__cdecl VehicleKindName(const AM2_Object *vehicle)
 {
     const char *const *names =
         g_vehicleNames;
@@ -857,6 +851,5 @@ const char *__cdecl VehicleKindName(const void *vehicle)
     if (vehicle == 0)
         return names[AM2_VEHICLE_NAME_UNKNOWN];
 
-    return names[*(const int32_t *)((const uint8_t *)vehicle
-                                    + VEHICLE_OFF_KIND)];
+    return names[vehicle->vehicleKind];
 }

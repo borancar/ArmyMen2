@@ -266,7 +266,7 @@ found:
  * header here would drag windows.h into a flat module. The same reason
  * script.cpp forward-declares PreloadSprite. */
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
-                            int32_t (__cdecl *keep)(void *obj));
+                            int32_t (__cdecl *keep)(AM2_Object *obj));
 
 uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
 {
@@ -280,7 +280,7 @@ uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
     box.bottom = where.y + AM2_AIR_ENEMY_RADIUS;
 
     o = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
-                                 (int32_t (__cdecl *)(void *))MeetsAllThree);
+                                 MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
      * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a
@@ -1277,7 +1277,7 @@ void __cdecl ToggleFogOfWar(void)
             continue;
         if (!ObjIsTypeIn238((const AM2_Object *)p))
             continue;
-        if (ObjIsFriendly(p))
+        if (ObjIsFriendly((const AM2_Object *)p))
             continue;
 
         if (*fog) {

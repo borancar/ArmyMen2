@@ -42,7 +42,11 @@ typedef struct {
     const void        *list;      /* +0x00 SUBREC_OFF_LIST */
     int32_t            count;     /* +0x04 SUBREC_OFF_COUNT */
     struct AM2_MapRow *rows;      /* +0x08 */
-    int32_t            capacity;  /* +0x0C */
+    union {                       /* +0x0C */
+        int32_t        capacity;
+        const uint8_t *hitMask;   /*   OBJ_OFF_HIT_MASK on an object: non-null
+                                   *   means test the bitmask too */
+    };
 } AM2_RowSet;
 
 /* AM2_FireSpot is in point.h, beside AM2_Point. */

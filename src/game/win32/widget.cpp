@@ -6557,7 +6557,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         }
 
     } else if (ObjIsType3((const AM2_Object *)obj)) {
-        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName(obj));
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName((const AM2_Object *)obj));
 
         /* Armour is clamped to two digits; nothing else here is. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "AR:");
@@ -7066,7 +7066,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
         /* A vehicle offers Sarge's two when he is its first occupant, and
          * otherwise the trooper's three: the image's `je 0x004173F6` lands
          * on the trooper arm's first store, past its type test. */
-        if (ObjType2Field548((const AM2_Object *)ListFirstObj(CTX))) {
+        if (ObjType2Field548((const AM2_Object *)ListFirstObj((const AM2_Object *)CTX))) {
             slots[0] = 1;
             slots[1] = 2;
         } else
@@ -17109,11 +17109,11 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
         if (ObjIsType2Inline(o))
             ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
 
-        if (!ExitOneFromVehicle(1, veh))
+        if (!ExitOneFromVehicle(1, (AM2_Object *)veh))
             break;
     }
 
-    ExitOneFromVehicle(0, veh);
+    ExitOneFromVehicle(0, (AM2_Object *)veh);
 
     for (i = 0; i < *(const int32_t *)(veh + SAVED_OFF_LIST_COUNT); ) {
         uint8_t *o = (uint8_t *)LookupByUID(

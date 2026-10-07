@@ -439,7 +439,7 @@ int32_t __cdecl IsKind14Or22(int32_t kind);
  * possible and lands outside the range; and 7..70 is the kind of span an
  * object-type enumeration has, which is the sort of thing data/<map>/object.aai
  * lists in its Type column. */
-int32_t __cdecl ClassifyByCode74(const void *obj);
+int32_t __cdecl ClassifyByCode74(const struct AM2_Object *obj);
 
 /* 0x0045EE20 and 0x00433520. Two membership tests over a kind code, each a
  * jump table with only "yes" and "no" arms, so what they really are is a
@@ -543,7 +543,7 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
  * `0x80 >> (x & 7)` and nothing observes the difference.
  *
  * Returns the masked BIT, not a boolean, like BitmapBitSet. */
-int32_t __cdecl ObjMaskBitAt(const void *obj, const AM2_Point *at);
+int32_t __cdecl ObjMaskBitAt(const struct AM2_Object *obj, const AM2_Point *at);
 
 
 /* 0x00402700. XOR of the record's own dwords, its length taken from inside it:
@@ -619,7 +619,7 @@ int32_t __cdecl Field51MeetsMin(const void *p);
 /* 0x0040D860. Whether the dword at +0x538 is between 10 and 17 inclusive --
  * the same range IsKind10To17 tests, read from the object instead of taken as
  * an argument. Signed comparisons, so a negative value is outside. */
-int32_t __cdecl ObjKind538In10To17(const void *obj);
+int32_t __cdecl ObjKind538In10To17(const struct AM2_Object *obj);
 
 /* 0x0040D880. Which value of +0x538 the object should take, given the one
  * asked for. Returns the CURRENT value when the change is refused, so a caller
@@ -647,7 +647,7 @@ int32_t __cdecl ObjKind538In10To17(const void *obj);
  * Named for the field, not for what the field means. +0x538 is the same one
  * ObjKind538In10To17 tests and +0x53C the one Field53C reads, and neither of
  * those established what either holds. */
-int32_t __cdecl ObjNextKind538(const void *obj, int32_t want);
+int32_t __cdecl ObjNextKind538(const struct AM2_Object *obj, int32_t want);
 
 /* 0x0041ADE0. Builds a 3-3-2 palette into the caller's buffer: the top three
  * bits of the index become the first channel, the next three the second, and
@@ -803,12 +803,12 @@ int32_t __cdecl MapCode18To28(int32_t code);
  * functions in the image and the correspondence is an observation about the
  * two tables, not a guarantee about either; writing one in terms of the other
  * would make a future divergence impossible to see. */
-int32_t __cdecl ObjCodeUnmapped(const void *obj);
+int32_t __cdecl ObjCodeUnmapped(const struct AM2_Object *obj);
 
 /* 0x00409650. Three conditions, all of which must hold: bit 2 of the byte at
  * +8 CLEAR, the dword at +0 equal to 1, and the dword at the start of the
  * record pointed to by +0x94 equal to 0x1F. */
-int32_t __cdecl MeetsAllThree(const void *p);
+int32_t __cdecl MeetsAllThree(struct AM2_Object *p);
 
 /* 0x0040F250 and 0x0040F200, both thiscall on the comm object. The player
  * records start at AM2_PLAYER_ARMY and are AM2_PLAYER_STRIDE apart.

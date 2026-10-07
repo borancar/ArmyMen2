@@ -2724,7 +2724,7 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
  * intersection, so it never sees an object that does not touch the rectangle.
  */
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
-                            int32_t (__cdecl *keep)(void *obj))
+                            int32_t (__cdecl *keep)(AM2_Object *obj))
 {
     const uint8_t *d    = (const uint8_t *)desc;
     uint8_t       *head = (uint8_t *)0;
@@ -2780,7 +2780,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                 if (!IntersectRect(&hit, (const RECT *)(o + OBJ_OFF_HIT_RECT),
                                    (const RECT *)r))
                     continue;
-                if (!keep(o))
+                if (!keep((AM2_Object *)o))
                     continue;
 
                 *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;

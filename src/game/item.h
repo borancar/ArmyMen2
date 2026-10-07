@@ -967,7 +967,7 @@ void __cdecl SetObjContext(struct AM2_Object *obj);
 /* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied
  * predicate, which runs BETWEEN the rectangle test and the mask test. */
 void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
-                              int32_t (__cdecl *keep)(void *obj));
+                              int32_t (__cdecl *keep)(struct AM2_Object *obj));
 
 /* 0x004499A0, one caller. Is the object's first row on a frame from which its
  * weapon may act? Three answers -- see the definition. */

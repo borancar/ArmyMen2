@@ -1077,7 +1077,7 @@ int32_t __cdecl PlaceScenario(void)
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
                     *(const uint32_t *)((const uint8_t *)w + OBJ_OFF_UID);
-                SetLeadsAndAct(unit);
+                SetLeadsAndAct((AM2_Object *)unit);
                 *(int32_t *)(unit + OBJ_OFF_RANK) = 7;   /* the leader outranks */
 
                 if ((uint32_t)army == g_defaultOwner) {
@@ -1342,7 +1342,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
     }
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
-    ObjInitCommon(o, g_dirScratch,
+    ObjInitCommon((AM2_Object *)o, g_dirScratch,
                   AM2_OBJ_TYPE_MISSILE, at,
                   g_missileBox,
                   initUnused, uid);
@@ -1459,7 +1459,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
 
-    ObjInitCommon(o, g_dirScratch,
+    ObjInitCommon((AM2_Object *)o, g_dirScratch,
                          AM2_OBJ_TYPE_MISSILE,
                          *(const AM2_Point *)(h + OBJ_OFF_POS),
                          g_missileBox,
@@ -1580,7 +1580,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, g_roachHealth);
+        SetMaxHealth((AM2_Object *)o, g_roachHealth);
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
@@ -1715,7 +1715,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, g_rankRecords[rank].max_health);
+        SetMaxHealth((AM2_Object *)o, g_rankRecords[rank].max_health);
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
@@ -1930,7 +1930,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+        SetMaxHealth((AM2_Object *)o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
@@ -2735,7 +2735,7 @@ void __cdecl DefFinish(void)
  * `neg eax; sbb eax, eax; inc eax` is the compiler's `== 0`, so the filter
  * keeps exactly the objects our army is NOT allied with: enemies. Written as
  * the negation rather than transcribed as three instructions. */
-int32_t __cdecl WalkCellKeepEnemy(void *obj)
+int32_t __cdecl WalkCellKeepEnemy(AM2_Object *obj)
 {
     return ArmyAlliedWithObj((int32_t)g_defaultOwner, (const AM2_Object *)obj, 0) == 0;
 }

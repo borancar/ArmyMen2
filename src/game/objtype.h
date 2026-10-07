@@ -137,7 +137,7 @@ static inline int32_t ObjIsTypeIn238Inline(const void *obj)
 }
 
 /* Original: 0x00413690. SelectionClick's filter: may a click pick this? */
-int32_t __cdecl ObjIsSelectable(void *o);
+int32_t __cdecl ObjIsSelectable(struct AM2_Object *o);
 
 /* 0x0045D970. The registry lookup and the type test in one: the object
  * registered for `uid` if it is type 3, and NULL for every other answer --
@@ -156,7 +156,7 @@ int objtype_install(void);
 
 /* 0x00433880, two callers. Build an object out of an AAI record. Eight
  * arguments. */
-int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
+int32_t __cdecl InitObjFromAai(struct AM2_Object *obj, char *name, int32_t army,
                                int32_t index, AM2_Point at, int32_t orFlags,
                                int32_t a7, int32_t a8);
 
@@ -169,7 +169,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
  * `flag` non-zero writes the frame to OBJ_OFF_FORMATION_SLOT and leaves
  * health alone; zero writes OBJ_OFF_REPAIR_FRAME, clears the other, and
  * resets health to the record's. */
-int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
+int32_t __cdecl ApplyObjFrame(struct AM2_Object *obj, int32_t set, int32_t index,
                               int32_t frame, int32_t flag);
 
 /* ADDR_OBJ_INIT_COMMON, still original, and shared rather than typedef'd
@@ -191,7 +191,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index,
  * the prototype said void for as long as only our callers read it, and four
  * of the eight are still the original's. `name` is NOT const: the function
  * lower-cases the caller's buffer in place. Arg 6 is never read. */
-int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
+int32_t __cdecl ObjInitCommon(struct AM2_Object *obj, char *name, int32_t type,
                               AM2_Point at, const int32_t *box,
                               int32_t unused, uint32_t uid);
 

@@ -50,7 +50,7 @@ int32_t __cdecl ArmiesAllied(int32_t a, int32_t b);
  * It dereferences `obj` unconditionally on the ordinary path -- the null test
  * at the top guards only the multiplayer block, and falls THROUGH to the read.
  * Reproduced; no caller passes null. */
-int32_t __cdecl ObjIsFriendly(const void *obj);
+int32_t __cdecl ObjIsFriendly(const struct AM2_Object *obj);
 
 /* 0x004574D0. Whether two objects are on the same side: AllyFlag with four
  * exceptions -- a multiplayer kind 7 is allied only to another kind 7, army 4
@@ -119,13 +119,13 @@ void __cdecl ForEachArmyObject(int32_t army,
  * x86-64 `long double` IS the x87 type, so this is the same function; plain
  * `double` would differ in the last place for some amounts and would only ever
  * show up as one health point somewhere. */
-void __cdecl SetMaxHealth(void *obj, int32_t amount);
+void __cdecl SetMaxHealth(struct AM2_Object *obj, int32_t amount);
 
 /* 0x0044BBD0, two callers. Put 1 in the dword at +0x548 -- the same field
  * LookupOwnerObj looks for -- and then run the type-2/3/8 action at
  * 0x00457CD0 with 0x2710. Whatever +0x548 means, this is what SETS it, and
  * nothing else in the tree does. The name is ours. */
-void __cdecl SetLeadsAndAct(void *obj);
+void __cdecl SetLeadsAndAct(struct AM2_Object *obj);
 
 /* 0x0045AFB0 and 0x0045AFE0, four and four callers. The first entry of the
  * three-field list at +0x538, resolved to an object; and the same run through
@@ -134,8 +134,8 @@ void __cdecl SetLeadsAndAct(void *obj);
  * Null for a null argument or an empty list, and the empty case answers 0
  * rather than falling through -- the count at +0x53C is tested against 1
  * before the pointer at +0x540 is touched. */
-void *__cdecl ListFirstObj(const void *obj);
-uint32_t __cdecl ListFirstField548(const void *obj);
+void *__cdecl ListFirstObj(const struct AM2_Object *obj);
+uint32_t __cdecl ListFirstField548(const struct AM2_Object *obj);
 
 /* 0x0045AE30, one caller, and it names itself twice: "ExitAllFromVehicle: I
  * was killed in a vehicle, damage owner is me" and "... not me".
@@ -158,9 +158,9 @@ uint32_t __cdecl ListFirstField548(const void *obj);
  * choose a spot beside it, unlink the seat, put the occupant on the ground and
  * move the selection if that emptied it. Answers 1 when somebody came out.
  * Was ADDR_VEHICLE_SEAT_BLOCKED, which was named from a call site. */
-int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle);
+int32_t __cdecl ExitOneFromVehicle(int32_t seat, struct AM2_Object *vehicle);
 
-void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner);
+void __cdecl ExitAllFromVehicle(struct AM2_Object *vehicle, uint32_t damageOwner);
 
 int army_install(void);
 
@@ -224,12 +224,12 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army,
 
 /* 0x00403600, 0x00403660 and 0x004036C0 -- three target predicates sharing
  * one functions.tsv entry, so all three are reconstructed together. */
-int32_t __cdecl ObjIsOurs(void *obj, int32_t allies);
-int32_t __cdecl ObjIsLiveTarget(void *obj);
-int32_t __cdecl ObjIsHittable(void *obj);
+int32_t __cdecl ObjIsOurs(struct AM2_Object *obj, int32_t allies);
+int32_t __cdecl ObjIsLiveTarget(struct AM2_Object *obj);
+int32_t __cdecl ObjIsHittable(struct AM2_Object *obj);
 
 /* 0x0045D990. The vehicle's display name for the HUD squad panel, or the
  * table's own "???" slot for a NULL vehicle. */
-const char *__cdecl VehicleKindName(const void *vehicle);
+const char *__cdecl VehicleKindName(const struct AM2_Object *vehicle);
 
 #endif /* AM2_ARMY_H */

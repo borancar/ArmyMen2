@@ -4781,7 +4781,7 @@ tail:
  * linkage. Getting that backwards is a link error rather than a silent one,
  * which is the only reason it is safe to repeat a declaration at all. */
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
-                            int32_t (__cdecl *keep)(void *obj));
+                            int32_t (__cdecl *keep)(AM2_Object *obj));
 
 /* 0x0045CAA0 called with ONE argument and no format string -- a third role for
  * that folded `ret`, neither the varargs logger nor a vtable slot. See orig.h.
