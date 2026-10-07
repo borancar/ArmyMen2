@@ -4552,7 +4552,7 @@ void __cdecl HudRepaintOne(void)
     w = (g_hudWidgetTable)
             [g_hudIndex];
 
-    *((uint8_t *)w + HUDWIDGET_OFF_FLAG70) = 0;
+    ((AM2_CountButton *)w)->lit = 0;
 
     WidgetVPaint(w, w->rect);
 }
@@ -9026,8 +9026,7 @@ void __cdecl BattleJoinOk(void)
             CommGetSessionDesc(comm);
             comm = g_commObject;
             comm->playerCount =
-                *(const int32_t *)((uint8_t *)comm->sessionDesc
-                                   + AM2_DPSESSION_OFF_CUR_PLAYERS);
+                (int32_t)((const DPSESSIONDESC2 *)comm->sessionDesc)->dwCurrentPlayers;
         }
 
         if (g_commObject->CommCreatePlayer(name, 0, 0, 0)) {
@@ -10929,7 +10928,7 @@ void __cdecl OnMpName(AM2_Widget *w)
     /* The comm object and the row are re-read where the image re-reads
      * them: after the flag is set. */
 #define COMM (g_commObject)
-#define ROW  (*(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW))
+#define ROW  (((AM2_ButtonBase *)w)->row)
     int32_t *active;
 
     if (!COMM->isHost)
@@ -10985,7 +10984,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
 {
 #define comm (g_commObject)
     AM2_MpPanelScreen *screen = (AM2_MpPanelScreen *)(g_paintObject);
-    int32_t  row    = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t  row    = ((AM2_ButtonBase *)w)->row;
     int32_t *sel;
     int32_t  next;
     int32_t  army;
@@ -11001,7 +11000,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
         if (sel[row] == -1)
             sel[row] = row;
 
-        row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+        row  = ((AM2_ButtonBase *)w)->row;
         next = sel[row] + 1;
         if (next >= AM2_PLAYERS_MAX)
             next = row + 1;
@@ -11010,7 +11009,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
         army = ((AM2_Comm *)comm)->CommArmyOfSlot(next);
         if (comm->isHost) {
             ((AM2_Comm *)comm)->CommSetArmyColour(
-                                 *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
+                                 ((AM2_ButtonBase *)w)->row,
                                  army);
             PlaySoundAt(2, 0, 0, 0, 0);
             SendPlayerMsg(0);
@@ -11079,7 +11078,7 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
 {
 #define comm (g_commObject)
-    int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t  row  = ((AM2_ButtonBase *)w)->row;
     int32_t *team;
     int32_t  next;
 
@@ -11110,7 +11109,7 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w)
 void __cdecl OnMpTeamRight(AM2_Widget *w)
 {
 #define comm (g_commObject)
-    int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t  row  = ((AM2_ButtonBase *)w)->row;
     int32_t *team;
     int32_t  next;
 
@@ -11197,7 +11196,7 @@ AM2_TextList::AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t o
     self->colours[3] = g_colourDarkGrey;
     self->colours[4] = g_hudColour;
 
-    *(int32_t *)((uint8_t *)self + LISTBOX_OFF_READ_ONLY) = 1;
+    self->disabled = 1;
     self->chosen  = -1;
 }
 
@@ -11698,7 +11697,7 @@ AM2_MoviesScreen::~AM2_MoviesScreen()
 
     AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
 
-    pair = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
+    pair = &this->sprites[0][0];
     for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++) {
         /* addressed from the pair's SECOND sprite: that is the base the
          * original's loop register holds ([esi-4], [esi]) */
@@ -12844,8 +12843,8 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
                 continue;
             if (parent->rows[i]->key != key)
                 continue;
-            *(int32_t *)((uint8_t *)parent->rows[i] + KEYROW_OFF_KEY)     = 0;
-            *(const char **)((uint8_t *)parent->rows[i] + LABEL_OFF_TEXT) = none;
+            parent->rows[i]->key  = 0;
+            parent->rows[i]->text = none;
         }
     }
 }
@@ -15652,7 +15651,7 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
 {
     AM2_Widget *w = this;
     AM2_ArrowBar    *self = (AM2_ArrowBar *)w;
-    AM2_Widget *arrow;
+    AM2_Arrow  *arrow;
 
     AM2_CTOR_VTABLE(w, VTABLE_ARROWBAR);
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
@@ -15663,7 +15662,7 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
     self->up = arrow;
     ::WidgetAddChild(parent, arrow);
     (self->up)->flag50 = flag50;
-    *(int32_t *)((uint8_t *)self->up + ARROW_OFF_FLAG5C) = 1;
+    self->up->repeats = 1;
 
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y + box.bottom - 9, 0x13, 9),
                           (const char *)AM2_BMP_DNARROW1,
@@ -15671,7 +15670,7 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
     self->down = arrow;
     ::WidgetAddChild(parent, arrow);
     (self->down)->flag50 = flag50;
-    *(int32_t *)((uint8_t *)self->down + ARROW_OFF_FLAG5C) = 1;
+    self->down->repeats = 1;
 
     w->flag50 = flag50;
     self->sprite0 = PreloadSpriteName(b0, 1, 1);
@@ -15679,7 +15678,7 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
     ::WidgetScreenRect(w);
 
     self->span = span;
-    *(int32_t *)((uint8_t *)self + ARROWBAR_OFF_LIST) = 0;
+    self->list = 0;
     w->unknown48              = 0;
     self->shift = 0;
     *(int32_t *)((uint8_t *)self + 0x6C) = 0;
@@ -15980,7 +15979,7 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
     self->range = AM2_SCROLLBAR_RANGE;
     self->shift = 0;
     *(int32_t *)((uint8_t *)self + 0x68)                = 0;
-    *(uint32_t *)((uint8_t *)self + SCROLLBAR_OFF_ONCHANGE) = 0;
+    self->onChange = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScrollBarDelete(int32_t flags)
@@ -16095,7 +16094,7 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
     self->min   = lo;
     self->max   = hi;
     self->step = step;
-    *(int32_t *)((uint8_t *)self + MPSPIN_OFF_ROW)  = row;
+    self->row  = row;
 
     inner = box.right - 0x29;
 
@@ -16131,8 +16130,7 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
      * parent's position, and that is the signature to look for. */
     self->up = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)self->up
-                 + ARROW_OFF_FLAG5C) = 1;
+    self->up->repeats = 1;
 
     /* BOTTOM-ALIGNED, not stacked under the up arrow: the original is
          * `mov edx,[esi+8]; mov eax,<height>; lea ecx,[edx+eax-9]` at
@@ -16142,8 +16140,7 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
                         "03_009_01_dnarrow.bmp", "03_009_02_dnarrow.bmp", SpinDown);
     self->down = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)self->down
-                 + ARROW_OFF_FLAG5C) = 1;
+    self->down->repeats = 1;
 
     am2_sprintf(self->text,
                 "%i", value);
@@ -16182,7 +16179,7 @@ void __attribute__((thiscall)) AM2_Widget::MpSpinRepaint()
 void __cdecl SpinCommit(AM2_Widget *w)
 {
     AM2_MpSpin *spin =
-        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_EDIT);
+        (AM2_MpSpin *)((AM2_Edit *)w)->owner;
     AM2_Edit *edit =
         (AM2_Edit *)spin->edit;
     int32_t     v = orig_atoi(edit->text);
@@ -16198,7 +16195,7 @@ void __cdecl SpinCommit(AM2_Widget *w)
 void __cdecl SpinUp(AM2_Widget *w)
 {
     AM2_MpSpin *spin =
-        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+        (AM2_MpSpin *)((AM2_Arrow *)w)->owner;
     AM2_Edit *edit =
         (AM2_Edit *)spin->edit;
     int32_t     v = orig_atoi(edit->text)
@@ -16214,7 +16211,7 @@ void __cdecl SpinUp(AM2_Widget *w)
 void __cdecl SpinDown(AM2_Widget *w)
 {
     AM2_MpSpin *spin =
-        (AM2_MpSpin *)*(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+        (AM2_MpSpin *)((AM2_Arrow *)w)->owner;
     AM2_Edit *edit =
         (AM2_Edit *)spin->edit;
     int32_t     v = orig_atoi(edit->text)

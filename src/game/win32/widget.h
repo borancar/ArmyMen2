@@ -516,8 +516,8 @@ struct AM2_TextList : AM2_ListBox {
 struct AM2_ArrowBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     struct AM2_ListBox *list;       /* 0x0058  ARROWBAR_OFF_LIST, the list it scrolls */
-    AM2_Widget *up;                 /* 0x005C  ARROWBAR_OFF_UP */
-    AM2_Widget *down;               /* 0x0060  ARROWBAR_OFF_DOWN */
+    struct AM2_Arrow *up;           /* 0x005C  ARROWBAR_OFF_UP */
+    struct AM2_Arrow *down;         /* 0x0060  ARROWBAR_OFF_DOWN */
     AM2_Sprite *sprite0;            /* 0x0064  ARROWBAR_OFF_SPRITE0, the thumb */
     AM2_Sprite *sprite1;            /* 0x0068  ARROWBAR_OFF_SPRITE1 */
     int32_t     field6C;            /* 0x006C */
