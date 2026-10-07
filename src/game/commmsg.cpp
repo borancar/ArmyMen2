@@ -1308,7 +1308,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
             *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
 
     TrooperDropItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                    *(const uint32_t *)(m + MSG_DROP_OFF_AT));
+                    *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
 }
 
 /* RecvTroopPair -- original 0x0044C960, one caller. Message kind 0x18.

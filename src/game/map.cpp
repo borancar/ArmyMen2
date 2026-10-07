@@ -96,25 +96,22 @@ uint32_t __cdecl Checksum(const char *path)
 }
 
 #if defined(_MSC_VER)
-extern "C" uint16_t __cdecl TileOfPoint(uint32_t packed)
+extern "C" uint16_t __cdecl TileOfPoint(AM2_Point pt)
 #else
-int32_t __cdecl TileOfPoint(uint32_t packed)
+int32_t __cdecl TileOfPoint(AM2_Point pt)
 #endif
 {
-    /* The point's halves read as words out of the argument slot. */
-#define PT (*(const AM2_Point *)&packed)
-    if (PT.x < 0 || PT.y < 0)
+    if (pt.x < 0 || pt.y < 0)
         return 0;
-    if (PT.x >= g_mapExtentX)
+    if (pt.x >= g_mapExtentX)
         return 0;
-    if (PT.y >= g_mapExtentY)
+    if (pt.y >= g_mapExtentY)
         return 0;
-    return (PT.y >> AM2_TILE_SHIFT) * g_mapTilesW
-           + (PT.x >> AM2_TILE_SHIFT);
-#undef PT
+    return (pt.y >> AM2_TILE_SHIFT) * g_mapTilesW
+           + (pt.x >> AM2_TILE_SHIFT);
 }
 
-uint32_t __cdecl PointOfTile(int32_t tile)
+AM2_Point __cdecl PointOfTile(int32_t tile)
 {
     AM2_Point p;   /* built in memory -- the original reuses `tile`'s slot */
 
@@ -127,7 +124,7 @@ uint32_t __cdecl PointOfTile(int32_t tile)
     p.y = (int16_t)((((uint16_t)tile
                       >> *(const int16_t *)&g_mapRowShift)
                      << AM2_TILE_SHIFT) + 8);
-    return *(const uint32_t *)&p;
+    return p;
 }
 
 /* 0x0042B210, five callers -- PointOfTile's two-pointer twin.
@@ -638,16 +635,14 @@ void *__cdecl ScriptListFind(char *name)
  * established, and neither is whether any of them had a zero-length line.
  * Said as the gap it is rather than argued away as likely.
  */
-void __cdecl TraceTileLine(uint32_t from, uint32_t to,
+void __cdecl TraceTileLine(AM2_Point from, AM2_Point to,
                            uint16_t *tiles, int32_t *count)
 {
-    /* Both points are packed: x in the low half, y in the high, each signed.
-       The original reads them with `movsx`, so the shift is arithmetic. */
-#define PT(p) (*(const AM2_Point *)&(p))
-    int32_t tx0 = PT(from).x >> 4;
-    int32_t ty0 = PT(from).y >> 4;
-    int32_t tx1 = PT(to).x >> 4;
-    int32_t ty1 = PT(to).y >> 4;
+    /* The coordinates are signed (`movsx`), so the shift is arithmetic. */
+    int32_t tx0 = from.x >> 4;
+    int32_t ty0 = from.y >> 4;
+    int32_t tx1 = to.x >> 4;
+    int32_t ty1 = to.y >> 4;
     int32_t dx  = tx1 - tx0;
     int32_t dy  = ty1 - ty0;
     int32_t adx = abs(dx) * 2;
@@ -657,10 +652,9 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
 
     int32_t stepDown = g_mapTilesW * stepY;
     /* Called as the `int` every file but this one declares it. */
-    int32_t tile = ((int32_t (__cdecl *)(uint32_t))TileOfPoint)(from);
+    int32_t tile = ((int32_t (__cdecl *)(AM2_Point))TileOfPoint)(from);
 
     int32_t i;
-#undef PT
 
     *count   = 0;
     tiles[0] = (uint16_t)tile;
@@ -1848,7 +1842,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (g_loadPending == 0) {
         void *cam = CreateItem((char *)"camera", 4,
                                g_aaiKey980000,
-                               *(const AM2_Point *)&g_zeroPoint,
+                               g_zeroXY,
                                0, 1, 0);
 
         g_evtId15Uid =
@@ -1961,11 +1955,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 flags |= *(const int32_t *)((*(uint8_t ** *)&g_aaiRecords)[aai] + 4);
                 /* Through map.h's int32_t view: the MSVC definition above
                  * returns a word, and its own callers here would widen it. */
-                SettlePointInRegion(((int32_t (__cdecl *)(uint32_t))(void *)TileOfPoint)(
-                                        *(const uint32_t *)&at),
-                                    (uint32_t *)&settled);
+                SettlePointInRegion(((int32_t (__cdecl *)(AM2_Point))(void *)TileOfPoint)(at),
+                                    &settled);
                 obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
-                                      aai, *(const uint32_t *)&at, flags,
+                                      aai, at, flags,
                                       numb, 1, 0);
             }
 

@@ -29,6 +29,7 @@
 #define AM2_PLACE_H
 
 #include <stdint.h>
+#include "dist.h"        /* AM2_Point */
 #include "image.h"        /* AM2_IMAGE -- the MakePlacedUnit seam below */
 #include "../inject/orig.h"
 
@@ -37,10 +38,9 @@ extern "C" {
 #endif
 
 /* 0x30 bytes. The parser writes x and y as separate int16s into +0x00 and
- * +0x02 and the consumer reads the pair as one packed point, so `where` is
- * spelled as the dword both halves agree on. */
+ * +0x02 and the consumer passes the pair by value as one point. */
 typedef struct {
-    uint32_t where;      /* +0x00, packed AM2_Point */
+    AM2_Point where;     /* +0x00 */
     uint8_t  facing;     /* +0x04, one byte -- the game's 0..255 angle */
     uint8_t  pad[3];     /* +0x05, never written and never read */
     int32_t  type;       /* +0x08, index into the unit-type table */
@@ -65,7 +65,7 @@ int32_t __cdecl CanAffordUnit(int32_t type, int32_t points);
  * mine and the vehicles, a CanPlaceAt against the building's own sprite for
  * the rest, and in every case the tile under the point must belong to that
  * slot's army. */
-int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
+int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
                                  int32_t pts, uint8_t facing);
 
 /* 0x0043A560. Build "<map>_<colour>_place.txt" for one comm slot. Returns
@@ -130,7 +130,7 @@ void __cdecl RefundPlacedUnit(uint8_t *o, int32_t slot, int32_t *points);
  * trooper with a weapon, a vehicle with its extra rows relinked, or an item,
  * which for a pillbox means three objects. Reconstructed; the seam it used to
  * need is gone with it. */
-void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
+void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name);
 

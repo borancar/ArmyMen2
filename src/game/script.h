@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"   /* am2_FILE, for the savegame section */
+#include "point.h"            /* AM2_Point */
 
 #include "objscript.h"
 #include "scripttokens.h"
@@ -344,7 +345,7 @@ typedef struct AM2_ScriptAction {
     int32_t subject;        /* +0x18 */
     int32_t target;         /* +0x1C */
     union {
-        struct { int16_t x, y; } pos;   /* +0x20 */
+        AM2_Point pos;                  /* +0x20 */
         int32_t                  both;  /* a pad centroid, two words at once */
     } u;
     int32_t relative;       /* +0x24, a leading `+` on the coordinates */

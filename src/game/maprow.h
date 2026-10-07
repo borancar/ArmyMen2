@@ -242,7 +242,7 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
 
 /* 0x004619F0. Spawn one particle. Argument 6 is a MODE: negative picks a
  * random direction, non-negative is an angle. */
-void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
+void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
                            int32_t kind, int32_t speed, int32_t height,
                            int32_t angle);
 
@@ -251,13 +251,13 @@ void __cdecl DiedEffectA(void *obj);
 
 /* 0x00461BA0. One to three particles where something was hit, the count from
  * a ten-entry weighted table. */
-void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
+void __cdecl SpawnHitEffect(const AM2_Point *at, int32_t rowField2C,
                             int32_t dir, int32_t height);
 
 /* 0x00461C30. The directional death burst: up to seven particles chosen by an
  * 8x7 mask indexed on the facing sector. Both its tables are decoded from the
  * prologue that builds them on the stack. */
-void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
+void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
                          int32_t rowField2C, int32_t height);
 
 #endif

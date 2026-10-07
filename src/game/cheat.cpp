@@ -85,7 +85,7 @@ static void __cdecl CheatHealOne(void *obj)
 #define CHEAT_GIVE_ITEM(kind, ammo)                                          \
     CreateWeapon(g_dirScratch, 0,               \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
-                 *(const uint32_t *)(u + OBJ_OFF_POS), 0, (ammo), 0, 0)
+                 *(const AM2_Point *)(u + OBJ_OFF_POS), 0, (ammo), 0, 0)
 
 typedef int32_t (__cdecl *am2_rand_fn)(void);
 #define orig_rand  ((am2_rand_fn)(uintptr_t)ADDR_GAME_RAND)
@@ -102,7 +102,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
 #define CHEAT_NEW_WEAPON(kind)                                               \
     ((uint8_t *)CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
-                 g_zeroPoint, 4, -1, 0, 0))
+                 g_zeroXY, 4, -1, 0, 0))
 
 /* 0x00417B80. */
 void __cdecl CheatLine(const char *line)

@@ -2065,7 +2065,7 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
      * `mov esi,[esp+0x10]` then `mov word [esp+0x14], si`. */
     point.x = (int16_t)x;
     point.y = (int16_t)z;
-    tile = (uint16_t)TileOfPoint(*(uint32_t *)&point);
+    tile = (uint16_t)TileOfPoint(point);
 
     /* The flags pointer is read once for the whole neighbourhood. */
     flags = FLAGS;
@@ -2122,7 +2122,7 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
  *
  * A point outside ADDR_MAP_BOUNDS_LEFT returns before allocating, so the
  * caller's loop can spray freely at an edge without leaking contexts. */
-void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
+void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
                            int32_t kind, int32_t speed, int32_t height,
                            int32_t angle)
 {
@@ -2136,7 +2136,7 @@ void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
     uint8_t       *row;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                     (const AM2_Point *)at))
+                     at))
         return;
 
     ctx = (uint8_t *)SeqAlloc(g_seqCtxA);
@@ -2205,7 +2205,7 @@ void __cdecl DiedEffectA(void *obj)
     int32_t        n;
 
     for (i = 0; i < 6; i++)
-        SpawnParticle((const uint32_t *)(o + OBJ_OFF_POS),
+        SpawnParticle((const AM2_Point *)(o + OBJ_OFF_POS),
                       *(const int32_t *)(o + 0x52Cu), i, 9,
                       *(const int8_t *)(o + 0x65u), -1);
 
@@ -2213,7 +2213,7 @@ void __cdecl DiedEffectA(void *obj)
     while (n > 0) {
         int32_t kind = (orig_game_rand() % 3) + 7;
 
-        SpawnParticle((const uint32_t *)(o + OBJ_OFF_POS),
+        SpawnParticle((const AM2_Point *)(o + OBJ_OFF_POS),
                       *(const int32_t *)(o + 0x52Cu), kind, 9,
                       *(const int8_t *)(o + 0x65u), -1);
         n--;
@@ -2238,7 +2238,7 @@ void __cdecl DiedEffectA(void *obj)
  * `<= 0` before the loop and the four registers it needs are pushed INSIDE
  * that test -- so the early exit skips the prologue as well, which is why the
  * function has two different stack depths at its two returns. */
-void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
+void __cdecl SpawnHitEffect(const AM2_Point *at, int32_t rowField2C,
                             int32_t dir, int32_t height)
 {
     /* A local array, built on the stack at every call as the image does --
@@ -2255,7 +2255,7 @@ void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
     }
 }
 
-void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
+void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
                          int32_t rowField2C, int32_t height)
 {
     /* Both tables are built on the stack at every call -- the image stores

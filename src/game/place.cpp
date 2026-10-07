@@ -260,14 +260,14 @@ found:
         return 3;
     if (!DefParseNumber(&x, tok))
         return 3;
-    ((AM2_Point *)&rec.where)->x = (int16_t)x;
+    rec.where.x = (int16_t)x;
 
     tok = am2_strtok((char *)0, kSep);
     if (!tok)
         return 4;
     if (!DefParseNumber(&y, tok))
         return 4;
-    ((AM2_Point *)&rec.where)->y = (int16_t)y;
+    rec.where.y = (int16_t)y;
 
     tok = am2_strtok((char *)0, kSep);
     if (!tok)
@@ -483,7 +483,7 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
  * the tile kind and once inside the arm -- and so it is here, since the image
  * lays the calls out that way. The two calls cannot disagree.
  */
-int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
+int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
                                  int32_t pts, uint8_t facing)
 {
     int32_t  tile;
@@ -564,8 +564,8 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
 
     /* The five soldiers, and the mine -- laid out last in the image. */
     case 0: case 1: case 2: case 3: case 4: case 17:
-        weight = BlockWeightAt((void *)0, *(const AM2_Point *)&where,
-                               *(const AM2_Point *)&where);
+        weight = BlockWeightAt((void *)0, where,
+                               where);
         break;
 
     default:
@@ -706,7 +706,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
  * The dead `mov ecx, ADDR_COMM_OBJECT` in front of the AllyFlag call is the
  * original's -- AllyFlag is stdcall and never reads ecx. Not reproduced,
  * because a register load with no effect has nothing to reproduce. */
-void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
+void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
@@ -721,8 +721,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
     if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
         made = (uint8_t *)CreateTrooper(
-                   (char *)name, ((const AM2_Point *)&where)->x,
-                   ((const AM2_Point *)&where)->y,
+                   (char *)name, where.x,
+                   where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
         ObjSetFieldA(made, (uint32_t)group);
@@ -730,7 +730,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         weapon = (uint8_t *)CreateWeapon(
                      g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
-                     g_zeroPoint,
+                     g_zeroXY,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
@@ -758,8 +758,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
          * seventh argument here (0x0043AE12). */
         made = (uint8_t *)CreateVehicle(
                    kind, (char *)name,
-                   ((const AM2_Point *)&where)->x,
-                   ((const AM2_Point *)&where)->y,
+                   where.x,
+                   where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, facing);
 
@@ -812,7 +812,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
         made = (uint8_t *)CreateItem((char *)name, slot, key,
-                                     *(AM2_Point *)&where, flag,
+                                     where, flag,
                                      0, 0);
 
         if (made)
@@ -844,8 +844,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
             occupant = (uint8_t *)CreateTrooper(
                            g_dirScratch,
-                           ((const AM2_Point *)&where)->x,
-                           ((const AM2_Point *)&where)->y,
+                           where.x,
+                           where.y,
                            AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                            0, 0, 0, 1, facing);
             ObjSetFieldA(occupant, (uint32_t)group);
@@ -854,7 +854,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                          g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),
-                         g_zeroPoint,
+                         g_zeroXY,
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {

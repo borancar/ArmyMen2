@@ -360,7 +360,7 @@ void __cdecl SendObjDestroyed(const void *obj)
  * build still sends and simply says nothing.
  */
 void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
-                                 int32_t quantity, uint32_t at)
+                                 int32_t quantity, AM2_Point at)
 {
     uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
     uint8_t *u = (uint8_t *)unit;
@@ -382,7 +382,7 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
     *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_DROP_ITEM;
     *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
         UidOnWire(((const AM2_Object *)it)->uid);
-    *(uint32_t *)(msg + MSG_DROP_OFF_AT)      = at;
+    *(AM2_Point *)(msg + MSG_DROP_OFF_AT)     = at;
     *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = slot;
     *(int32_t *)(msg + MSG_DROP_OFF_QUANT)    = quantity;
     *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_DO_DROP;
@@ -873,7 +873,7 @@ void __cdecl RecvItemDeploy(void *msg)
     *(uint8_t *)((uint8_t *)obj + OBJ_OFF_FACING) =
         *(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING);
 
-    DeployItem(obj, *(const uint32_t *)(m + MSG_DEPLOY_OFF_POS),
+    DeployItem(obj, *(const AM2_Point *)(m + MSG_DEPLOY_OFF_POS),
                (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_RESURRECT), 1);
 }
 
@@ -971,7 +971,7 @@ void __cdecl RecvDamage(void *msg)
  * The block is clamped per axis before the walk, so an object at the map's
  * edge reveals a smaller rectangle rather than wrapping.
  */
-void __cdecl ItemPostCreate(int32_t army, uint32_t where)
+void __cdecl ItemPostCreate(int32_t army, AM2_Point where)
 {
     uint16_t tile;
     int32_t x, y, x0, x1, y0, y1;
@@ -1226,7 +1226,7 @@ void __cdecl RecvItemCreate(void *msg)
             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                             (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE),
                             0),
-            *(const int32_t *)(m + MSG_CREATE_OFF_A),
+            *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
             *(const int32_t *)(m + MSG_CREATE_OFF_C),
             *(const int32_t *)(m + MSG_CREATE_OFF_D),
             1, uid);
@@ -1245,7 +1245,7 @@ void __cdecl RecvItemCreate(void *msg)
             != g_createWatchedKind)
             return;
         /* ARMY first, not the object -- see ItemPostCreate above. */
-        ItemPostCreate(army, *(const uint32_t *)(m + MSG_CREATE_OFF_A));
+        ItemPostCreate(army, *(const AM2_Point *)(m + MSG_CREATE_OFF_A));
         if (!(*(AM2_Comm *const *)&g_commObject)->AllyFlag(g_defaultOwner, army))
             ObjConceal(made, 1);
         return;
@@ -1514,7 +1514,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
             return;
 
         TrooperDropItem(t, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                        *(const uint32_t *)(m + MSG_DROP_OFF_AT));
+                        *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
         return;
     }
 

@@ -16,6 +16,7 @@
 #define AM2_ARMYMSG_H
 
 #include <stdint.h>
+#include "dist.h"        /* AM2_Point */
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +28,7 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant);
  * tiles around a new object, in every allied army's grid. Its first argument
  * is an ARMY, which orig.h had as an object for a long time -- see
  * armymsg.cpp. */
-void __cdecl ItemPostCreate(int32_t army, uint32_t where);
+void __cdecl ItemPostCreate(int32_t army, AM2_Point where);
 
 /* 0x0042AB50, four callers, all of them creators. Declared here now that
  * CreateItem is reconstructed and calls it by name; it had no header
@@ -47,7 +48,7 @@ void __cdecl TellOneSlot(int32_t slot);
  * time -- harmless only because that function is the identity here. See
  * armymsg.cpp. */
 void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
-                                 int32_t quantity, uint32_t at);
+                                 int32_t quantity, AM2_Point at);
 
 /* 0x0044BFA0, two callers, one of them the kind-0x19 receiver turning a WANT
  * into a DO. The same 0x1C record under kind 0x19, with the point taken from

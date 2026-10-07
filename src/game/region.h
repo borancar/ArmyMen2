@@ -13,6 +13,7 @@
 #define AM2_REGION_H
 
 #include <stdint.h>
+#include "dist.h"        /* AM2_Point */
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +43,7 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
  * of the ring for the decals and the four orthogonals. */
 void __cdecl BuildTileDeltas(void);
 
-void __cdecl SetPointRule(void *obj);
+void __cdecl SetPointRule(const struct AM2_Object *o);
 
 /* 0x00437D10, 0x00437D60 and 0x00437DB0, the three rules SetPointRule chooses
  * between. Each answers "is this tile REFUSED"; see the note in region.cpp. */
@@ -53,30 +54,35 @@ int32_t __cdecl PointRuleDefault(int32_t tile);
 /* 0x00407BF0, one caller. The `ignore` arm of the AI mode dispatcher at
  * 0x00407F80 -- mode 2. Walk to the remembered destination; on arrival, turn
  * only for an unreacted hit or, after a delay, for what the context found. */
-void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx);
+void __cdecl AiStepIgnore(struct AM2_Object *o, struct AM2_SteerOut *out,
+                          const struct AM2_AiCtx *c);
 
 /* 0x00407640, one caller. The `defend` arm -- mode 7. AiStepIgnore plus two
  * things: it promotes whatever the search found into the slot ConsiderSighting
  * reads, and it calls ConsiderSighting on every path. */
-void __cdecl AiStepDefend(void *obj, void *out, void *ctx);
+void __cdecl AiStepDefend(struct AM2_Object *o, struct AM2_SteerOut *out,
+                          struct AM2_AiCtx *c);
 
 /* 0x00407560, one caller. The arm modes 1, 4 and 5 share -- 5 is `evade`.
  * AiStepDefend with one branch target moved: it turns toward what it sees
  * while still walking, where defend turns only on arrival. Name ours. */
-void __cdecl AiStepTrack(void *obj, void *out, void *ctx);
+void __cdecl AiStepTrack(struct AM2_Object *o, struct AM2_SteerOut *out,
+                         struct AM2_AiCtx *c);
 
 /* 0x00407C80, one caller. The `follow` arm -- mode 3. AiStepDefend with the
  * gate replaced: walk when out of formation OR when the leader has moved. */
-void __cdecl AiStepFollow(void *obj, void *out, void *ctx);
+void __cdecl AiStepFollow(struct AM2_Object *o, struct AM2_SteerOut *out,
+                          struct AM2_AiCtx *c);
 
 /* 0x00407BD0, one caller. The `attack` arm -- mode 6. Forwards its three
  * arguments to ADDR_AI_ATTACK_BODY and does nothing else. */
-void __cdecl AiStepAttack(void *obj, void *out, void *ctx);
+void __cdecl AiStepAttack(struct AM2_Object *o, struct AM2_SteerOut *out,
+                          struct AM2_AiCtx *c);
 
 /* 0x00407F80, two callers, both in the type-3 stepper. One frame of AI for one
  * object: build the context, run the arm OBJ_OFF_AI_MODE selects through an
  * eight-entry table, then record the object's region. */
-void __cdecl AiStep(void *obj, void *out);
+void __cdecl AiStep(struct AM2_Object *o, struct AM2_SteerOut *out);
 
 /* 0x00405100, six call sites in five functions. Keep the unit at the range it
  * wants from what it sees: a spot re-picked every five seconds, a pose while
@@ -101,60 +107,62 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
 int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
                               void *outPt, int32_t fast);
 
-int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg);
+int32_t __cdecl PlanPathTo(struct AM2_Object *o, AM2_Point *at, int32_t arg);
 
-void __cdecl AiHitReact(void *obj, void *out, void *ctx);
+void __cdecl AiHitReact(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
-void __cdecl AiKeepRange(void *obj, void *out, void *ctx);
+void __cdecl AiKeepRange(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
 /* 0x00405D30, two callers. The trooper family's minimal arm, and the exact
  * counterpart of AiStepIgnore: advance the walk, or on arrival forget the
  * destination, react to a hit and face what it sees. */
-void __cdecl AiWalkStep(void *obj, void *out, void *ctx);
+void __cdecl AiWalkStep(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
 /* 0x00407190, NINE callers -- the step every AI arm but one shares. Turn the
  * destination at OBJ_OFF_FIELD_C0 into a heading in `out`, routing through the
  * region graph when it is not in the region the object stands in. The third
  * argument is never read; the fourth suppresses the second copy of the
  * bearing. */
-void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
+void __cdecl AiRouteToward(struct AM2_Object *o, struct AM2_SteerOut *out,
+                           const struct AM2_AiCtx *ctx,
                            int32_t keepFacing);
 
 /* 0x00408210, three callers, all ADDR_ROACH_BEHAVIOUR. The same function for
  * a roach: 518 of 784 bytes identical, arriving eight units closer, reporting
  * through out+0x14 rather than out+8, and resetting the path when its
  * waypoint cursor runs out. */
-void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx);
+void __cdecl RoachRouteToward(struct AM2_Object *o, struct AM2_RoachOut *out,
+                              const struct AM2_RoachCtx *ctx);
 
 /* 0x00407020, one caller. Sarge's per-frame AI step: build a SIGHTC record on
  * the stack, pick up a weapon if one is in reach, react to being hit, then
  * dispatch on OBJ_OFF_AI_MODE and record the region. */
-void __cdecl SargeAiStep(void *obj, void *out);
+void __cdecl SargeAiStep(struct AM2_Object *o, struct AM2_SightOut *out);
 
 /* 0x004062B0, one caller. The same for every other trooper -- no pickup, and
  * a tail that maps OBJ_OFF_FIELD_540 onto the output state. The caller at
  * 0x0044B9FE chooses between the two on OBJ_OFF_SARGE. */
-void __cdecl TrooperAiStep(void *obj, void *out);
+void __cdecl TrooperAiStep(struct AM2_Object *o, struct AM2_SightOut *out);
 
 /* 0x00407D70, one caller -- the AI mode dispatcher at 0x00407F80, whose
  * `sub esp, 0x44` is this record's length. Build the sight record every mode
  * arm reads: the leader, the target, what is in view, and the held weapon.
  * Its twin 0x00408060 fills a 0x40-byte record and differs in three ways;
  * see the body. */
-void __cdecl AiBuildContext(void *obj, void *out);
+void __cdecl AiBuildContext(struct AM2_Object *o, struct AM2_AiCtx *s);
 
 /* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
  * this record's length. AiBuildContext's twin for a roach: the same structure
  * one dword shorter, with a null weapon and the ranges a weapon of range 64
  * would give. */
-void __cdecl RoachBuildContext(void *obj, void *out);
+void __cdecl RoachBuildContext(struct AM2_Object *o, struct AM2_RoachCtx *s);
 
 /* 0x004060D0, one caller, inside the trooper step chooser. Walk toward the
  * destination, and on arrival attach to a nearby object; a unit that lingers
  * fifteen seconds is killed. The name is ours. Its object pick reads the
  * count from one army's list and the array from another -- the original's
  * defect, reproduced; see the body. */
-void __cdecl AiStepAttach(void *obj, void *out);
+void __cdecl AiStepAttach(struct AM2_Object *o, struct AM2_SightOut *out);
 
 /* 0x00404730, three callers, all of them ours. The THIRD sight builder and
  * the trooper's: it fills the 0x58 SIGHTC record every trooper AI step reads.
@@ -162,13 +170,14 @@ void __cdecl AiStepAttach(void *obj, void *out);
  * the front, the vehicle pair and a second destination distance in the middle
  * -- and it validates the leader and the target far more strictly than they
  * do. Its counter cannot move; every caller is reconstructed. */
-void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge);
+void __cdecl TrooperBuildContext(struct AM2_Object *o, struct AM2_SightCtx *c,
+                                 int32_t sarge);
 
 /* 0x00408A60, one caller. The roach's per-frame step: build the sight
  * context, run the behaviour that consumes it, record the region. Its
  * `sub esp, 0x40` is what fixes RoachBuildContext's record length. The second
  * argument is the output record, not a facing -- see the body. */
-void __cdecl RoachAliveStepA(void *obj, void *out);
+void __cdecl RoachAliveStepA(struct AM2_Object *o, struct AM2_RoachOut *out);
 
 /* 0x0044B7D0, one caller -- ObjFrameStep's type-2 arm. The trooper's
  * per-frame step. The player's own Sarge never reaches the AI from here: a
@@ -188,7 +197,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
  * into the same record Type2PlayerStep then acts on. */
 void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
 
-void __cdecl Type2PlayerStep(void *obj, void *out);
+void __cdecl Type2PlayerStep(struct AM2_Object *o, struct AM2_SightOut *out);
 
 /* 0x00449FD0, two callers -- StepType2's trooper AI arm and 0x0044AFB0. The
  * trooper's shot: pick the weapon (the sight record may override the one in
@@ -197,37 +206,41 @@ void __cdecl Type2PlayerStep(void *obj, void *out);
  * It names itself in "FIRE  trooper: %x  weapon: %x  ammo: %d".
  *
  * Cold in every configuration here: nothing in a Boot Camp drive shoots. */
-void __cdecl TrooperFire(void *obj, void *held, void *sight);
+void __cdecl TrooperFire(struct AM2_Object *o, struct AM2_Object *held,
+                         struct AM2_SightOut *out);
 
 /* 0x0044AFB0, four callers, all in StepType2 which reaches it as a tail. The
  * player's trooper: turn it, walk it, pick things up, fire, and drag the held
  * weapons along. The name is the program's, off its own log string. */
-void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out);
+void __cdecl UpdateTrooperAction(struct AM2_Object *o, struct AM2_Object *weapon,
+                                 struct AM2_SightOut *out);
 
-void __cdecl StepType2(void *obj);
+void __cdecl StepType2(struct AM2_Object *o);
 
 /* 0x0045D660, one caller -- ObjFrameStep's type-3 arm. The vehicle's
  * per-frame step: the same reveal-expiry prologue as StepType2, then either a
  * death sequence keyed on the vehicle's kind or the AI, and TWO sequential
  * converging tails that every path reaches. Its output record is at +0x578
  * where StepType2's is at +0x57C. */
-void __cdecl StepType3(void *obj);
+void __cdecl StepType3(struct AM2_Object *o);
 
 /* 0x00408640, one caller -- RoachAliveStepA. The roach's decision half. It
  * promotes one {object, range, bearing} triple into the SIGHT record's
  * observer slot -- the found triple in three arms, the leader triple in the
  * fourth -- which is what ConsiderSighting then reads. */
-void __cdecl RoachBehaviour(void *obj, void *out, void *ctx);
+void __cdecl RoachBehaviour(struct AM2_Object *o, struct AM2_RoachOut *out,
+                            struct AM2_RoachCtx *c);
 
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */
-uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt);
+uint16_t __cdecl SettlePointInRegion(int32_t tile, AM2_Point *pt);
 
 /* 0x00406460 and 0x004066B0. Hops between two regions, and whether two objects
  * are in the same region or neighbouring ones. See region.cpp. */
 int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve);
-int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve);
+int32_t __cdecl RegionsNear(const struct AM2_Object *a,
+                            const struct AM2_Object *b, int32_t solve);
 
 /* 0x0042BC70 and 0x0042BCB0. The script's `activateregion` and
  * `inactivateregion`: set or clear REGION_OFF_ACTIVE, and bump the routing
@@ -241,9 +254,10 @@ void __cdecl InactivateRegion(int32_t region);
 /* 0x0043A0A0. The nearest tile the object's point rule accepts, spiralling
  * outward from the one given. Writes the point back only when its low word is
  * zero; returns the tile, or 0 when a whole ring produced no candidate. */
-uint16_t __cdecl NearestAllowedTile(void *obj, uint32_t tile, uint32_t *pt);
+uint16_t __cdecl NearestAllowedTile(struct AM2_Object *obj, uint32_t tile,
+                                   AM2_Point *pt);
 
-int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to);
+int32_t __cdecl BeginMoveTo(struct AM2_Object *o, AM2_Point *to);
 
 int region_install(void);
 
@@ -307,18 +321,21 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
 /* 0x00403B40, five callers: the sighting scan. Fills SIGHT_OFF_FOUND and the
  * range and bearing beside it, and is what refills the heading cache every AI
  * step reads. The name is ours. */
-void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
-                        int32_t *nAllied, int32_t *nOther, int32_t flags);
+struct AM2_Object *__cdecl SightScan(struct AM2_Object *o, int32_t *outRange,
+                                     uint8_t *outBearing, int32_t *nAllied,
+                                     int32_t *nOther, int32_t flags);
 
-void __cdecl AiGuardStep(void *obj, void *out, void *ctx);
+void __cdecl AiGuardStep(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
-void __cdecl AiPatrolStep(void *obj, void *out, void *ctx);
+void __cdecl AiPatrolStep(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
-void __cdecl AiEngageStep(void *obj, void *out, void *ctx);
+void __cdecl AiEngageStep(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
-void __cdecl AiAttackBody(void *obj, void *out, void *ctx);
+void __cdecl AiAttackBody(struct AM2_Object *o, struct AM2_SteerOut *out,
+                          struct AM2_AiCtx *c);
 
-void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx);
+void __cdecl AiTrooperStep(struct AM2_Object *ob, struct AM2_SightOut *out,
+                           const struct AM2_SightCtx *ctx);
 
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused);
@@ -342,12 +359,12 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage);
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an
  * argument rather than a field. */
-int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
+int32_t __cdecl ListBoxAction(AM2_Point at, void *list, void *out);
 
 /* 0x004385A0, the bitmask twin of the above -- and ObjHitMaskAction's twin in
  * the other direction, which is the one to read for how the walk works. The
  * mask record is embedded in the header at LISTHDR_OFF_MASK. */
-int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out);
+int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out);
 
 /* 0x0043A6D0, six callers. Could the thing described by key-table slot `slot`
  * stand at world point `at`? Build its tile mask there and answer 0 the moment
@@ -356,14 +373,14 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out);
 /* 0x004045E0, three callers. Fill the six sight-context fields that describe
  * the weapon a unit is holding: SIGHTC_OFF_WEAPON, _KIND, _DAMAGE,
  * _WANT_RANGE, _MAX_RANGE and _READY. */
-void __cdecl UnitWeaponInfo(void *unit, void *out);
+void __cdecl UnitWeaponInfo(const struct AM2_Object *u, struct AM2_SightCtx *c);
 
 /* 0x00438300, four callers. Solve the route from one region to another and
  * record it in the two all-pairs byte matrices. The found exit fills BOTH
  * directions of the path; the no-path exit answers one way round only. */
 void __cdecl RegionSolvePair(int32_t from, int32_t to);
 
-int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind);
+int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind);
 
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
  * weights. */
@@ -375,15 +392,18 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile);
 
 /* 0x004074A0, four callers. One observer against one object: range, bearing,
  * and a two-second reveal when the observer is ours. */
-void __cdecl ConsiderSighting(void *seen, void *out, const void *sight);
+void __cdecl ConsiderSighting(struct AM2_Object *o, struct AM2_SteerOut *out,
+                              const struct AM2_AiCtx *c);
 
 /* 0x00408580, one caller. ConsiderSighting's sibling over a different record
  * layout, with a wider cone and a tail that commits the hit. */
-void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight);
+void __cdecl ConsiderSightingB(struct AM2_Object *o, struct AM2_RoachOut *out,
+                               const struct AM2_RoachCtx *c);
 
 /* 0x00404F40, four callers. The third sighting variant: a magic maximum range
  * that widens the cone and suppresses the reveal at once. */
-void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight);
+void __cdecl ConsiderSightingC(struct AM2_Object *o, struct AM2_SightOut *out,
+                               const struct AM2_SightCtx *c);
 
 /* 0x0042BCF0, one caller. Seal the map's four edges, then flag every tile as
  * blocking and/or near the border. */
@@ -391,7 +411,7 @@ void __cdecl SealMapEdges(void);
 
 /* 0x0043A330, one caller. Decrement the reveal count over a five-by-five tile
  * block, in the grid of every allied army. */
-void __cdecl UnrevealArea(int32_t army, uint32_t at);
+void __cdecl UnrevealArea(int32_t army, AM2_Point at);
 
 /* 0x0045C6E0. Choose the vehicle's turn for this frame and answer whether the
  * step it implies is blocked. THREE arguments -- the call site's
@@ -412,7 +432,7 @@ void __cdecl Step3TurnState(void *obj, void *rec);
 /* 0x0045D4B0. Route the vehicle toward its destination, correct the heading
  * against a distance-scaled tolerance, snap the view, and board selected
  * units. */
-void __cdecl Step3RouteAndBoard(void *obj, void *rec);
+void __cdecl Step3RouteAndBoard(struct AM2_Object *o, struct AM2_SteerOut *r);
 
 /* 0x0045CB30. The whole per-frame step of a driven vehicle: aim the turret,
  * pick a target point, choose a speed, take the step, fire, sound the

@@ -207,7 +207,7 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
 
 /* 0x00461350. The fourth adder -- kind 4, into the OTHER context, shaded
  * through ROW_OFF_FIELD_2C, and what a kind 5 emits every 300 ms. */
-void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust);
+void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust);
 
 /* 0x004613E0. Kind 4's stepper: a four-cell shaded sprite that drifts and
  * retires, either on its last cell or on leaving the map. */
@@ -219,12 +219,12 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx);
 
 /* 0x00461660. The third adder -- kind 6, whose sprite is a VARIANT of eight
  * frames rather than a frame, and whose depth key carries the terrain. */
-void __cdecl SeqAddKind6(const int32_t *at, int32_t variant);
+void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant);
 
 /* 0x00462000 and 0x00462080. Add one SEQ record at a map point -- kind 5 and
  * kind 7. Were ADDR_BY_REF_ACTION_A and _B; see misc.cpp. */
-void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life);
-void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
+void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life);
+void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
                          int32_t c, int32_t life);
 
 /* 0x00453AB0, thiscall. Grow a list of 260-byte records by one, then search
@@ -253,7 +253,9 @@ int32_t __cdecl CompareDword(const void *a, const void *b);
 
 /* 0x00408560. Copies the byte at +0x18 of `src` to `*dst`, but only when the
  * dword at +0x10 is non-zero. The first parameter is read by nothing. */
-void __cdecl CopyByteIfSet(uint32_t unused, uint8_t *dst, const void *src);
+void __cdecl CopyByteIfSet(const struct AM2_Object *unused,
+                           struct AM2_RoachOut *out,
+                           const struct AM2_RoachCtx *c);
 
 /* 0x0042E4F0. (v / 32 + 1) * 1000, with the division rounding toward zero --
  * the original adds 31 before shifting when v is negative. The *1000 is three
@@ -758,7 +760,8 @@ int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
  *
  * The pending byte is read TWICE, and it has to be: loading `cfg` clobbers the
  * register the first read used, so the original goes back for it. */
-void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg);
+void __cdecl ConsumePendingByte(struct AM2_Object *o, struct AM2_RoachOut *out,
+                                const struct AM2_RoachCtx *c);
 
 /* 0x0045C870 and 0x0043D550. The same function over the two records SetFacing08
  * and SetFacing14 write -- same offset pairs, +8/+0xC and +0x14/+0x18 -- and it

@@ -157,7 +157,7 @@ int objtype_install(void);
 /* 0x00433880, two callers. Build an object out of an AAI record. Eight
  * arguments. */
 int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
-                               int32_t index, uint32_t at, int32_t orFlags,
+                               int32_t index, AM2_Point at, int32_t orFlags,
                                int32_t a7, int32_t a8);
 
 /* 0x00434F20, three callers. Give an object the appearance of one sprite
@@ -192,7 +192,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index,
  * of the eight are still the original's. `name` is NOT const: the function
  * lower-cases the caller's buffer in place. Arg 6 is never read. */
 int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
-                              uint32_t at, const int32_t *box,
+                              AM2_Point at, const int32_t *box,
                               int32_t unused, uint32_t uid);
 
 #endif /* AM2_OBJTYPE_H */

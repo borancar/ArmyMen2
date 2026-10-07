@@ -71,8 +71,8 @@ uint32_t __cdecl MakePoint(uint32_t x, uint32_t y);
  * halves are read as words from +0 and +2 of each argument slot, which is the
  * same layout MakePoint builds. One answers equal, the other differs -- the
  * original has both rather than one and a negation. */
-int32_t __cdecl PointsEqual(uint32_t a, uint32_t b);
-int32_t __cdecl PointsDiffer(uint32_t a, uint32_t b);
+int32_t __cdecl PointsEqual(AM2_Point a, AM2_Point b);
+int32_t __cdecl PointsDiffer(AM2_Point a, AM2_Point b);
 
 int rect_install(void);
 
@@ -103,7 +103,7 @@ int rect_install(void);
  *
  * GCC on Linux i386 has the CALLEE pop that hidden pointer; RectSet does
  * not, so the pointer type says so. MinGW already follows MSVC. */
-#if defined(__GNUC__) && defined(__i386__)
+#if defined(__GNUC__) && defined(__i386__) && !defined(__clang__)
 #define AM2_AGG_NOPOP __attribute__((callee_pop_aggregate_return(0)))
 #else
 #define AM2_AGG_NOPOP

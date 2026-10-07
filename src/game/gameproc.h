@@ -23,7 +23,8 @@ extern "C" {
  * the level teardown and each ends by tail-jumping to the logger. */
 void __cdecl ZeroUnread50C34C(void);
 int32_t __cdecl NoteKind31(void *rec);
-void __cdecl Call405220(int32_t a, int32_t b, int32_t c);
+void __cdecl Call405220(struct AM2_Object *o, struct AM2_SightOut *out,
+                        struct AM2_SightCtx *c);
 /* 0x00445FE0. Free the sprite registry, then log `msg`. The message is an
  * ARGUMENT, inherited by Log through a tail jump -- see gameproc.cpp. */
 void __cdecl Teardown445F40(const char *msg);
@@ -37,9 +38,10 @@ void __cdecl InitRemapsAndLists(void);
 void __cdecl InitStartupColours(void);
 void __cdecl InitStartupColoursB(void);
 void __cdecl FreeArmyObjLists(void);
-void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);
+void __cdecl Call4057D0(struct AM2_Object *o, struct AM2_SightOut *out,
+                        struct AM2_SightCtx *c);
 void __cdecl DefFinish(void);
-void *__cdecl WalkCellWrapper(void *unused, uint32_t at);
+void *__cdecl WalkCellWrapper(void *unused, AM2_Point at);
 void __cdecl ResetHostState(void);
 
 #endif
@@ -143,7 +145,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
  * type-5 object from a weapon and a firing position. Def 3 is a chained kind
  * that links consecutive segments into a trail; every other def gets
  * missile.ani and an ordinary SetAnimFrame. */
-void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
+void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
                             int32_t heading, int32_t a5, int32_t a6,
                             int32_t repairFrame, float speedScale,
                             int32_t initUnused, uint32_t uid,

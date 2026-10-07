@@ -118,14 +118,13 @@ int32_t __cdecl CompareDword(const void *a, const void *b)
     return *(const int32_t *)a - *(const int32_t *)b;
 }
 
-void __cdecl CopyByteIfSet(uint32_t unused, uint8_t *dst, const void *src)
+void __cdecl CopyByteIfSet(const AM2_Object *unused, AM2_RoachOut *out,
+                           const AM2_RoachCtx *c)
 {
-    const uint8_t *s = (const uint8_t *)src;
-
     (void)unused;
-    if (!*(const uint32_t *)(s + 0x10))
+    if (!c->observer)
         return;
-    *dst = s[0x18];
+    out->heading = c->bearing;
 }
 
 int32_t __cdecl ScaleBy32Blocks(int32_t v)
@@ -1058,22 +1057,19 @@ int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
     return 1;
 }
 
-void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg)
+void __cdecl ConsumePendingByte(AM2_Object *o, AM2_RoachOut *out,
+                                const AM2_RoachCtx *c)
 {
-    uint8_t       *s = (uint8_t *)src;
-    uint8_t       *d = (uint8_t *)dst;
-    const uint8_t *c = (const uint8_t *)cfg;
-
-    if (!s[0x104])
+    if (!o->hitDir)
         return;
 
-    if (c[0x2C] > 0x40)                       /* unsigned */
-        *(int32_t *)(d + 0x14) = 3;
+    if (c->seed > 0x40)                       /* unsigned */
+        out->state = 3;
 
-    if (*(const uint32_t *)(c + 0x10) == 0)
-        *d = s[0x104];                        /* re-read, as the original */
+    if (c->observer == 0)
+        out->heading = o->hitDir;             /* re-read, as the original */
 
-    s[0x104] = 0;
+    o->hitDir = 0;
 }
 
 /* Inline, and in the original's branch order. VC6 materialises each ternary
@@ -1814,7 +1810,7 @@ typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 
 /* The three the seq adders below still reach the image for: the pool
  * allocator, the kind-6 adder, and the game's own LCG. */
-typedef void  (__cdecl *AM2_SeqAdd6Fn)(const int32_t *at, int32_t a);
+typedef void  (__cdecl *AM2_SeqAdd6Fn)(const AM2_Point *at, int32_t a);
 typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 /* SeqAlloc is reconstructed; maprow.h declares it and is included above. */
 #define orig_seq_rand         ((AM2_SeqRandFn)(uintptr_t)ADDR_GAME_RAND)
@@ -2231,13 +2227,12 @@ static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
  * unlinking and re-linking -- so a kind-6 row starts linkable and the other
  * two start not. Reproduced; the asymmetry is the original's.
  */
-void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
+void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
 {
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                     (const AM2_Point *)at))
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
     seq = (uint8_t *)SeqAlloc(g_seqCtxA);
@@ -2257,11 +2252,11 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     *(void **)(row + ROW_OFF_SPRITE)     =
         (g_seqSprites7)
             [variant * *(const int32_t *)((void *)(uintptr_t)(AM2_SEQ_VARIANT_STRIDE))];
-    *(int32_t *)(row + ROW_OFF_X)        = *at;
+    *(AM2_Point *)(row + ROW_OFF_X)      = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C) = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26) =
-        (int16_t)(ScaleBy32Blocks(TileAttrAt(TileOfPoint((uint32_t)*at)))
+        (int16_t)(ScaleBy32Blocks(TileAttrAt(TileOfPoint(*at)))
                   + AM2_SEQ_DEPTH_BIAS);
 }
 
@@ -2295,13 +2290,12 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
  * Three of its constants are globals rather than literals -- 3, -1 and a life
  * of 120 -- which is the only reason they can be named at all.
  */
-void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
+void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
 {
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                     (const AM2_Point *)at))
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
     seq = (uint8_t *)SeqAlloc(g_seqCtxB);
@@ -2323,7 +2317,7 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(row + 0)                = 1;
     *(void **)(row + ROW_OFF_SPRITE)     =
         *g_seqSprites5;
-    *(int32_t *)(row + ROW_OFF_X)        = *at;
+    *(AM2_Point *)(row + ROW_OFF_X)      = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
     *(void **)(row + ROW_OFF_FIELD_2C)   =
         g_remapShades[0];
@@ -2444,10 +2438,9 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE)
             > g_seqEmitMs) {
-        int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
+        AM2_Point pt = *(const AM2_Point *)(row + ROW_OFF_X);
 
-        *(int16_t *)&pt = (int16_t)(*(const int16_t *)&pt
-                                    + (orig_seq_rand() % 3) * 4 - 4);
+        pt.x = (int16_t)(pt.x + (orig_seq_rand() % 3) * 4 - 4);
         SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
 
         *(int32_t *)(r + SEQ_OFF_GATE) -=
@@ -2562,13 +2555,12 @@ void __cdecl SeqRun(void *ctx)
  * whenever a mission fires one. What is NOT established is what a seq is for;
  * ADDR_SEQ_RUN's own comment says the same, and neither of these adds to it.
  */
-void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
+void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
 {
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                     (const AM2_Point *)at))
+    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
         return;
 
     seq = (uint8_t *)SeqAlloc(g_seqCtxA);
@@ -2590,13 +2582,13 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     *(int32_t *)(row + 0)                 = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
         *g_seqSprites5;
-    *(int32_t *)(row + ROW_OFF_X)         = *at;
+    *(AM2_Point *)(row + ROW_OFF_X)       = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_5;
 }
 
-void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
+void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
                          int32_t c, int32_t life)
 {
     uint8_t *seq;
@@ -2606,7 +2598,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     (void)c;
 
     if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
-                     (const AM2_Point *)at))
+                     at))
         return;
 
     seq = (uint8_t *)SeqAlloc(g_seqCtxA);
@@ -2627,7 +2619,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
         *g_seqSprites7;
-    *(int32_t *)(row + ROW_OFF_X)         = *at;
+    *(AM2_Point *)(row + ROW_OFF_X)       = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_7;
@@ -3038,15 +3030,12 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
         return SeqRetire(ctx, rec);
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE) > 0x12Cu) {
-        int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
-        int32_t variant = orig_seq_rand() % 3;
-        int32_t skip = 0;
+        AM2_Point pt = *(const AM2_Point *)(row + ROW_OFF_X);
+        int32_t   variant = orig_seq_rand() % 3;
+        int32_t   skip = 0;
 
-        *((int16_t *)&pt + 1) =
-            (int16_t)(*((const int16_t *)&pt + 1) - (orig_seq_rand() % 16));
-        *(int16_t *)&pt =
-            (int16_t)(*(const int16_t *)&pt
-                      + ((orig_seq_rand() % 16) - 8) * variant);
+        pt.y = (int16_t)(pt.y - (orig_seq_rand() % 16));
+        pt.x = (int16_t)(pt.x + ((orig_seq_rand() % 16) - 8) * variant);
 
         SeqAddKind6(&pt, variant);
         *(int32_t *)(r + SEQ_OFF_FIELD_0C) += 1;
@@ -3165,7 +3154,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
                          (const AM2_Point *)&pt))
             return SeqRetire(ctx, rec);
 
-        tile = TileOfPoint(*(const uint32_t *)(row + ROW_OFF_X)) & 0xFFFF;
+        tile = TileOfPoint(*(const AM2_Point *)(row + ROW_OFF_X)) & 0xFFFF;
         ground = (*(const char *const *)&g_tileAttrs)[tile];
 
         if (Z + *(const int32_t *)(r + 0x18u) <= ground) {

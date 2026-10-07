@@ -8,6 +8,7 @@
 #define AM2_GLOBALTYPES_H
 
 #include <stdint.h>
+#include "point.h"   /* AM2_Point, for AM2_MaskRec */
 
 /* One A* node of FindPath's tile search, ADDR_PATH_NODES[0x10000], indexed
  * by tile. The original addresses the table as an array of these --
@@ -65,7 +66,7 @@ typedef struct AM2_FormationSlot {
  * `[(rec*41 + i)*4 + base + 4]`, which is this record indexed. */
 typedef struct AM2_MaskRec {
     int32_t count;
-    struct { int16_t x, y; } pts[40];
+    AM2_Point pts[40];
 } AM2_MaskRec;
 
 /* One checkbox of the OPTIONS dialog, ADDR_OPTION_TABLE[AM2_OPTION_COUNT],

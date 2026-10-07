@@ -162,7 +162,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
                            int32_t resurrect);
 
-void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
+void __cdecl DeployItem(void *obj, AM2_Point where, int32_t resurrect,
                         int32_t suppress);
 
 void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
@@ -221,7 +221,7 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
  * on the ground. THE SLOT RANGE IS 1..5, not 0..5 -- slot 0 can never be
  * dropped -- and the deploy is gated on ITEM_OFF_AMMO, so a spent weapon
  * disappears instead. See item.cpp. */
-void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at);
+void __cdecl TrooperDropItem(void *unit, int32_t slot, AM2_Point at);
 
 /* 0x00449760, one caller, and it names itself twice. Spend one charge of an
  * inventory slot; when the last one goes the slot is removed, the others are
@@ -266,20 +266,8 @@ void     __cdecl ObjSetFieldA(void *obj, uint32_t value);
  * are meaningful. */
 int32_t __cdecl ObjFieldB(const void *obj);
 
-/* 0x0045F460's argument 5 and 6, which the original passes as ONE six-byte
- * structure -- three words, pushed as eight: every caller copies it with
- * `sub esp, 8; mov ecx, esp; mov [ecx], dword; mov [ecx+4], word`, so the top
- * two bytes of the pushed copy are whatever was on the stack. Both fields
- * have a fallback inside the callee: a zero point is filled from the target
- * object's position and a zero ground height from the shooter's own.
- *
- * Here rather than in event.cpp because region.cpp's TrooperFire needs the
- * same declaration, and two spellings of one prototype is how they come to
- * disagree. */
-typedef struct {
-    AM2_Point at;
-    int16_t   ground;
-} AM2_FireSpot;
+/* AM2_FireSpot, FireWeapon's spot argument, is objtable.h's: the sight
+ * record embedded in AM2_Object carries one. */
 
 /* Reconstructed now, so the seam is gone and the eight call sites reach it
  * directly. The typedef went with it: its whole purpose was to give the
@@ -338,20 +326,20 @@ int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref);
  * strictly-greater distance test where Troops uses >=, and an out-parameter
  * saying whether the object's current route leg falls inside anything. On
  * saturation it advances the route or drops it. */
-int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
+int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at, AM2_Object *chain,
                                  int32_t *inside);
 
 /* 0x0045B690. The same total for a chain the caller has already collected,
  * with the tile term on AM2_TILE_OPEN and no height step. */
-int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
-                                 uint32_t ref);
+int32_t __cdecl BlockWeightChain(void *from, AM2_Point at, void *chain,
+                                 AM2_Point ref);
 
 /* 0x0045BC70, three callers. How blocked is this vehicle, at this point,
  * facing this way -- and when `apply` is non-zero, run over whatever is
  * standing there. TWO nearly identical mask loops, one for the boat and one
  * for everything else, differing in five ways that a merged loop would lose;
  * see the note on the definition. */
-int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
+int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, AM2_Point at,
                                    int32_t apply);
 
 /* 0x0043CF70. The FOURTH variant, and the only one with a side effect: the
@@ -359,8 +347,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
  * AM2_TILE_OPEN, with BlockWeightAt's height step, and DAMAGING every object
  * in the chain that ObjIsWatchedKind accepts. Its fifth argument is never
  * read. See item.cpp. */
-int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
-                                    uint32_t ref, int32_t unused);
+int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
+                                    AM2_Point ref, int32_t unused);
 
 /* 0x0043D050, four call sites in two functions. How obstructed is a roach at
  * `at` facing `dir`: BlockWeightDamaging summed over every point of its mask
@@ -397,7 +385,7 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * 4 -- not the object type, which is what CommMustBroadcast's parameter
  * establishes and what a literal 4 in a type-4 constructor invites. */
 void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
-                           uint32_t at, int32_t flags, int32_t quantity,
+                           AM2_Point at, int32_t flags, int32_t quantity,
                            int32_t remote, int32_t uid);
 
 /* 0x0045B090, four callers, and formerly deferred -- the LAST of the four
@@ -469,6 +457,10 @@ void __cdecl ObjClearFootprint(void *obj);
 
 void __cdecl ObjClearRoachFootprint(void *obj);
 
+/* RoachMaskWeight's point is a SCALAR, a packed x/y dword, where most of
+ * this file passes AM2_Point. Not an oversight: VC6 allocates registers in
+ * the CALLER differently for a struct argument, and RoachStepTailA only
+ * matches the image when this parameter is an integer. */
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
                                 int32_t unused);
 
@@ -526,36 +518,36 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
-void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
+void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
                              int16_t unusedB, int32_t doubled);
 
 /* 0x0043C000, one caller -- the type-5 stepper, type 5 being the SHOT. Damage
  * everything at a point that this shot can hit, then ask the terrain whether
  * it stops there. Answers one of AM2_SHOT_STRUCK_*. */
-int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height);
+int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height);
 
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */
-int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
-                                  uint32_t ref);
+int32_t __cdecl BlockWeightTroops(void *from, AM2_Point at, void *chain,
+                                  AM2_Point ref);
 
 /* 0x0045BBB0. Sum the block weight over a vehicle mask's points for a heading.
  * Kind 5 uses BlockWeightChain and every other kind BlockWeightTroops. */
-int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at);
+int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, AM2_Point at);
 
 /* 0x0042A820. The ground height at a point, raised by any ITEM standing on
  * it. A byte return -- see item.cpp. */
-uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
+uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint);
 
 /* 0x0042A1B0. The mouse pick: every object in a cell whose own hit rectangle
  * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
-void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc);
+void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc);
 
 /* 0x0042A550, fifteen callers. Its sibling, asking a LOOSER question of the
  * same cell: the hit rectangle, then one of three further tests chosen by the
  * object's flags and whether it has a bitmask at all. */
-void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc);
+void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc);
 
 /* 0x004294C0, fifteen callers. Recompute an object's tile from its position
  * and, if anything moved, put it back on the map. */
@@ -577,7 +569,7 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height);
 void __cdecl PointActionC(AM2_Object *o, AM2_Point point);
 
 /* 0x00435550. Make a kind-7 object, or refuse a thirty-third. */
-void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
+void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
                         uint8_t facing, int32_t e, int32_t f);
 
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
@@ -758,7 +750,7 @@ void __cdecl ObjFrameStep(AM2_Object *obj);
 /* 0x004582F0. Points an object at a place: detach, clear the script id, and
  * store the point ADDR_NEAREST_ALLOWED_TILE snaps it to -- NOT the point
  * passed in. Types 2, 3 and 8 only. */
-void __cdecl PointActionA(void *obj, uint32_t point);
+void __cdecl PointActionA(AM2_Object *o, AM2_Point point);
 
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
@@ -961,19 +953,19 @@ void __cdecl ToggleSelect(void *obj);
  * the map and passable, and write it back. It has no give-up: the only exit is
  * success. `out` is an AM2_Point, taken as void * for the reason given at
  * ObjRowsMaskAt above. */
-void __cdecl NearestClearPoint(uint32_t from, void *out);
+void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out);
 
 /* 0x0045B930, one caller. The same spiral asking a different question: walk out
- * until THAT VEHICLE fits at the point facing that way. `outPt` is an
- * AM2_Point, and it has no give-up either. */
+ * until THAT VEHICLE fits at the point facing that way. It has no give-up
+ * either. */
 void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing,
-                                      uint32_t from, void *outPt);
+                                      AM2_Point from, AM2_Point *out);
 
 void __cdecl SetObjContext(void *obj);
 
 /* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied
  * predicate, which runs BETWEEN the rectangle test and the mask test. */
-void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
+void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
                               int32_t (__cdecl *keep)(void *obj));
 
 /* 0x004499A0, one caller. Is the object's first row on a frame from which its
@@ -1013,9 +1005,9 @@ void __cdecl InitItemHeaderSize(void);
 /* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a
  * point. The first also runs ItemPostCreate and conceals what it drops from
  * a player not allied to the owner; the second does neither. */
-void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
+void __cdecl CreateWatchedItem(void *weapon, void *obj, AM2_Point at,
                                uint8_t facing);
-void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
+void __cdecl CreateWatchedType(void *weapon, void *obj, AM2_Point at,
                                uint8_t facing);
 
 #endif

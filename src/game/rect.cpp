@@ -134,24 +134,16 @@ uint32_t __cdecl MakePoint(uint32_t x, uint32_t y)
     return *(uint32_t *)&p;
 }
 
-int32_t __cdecl PointsEqual(uint32_t a, uint32_t b)
+/* Two AM2_Points by value, as the original passes them: each half compared
+ * where it lies in its argument slot. */
+int32_t __cdecl PointsEqual(AM2_Point a, AM2_Point b)
 {
-    /* Two AM2_Points by value in the original: each half compared where it
-     * lies in its argument slot. */
-    const AM2_Point *pa = (const AM2_Point *)&a;
-    const AM2_Point *pb = (const AM2_Point *)&b;
-
-    return (pa->x == pb->x && pa->y == pb->y) ? 1 : 0;
+    return (a.x == b.x && a.y == b.y) ? 1 : 0;
 }
 
-int32_t __cdecl PointsDiffer(uint32_t a, uint32_t b)
+int32_t __cdecl PointsDiffer(AM2_Point a, AM2_Point b)
 {
-    /* Two AM2_Points by value in the original: each half compared where it
-     * lies in its argument slot. */
-    const AM2_Point *pa = (const AM2_Point *)&a;
-    const AM2_Point *pb = (const AM2_Point *)&b;
-
-    return (pa->x == pb->x && pa->y == pb->y) ? 0 : 1;
+    return (a.x == b.x && a.y == b.y) ? 0 : 1;
 }
 
 int rect_install(void)

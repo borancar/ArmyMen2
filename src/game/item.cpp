@@ -1230,7 +1230,7 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
  * as the strongest corroboration available -- the two share their bounds,
  * their chaining and their newest-first order, and differ only in the test.
  */
-void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
+void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc)
 {
     const uint8_t *d    = (const uint8_t *)desc;
     int32_t        cx   = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
@@ -1253,7 +1253,7 @@ void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
         if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             continue;
         if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
-                         (const AM2_Point *)pt))
+                         pt))
             continue;
 
         if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_ROWS_MASK) {
@@ -1271,9 +1271,9 @@ void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
             box.bottom = *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM)
                          + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
-            if (!PointInRect(&box, (const AM2_Point *)pt))
+            if (!PointInRect(&box, pt))
                 continue;
-        } else if (!ObjMaskBitAt(o, (const AM2_Point *)pt)) {
+        } else if (!ObjMaskBitAt(o, pt)) {
             continue;
         }
 
@@ -1412,7 +1412,7 @@ typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
  * then given its army, a flags word of 1, and a deadline of one second from
  * now. The name handed to the initialiser is the empty string.
  */
-void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
+void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
                         uint8_t facing, int32_t e, int32_t f)
 {
     int32_t *count = g_kind7Count;
@@ -1674,23 +1674,20 @@ void __cdecl VehicleDied(void *obj, uint32_t by)
  * stays verified by reading. */
 void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = (AM2_Object *)obj;   /* callers not typed yet */
 
-    *(uint32_t *)(o + OBJ_OFF_PREV_TILE) = *(const uint16_t *)(o + OBJ_OFF_TILE);
-    *(uint16_t *)(o + OBJ_OFF_TILE) =
-        (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+    o->prevTile = o->tile;
+    o->tile     = (uint16_t)TileOfPoint(o->pos);
 
-    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_NO_TILE_HOOK))
+    if (!((uint8_t)o->flags & OBJ_FLAG_NO_TILE_HOOK))
         ObjTileHook(o);
 
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_PREV_POS),
-                    *(const uint32_t *)(o + OBJ_OFF_POS))
-        && *(const uint32_t *)(o + OBJ_OFF_PREV_TILE)
-               == (uint32_t)*(const uint16_t *)(o + OBJ_OFF_TILE)
+    if (PointsEqual(o->prevPos, o->pos)
+        && o->prevTile == (uint32_t)o->tile
         && force == 0)
         return;
 
-    ObjRemap((AM2_Object *)o, g_objMapDesc, force);
+    ObjRemap(o, g_objMapDesc, force);
     ApplyObjHeight(o, height);
 }
 
@@ -1726,7 +1723,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
  * whatever the function is for; what changed is the fix. Clicking on a unit
  * would not have closed it, because no caller here reads the cursor.
  * Verified by reading. */
-void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
+void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc)
 {
     const uint8_t *d = (const uint8_t *)desc;
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
@@ -1749,10 +1746,10 @@ void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
         if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             continue;
         if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
-                         (const AM2_Point *)pt))
+                         pt))
             continue;
         if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
-            && !ObjMaskBitAt(o, (const AM2_Point *)pt))
+            && !ObjMaskBitAt(o, pt))
             continue;
 
         *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
@@ -1812,17 +1809,17 @@ int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref)
     uint32_t tile;
 
     o = (uint8_t *)ObjectsAtPoint(
-            (const uint32_t *)&at,
+            (const AM2_Point *)&at,
             g_objMapDesc);
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, o, *(const int32_t *)&at,
-                                *(const uint32_t *)&ref);
+        total += ObjBlockWeight(from, o, at,
+                                ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
     }
 
-    tile = (uint32_t)TileOfPoint(*(const uint32_t *)&at) & 0xFFFFu;
+    tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
     /* The original's range check, kept and vacuous; see above. */
     if ((int32_t)tile < 0 || (int32_t)tile > 0xFFFF)
         return 0xFF;
@@ -1922,7 +1919,6 @@ void __cdecl ObjSetRoachFootprint(void *obj)
     int32_t        dir;
     int32_t        baseX, baseY;
     int32_t        i;
-    typedef struct { int16_t x, y; } Pt;
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
         return;
@@ -1945,7 +1941,7 @@ void __cdecl ObjSetRoachFootprint(void *obj)
 #define COUNT (g_roachMasks[dir].count)
 #define PTS   (g_roachMasks[dir].pts)
     for (i = 0; i < COUNT; i++) {
-        Pt        at;
+        AM2_Point        at;
         uint16_t *mark;
         int32_t   tile;
 
@@ -1959,7 +1955,7 @@ void __cdecl ObjSetRoachFootprint(void *obj)
         if (g_roachMarkStamp == *mark)
             continue;
 
-        tile = TileOfPoint(*(uint32_t *)&at);
+        tile = TileOfPoint(at);
         (*(uint8_t * *)&g_cellWeights)[(uint32_t)tile & 0xFFFF]
             += AM2_TILE_COVER_STEP;
         TileCoverAdd((uint16_t)tile);
@@ -2048,7 +2044,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
         + *(const int32_t *)&g_gameClockMs;
     *(int32_t *)(o + OBJ_OFF_RANK) = 7;
 
-    ObjInitCommon(o, name, 8, *(const uint32_t *)&at,
+    ObjInitCommon(o, name, 8, at,
                          g_roachBox, a7, uid);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 g_roachRowSpec, x, y,
@@ -2172,7 +2168,7 @@ static inline void ObjFootprint(void *obj, int32_t set)
         if (*mark == g_objMarkStamp)
             continue;
 
-        tile = TileOfPoint(*(const uint32_t *)&at);
+        tile = TileOfPoint(at);
         if (set) {
             (*(uint8_t * *)&g_cellWeights)[(uint32_t)tile & 0xFFFF]
                 += AM2_TILE_COVER_STEP;
@@ -2308,7 +2304,7 @@ void __cdecl WeaponRespawn(void *obj)
     made = orig_create_weapon(name, AM2_ARMY_NEUTRAL,
                               KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                               (uint32_t)kind, 0),
-                              *(const uint32_t *)(o + OBJ_OFF_POS),
+                              *(const AM2_Point *)(o + OBJ_OFF_POS),
                               (int32_t)flags,
                               quantity, 0, 0);
 
@@ -2461,7 +2457,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
     int32_t         speed = 0;
     int32_t         cur, next, here;
     uint8_t         facing;
-    uint32_t        at;
+    AM2_Point        at;
 
     if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
         int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
@@ -2522,7 +2518,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 
     MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
 
-    return RoachMaskWeight(obj, next, at, 0) >= here;
+    return RoachMaskWeight(obj, next, *(const uint32_t *)&at, 0) >= here;
 #undef anim
 #undef o
 }
@@ -2573,7 +2569,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
     int32_t         cap   = 0;
     int32_t         turn, cur, next, here;
     uint8_t         facing;
-    uint32_t        at;
+    AM2_Point        at;
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) == 4
         && *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
@@ -2654,7 +2650,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
            != ((const AM2_Point *)(o + OBJ_OFF_POS))->y) {
         int32_t n;
 
-        if (RoachMaskWeight(obj, next, at, 1) >= here) {
+        if (RoachMaskWeight(obj, next, *(const uint32_t *)&at, 1) >= here) {
             speed = 0;
             if (*(const uint32_t *)(o + OBJ_OFF_STUCK_SINCE) == 0)
                 *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) =
@@ -2779,7 +2775,6 @@ void __cdecl ObjClearRoachFootprint(void *obj)
     int32_t        dir;
     int32_t        baseX, baseY;
     int32_t        i;
-    typedef struct { int16_t x, y; } Pt;
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
         return;
@@ -2802,7 +2797,7 @@ void __cdecl ObjClearRoachFootprint(void *obj)
 #define COUNT (g_roachMasks[dir].count)
 #define PTS   (g_roachMasks[dir].pts)
     for (i = 0; i < COUNT; i++) {
-        Pt        at;
+        AM2_Point        at;
         uint16_t *mark;
         int32_t   tile;
 
@@ -2816,7 +2811,7 @@ void __cdecl ObjClearRoachFootprint(void *obj)
         if (g_roachMarkStamp == *mark)
             continue;
 
-        tile = TileOfPoint(*(uint32_t *)&at);
+        tile = TileOfPoint(at);
         (*(uint8_t * *)&g_cellWeights)[(uint32_t)tile & 0xFFFF]
             -= AM2_TILE_COVER_STEP;
         TileCoverSub((uint16_t)tile);
@@ -2862,7 +2857,6 @@ void __cdecl ObjClearRoachFootprint(void *obj)
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
                                 int32_t unused)
 {
-    typedef struct { int16_t x, y; } Pt;
     int32_t     total = 0;
     uint32_t    slot  = (uint32_t)(dir & 0xFF) * AM2_MASK_STRIDE;
     int32_t     i;
@@ -2870,17 +2864,18 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
     /* The count is re-read on every pass; the point is built from the
      * halves of `at` read out of its argument slot. */
 #define COUNT (*(const int32_t *)((const uint8_t *)g_roachMasks + slot))
-#define PTS   ((const Pt *)((const uint8_t *)g_roachMasks[0].pts + slot))
+#define PTS   ((const AM2_Point *)((const uint8_t *)g_roachMasks[0].pts + slot))
     for (i = 0; i < COUNT; i++) {
-        Pt    pt;
+        AM2_Point    pt;
         void *chain;
 
-        pt.x = PTS[i].x + ((const Pt *)&at)->x;
-        pt.y = PTS[i].y + ((const Pt *)&at)->y;
+        pt.x = PTS[i].x + ((const AM2_Point *)&at)->x;
+        pt.y = PTS[i].y + ((const AM2_Point *)&at)->y;
 
-        chain = ObjectsAtPoint((const uint32_t *)&pt,
+        chain = ObjectsAtPoint((const AM2_Point *)&pt,
                                g_objMapDesc);
-        total += BlockWeightDamaging(from, *(uint32_t *)&pt, chain, at, unused);
+        total += BlockWeightDamaging(from, pt, chain, *(const AM2_Point *)&at,
+                                     unused);
     }
 #undef COUNT
 #undef PTS
@@ -2931,8 +2926,8 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
  * and cleans five; the body reads four. Same shape as ObjBlockWeight's unused
  * third parameter one level down, and reproduced the same way.
  */
-int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
-                                    uint32_t ref, int32_t unused)
+int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
+                                    AM2_Point ref, int32_t unused)
 {
     uint8_t *o     = (uint8_t *)chain;
     int32_t  total = 0;
@@ -2941,7 +2936,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
     (void)unused;
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+        total += ObjBlockWeight(from, o, at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
 
@@ -3020,56 +3015,45 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
  * Each pass copies the leg and the target point before their addresses are
  * taken, which is what puts one copy in the dead `chain` slot; the weight
  * lives in two variables because the three zero exits skip the copy. */
-int32_t __cdecl BlockWeightRoute(
-void *from, uint32_t at, void *chain,
-                                 int32_t *inside)
+int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
+                                 AM2_Object *chain, int32_t *inside)
 {
-    uint8_t *o;
-    uint8_t *f = (uint8_t *)from;
-    int32_t  total = 0;
-    uint32_t leg;
-    int32_t  tile;
-    uint8_t  fl;
+    AM2_Object *o;
+    int32_t     total = 0;
+    AM2_Point   leg;
+    int32_t     tile;
+    uint8_t     fl;
 
     *inside = 0;
 
-    leg = *(const uint32_t *)(f + OBJ_OFF_FIELD_C0);
-    if (*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)
-        < *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT))
-        leg = ((const uint32_t *)(f + OBJ_OFF_MOVE_FROM))
-                  [*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)];
+    leg = f->dest;
+    if (f->moveAt < f->moveCount)
+        leg = f->waypoints[f->moveAt];
 
-    for (o = (uint8_t *)chain; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        uint32_t lp = leg;
-        uint32_t ap = at;
-        int32_t  w;
+    for (o = chain; o; o = o->queryNext) {
+        AM2_Point lp = leg;
+        AM2_Point ap = at;
+        int32_t   w;
 
         if (o == f)
             w = 0;
-        else if (f && abs(*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-                          - *(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
-                      > AM2_BLOCK_HEIGHT_STEP)
+        else if (f && abs(o->heightSet - f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
             w = 0;
         else {
             int32_t wt = AM2_BLOCK_FULL;
 
-            if (ObjIsItem((const AM2_Object *)o)) {
-                wt = *(const int8_t *)(o + OBJ_OFF_RANK);
+            if (ObjIsItem(o)) {
+                wt = o->itemFlag;
                 if (wt >= AM2_BLOCK_FULL)
                     goto ask;
                 goto skip;
-            } else if (f && ObjIsTypeIn238((const AM2_Object *)o)
-                       && ApproxDist((const AM2_Point *)&ap,
-                                     (const AM2_Point *)(o + OBJ_OFF_POS))
-                          > ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                                       (const AM2_Point *)(o + OBJ_OFF_POS))) {
+            } else if (f && ObjIsTypeIn238(o)
+                       && ApproxDist(&ap, &o->pos) > ApproxDist(&f->pos, &o->pos)) {
                 w = 0;
                 goto add;
             }
 ask:
-            *inside = PointInRect(
-                (const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
-                (const AM2_Point *)&lp);
+            *inside = PointInRect(&o->hit, &lp);
 skip:
             w = wt;
 
@@ -3078,30 +3062,24 @@ add:
         total += w;
         if (total >= AM2_BLOCK_FULL) {
             if (*inside) {
-                uint16_t cur = *(const uint16_t *)(f + OBJ_OFF_MOVE_AT);
-                uint16_t cnt = *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT);
+                uint16_t cur = f->moveAt;
+                uint16_t cnt = f->moveCount;
 
                 if (cur < cnt) {
                     if (cur < cnt - 1)
-                        *(uint16_t *)(f + OBJ_OFF_MOVE_AT) =
-                            (uint16_t)(cur + 1);
+                        f->moveAt = (uint16_t)(cur + 1);
                     else
-                        *(uint32_t *)(f + OBJ_OFF_FIELD_C0) =
-                            g_zeroPoint;
-                } else if (PointsEqual(
-                               *(const uint32_t *)(f + OBJ_OFF_FIELD_C0),
-                               *(const uint32_t *)(f + OBJ_OFF_SCRIPT_STATE))) {
-                    *(uint32_t *)(f + OBJ_OFF_FIELD_C0) =
-                            g_zeroPoint;
-                    *(uint32_t *)(f + OBJ_OFF_SCRIPT_STATE) =
-                            g_zeroPoint;
+                        f->dest = g_zeroXY;
+                } else if (PointsEqual(f->dest, f->scriptPoint)) {
+                    f->dest        = g_zeroXY;
+                    f->scriptPoint = g_zeroXY;
                 }
             }
             return total;
         }
     }
 
-    tile = ((uint16_t (__cdecl *)(uint32_t))(void (*)(void))TileOfPoint)(at);
+    tile = ((uint16_t (__cdecl *)(AM2_Point))(void (*)(void))TileOfPoint)(at);
     /* The original's guard, on the tile widened to int -- vacuous, exactly as
      * in BlockWeightChain, and kept for the same reason. */
 #pragma GCC diagnostic push
@@ -3118,14 +3096,12 @@ add:
      * being the player's own army, and it fires only when the destination
      * tile has bit 1 and OUR tile does not -- so crossing into that kind of
      * tile costs, standing in one already does not. */
-    if ((g_mpSession
-         || *(const int8_t *)(f + OBJ_OFF_ARMY) == (int32_t)g_defaultOwner)
+    if ((g_mpSession || f->owner == (int32_t)g_defaultOwner)
         && (fl & 2)
-        && !(g_tileFlags[*(const uint16_t *)(f + OBJ_OFF_TILE)] & 2))
+        && !(g_tileFlags[f->tile] & 2))
         total += AM2_BLOCK_FULL;
 
-    if ((uint16_t)TileOfPoint(*(const uint32_t *)(f + OBJ_OFF_FIELD_C0))
-        == tile)
+    if ((uint16_t)TileOfPoint(f->dest) == tile)
         *inside = 1;
 
     return total;
@@ -3170,14 +3146,14 @@ add:
  * one-character error no A/B here could ever report. That is why the polarity
  * is spelled out rather than left to the code.
  */
-int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
-                                 uint32_t ref)
+int32_t __cdecl BlockWeightChain(void *from, AM2_Point at, void *chain,
+                                 AM2_Point ref)
 {
     int32_t  total = 0;
     uint16_t tile;
 
     for (; chain; chain = *(void **)((uint8_t *)chain + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, chain, (int32_t)at, ref);
+        total += ObjBlockWeight(from, chain, at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
     }
@@ -3519,7 +3495,7 @@ int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
  * flagged in ADDR_TILE_FLAGS and of ADDR_CELL_WEIGHTS 15 or more is
  * AM2_SHOT_STRUCK_HARD; everything else is AM2_SHOT_STRUCK_NOTHING.
  */
-int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
+int32_t __cdecl ShotStrike(void *shot, AM2_Point at, int16_t height)
 {
     uint8_t       *s = (uint8_t *)shot;
     /* The type record is re-read through the shot at each use. */
@@ -3541,7 +3517,7 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
                                 height, (AM2_Object *)shot, &scratch))
             continue;
 
-        ApplyShotDamage(o, shot, (int32_t)at, height, scratch);
+        ApplyShotDamage(o, shot, at, height, scratch);
 
         if (code != 3)
             return AM2_SHOT_STRUCK_NOTHING;
@@ -3616,7 +3592,7 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
  * offset. On a shot it is the uid of whoever fired it: DamageObject takes it
  * as the attacker and LookupByUID resolves it four instructions later.
  */
-void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
+void __cdecl ApplyShotDamage(void *target, void *shot, AM2_Point unusedA,
                              int16_t unusedB, int32_t doubled)
 {
     const uint8_t *sh  = (const uint8_t *)shot;
@@ -3788,7 +3764,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
  * constant arms straight in eax and keeps the default in a register of its
  * own, and its by-value `ref` is the copy homed in the caller's dead slot. */
 static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
-                                       uint32_t ref)
+                                       AM2_Point ref)
 {
     int32_t w;
 
@@ -3816,8 +3792,7 @@ static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
     } else if (f
                && (ObjIsType3((const AM2_Object *)o)
                    || ObjIsType8((const AM2_Object *)o))) {
-        if (ApproxDist((const AM2_Point *)&ref,
-                       (const AM2_Point *)(o + OBJ_OFF_POS))
+        if (ApproxDist(&ref, (const AM2_Point *)(o + OBJ_OFF_POS))
             >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
                           (const AM2_Point *)(o + OBJ_OFF_POS)))
             return 0;
@@ -3825,8 +3800,8 @@ static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
     return w;
 }
 
-int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
-                                  uint32_t ref)
+int32_t __cdecl BlockWeightTroops(void *from, AM2_Point at, void *chain,
+                                  AM2_Point ref)
 {
     uint8_t *o;
     uint8_t *f     = (uint8_t *)from;
@@ -3902,9 +3877,8 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
  * exactly, which is the correct outcome -- and if I have misread the two
  * adjacent stack slots, nothing here would tell me.
  */
-int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
+int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, AM2_Point at)
 {
-    typedef struct { int16_t x, y; } Pt;
     int32_t  total;
     int32_t  i;
 
@@ -3918,22 +3892,22 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
 #define slot ((uint32_t)(kind * AM2_VEHICLE_MASK_DIRS + heading) \
               * AM2_VEHICLE_MASK_STRIDE)
 #define COUNT (*(const int32_t *)((const uint8_t *)g_vehicleMasks + slot))
-#define PTS   ((const Pt *)((const uint8_t *)g_vehicleMasks[0].pts + slot))
+#define PTS   ((const AM2_Point *)((const uint8_t *)g_vehicleMasks[0].pts + slot))
     for (i = 0; i < COUNT; i++) {
-        Pt    here;
+        AM2_Point    here;
         void *chain;
 
         /* Both halves of the packed base, summed with the mask offset. */
-        here.x = PTS[i].x + ((const Pt *)&at)->x;
-        here.y = PTS[i].y + ((const Pt *)&at)->y;
+        here.x = PTS[i].x + at.x;
+        here.y = PTS[i].y + at.y;
 
         /* NOTE: the BASE point, not `here`. */
         chain = (uint8_t *)ObjectsAtPoint(&at,
                                       g_objMapDesc);
 
         total += (kind == AM2_MASK_CHAIN_KIND)
-                 ? BlockWeightChain((void *)0, *(uint32_t *)&here, chain, at)
-                 : BlockWeightTroops((void *)0, *(uint32_t *)&here, chain, at);
+                 ? BlockWeightChain((void *)0, here, chain, at)
+                 : BlockWeightTroops((void *)0, here, chain, at);
     }
 #undef COUNT
 #undef PTS
@@ -3966,7 +3940,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
  * live mission, and adding 40 to the answer leaves `mission` at 299 and
  * `bootcamp` at 76 -- both inside their bands. Twelve calls over a whole
  * mission is a thin path and the frame does not show what they decide. */
-uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
+uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint)
 {
     /* TileAttrAt's body, inline as the image has it. */
     int8_t  best = *(const int8_t *)(g_tileAttrs
@@ -4385,14 +4359,14 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
  * evidence that the revive path is untaken rather than an inference from the
  * caller. An absent log line is evidence when the line is unconditional on the
  * path you are asking about. */
-void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
+void __cdecl DeployItem(void *obj, AM2_Point where, int32_t resurrect,
                         int32_t suppress)
 {
     uint8_t *o = (uint8_t *)obj;
 
     /* The point is read in halves from its own argument slot, and the owner
      * widened afresh at each use, as the image does. */
-#define WHERE (*(const AM2_Point *)&where)
+#define WHERE where
 #define OWNER ((int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF))
     if (g_mpSession && suppress == 0
         && !((AM2_Comm *)kItemComm)->CommMustBroadcast(OWNER))
@@ -4508,7 +4482,7 @@ void __cdecl PortalSpawn(void)
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[orig_game_rand() % 4],
                                      0),
-                     g_zeroPoint,
+                     g_zeroXY,
                      4, -1, 0, 0);
         if (!weapon)
             continue;
@@ -4558,7 +4532,7 @@ void __cdecl PortalSpawn(void)
 void __cdecl FlameTick(void)
 {
     uint8_t *leader;
-    int32_t  pt;
+    AM2_Point pt;
     uint32_t now;
 
     if (!g_flameOn)
@@ -4574,9 +4548,8 @@ void __cdecl FlameTick(void)
         g_defaultOwner);
 
     /* Dereferenced before the test below -- see the note above. */
-    *(int16_t *)&pt = *(const int16_t *)(leader + OBJ_OFF_POS);
-    *((int16_t *)&pt + 1) =
-        (int16_t)(*(const int16_t *)(leader + OBJ_OFF_POS + 2) - 1);
+    pt.x = *(const int16_t *)(leader + OBJ_OFF_POS);
+    pt.y = (int16_t)(*(const int16_t *)(leader + OBJ_OFF_POS + 2) - 1);
 
     if (!leader)
         return;
@@ -5150,7 +5123,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 {
 #define o ((uint8_t *)obj)
     uint8_t  *armour = (uint8_t *)0;
-    uint32_t  at;
+    AM2_Point at;
     int32_t   slot;
     int32_t   left;          /* the armour's remaining ITEM_OFF_AMMO */
     int32_t   i;
@@ -5168,8 +5141,8 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         g_gameClockMs;
 
     /* The effect goes at the trooper's position raised by its own height. */
-    at = *(const uint32_t *)(o + OBJ_OFF_POS);
-    ((AM2_Point *)&at)->y -= (int16_t)ObjHeight(o);
+    at = *(const AM2_Point *)(o + OBJ_OFF_POS);
+    at.y -= (int16_t)ObjHeight(o);
 
 
     if (kind != 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE) {
@@ -5243,7 +5216,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                              *(const uint32_t *)(armour + OBJ_OFF_UID));
 
                 TrooperDropItemSend(o, armour, slot, 0,
-                                    *(const uint32_t *)(o + OBJ_OFF_POS));
+                                    *(const AM2_Point *)(o + OBJ_OFF_POS));
             }
 
             *(uint32_t *)(armour + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
@@ -5320,7 +5293,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                 where.x = (int16_t)(ring[k - 1] + *(const int16_t *)(o + OBJ_OFF_X));
                 where.y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_Y) + ring[k]);
                 TrooperDropItem(o, AM2_TROOPER_DROP_SLOT,
-                                *(const uint32_t *)&where);
+                                where);
                 k += 2;
             } while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
                          [AM2_TROOPER_DROP_SLOT] != 0);
@@ -5394,7 +5367,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint32_t at;
+    AM2_Point at;
 
     (void)kind;
 
@@ -5416,7 +5389,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
     if (amount > *(const int16_t *)(o + OBJ_OFF_HEALTH))
         amount = *(const int16_t *)(o + OBJ_OFF_HEALTH);
 
-    at = *(const uint32_t *)(o + OBJ_OFF_POS);
+    at = *(const AM2_Point *)(o + OBJ_OFF_POS);
 
     if (amount > 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE)
         SpawnHitEffect(&at,
@@ -6221,7 +6194,7 @@ void __cdecl NextInventorySlot(void *obj)
         int32_t range, allied, other;
         uint8_t bearing;
 
-        SightScan(obj, &range, &bearing, &allied, &other, 0);
+        SightScan((AM2_Object *)obj, &range, &bearing, &allied, &other, 0);
     }
 
     if (!ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)) {
@@ -6334,7 +6307,7 @@ void __cdecl StepType8(void *obj)
                     *(const int16_t *)(o + OBJ_OFF_POS),
                     *(const int16_t *)(o + OBJ_OFF_POS + 2));
 
-        RoachAliveStepA(obj, facing);
+        RoachAliveStepA((AM2_Object *)obj, (AM2_RoachOut *)facing);
         RoachAliveStepB(obj, facing);
     }
 
@@ -6408,8 +6381,8 @@ void __cdecl ObjFrameStep(AM2_Object *o)
     switch (o->type) {
     case 1:
     case 4: if (LIVE) StepType1And4(o);      break;
-    case 2:           StepType2(obj);        break;
-    case 3: if (LIVE) StepType3(obj);        break;
+    case 2:           StepType2(o);          break;
+    case 3: if (LIVE) StepType3(o);          break;
     case 5: if (LIVE) StepType5(obj);        break;
     case 6: if (LIVE) StepType6(obj);        break;
     case 7: if (LIVE) ObjMarkIfOverdue(obj); break;
@@ -6535,33 +6508,31 @@ void __cdecl DamageRoach(void *obj, int32_t amount, uint8_t dir, int32_t kind,
  * orders an object to a point is something this drive does not do. Checked on
  * the CAMPAIGN map as well, which is a different map with different scripted
  * content: also 0. So this is not a Boot Camp peculiarity. */
-void __cdecl PointActionA(void *obj, uint32_t point)
+void __cdecl PointActionA(AM2_Object *o, AM2_Point point)
 {
-    uint8_t *o = (uint8_t *)obj;
-    int32_t  type;
+    int32_t type;
 
-    if (!obj)
+    if (!o)
         return;
 
-    type = *(const int32_t *)o;
+    type = (int32_t)o->type;
     if (type < 2)
         return;
     if (type > 3 && type != 8)
         return;
 
-    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
+    ObjAttachTo(o, (AM2_Object *)0);
 
-    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID) = 0;
-    *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
+    o->fieldB0 = 0;
+    o->fieldB2 = 0;
 
-    NearestAllowedTile(obj, TileOfPoint(point), &point);
+    NearestAllowedTile(o, TileOfPoint(point), &point);
 
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) = point;
-    *(int32_t *)(o + OBJ_OFF_FIELD_EC) =
-        (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;
+    o->scriptPoint = point;
+    o->fieldEC     = (o->fieldF4 > 0) ? 1 : 0;
 
-    if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3)
-        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+    if (o->aiMode == 3)
+        o->aiMode = 1;
 }
 
 /* 0x004480E0, three callers. Type2ActionB's sibling and the same shape: the
@@ -6847,7 +6818,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
                     ((const AM2_Object *)item)->uid);
 
         TrooperDropItemSend(u, item, slot, 0,
-                            *(const uint32_t *)(u + OBJ_OFF_POS));
+                            *(const AM2_Point *)(u + OBJ_OFF_POS));
     }
 
     *(uint32_t *)(item + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
@@ -6890,7 +6861,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
  * never notified as dropped. So an empty weapon disappears rather than being
  * droppable.
  */
-void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
+void __cdecl TrooperDropItem(void *unit, int32_t slot, AM2_Point at)
 {
     uint8_t *u = (uint8_t *)unit;
     uint8_t *item;
@@ -6988,7 +6959,7 @@ void __cdecl Type2ActionA(void *obj)
                             (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),
-                            g_zeroPoint,
+                            g_zeroXY,
                             4, -1, 0, 0);
     if (!made)
         return;
@@ -7654,7 +7625,7 @@ void __cdecl RankPromote(void *obj)
         g_dirScratch,
         *(const int8_t *)(o + OBJ_OFF_ARMY),
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
-        g_zeroPoint,
+        g_zeroXY,
         4, -1, 0, 0);
 
     if (!made)
@@ -9403,7 +9374,7 @@ void __cdecl SelectionClick(void)
             goto changed;
         }
         {
-            const AM2_Point *a = (const AM2_Point *)&g_dragAnchor;
+            const AM2_Point *a = &g_dragAnchor;
             const AM2_Point *w = &world;
             AM2_Rect *r = (AM2_Rect *)g_viewRect_;
 
@@ -9428,7 +9399,7 @@ void __cdecl SelectionClick(void)
         return;
 
     e = (uint8_t *)WalkCellAtPoint(
-            (const uint32_t *)&world, g_objMapDesc,
+            (const AM2_Point *)&world, g_objMapDesc,
             ObjIsSelectable);
     if (!e)
         return;
@@ -9555,7 +9526,7 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
         noise = 5;
         if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big
             && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 0x21)
-            DiedEffectB((const uint32_t *)(o + OBJ_OFF_POS),
+            DiedEffectB((const AM2_Point *)(o + OBJ_OFF_POS),
                             *(const uint8_t *)(o + OBJ_OFF_FACING),
                             *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
                             *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
@@ -10011,7 +9982,7 @@ void __cdecl ToggleSelect(void *obj)
  * each loop rather than latched, which is the original's spelling; for the
  * boat loop that is the same 5 it entered with.
  */
-int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
+int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, AM2_Point at,
                                    int32_t apply)
 {
     uint8_t       *v       = (uint8_t *)veh;
@@ -10032,13 +10003,13 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
         if (AM2_MASK_REC(rec) > 0) {
         i = 0;
         do {
-            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + ((const AM2_Point *)&at)->x);
-            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + ((const AM2_Point *)&at)->y);
+            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + at.x);
+            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + at.y);
 
             /* &base, and that is the one byte the two loops differ in. */
             list = ObjectsAtPoint(&at,
                                   g_objMapDesc);
-            weight += BlockWeightChain(v, *(const uint32_t *)&pt, list, at);
+            weight += BlockWeightChain(v, pt, list, at);
 
             if (apply && list) {
                 for (o = (uint8_t *)list; o != (uint8_t *)0;
@@ -10087,12 +10058,12 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     if (AM2_MASK_REC(rec) > 0) {
         i = 0;
         do {
-            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + ((const AM2_Point *)&at)->x);
-            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + ((const AM2_Point *)&at)->y);
+            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + at.x);
+            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + at.y);
 
-            list = ObjectsAtPoint((const uint32_t *)&pt,
+            list = ObjectsAtPoint((const AM2_Point *)&pt,
                                   g_objMapDesc);
-            weight += BlockWeightTroops(v, *(const uint32_t *)&pt, list, at);
+            weight += BlockWeightTroops(v, pt, list, at);
 
             if (apply && list) {
                 for (o = (uint8_t *)list; o != (uint8_t *)0;
@@ -10158,7 +10129,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     /* One last sample, at the vehicle's own point, and a weight at or above
      * AM2_BLOCK_CLEAR replaces everything the mask accumulated. */
     {
-        uint32_t pt = at;
+        AM2_Point pt = at;
 
         list = ObjectsAtPoint(&pt, g_objMapDesc);
         if (BlockWeightTroops(v, pt, list, at) >= AM2_BLOCK_CLEAR)
@@ -10170,7 +10141,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
         /* PlaySoundAt takes 16-bit coordinates; the original pushes each
          * as the dword loaded from its half of `at`. */
-#define AT ((const AM2_Point *)&at)
+#define AT (&at)
         if (kind == AM2_VEHICLE_KIND_TANK)
             PlaySoundAt(AM2_SND_CRUSH_TANK, 2, 0, AT->x, AT->y);
         else if (kind == AM2_VEHICLE_KIND_JEEP)
@@ -10210,25 +10181,23 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
  * ever on a crowded map is the same thing that stops the other -- the step
  * arithmetic is sixteen bits, so a long enough walk wraps the coordinate.
  */
-void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing, uint32_t from,
-                                      void *outPt)
+void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing, AM2_Point from,
+                                      AM2_Point *out)
 {
-    AM2_Point *out = (AM2_Point *)outPt;
     int32_t    dir = 0;
     int32_t    step = 0;
     int32_t    leg = 1;
     int32_t    grew = 0;
     uint8_t    snapped;
 
-    *(uint32_t *)out = from;
+    *out = from;
     snapped = (uint8_t)RoundTo8(facing & 0xFF, AM2_VEHICLE_FACING_BITS);
 
     for (;;) {
         const uint8_t *entry;
 
         if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
-            && VehicleBlockWeight(veh, snapped,
-                                         *(const uint32_t *)out, 0)
+            && VehicleBlockWeight(veh, snapped, *out, 0)
                < AM2_VEHICLE_CLEAR_WEIGHT)
             return;
 
@@ -10282,15 +10251,14 @@ void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing, uint32_t from,
  * The weight comes from BlockWeightAt with a NULL object and the candidate
  * point passed twice -- "how blocked is this point, for nobody in particular".
  */
-void __cdecl NearestClearPoint(uint32_t from, void *outPt)
+void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out)
 {
-    AM2_Point *out = (AM2_Point *)outPt;
     int32_t dir = 0;
     int32_t step = 0;
     int32_t leg = 1;
     int32_t grew = 0;
 
-    *(uint32_t *)out = from;
+    *out = from;
 
     for (;;) {
         const uint8_t *entry;
@@ -10432,7 +10400,7 @@ void __cdecl SetObjContext(void *obj)
  * that order. Same as the sibling, and worth stating because a caller taking
  * "the first hit" gets the last one added.
  */
-void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
+void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
                               int32_t (__cdecl *keep)(void *obj))
 {
     const uint8_t *d = (const uint8_t *)desc;
@@ -10456,12 +10424,12 @@ void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
         if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             continue;
         if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
-                         (const AM2_Point *)pt))
+                         pt))
             continue;
         if (!keep(o))
             continue;
         if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
-            && !ObjMaskBitAt(o, (const AM2_Point *)pt))
+            && !ObjMaskBitAt(o, pt))
             continue;
 
         *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
@@ -10787,7 +10755,7 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit)
         if (slot == AM2_SLOT_ALL_FULL)
             return 0;           /* nothing carried is worth less */
 
-        TrooperDropItem(u, slot, *(const uint32_t *)(u + OBJ_OFF_POS));
+        TrooperDropItem(u, slot, *(const AM2_Point *)(u + OBJ_OFF_POS));
     }
 
     return code;
@@ -11019,7 +10987,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 #define o ((uint8_t *)obj)
     uint8_t  *row0;
     AM2_Point at;
-    uint32_t  where;
+    AM2_Point where;
     uint8_t   height;
     int32_t   i;
 
@@ -11027,13 +10995,13 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 
     at.x = (int16_t)x;
     at.y = (int16_t)y;
-    where = *(const uint32_t *)&at;
+    where = at;
 
     NearestClearVehiclePoint(o, *(const uint8_t *)(o + OBJ_OFF_FACING),
                              where, &at);
-    *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&at;
+    *(AM2_Point *)(o + OBJ_OFF_POS) = at;
 
-    height = HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+    height = HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
     *(o + OBJ_OFF_HEIGHT_SET) = height;
     ObjTileChanged(o, (int32_t)(int8_t)height, 1);
 
@@ -11141,10 +11109,10 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
     at.x = (int16_t)x;
     at.y = (int16_t)y;
-    NearestClearPoint(*(const uint32_t *)&at, &out);
+    NearestClearPoint(at, &out);
     *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&out;
 
-    height = HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+    height = HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
     *(o + OBJ_OFF_HEIGHT_SET) = height;
     ObjTileChanged(o, (int32_t)(int8_t)height, 1);
 
@@ -11252,7 +11220,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     int32_t        cols, cell, stride;
 
     if (force == 0
-        && PointsEqual(*(const uint32_t *)&o->prevPos, *(const uint32_t *)&o->pos))
+        && PointsEqual(o->prevPos, o->pos))
         return;
 
     x = o->pos.x;
@@ -11616,7 +11584,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                               int32_t unused, uint32_t uid, uint8_t facing)
 {
     uint8_t  *o = (uint8_t *)am2_malloc(AM2_EXPLOSION_BYTES);
-    uint32_t  at;
+    AM2_Point  at;
     int16_t   depth;
     int32_t   tile;
 
@@ -11806,7 +11774,7 @@ void __cdecl StepType6(void *obj)
             uint16_t tile;
 
             PlaceGroundDecal(pos->x, *(const int16_t *)(o + OBJ_OFF_POS + 2), spin);
-            tile = (uint16_t)TileOfPoint(*(const uint32_t *)pos);
+            tile = (uint16_t)TileOfPoint(*pos);
 
             if ((( g_tileFlags)[tile] & 1)
                 && (g_cellWeights)[tile]
@@ -11898,7 +11866,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     uint8_t  *o;
     uint8_t  *rows;
     AM2_Point at;
-    uint32_t  where;
+    AM2_Point  where;
     AM2_Rect  r;
 
     if (g_mpSession && !remote
@@ -11912,9 +11880,9 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     at.y = (int16_t)y;
 
     if (settle)
-        NearestClearPoint(*(uint32_t *)&at, &where);
+        NearestClearPoint(at, &where);
     else
-        where = *(uint32_t *)&at;
+        where = at;
 
     *(uint8_t *)(o + TROOPER_OFF_FACING)  = (uint8_t)facing;
     *(uint8_t *)(o + TROOPER_OFF_FACING2) = (uint8_t)facing;
@@ -11966,7 +11934,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         *(int32_t *)(o + OBJ_OFF_NAME_INDEX) = TakeSoldierName();
 
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
-        HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+        HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
 
     if (!remote
         && AM2_THE_COMM->CommMustBroadcast(army))
@@ -12111,7 +12079,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)
         (g_vehicleHeightByKind)[kind];
 
-    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, *(const uint32_t *)&at,
+    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
                   g_vehicleBox, remote, uid);
 
     *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
@@ -12158,7 +12126,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(int32_t *)(o + VEHICLE_OFF_ARMOUR) =
         *(const int32_t *)(def + VEHDEF_OFF_ARMOUR);
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
-        HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+        HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
 
     /* Kinds 3 and 4 carry no weapon and skip the whole block, as does
      * anything past 5. The arms are in the image's layout order. */
@@ -12176,7 +12144,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         void *w = CreateWeapon(g_dirScratch, army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                                (uint32_t)weaponKind, 0),
-                               g_zeroPoint,
+                               g_zeroXY,
                                AM2_VEHICLE_WEAPON_FLAGS, -1, remote, 0);
 
         if (w != (void *)0)
@@ -12372,7 +12340,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
         o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
         memset(o, 0, AM2_ITEM_BYTES);
 
-        if (!InitObjFromAai(o, name, army, slot, *(uint32_t *)&at, orFlags, remote,
+        if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
                             (int32_t)uid)) {
             am2_free(o);
             return (void *)0;
@@ -12390,7 +12358,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
 
         if (ObjIsWatchedKind(o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
             ItemPostCreate((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
-                           *(const uint32_t *)(o + OBJ_OFF_POS));
+                           *(const AM2_Point *)(o + OBJ_OFF_POS));
 
         *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
 
@@ -12506,7 +12474,7 @@ have:
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SEQ_STARTED;
         life = (*(const int16_t *)(o + OBJ_OFF_HEALTH) + AM2_SEQ_LIFE_BIAS)
                * AM2_SEQ_LIFE_PER_HP;
-        SeqAddKind7((const int32_t *)(o + OBJ_OFF_POS), (int32_t)attacker,
+        SeqAddKind7((const AM2_Point *)(o + OBJ_OFF_POS), (int32_t)attacker,
                     0, 0, life);
     }
 
@@ -12572,7 +12540,7 @@ have:
             sixth = g_unused662288;
 
         UnrevealArea((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
-                     *(const uint32_t *)(o + OBJ_OFF_POS));
+                     *(const AM2_Point *)(o + OBJ_OFF_POS));
 
         SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
                 (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
@@ -12775,7 +12743,7 @@ void __cdecl StepType5(void *obj)
         *(int32_t *)(o + MISSILE_OFF_FLOWN) += (int32_t)d;
 
         if (strike) {
-            outcome = ShotStrike(o, *(const uint32_t *)(o + OBJ_OFF_POS),
+            outcome = ShotStrike(o, *(const AM2_Point *)(o + OBJ_OFF_POS),
                                  *(const int16_t *)(o + MISSILE_OFF_HEIGHT));
             if (outcome != 6)
                 break;
@@ -12892,7 +12860,7 @@ after_flight:
             && !(flags[*(const uint16_t *)(o + OBJ_OFF_TILE)]
                  & AM2_TILE_OPEN)) {
             int16_t want = (int8_t)HeightAtPoint(
-                               *(const uint32_t *)(o + OBJ_OFF_POS))
+                               *(const AM2_Point *)(o + OBJ_OFF_POS))
                            + AM2_SIGHT_OVERHEAD;
 
             if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > (int16_t)want) {
@@ -13193,8 +13161,8 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
  * win32/widget.h, and this module is on the flat side of the split -- pulling
  * that header in would drag Win32 types across it and fail checksplit. Same
  * reason script.cpp forward-declares PreloadSprite. */
-void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
-void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
+void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at);
+void __cdecl AimStartB(uint32_t uid, int8_t army, AM2_Point at);
 
 
 
@@ -13248,7 +13216,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
     uint8_t  *u   = (uint8_t *)unit;
     int16_t  *pt  = (int16_t *)&spot.at;
     uint8_t  *spr;
-    uint32_t  from;         /* the packed spot.at the shot leaves from */
+    AM2_Point  from;         /* the packed spot.at the shot leaves from */
     int16_t  *fromP = (int16_t *)&from;
     int32_t   dir;
     uint32_t  kind;
@@ -13278,11 +13246,11 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
      * own. Nothing new had to be named for this function. */
 #define rows (*(uint8_t **)(u + OBJ_OFF_ROWS))
     if (*(const int32_t *)(u + OBJ_OFF_ROW_COUNT) > 1) {
-        from = *(const uint32_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
+        from = *(const AM2_Point *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
         spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
         dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
     } else {
-        from = *(const uint32_t *)(u + OBJ_OFF_POS);
+        from = *(const AM2_Point *)(u + OBJ_OFF_POS);
         spr  = *(uint8_t **)(rows + ROW_OFF_SPRITE);
         dir  = *(const int16_t *)(rows + ROW_OFF_FIELD_26);
     }
@@ -13551,17 +13519,17 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
      * regular is the clearest evidence the dispatch table is read right. */
     case 24:
         SpeakLine(0x16, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(0, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(0, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     case 25:
         SpeakLine(0x17, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(1, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(1, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     case 26:
         SpeakLine(0x18, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(2, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(2, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     /* arms 18 and 19 -- 0x0045FCAE and 0x0045FCFD. Aim rather than fire: they
@@ -13574,7 +13542,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
         pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewX);
         pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewY);
         AimStart(*(const uint32_t *)(u + OBJ_OFF_UID),
-                 *(const int8_t *)(u + OBJ_OFF_ARMY), *(const uint32_t *)&spot.at);
+                 *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
         return 1;
 
     case 40:
@@ -13583,7 +13551,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
         pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewX);
         pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewY);
         AimStartB(*(const uint32_t *)(u + OBJ_OFF_UID),
-                  *(const int8_t *)(u + OBJ_OFF_ARMY), *(const uint32_t *)&spot.at);
+                  *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
         return 1;
 
     /* arm 11 -- 0x0045FD4B, the medic pack. Refuse a casualty who is dead or
@@ -13718,7 +13686,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
             Sin8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + *(const int16_t *)(u + OBJ_OFF_POS + 2));
 
-        o = (uint8_t *)ObjectsHitByPoint((const uint32_t *)&from,
+        o = (uint8_t *)ObjectsHitByPoint((const AM2_Point *)&from,
                 g_objMapDesc);
 
         attacker = *(const uint32_t *)(u + OBJ_OFF_UID);
@@ -14123,7 +14091,7 @@ void item_install(void)
  * when the owner is not allied to the local player. The second does neither,
  * so what it drops is always visible. Two functions rather than one with a
  * flag, and the difference is behaviour rather than a constant. */
-void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
+void __cdecl CreateWatchedItem(void *weapon, void *obj, AM2_Point at,
                                uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -14131,9 +14099,9 @@ void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
     void    *item;
 
     /* `at` is a packed point, read a half at a time from its slot. */
-    point.x = (int16_t)(((const AM2_Point *)&at)->x
+    point.x = (int16_t)(at.x
                                        - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
-    point.y = (int16_t)(((const AM2_Point *)&at)->y
+    point.y = (int16_t)(at.y
                                        - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
 
     item = CreateItem(g_dirScratch,
@@ -14143,7 +14111,7 @@ void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
     if (item == 0)
         return;
 
-    ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), *(uint32_t *)&point);
+    ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), point);
 
     *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
     ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
@@ -14158,7 +14126,7 @@ void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
     (void)weapon;
 }
 
-void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
+void __cdecl CreateWatchedType(void *weapon, void *obj, AM2_Point at,
                                uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -14166,9 +14134,9 @@ void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
     void    *item;
 
     /* `at` is a packed point, read a half at a time from its slot. */
-    point.x = (int16_t)(((const AM2_Point *)&at)->x
+    point.x = (int16_t)(at.x
                                        - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
-    point.y = (int16_t)(((const AM2_Point *)&at)->y
+    point.y = (int16_t)(at.y
                                        - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
 
     item = CreateItem(g_dirScratch,
@@ -14214,7 +14182,7 @@ void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
  * is why that cleanup counts nine dwords against eight pushes -- the shared
  * cleanup shape, once more. */
 void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
-                           uint32_t at, int32_t flags, int32_t quantity,
+                           AM2_Point at, int32_t flags, int32_t quantity,
                            int32_t remote, int32_t uid)
 {
     uint8_t       *o;
@@ -14223,8 +14191,8 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
 
     if (g_debugItemList)
         am2_log("CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x\n", name, army,
-                key, (int32_t)((const AM2_Point *)&at)->x,
-                (int32_t)((const AM2_Point *)&at)->y, flags, quantity, remote, uid);
+                key, (int32_t)at.x,
+                (int32_t)at.y, flags, quantity, remote, uid);
 
     if (g_mpSession != 0 && remote == 0
         && !AM2_THE_COMM->CommMustBroadcast(

@@ -155,17 +155,17 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b);
  * geometry"; the two with an explicit weapon lend it the firing unit's army
  * for the duration. See event.cpp for what the callee fills in. */
 void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
-                               int32_t heading, uint32_t at);
+                               int32_t heading, AM2_Point at);
 void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
                                 int32_t heading, uint32_t targetUid);
-void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at);
+void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at);
 void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
                               uint32_t targetUid);
 
 /* 0x004203A0. Work out the point an action refers to: a pair of variables when
  * `xvar` is set, a literal when its x is non-zero, or the target object's
  * position otherwise. Fourteen callers. */
-uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
+AM2_Point __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
 
 /* 0x00420410. Run one parsed action against an owner -- or, when the action
  * names a subject, hand it to EventNotify for later. */
@@ -213,12 +213,12 @@ void __cdecl EvtObjAction(uint32_t uid);
 
 /* 0x0041FE70. Deploy the object a uid names. A zero LOW WORD in `where` means
  * "leave it where it is" and its own position is used. */
-void __cdecl EvtDeployItem(uint32_t uid, uint32_t where);
+void __cdecl EvtDeployItem(uint32_t uid, AM2_Point where);
 
 /* 0x0041FEC0. Resurrect a named item -- the same lookup and the same
  * zero-low-word idiom as EvtDeployItem, differing only in the resurrect flag
  * it passes DeployItem. */
-void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where);
+void __cdecl ScriptResurrectItem(uint32_t uid, AM2_Point where);
 
 /* 0x0041FBE0 and 0x0041FC10. The same shim twice -- uid threshold, lookup,
  * ObjIsType2 -- differing only in which function it then calls. Role names;
@@ -275,8 +275,8 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b);
  * coordinates -- and ADDS the object's position to the point when it is set.
  * EvtAtPointC additionally declines when the object is already there, on the
  * non-relative path only. */
-void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative);
-void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative);
+void __cdecl EvtAtPointA(uint32_t uid, AM2_Point point, int32_t relative);
+void __cdecl EvtAtPointC(uint32_t uid, AM2_Point point, int32_t relative);
 
 /* 0x0041F7F0. The "On" wrapper for EvtAtPointC: `target` is acted on, `at`
  * only supplies a position. */
@@ -285,8 +285,8 @@ void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative);
 /* 0x0041FD10 and 0x0041FD30. Hand the ADDRESS of the first argument to a
  * function further up the image; the zero arguments differ, so they are not
  * one function called twice. */
-void __cdecl EvtByRefA(int32_t a, int32_t b);
-void __cdecl EvtByRefB(int32_t a, int32_t b);
+void __cdecl EvtByRefA(AM2_Point a, int32_t b);
+void __cdecl EvtByRefB(AM2_Point a, int32_t b);
 
 void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c);
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
@@ -295,7 +295,7 @@ void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
  * a flag bit and an ObjFieldA filter that -1 disables. Dead uids are pruned
  * from the list as it walks. NOTE the relative offset ACCUMULATES across
  * objects -- a defect in the original, reproduced. */
-void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
+void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
                             int32_t relative);
 
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
@@ -402,7 +402,7 @@ void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode);
  * EvtPlaySoundOn (0x0041F6B0) passes x and y as zero and an owner uid instead.
  * PlayDynamicSound then looks the object up and takes the position from +0x12
  * and +0x14, so the sound follows the unit rather than a fixed spot. */
-void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
+void __cdecl EvtPlaySoundAt(const char *name, AM2_Point point, int32_t slot,
                             int32_t priority, int32_t loop);
 void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
                             int32_t priority, int32_t loop);
@@ -589,7 +589,7 @@ int event_install(void);
 
 /* 0x0041FC80, one caller. The `dropitem` action: find a weapon uid among a
  * trooper's inventory slots 1..5 and drop it at a point. */
-void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at);
+void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, AM2_Point at);
 
 /* 0x0041FDB0, one caller. Attach every object an army owns -- optionally only
  * those whose field A matches -- to one target object. */

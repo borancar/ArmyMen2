@@ -969,7 +969,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
-#define g_defaultPos    (*(const AM2_Point *)&g_zeroPoint)
+#define g_defaultPos    (g_zeroXY)
 
 /* ParseWave -- original 0x0040C220, one caller, and that caller is
  * ReadWaveFile below. The RIFF chunk walk: given the whole file in memory,
@@ -1508,7 +1508,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
          * PointsEqual takes both points BY VALUE. */
         if (owner && *(const int16_t *)((uint8_t *)owner + 0x62) > 0) {
             at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
-            if (PointsEqual(*(const uint32_t *)&where, *(const uint32_t *)at))
+            if (PointsEqual(where, *at))
                 d2 = SOUND_NEAR_DISTANCE;
             else
                 d2 = ApproxDist(at, &where) >> 1;

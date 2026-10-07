@@ -349,11 +349,11 @@ extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
                                          int32_t slot, int32_t priority,
                                          uint32_t owner);
 
-void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
+void __cdecl EvtPlaySoundAt(const char *name, AM2_Point point, int32_t slot,
                             int32_t priority, int32_t loop)
 {
-    PlayDynamicSound(name, loop, 0, ((const AM2_Point *)&point)->x,
-                     ((const AM2_Point *)&point)->y, slot, priority, 0);
+    PlayDynamicSound(name, loop, 0, point.x,
+                     point.y, slot, priority, 0);
 }
 
 void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
@@ -957,8 +957,8 @@ typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
-typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
-typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
+typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, AM2_Point point, int32_t c);
+typedef void (__cdecl *AM2_PointActionFn)(void *obj, AM2_Point point);
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -969,15 +969,15 @@ typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
  *
  * Checks the pointer rather than the uid, like EvtObjAction and EvtSetByte40.
  */
-void __cdecl EvtDeployItem(uint32_t uid, uint32_t where)
+void __cdecl EvtDeployItem(uint32_t uid, AM2_Point where)
 {
-    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+    AM2_Object *obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == (AM2_Object *)0)
         return;
 
-    if ((uint16_t)where == 0)
-        where = *(const uint32_t *)(obj + OBJ_OFF_POS);
+    if (where.x == 0)
+        where = obj->pos;
 
     DeployItem(obj, where, 0, 0);
 }
@@ -1077,24 +1077,24 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
  *
  * The log is gated on the comm object's debug field, like the rest of this
  * module, and prints the point as two SIGNED 16-bit halves. */
-void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
+void __cdecl ScriptResurrectItem(uint32_t uid, AM2_Point where)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     /* `where` is an AM2_Point by value; its halves are read out of the
      * argument slot. */
     if (kEventDebug)
         orig_log("ScriptResurrectItem, uid=%x, pos=(%d,%d)\n", uid,
-                 (int32_t)((const AM2_Point *)&where)->x,
-                 (int32_t)((const AM2_Point *)&where)->y);
+                 (int32_t)where.x,
+                 (int32_t)where.y);
 
-    obj = (uint8_t *)LookupByUID(uid);
+    obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == (AM2_Object *)0)
         return;
 
-    if (((const AM2_Point *)&where)->x == 0)
-        where = *(const uint32_t *)(obj + OBJ_OFF_POS);
+    if (where.x == 0)
+        where = obj->pos;
 
     DeployItem(obj, where, AM2_DEPLOY_RESURRECT, 0);
 }
@@ -1119,7 +1119,7 @@ void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
  * it. Reproduced: nothing in this port may quietly fix a bug the game ships,
  * and a mission relying on the first object's offset would change behaviour if
  * it were fixed. */
-void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
+void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
                             int32_t relative)
 {
     int32_t  i;
@@ -1153,11 +1153,11 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
         if (relative) {
             /* Cumulative across objects, as the original's: each adds into
              * the argument's halves. */
-            ((AM2_Point *)&point)->x = (int16_t)(((AM2_Point *)&point)->x + *(const int16_t *)(obj + OBJ_OFF_X));
-            ((AM2_Point *)&point)->y = (int16_t)(((AM2_Point *)&point)->y + *(const int16_t *)(obj + OBJ_OFF_Y));
+            point.x = (int16_t)(point.x + *(const int16_t *)(obj + OBJ_OFF_X));
+            point.y = (int16_t)(point.y + *(const int16_t *)(obj + OBJ_OFF_Y));
         }
 
-        PointActionA(obj, point);
+        PointActionA((AM2_Object *)obj, point);
         i++;
     }
 #undef list
@@ -1181,7 +1181,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
  *
  * The original builds the relative sum in its own first argument slot. That is
  * a register-allocation detail with no observable side, so a local is used. */
-void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
+void __cdecl EvtAtPointA(uint32_t uid, AM2_Point point, int32_t relative)
 {
     uint8_t *obj;
 
@@ -1195,17 +1195,17 @@ void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
 
     if (relative) {
         /* Added into the argument's own halves. */
-        ((AM2_Point *)&point)->x = (int16_t)(((AM2_Point *)&point)->x + *(const int16_t *)(obj + OBJ_OFF_X));
-        ((AM2_Point *)&point)->y = (int16_t)(((AM2_Point *)&point)->y + *(const int16_t *)(obj + OBJ_OFF_Y));
+        point.x = (int16_t)(point.x + *(const int16_t *)(obj + OBJ_OFF_X));
+        point.y = (int16_t)(point.y + *(const int16_t *)(obj + OBJ_OFF_Y));
     }
 
     if (ObjIsType2((const AM2_Object *)obj))
         *(int32_t *)(obj + OBJ_OFF_FIELD_540) = 0;
 
-    PointActionA(obj, point);
+    PointActionA((AM2_Object *)obj, point);
 }
 
-void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
+void __cdecl EvtAtPointC(uint32_t uid, AM2_Point point, int32_t relative)
 {
     uint8_t *obj;
 
@@ -1219,7 +1219,7 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
 
     /* The point's halves read as words out of its argument slot; the
      * relative sum built as a struct (the image puts it in uid's slot). */
-#define PT (*(const AM2_Point *)&point)
+#define PT point
     if (relative) {
         AM2_Point at;
 
@@ -1241,17 +1241,17 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
  * `target` is acted on, `at` only supplies a position. */
 void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative)
 {
-    const uint8_t *obj;
+    const AM2_Object *obj;
 
     if (at < AM2_UID_COUNTER_MIN)
         return;
 
-    obj = (const uint8_t *)LookupByUID(at);
+    obj = LookupByUID(at);
 
-    if (obj == (const uint8_t *)0)
+    if (obj == (const AM2_Object *)0)
         return;
 
-    EvtAtPointC(target, *(const uint32_t *)(obj + OBJ_OFF_POS), relative);
+    EvtAtPointC(target, obj->pos, relative);
 }
 
 /* 0x0041FD10 and 0x0041FD30. Two shims that hand the ADDRESS of their first
@@ -1265,12 +1265,12 @@ void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative)
  *
  * The zero arguments differ in number and position between the two, so they
  * are not one function called twice. */
-void __cdecl EvtByRefA(int32_t a, int32_t b)
+void __cdecl EvtByRefA(AM2_Point a, int32_t b)
 {
     SeqAddKind5(&a, 0, b);
 }
 
-void __cdecl EvtByRefB(int32_t a, int32_t b)
+void __cdecl EvtByRefB(AM2_Point a, int32_t b)
 {
     SeqAddKind7(&a, 0, 0, 0, b);
 }
@@ -1326,7 +1326,7 @@ void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c)
     if (obj == (const uint8_t *)0)
         return;
 
-    EvtAtPointA(a, *(const uint32_t *)(obj + OBJ_OFF_POS), c);
+    EvtAtPointA(a, *(const AM2_Point *)(obj + OBJ_OFF_POS), c);
 }
 
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
@@ -1341,7 +1341,7 @@ void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
     if (obj == (const uint8_t *)0)
         return;
 
-    EvtArmyAtPoint(a, b, *(const uint32_t *)(obj + OBJ_OFF_POS), d);
+    EvtArmyAtPoint(a, b, *(const AM2_Point *)(obj + OBJ_OFF_POS), d);
 }
 
 /* ------------------------------------------------------- reset ---- */
@@ -1795,7 +1795,7 @@ void __cdecl EvtRuleC(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     if (!obj)
         return;
 
-    DeployItem(obj, *(const uint32_t *)(obj + OBJ_OFF_POS), 0, 0);
+    DeployItem(obj, *(const AM2_Point *)(obj + OBJ_OFF_POS), 0, 0);
 }
 
 /* 0x00422270, 156 bytes -- put a unit back on the map where it fell.
@@ -1836,7 +1836,7 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 
     *(uint8_t *)(obj + OBJ_OFF_FACING) =
         *(const uint8_t *)(obj + OBJ_OFF_SPAWN_FACING);
-    DeployItem(obj, *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
+    DeployItem(obj, *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
 
     if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
         == *(const int32_t *)&g_defaultOwner)
@@ -2569,7 +2569,7 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
 
 /* 0x004200F0. A named weapon, fired by a named unit, at a point. */
 void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
-                               int32_t heading, uint32_t at)
+                               int32_t heading, AM2_Point at)
 {
     uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
     uint8_t     *unit;
@@ -2583,15 +2583,15 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
         return;
 
     /* `at` is a point passed by value, read a word at a time. */
-    spot.at.x   = (*(const AM2_Point *)&at).x;
-    spot.at.y   = (*(const AM2_Point *)&at).y;
+    spot.at.x   = at.x;
+    spot.at.y   = at.y;
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
     lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), (const AM2_Point *)&at);
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
     FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 
@@ -2644,7 +2644,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
 }
 
 /* 0x00420260. The unit's own held weapon, at a point. */
-void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
+void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
 {
     uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
     void        *weapon;
@@ -2657,12 +2657,12 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
         return;
 
     /* `at` is a point passed by value, read a word at a time. */
-    spot.at.x   = (*(const AM2_Point *)&at).x;
-    spot.at.y   = (*(const AM2_Point *)&at).y;
+    spot.at.x   = at.x;
+    spot.at.y   = at.y;
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), (const AM2_Point *)&at);
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
     FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 }
@@ -2719,9 +2719,9 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
  *
  * The original assembles the result in its own two argument slots. Locals here;
  * nothing observable turns on it. */
-uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me)
+AM2_Point __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me)
 {
-    void *obj;
+    AM2_Object *obj;
 
     if (act->xvar != 0) {
         /* One value read twice into, not zeroed first: GetVarValue leaves
@@ -2741,15 +2741,15 @@ uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me)
         p.x = (int16_t)v;
         GetVarValue(act->yvar, &v);
         p.y = (int16_t)v;
-        return *(const uint32_t *)&p;
+        return p;
     }
 
     if (act->u.pos.x == 0) {
         obj = LookupByUID(ResolveUid(act->target, me));
         if (obj)
-            return *(const uint32_t *)((const uint8_t *)obj + OBJ_OFF_POS);
+            return obj->pos;
     }
-    return (uint32_t)act->u.both;
+    return act->u.pos;
 }
 
 /* ------------------------------------------------------ raise ---- */
@@ -2981,7 +2981,7 @@ void __cdecl ResetTimers(void)
  *
  * The Sarge test is on the object, not on the weapon: only Sarge drops things.
  */
-void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
+void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, AM2_Point at)
 {
     uint8_t *obj;
     int32_t  slot;
@@ -3001,8 +3001,8 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
     if (!*(const int32_t *)(obj + OBJ_OFF_SARGE))
         return;
 
-    if (!(uint16_t)at)
-        at = *(const uint32_t *)(obj + OBJ_OFF_POS);
+    if (!at.x)
+        at = ((const AM2_Object *)obj)->pos;
 
     for (slot = 1; slot < AM2_INVENTORY_SLOTS; slot++)
         if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY
@@ -3463,8 +3463,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x06:                                  /* playsound */
         if (act->text != 0) {
-            *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-            EvtPlaySoundAt(act->text, *(const uint32_t *)&at,
+            at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+            EvtPlaySoundAt(act->text, at,
                            act->n0, act->n1, act->extra);
         }
         return;
@@ -3515,7 +3515,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             p1.x = (int16_t)v3;
             GetVarValue(act->yvar, &v3);
             p1.y = (int16_t)v3;
-            EvtAtPointC(UID, *(const uint32_t *)&p1, act->relative);
+            EvtAtPointC(UID, p1, act->relative);
             return;
         }
         if (act->relative == 0 && act->u.pos.x == 0) {
@@ -3524,7 +3524,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                          0);
             return;
         }
-        EvtAtPointC(UID, act->u.both, act->relative);
+        EvtAtPointC(UID, act->u.pos, act->relative);
         return;
 #undef UID
     }
@@ -3592,7 +3592,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x0D: {                                /* createtrooper */
         uint8_t *unit, *weapon;
 
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
 
@@ -3610,7 +3610,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         weapon = (uint8_t *)CreateWeapon(
                      g_dirScratch, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
-                     g_zeroPoint,
+                     g_zeroXY,
                      4, -1, 0, 0);
         if (weapon == 0)
             return;
@@ -3626,7 +3626,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     }
 
     case 0x0F: {                                /* createvehicle */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
 
@@ -3644,16 +3644,16 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     }
 
     case 0x10:                                  /* createweapon at a point */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
         CreateWeapon(act->text, 4,
                               KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
-                              *(const uint32_t *)&at, 0, act->n0, 0, 0);
+                              at, 0, act->n0, 0, 0);
         return;
 
     case 0x0E:                                  /* createexplosion */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
         CreateExplosion(at.x, at.y, act->n0,
@@ -3661,7 +3661,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x11:                                  /* createroach */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x == 0)
             return;
         CreateRoach(0, act->text, at.x, at.y,
@@ -3686,7 +3686,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                 GetVarValue(act->yvar, &v4);
                 p1.y = (int16_t)v4;
                 EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                            *(const uint32_t *)&p1, act->relative);
+                            p1, act->relative);
                 return;
             }
             if (act->relative == 0 && act->u.pos.x == 0) {
@@ -3696,7 +3696,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                 return;
             }
             EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                        act->u.both, act->relative);
+                        act->u.pos, act->relative);
             return;
         }
 
@@ -3708,7 +3708,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             p3.x = (int16_t)v4;
             GetVarValue(act->yvar, &v4);
             p3.y = (int16_t)v4;
-            EvtArmyAtPoint(act->army, act->subject, *(const uint32_t *)&p3,
+            EvtArmyAtPoint(act->army, act->subject, p3,
                            act->relative);
             return;
         }
@@ -3717,7 +3717,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                          ResolveUid(act->target, (uint32_t)(uintptr_t)owner), 0);
             return;
         }
-        EvtArmyAtPoint(act->army, act->subject, act->u.both, act->relative);
+        EvtArmyAtPoint(act->army, act->subject, act->u.pos, act->relative);
         return;
 
     /* Two arms of one shape: a value that comes from a VARIABLE when one is
@@ -3901,15 +3901,15 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x31:                                  /* by point, not by uid */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x != 0)
-            EvtByRefA(*(const int32_t *)&at, act->n0);
+            EvtByRefA(at, act->n0);
         return;
 
     case 0x32:
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if (at.x != 0)
-            EvtByRefB(*(const int32_t *)&at, act->n0);
+            EvtByRefB(at, act->n0);
         return;
 
     case 0x33:

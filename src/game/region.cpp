@@ -454,17 +454,14 @@ int32_t __cdecl PointRuleDefault(int32_t tile)
  * ADDR_POINT_RULE_ARMY keeps whatever the previous object left. Both
  * reproduced.
  */
-void __cdecl SetPointRule(void *obj)
+void __cdecl SetPointRule(const AM2_Object *o)
 {
-    const uint8_t *o = (const uint8_t *)obj;
-
     if (o) {
-        g_pointRuleArmy =
-            *(const int8_t *)(o + OBJ_OFF_ARMY);
+        g_pointRuleArmy = o->owner;
 
-        if (ObjIsType3((const AM2_Object *)o)) {
+        if (ObjIsType3(o)) {
             g_pointRule =
-                *(const int32_t *)(o + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
+                o->vehicleKind == AM2_VEHICLE_KIND_BOAT
                     ? (uint32_t)(uintptr_t)PointRuleBoat
                     : (uint32_t)(uintptr_t)PointRuleVehicle;
             return;
@@ -473,7 +470,7 @@ void __cdecl SetPointRule(void *obj)
         {
             /* Asked BEFORE the store and tested after it -- the original's
              * order; the other way round scheduled the store first. */
-            int32_t roach = ObjIsType8((const AM2_Object *)o);
+            int32_t roach = ObjIsType8(o);
 
             g_pointRule =
                 (uint32_t)(uintptr_t)PointRuleVehicle;
@@ -615,18 +612,15 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
  *
  * True for a hop count of 0 or 1, and false for -1, which folds "unreachable"
  * and "unsolved" together with "far away". */
-int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
+int32_t __cdecl RegionsNear(const AM2_Object *a, const AM2_Object *b,
+                            int32_t solve)
 {
     /* The region map is re-read after each call, as the image does. */
 #define CELLS (g_regionOfCell)
     int32_t rb, ra, hops;
 
-    rb = CELLS[(uint32_t)TileOfPoint(
-                   *(const uint32_t *)((const uint8_t *)b + OBJ_OFF_POS))
-               & 0xFFFFu];
-    ra = CELLS[(uint32_t)TileOfPoint(
-                   *(const uint32_t *)((const uint8_t *)a + OBJ_OFF_POS))
-               & 0xFFFFu];
+    rb = CELLS[(uint32_t)TileOfPoint(b->pos) & 0xFFFFu];
+    ra = CELLS[(uint32_t)TileOfPoint(a->pos) & 0xFFFFu];
 #undef CELLS
 
     hops = RegionHops(rb, ra, solve);
@@ -745,12 +739,12 @@ typedef int32_t (__cdecl *AM2_PointRuleFn)(uint16_t tile);
  * leaving the rest of eax holding whatever the spiral left there. Log2Mask's
  * problem again: read the low word.
  */
-uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
+uint16_t __cdecl SettlePointInRegion(int32_t tile, AM2_Point *pt)
 {
     int32_t  region;
     uint32_t cell;
 
-    SetPointRule((void *)0);
+    SetPointRule((const AM2_Object *)0);
 
     /* As NearestAllowedTile: the rule, the map's size, its row shift and the
      * cell table are read from their globals at every use. */
@@ -866,7 +860,7 @@ next:
  * all verified by reading, and the A/B covers them only if some call was
  * refused -- which is exactly what is not known.
  */
-uint16_t __cdecl NearestAllowedTile(void *obj, uint32_t tile, uint32_t *pt)
+uint16_t __cdecl NearestAllowedTile(AM2_Object *obj, uint32_t tile, AM2_Point *pt)
 {
     int32_t  region;
     uint32_t cell;
@@ -884,7 +878,7 @@ uint16_t __cdecl NearestAllowedTile(void *obj, uint32_t tile, uint32_t *pt)
 #define MAP_H (g_mapTilesH)
 #define SHIFT (*(const int32_t *)&g_mapRowShift)
     if (!RULE(tile)) {
-        if (*(const uint16_t *)pt == 0)
+        if ((uint16_t)pt->x == 0)
             *pt = PointOfTile(tile);
         return (uint16_t)tile;
     }
@@ -1520,26 +1514,22 @@ ok:
  * where the object may actually stand, not to where it was asked to go. The
  * caller sees the rewritten point too, since the pointer is its own.
  */
-int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
+int32_t __cdecl PlanPathTo(AM2_Object *o, AM2_Point *at, int32_t arg)
 {
-    uint8_t  *o = (uint8_t *)obj;
     uint16_t *route = g_tileLineBuf;
     int32_t   n;       /* FindPath fills it; only read on success */
     int32_t   i;
     int32_t   x, y;
 
-    SetPointRule(obj);
-    NearestAllowedTile(obj, TileOfPoint(*at), at);
+    SetPointRule(o);
+    NearestAllowedTile(o, TileOfPoint(*at), at);
 
-    *(uint16_t *)(o + OBJ_OFF_MOVE_FROM)  = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
+    o->moveFrom.x = 0;
+    o->moveAt     = 0;
+    o->moveCount  = 0;
 
-    if (!FindPath(*(const uint16_t *)(o + OBJ_OFF_TILE),
-                        TileOfPoint(*at), route, &n, arg)) {
-        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-            *(const int32_t *)&g_gameClockMs
-            + g_pathRetryMs;
+    if (!FindPath(o->tile, TileOfPoint(*at), route, &n, arg)) {
+        o->moveUntil = (int32_t)g_gameClockMs + g_pathRetryMs;
         return 0;
     }
 
@@ -1547,19 +1537,15 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
 
     for (i = 0; i < n; i++) {
         TileToXY(route[i], &x, &y);
-        *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES)
-            = (uint16_t)x;
-        *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES
-                      + 2) = (uint16_t)y;
+        o->waypoints[i].x = (int16_t)x;
+        o->waypoints[i].y = (int16_t)y;
     }
 
-    *(uint16_t *)(o + OBJ_OFF_MOVE_FROM
-                  + (uint32_t)n * AM2_MOVE_STEP_BYTES) = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = (uint16_t)n;
+    o->waypoints[n].x = 0;
+    o->moveAt    = 0;
+    o->moveCount = (uint16_t)n;
 
-    *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
-        *(const int32_t *)&g_gameClockMs + AM2_MOVE_VALID_MS;
+    o->moveUntil = (int32_t)g_gameClockMs + AM2_MOVE_VALID_MS;
     return 1;
 }
 
@@ -1607,18 +1593,16 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
  * is not established, and neither is which of the three rule arms was
  * installed. Boot Camp has no boats.
  */
-int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
+int32_t __cdecl BeginMoveTo(AM2_Object *o, AM2_Point *to)
 {
-    uint8_t *o = (uint8_t *)obj;
-    int32_t  count;                     /* TraceTileLine sets it */
-    int32_t  i;
+    int32_t count;                      /* TraceTileLine sets it */
+    int32_t i;
 
-    SetPointRule(obj);
+    SetPointRule(o);
 
-    NearestAllowedTile(obj, TileOfPoint(*to), to);
+    NearestAllowedTile(o, TileOfPoint(*to), to);
 
-    TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS), *to,
-                  g_tileLineBuf, &count);
+    TraceTileLine(o->pos, *to, g_tileLineBuf, &count);
 
     for (i = 0; i < count; i++) {
         if ((*(AM2_PointRuleFn *)&g_pointRule)(
@@ -1626,12 +1610,11 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
             return 0;                   /* the rule refused this tile */
     }
 
-    *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
-        *(const uint32_t *)(o + OBJ_OFF_POS);
-    *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *to;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_END) = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_AT) = 1;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 2;
+    o->moveFrom  = o->pos;
+    o->moveTo    = *to;
+    o->moveEnd   = 0;
+    o->moveAt    = 1;
+    o->moveCount = 2;
 
     return 1;
 }
@@ -2591,12 +2574,12 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
 
             if (damage) {
                 int32_t   ox, oy;     /* TileToXY writes both */
-                uint32_t  at;
+                AM2_Point at;
                 uint8_t  *hit;
 
                 TileToXY(cell, &ox, &oy);
-                ((int16_t *)&at)[0] = (int16_t)ox;
-                ((int16_t *)&at)[1] = (int16_t)oy;
+                at.x = (int16_t)ox;
+                at.y = (int16_t)oy;
 
                 for (hit = (uint8_t *)ObjectsAtPoint(&at,
                          g_objMapDesc);
@@ -2637,7 +2620,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
  *
  * Not exercised, for the same reason BoxAction is not -- see the note there.
  */
-int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
+int32_t __cdecl ListBoxAction(AM2_Point at, void *list, void *out)
 {
     const uint8_t *h = (const uint8_t *)list;
     const uint8_t *spr;
@@ -2654,8 +2637,8 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
         return 0;
     if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
         /* `at` is a packed point, read a half at a time from its slot. */
-        x = ((const AM2_Point *)&at)->x;
-        y = ((const AM2_Point *)&at)->y;
+        x = at.x;
+        y = at.y;
 
         area.left   = *(const int32_t *)(h + LISTHDR_OFF_BOX_LEFT)   + x;
         area.right  = *(const int32_t *)(h + LISTHDR_OFF_BOX_RIGHT)  + x;
@@ -2715,7 +2698,7 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
  * one arm being taken, and both were nearly written up from blind counters.
  * The rule is the one CLAUDE.md already states and the addition is the
  * control: a probe whose control cannot fire is a test that cannot fail. */
-int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
+int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, void *out)
 {
     const uint8_t  *h     = (const uint8_t *)hdr;
     uint8_t        *rec   = (uint8_t *)out;
@@ -2753,9 +2736,9 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
               (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
                + LISTREC_OFF_SPRITE);
 
-    ox = ((const AM2_Point *)&at)->x
+    ox = at.x
          - *(const int16_t *)(spr + SPR_OFF_HOTX);
-    oy = ((const AM2_Point *)&at)->y
+    oy = at.y
          - *(const int16_t *)(spr + SPR_OFF_HOTY);
 
 
@@ -2898,73 +2881,57 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
  * UNSIGNED; the kind-3 compare is a plain signed one. Both are then written as
  * `cmp; sbb; neg`, a comparison spelled as arithmetic.
  */
-void __cdecl UnitWeaponInfo(void *unit, void *out)
+void __cdecl UnitWeaponInfo(const AM2_Object *u, AM2_SightCtx *c)
 {
-    const uint8_t *u = (const uint8_t *)unit;
-    uint8_t       *c = (uint8_t *)out;
-    const uint8_t *w;
+    AM2_Object *w;
 
-    w = (const uint8_t *)WeaponByUid(*(const uint32_t *)
-            (u + UNIT_OFF_INVENTORY
-             + (uint32_t)*(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL) * 4));
+    w = WeaponByUid(u->inventory[u->inventorySel]);
 
-    *(const void **)(c + SIGHTC_OFF_WEAPON) = w;
+    c->weapon = w;
     if (!w) {
-        *(int32_t *)(c + SIGHTC_OFF_KIND)  = 0;
-        *(int32_t *)(c + SIGHTC_OFF_READY) = 0;
+        c->kind  = 0;
+        c->ready = 0;
         return;
     }
 
     /* The type record is read through the weapon at every use. The kind is
      * stored and then read BACK out of the context for the tests below --
      * except the timed-range test, which asks the record again. */
-#define REC (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0))
-    *(int32_t *)(c + SIGHTC_OFF_KIND)   = *(const int32_t *)(REC + ITEMTYPE_OFF_KIND);
-    *(int32_t *)(c + SIGHTC_OFF_DAMAGE) = *(const int32_t *)(REC + ITEMTYPE_OFF_DAMAGE);
-#define RANGE (*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE))
+    c->kind   = w->itemType->kind;
+    c->damage = w->itemType->damage;
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_FIXED) {
-        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = RANGE - 4;
-        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = RANGE + 2;
-    } else if (RANGE == 0) {
-        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = AM2_WEAPON_RANGE_NONE;
-        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = AM2_WEAPON_RANGE_NONE;
+    if (c->kind == AM2_WEAPON_KIND_FIXED) {
+        c->wantRange = w->itemType->range - 4;
+        c->maxRange  = w->itemType->range + 2;
+    } else if (w->itemType->range == 0) {
+        c->wantRange = AM2_WEAPON_RANGE_NONE;
+        c->maxRange  = AM2_WEAPON_RANGE_NONE;
     } else {
         /* A copy, which lives in memory for the fild; `range` itself stays
          * in a register above. */
-        int32_t r = RANGE;
+        int32_t r = w->itemType->range;
 
-        if (*(const int32_t *)(REC + ITEMTYPE_OFF_KIND) == AM2_WEAPON_KIND_TIMED)
+        if (w->itemType->kind == AM2_WEAPON_KIND_TIMED)
             r = (int32_t)((double)r * 1.2);
 
         /* LITERALS, not the named doubles at ADDR_WEAPON_RANGE_K3/_LO/_HI
          * (which hold the same values): a compiler constant cannot alias the
          * WANT store, so VC6 hoists the HI multiply above it, as the image
          * does. Through the named globals it may not. */
-        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = (int32_t)((double)r * 0.9);
-        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = (int32_t)((double)r * 1.1);
+        c->wantRange = (int32_t)((double)r * 0.9);
+        c->maxRange  = (int32_t)((double)r * 1.1);
     }
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_TIMED) {
-        *(int32_t *)(c + SIGHTC_OFF_READY) =
-            ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
-             < g_gameClockMs
-               - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
+    if (c->kind == AM2_WEAPON_KIND_TIMED) {
+        c->ready = (w->itemType->cooldown < g_gameClockMs - w->lastUse) ? 1 : 0;
     } else {
-        const AM2_RankRec *rank =
-            &g_rankRecords[*(const int32_t *)(u + OBJ_OFF_RANK)];
+        const AM2_RankRec *rank = &g_rankRecords[u->rank];
         /* The cooldown widened to 64 bits (`fild qword`) and scaled by the
          * rank's float directly (`fmul dword`). */
-        uint32_t wait = (uint32_t)
-            ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
-             * rank->fire_scale);
+        uint32_t wait = (uint32_t)(w->itemType->cooldown * rank->fire_scale);
 
-        *(int32_t *)(c + SIGHTC_OFF_READY) =
-            (wait < g_gameClockMs
-                    - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
+        c->ready = (wait < g_gameClockMs - w->lastUse) ? 1 : 0;
     }
-#undef RANGE
-#undef REC
 }
 
 
@@ -2997,7 +2964,7 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
  * the extra eight being the loop's own row counter and the point it hands the
  * hit test. Written as the record it is rather than as a byte array.
  */
-int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
+int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
 {
     struct {
         AM2_Rect r;
@@ -3028,7 +2995,7 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
                        + mask.r.left;
 
         for (x = mask.r.left; x <= mask.r.right; n++, tile++, x++) {
-            uint32_t pt;
+            AM2_Point pt;
 
             if (!mask.cells[n] || !(mask.cells[n] & 1))
                 continue;
@@ -3246,32 +3213,28 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
  * the matrices are indexed, and the stuck check refuses a route out of a
  * region the object has not left since it got stuck.
  */
-void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
-                           int32_t keepFacing)
+void __cdecl AiRouteToward(AM2_Object *o, AM2_SteerOut *out,
+                           const AM2_AiCtx *ctx, int32_t keepFacing)
 {
-    uint8_t  *o    = (uint8_t *)obj;
-    uint8_t  *w    = (uint8_t *)out;
-    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
+    AM2_Point *dest = &o->dest;
     AM2_Point pt;                    /* the original's first argument slot */
     int32_t   from, to;
     int32_t   d;
 
     (void)ctx;
 
-    *(uint32_t *)&pt = *(const uint32_t *)dest;
+    pt = *dest;
 
-    from = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS))
-                         & 0xFFFFu];
-    to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
+    from = kRegionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
+    to   = kRegionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
 
-    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
-            *(const uint32_t *)(o + OBJ_OFF_POS);
-        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
-        *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 0;
-        *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 1;
+    if (BeginMoveTo(o, &pt)) {
+        o->routeGoal = pt;
+        o->moveTo   = pt;
+        o->moveFrom = o->pos;
+        o->moveEnd   = 0;
+        o->moveAt    = 0;
+        o->moveCount = 1;
         goto heading;
     }
 
@@ -3280,14 +3243,13 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
 #define stride (g_regionStride)
         int16_t link;
 
-        *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
+        o->goalRegion = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
             != g_regionStamp)
             RegionSolvePair(from, to);
 
-        if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
-            && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+        if (from == o->prevRegion && !o->stuckCount)
             goto waypoint;
 
         {
@@ -3310,72 +3272,62 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     }
 
 waypoint:
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_ROUTE_GOAL), &pt);
+    d = ApproxDist(&o->routeGoal, &pt);
 
     if (d > AM2_AI_REPLAN_DIST
-        || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-           >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+        || (int32_t)o->moveAt >= (int32_t)o->moveCount - 1) {
         int32_t budget;
 
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-        budget = (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+        o->routeGoal = pt;
+        budget = ((int16_t)o->region != 0 && to != 0)
                  ? AM2_AI_PLAN_BUDGET_LONG : AM2_AI_PLAN_BUDGET_SHORT;
 
-        if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
-            *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
-                *(const uint32_t *)(o + OBJ_OFF_POS);
-            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
-            *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 1;
-            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 2;
+        if (!PlanPathTo(o, &pt, budget)) {
+            o->routeGoal = pt;
+            o->moveFrom = o->pos;
+            o->moveTo   = pt;
+            o->moveEnd   = 0;
+            o->moveAt    = 1;
+            o->moveCount = 2;
             goto heading;
         }
     }
 
     /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
      * original's `jne` from PlanPathTo lands here, not past it. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
-                           *(const uint32_t *)&pt)
-               && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-                  < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
-        uint16_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+    if (PointsEqual(o->routeGoal, pt) && o->moveAt < o->moveCount) {
+        uint16_t at = o->moveAt;
 
-        *(uint32_t *)&pt =
-            *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+        pt = o->waypoints[at];
 
-        while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
-               < AM2_AI_ARRIVED_DIST) {
-            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
-            if ((int32_t)at
-                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+        while (ApproxDist(&o->pos, &pt) < AM2_AI_ARRIVED_DIST) {
+            at = o->moveAt;
+            if ((int32_t)at >= (int32_t)o->moveCount - 1)
                 break;
 
             at++;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
-            *(uint32_t *)&pt =
-                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+            o->moveAt = at;
+            pt = o->waypoints[at];
         }
     }
 
 heading:
-    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                   (const AM2_Point *)dest) < AM2_AI_ARRIVED_DIST) {
-        *(int32_t *)(w + 8) = 1;
-        *(uint32_t *)dest = g_zeroPoint;
+    if (ApproxDist(&o->pos, dest) < AM2_AI_ARRIVED_DIST) {
+        out->state = 1;
+        *dest = g_zeroXY;
         return;
     }
 
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
-    w[0] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
+    d = ApproxDist(&o->pos, &pt);
+    out->heading = AngleBetween(&o->pos, &pt);
     if (!keepFacing)
-        w[1] = w[0];
+        out->aim = out->heading;
 
-    *(int32_t *)(w + 8) = 4;
+    out->state = 4;
     if (d < AM2_AI_APPROACH_SLOW) {
         if (d < AM2_AI_APPROACH_STOP)
-            *(int32_t *)(w + 0x10) = 1;
-        *(int32_t *)(w + 0x14) = 1;
+            out->stop = 1;
+        out->approach = 1;
     }
 #undef stride
 }
@@ -3420,54 +3372,44 @@ heading:
  * THE FACING GOES TO out+4, not out+0 as in AiRouteToward, and only one field
  * is written rather than that function's two. The state comes from one of the
  * two three-entry tables in orig.h, indexed by the AI context's class. */
-void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
+void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx *ctx)
 {
-    uint8_t  *o    = (uint8_t *)obj;
-    AM2_Object *ob = (AM2_Object *)obj;
-    uint8_t  *w    = (uint8_t *)out;
-    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
-    uint8_t  *pos;
-    AM2_Point pt;                    /* the original's first argument slot */
+    const AM2_Point    *dest = &ob->dest;
+    const AM2_Point    *pos;
+    AM2_Point           pt;          /* the original's first argument slot */
     int32_t   fromTile, toTile;
     int16_t   fromRegion, toRegion;
     int32_t   d;
 
     /* A zero goal is "nowhere to be", and it leaves `out` alone entirely. */
-    if (!*(const uint16_t *)dest)
+    if (!(uint16_t)dest->x)
         return;
 
     /* Arrived. The deadline is cleared so the next goal may plan at once. */
-    pos = o + OBJ_OFF_POS;
-    if (ApproxDist((const AM2_Point *)dest, (const AM2_Point *)pos)
-        < AM2_AI_TROOPER_ARRIVED) {
+    pos = &ob->pos;
+    if (ApproxDist(dest, pos) < AM2_AI_TROOPER_ARRIVED) {
         ob->moveUntil = 0;
         return;
     }
 
-    if (!*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)
-        && g_gameClockMs
-               > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
-        *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+    if (!ob->field5A4 && g_gameClockMs > ob->deadline58)
+        ob->deadline58 = 0;
 
-    *(uint32_t *)&pt = *(const uint32_t *)dest;
+    pt = *dest;
 
     /* Still heading where we were told, and the cooldown has not run out:
      * keep the route and go straight to walking it. */
-    if (PointsEqual(ob->routeGoal,
-                    *(const uint32_t *)&pt)
-        && (uint32_t)*(const int32_t *)&g_gameClockMs
-               < (uint32_t)ob->moveUntil)
+    if (PointsEqual(ob->routeGoal, pt)
+        && (uint32_t)g_gameClockMs < (uint32_t)ob->moveUntil)
         goto walk;
 
-    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        ob->moveUntil =
-            *(const int32_t *)&g_gameClockMs
-            + AM2_AI_TROOPER_RETRY_MS;
-        *(uint32_t *)&pt                      = *(const uint32_t *)dest;
-        ob->moveFrom  = *(const uint32_t *)pos;
-        ob->routeGoal = *(const uint32_t *)&pt;
-        ob->moveTo    = *(const uint32_t *)&pt;
-        ob->moveEnd    = 0;
+    if (BeginMoveTo(ob, &pt)) {
+        ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
+        pt            = *dest;
+        ob->moveFrom  = *pos;
+        ob->routeGoal = pt;
+        ob->moveTo    = pt;
+        ob->moveEnd   = 0;
         goto two_waypoints;
     }
 
@@ -3480,16 +3422,15 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
      * clear it replanned a 15-waypoint path into a 2-waypoint straight move,
      * one step off from the original. Only the radar showed it -- an off-screen
      * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
-    if (PointsEqual(*(const uint32_t *)&pt,
-                    ob->routeGoal)
+    if (PointsEqual(pt, ob->routeGoal)
         && ob->moveCount > 0
         && (int32_t)ob->moveAt
            < (int32_t)ob->moveCount - 1)
         goto after_region;
 
-    fromTile   = TileOfPoint(*(const uint32_t *)pos);
+    fromTile   = TileOfPoint(*pos);
     fromRegion = kRegionOfCell[(uint32_t)fromTile & 0xFFFFu];
-    toTile     = TileOfPoint(*(const uint32_t *)&pt);
+    toTile     = TileOfPoint(pt);
     toRegion   = kRegionOfCell[(uint32_t)toTile & 0xFFFFu];
 
     /* Both answers are DISCARDED -- see the header. */
@@ -3504,9 +3445,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
 
     /* The region hop, skipped when we are already routing to this goal from
      * the region we were last in, and when both ends are in one region. */
-    if ((PointsEqual(ob->routeGoal,
-                     *(const uint32_t *)&pt)
-         && *(const int16_t *)(o + OBJ_OFF_PREV_REGION) == (int16_t)fromRegion)
+    if ((PointsEqual(ob->routeGoal, pt) && ob->prevRegion == fromRegion)
         || toRegion == fromRegion)
         goto after_region;
 
@@ -3530,50 +3469,44 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         /* NearestAllowedTile writes the point, so the x half is cleared first
          * rather than the whole local -- the original's `mov word`. */
         pt.x = 0;
-        NearestAllowedTile(obj, kLinks(fromRegion)[link].into,
-                           (uint32_t *)&pt);
+        NearestAllowedTile(ob, kLinks(fromRegion)[link].into,
+                           (AM2_Point *)&pt);
     }
 
 after_region:
     /* Keep the route we have when it still aims at this point AND either has
      * waypoints left or has run past its cooldown. Both arms of that second
      * test skip the re-plan; see the header. */
-    if (PointsEqual(*(const uint32_t *)&pt,
-                    ob->routeGoal)) {
-        if (ob->moveCount > 0
-            && ob->moveAt
-                   < ob->moveCount)
+    if (PointsEqual(pt, ob->routeGoal)) {
+        if (ob->moveCount > 0 && ob->moveAt < ob->moveCount)
             goto walk;
-        if ((uint32_t)*(const int32_t *)&g_gameClockMs
-            > (uint32_t)ob->moveUntil)
+        if ((uint32_t)g_gameClockMs > (uint32_t)ob->moveUntil)
             goto walk;
     }
 
-    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        ob->moveUntil =
-            *(const int32_t *)&g_gameClockMs
-            + AM2_AI_TROOPER_RETRY_MS;
+    if (BeginMoveTo(ob, &pt)) {
+        ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
         /* The goal it was ASKED for, not the point it is walking to. */
-        ob->routeGoal = *(const uint32_t *)dest;
-        ob->moveFrom  = *(const uint32_t *)pos;
+        ob->routeGoal = *dest;
+        ob->moveFrom  = *pos;
         goto set_move_to;
     }
 
-    ob->routeGoal = *(const uint32_t *)&pt;
-    if (!PlanPathTo(obj, (uint32_t *)&pt, AM2_AI_PLAN_BUDGET_LONG)) {
-        ob->routeGoal = *(const uint32_t *)dest;
-        ob->moveFrom  = *(const uint32_t *)pos;
+    ob->routeGoal = pt;
+    if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
+        ob->routeGoal = *dest;
+        ob->moveFrom  = *pos;
         goto set_move_to;
     }
     /* A route was found; PlanPathTo filled the waypoints itself. */
-    ob->routeGoal = *(const uint32_t *)dest;
+    ob->routeGoal = *dest;
     goto walk;
 
 no_region:
-    ob->routeGoal = *(const uint32_t *)&pt;
-    ob->moveFrom  = *(const uint32_t *)pos;
+    ob->routeGoal = pt;
+    ob->moveFrom  = *pos;
 set_move_to:
-    ob->moveTo = *(const uint32_t *)&pt;
+    ob->moveTo = pt;
     ob->moveEnd = 0;
 two_waypoints:
     ob->moveAt    = 1;
@@ -3590,15 +3523,11 @@ walk:
      * Written out because that is what the instructions say, and because the
      * two dead compares are the sort of thing a tidier reading silently drops
      * along with a live one. */
-    if (PointsEqual(ob->routeGoal,
-                    *(const uint32_t *)&pt)
-        && ob->moveAt
-               < ob->moveCount) {
+    if (PointsEqual(ob->routeGoal, pt) && ob->moveAt < ob->moveCount) {
         uint32_t at = ob->moveAt;
 
-        *(uint32_t *)&pt =
-            ob->waypoints[at];
-        d = ApproxDist((const AM2_Point *)pos, &pt);
+        pt = ob->waypoints[at];
+        d = ApproxDist(pos, &pt);
 
         while (d < AM2_AI_WAYPOINT_DIST) {
             at = ob->moveAt;
@@ -3609,32 +3538,30 @@ walk:
                 if ((int32_t)ob->moveAt
                     < (int32_t)ob->moveCount - 1)
                     break;
-                ob->moveCount  = 0;
-                ob->routeGoal =
-                    g_zeroPoint;
+                ob->moveCount = 0;
+                ob->routeGoal = g_zeroXY;
                 break;
             }
             at++;
             ob->moveAt = (int16_t)at;
-            *(uint32_t *)&pt =
-                ob->waypoints[at];
-            d = ApproxDist((const AM2_Point *)pos, &pt);
+            pt = ob->waypoints[at];
+            d = ApproxDist(pos, &pt);
         }
     }
 
     /* One field, at +4 rather than AiRouteToward's +0 and +1. */
-    w[4] = AngleBetween((const AM2_Point *)pos, &pt);
+    out->bearing = AngleBetween(pos, &pt);
 
-    /* Indexed by the AI context's class -- SIGHTC_OFF_FIELD_00, which
-     * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
-    if (*(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) == 0)
-        *(int32_t *)(w + 8) = g_aiMoveState[*(const int32_t *)ctx];
+    /* Indexed by the AI context's class, which TrooperBuildContext fills
+     * from ClassifyByCode74, so 0, 1 or 2. */
+    if (ob->moveStateAlt == 0)
+        out->state = g_aiMoveState[ctx->klass];
     else
-        *(int32_t *)(w + 8) = g_aiMoveStateAlt[*(const int32_t *)ctx];
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
-        *(int32_t *)(w + 8) = 3;
+        out->state = g_aiMoveStateAlt[ctx->klass];
+    if (ob->soldierKind == AM2_AI_KIND_FORCES_ALT)
+        out->state = 3;
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+    ob->field578 = 0;
 #undef stride
 }
 
@@ -3667,31 +3594,28 @@ walk:
  * tables, the middle link, PlanPathTo with the same two budgets, the cursor
  * walk -- is AiRouteToward's, and the comment there is the one to read.
  */
-void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
+void __cdecl RoachRouteToward(AM2_Object *o, AM2_RoachOut *out,
+                              const AM2_RoachCtx *ctx)
 {
-    uint8_t  *o    = (uint8_t *)obj;
-    uint8_t  *w    = (uint8_t *)out;
-    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
+    AM2_Point *dest = &o->dest;
     AM2_Point pt;                    /* the original's first argument slot */
     int32_t   from, to;
     int32_t   d;
 
     (void)ctx;
 
-    *(uint32_t *)&pt = *(const uint32_t *)dest;
+    pt = *dest;
 
-    from = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS))
-                         & 0xFFFFu];
-    to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
+    from = kRegionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
+    to   = kRegionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
 
-    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
-        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
-            *(const uint32_t *)(o + OBJ_OFF_POS);
-        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
-        *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 0;
-        *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 1;
+    if (BeginMoveTo(o, &pt)) {
+        o->routeGoal = pt;
+        o->moveTo   = pt;
+        o->moveFrom = o->pos;
+        o->moveEnd   = 0;
+        o->moveAt    = 0;
+        o->moveCount = 1;
         goto heading;
     }
 
@@ -3700,14 +3624,13 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
 #define stride (g_regionStride)
         int16_t link;
 
-        *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
+        o->goalRegion = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
             != g_regionStamp)
             RegionSolvePair(from, to);
 
-        if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
-            && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+        if (from == o->prevRegion && !o->stuckCount)
             goto waypoint;
 
         {
@@ -3730,77 +3653,67 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     }
 
 waypoint:
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_ROUTE_GOAL), &pt);
+    d = ApproxDist(&o->routeGoal, &pt);
 
     if (d > AM2_AI_REPLAN_DIST
-        || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-           >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+        || (int32_t)o->moveAt >= (int32_t)o->moveCount - 1) {
         int32_t budget;
 
-        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-        budget = (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+        o->routeGoal = pt;
+        budget = ((int16_t)o->region != 0 && to != 0)
                  ? AM2_AI_PLAN_BUDGET_LONG : AM2_AI_PLAN_BUDGET_SHORT;
 
-        if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
-            *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
-            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
-                *(const uint32_t *)(o + OBJ_OFF_POS);
-            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
-            *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 1;
-            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 2;
+        if (!PlanPathTo(o, &pt, budget)) {
+            o->routeGoal = pt;
+            o->moveFrom = o->pos;
+            o->moveTo   = pt;
+            o->moveEnd   = 0;
+            o->moveAt    = 1;
+            o->moveCount = 2;
             goto heading;
         }
     }
 
     /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
      * original's `jne` from PlanPathTo lands here, not past it. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
-                    *(const uint32_t *)&pt)) {
-        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-            < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
-            uint16_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+    if (PointsEqual(o->routeGoal, pt)) {
+        if (o->moveAt < o->moveCount) {
+            uint16_t at = o->moveAt;
 
-            *(uint32_t *)&pt =
-                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+            pt = o->waypoints[at];
 
-            while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
-                   < AM2_AI_ARRIVED_DIST) {
-                at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
-                if ((int32_t)at
-                    >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+            while (ApproxDist(&o->pos, &pt) < AM2_AI_ARRIVED_DIST) {
+                at = o->moveAt;
+                if ((int32_t)at >= (int32_t)o->moveCount - 1)
                     break;
 
                 at++;
-                *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
-                *(uint32_t *)&pt =
-                    *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+                o->moveAt = at;
+                pt = o->waypoints[at];
             }
         } else {
             /* THE ONE STRUCTURAL ADDITION over the trooper's copy: a cursor
              * that has run out resets the path to a zero-length one instead
              * of heading straight off -- and this is the one seeder of the
              * three that does NOT write OBJ_OFF_ROUTE_GOAL. */
-            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
-                *(const uint32_t *)(o + OBJ_OFF_POS);
-            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *(const uint32_t *)&pt;
-            *(int16_t *)(o + OBJ_OFF_MOVE_END)   = 0;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
-            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
+            o->moveFrom = o->pos;
+            o->moveTo   = pt;
+            o->moveEnd   = 0;
+            o->moveAt    = 0;
+            o->moveCount = 0;
             goto heading;
         }
     }
 
 heading:
-    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                   (const AM2_Point *)dest) < AM2_ROACH_ARRIVED_DIST) {
-        *(int32_t *)(w + 0x14) = 1;
-        *(uint32_t *)dest = g_zeroPoint;
+    if (ApproxDist(&o->pos, dest) < AM2_ROACH_ARRIVED_DIST) {
+        out->state = 1;
+        *dest = g_zeroXY;
         return;
     }
 
-    w[0] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
-    *(int32_t *)(w + 0x14) = 2;
+    out->heading = AngleBetween(&o->pos, &pt);
+    out->state = 2;
 #undef stride
 }
 
@@ -3841,34 +3754,27 @@ heading:
  * The delay is compared UNSIGNED (`jb`), so a deadline in the future wraps to
  * a huge number and passes. Written as the original has it.
  */
-void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
+void __cdecl AiStepIgnore(AM2_Object *o, AM2_SteerOut *out, const AM2_AiCtx *c)
 {
-    uint8_t       *o = (uint8_t *)obj;
-    uint8_t       *w = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)ctx;
-
-    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiRouteToward(obj, out, ctx, 0);
+    if (c->destDist > AM2_AI_ARRIVED_DIST) {
+        o->dest = o->scriptPoint;
+        AiRouteToward(o, out, c, 0);
         return;
     }
 
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        g_zeroPoint;
+    o->scriptPoint = g_zeroXY;
 
-    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR) > 0) {   /* unsigned; `> 0` is the
-                                       * original's `test; jbe`-skip spelling */
-        if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
-            w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
-        *(o + OBJ_OFF_HIT_DIR) = 0;
+    if (o->hitDir > 0) {    /* unsigned; `> 0` is the original's
+                             * `test; jbe`-skip spelling */
+        if (!c->observer)
+            out->aim = o->hitDir;
+        o->hitDir = 0;
     }
 
-    if (*(const int32_t *)(c + SIGHT_OFF_FOUND)
-        && (uint32_t)(g_gameClockMs
-                      - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+    if (c->found
+        && (uint32_t)(g_gameClockMs - o->deadlineD0)
            >= AM2_AI_TURN_DELAY_MS)
-        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+        out->aim = c->bearing;
 }
 
 /* The promotion the `defend` arm does twice. Whatever 0x00403B40 found becomes
@@ -3882,20 +3788,16 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
  * idempotent and writing it once would be indistinguishable. Kept as two calls
  * because "the original does it twice" is a fact about the original, and a
  * reader diffing against the disassembly should find both. */
-static inline void AiPromoteFound(uint8_t *o, uint8_t *c)
+static inline void AiPromoteFound(AM2_Object *o, AM2_AiCtx *c)
 {
     /* The found slot is read afresh for each use. */
-#define FOUND (*(uint8_t **)(c + SIGHT_OFF_FOUND))
-    if (!FOUND)
+    if (!c->found)
         return;
 
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        ((const AM2_Object *)FOUND)->uid;
-    *(uint8_t **)(c + SIGHT_OFF_OBSERVER) = FOUND;
-#undef FOUND
-    *(int32_t *)(c + SIGHT_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHT_OFF_FOUND_RANGE);
-    *(c + SIGHT_OFF_BEARING) = *(const uint8_t *)(c + SIGHT_OFF_FOUND_BEARING);
+    o->targetUid = c->found->uid;
+    c->observer  = c->found;
+    c->range     = c->foundRange;
+    c->bearing   = c->foundBearing;
 }
 
 /* AiStepDefend -- original 0x00407640, one caller. The `defend` arm of the AI
@@ -3922,39 +3824,32 @@ static inline void AiPromoteFound(uint8_t *o, uint8_t *c)
  * The delay is compared UNSIGNED, as in AiStepIgnore, so a deadline in the
  * future wraps and passes. Written as the original has it.
  */
-void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
+void __cdecl AiStepDefend(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    uint8_t *c = (uint8_t *)ctx;
-
-    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiRouteToward(obj, out, ctx, 0);
+    if (c->destDist > AM2_AI_ARRIVED_DIST) {
+        o->dest = o->scriptPoint;
+        AiRouteToward(o, out, c, 0);
     } else {
-        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        uint8_t hit = o->hitDir;
 
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            g_zeroPoint;
+        o->scriptPoint = g_zeroXY;
 
         if (hit > 0) {
-            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
-                w[1] = hit;
-            *(o + OBJ_OFF_HIT_DIR) = 0;
+            if (!c->observer)
+                out->aim = hit;
+            o->hitDir = 0;
         }
 
         AiPromoteFound(o, c);
 
-        if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-            && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+        if (c->observer
+            && (uint32_t)(g_gameClockMs - o->deadlineD0)
                >= AM2_AI_TURN_DELAY_MS)
-            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+            out->aim = c->bearing;
     }
 
     AiPromoteFound(o, c);
-    ConsiderSighting(obj, out, ctx);
+    ConsiderSighting(o, out, c);
 }
 
 /* AiStepTrack -- original 0x00407560, one caller. The arm modes 1, 4 and 5
@@ -3985,26 +3880,20 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
  * with nothing between the two that can change what it reads. See that
  * function for the rest.
  */
-void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
+void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    uint8_t *c = (uint8_t *)ctx;
-
-    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiRouteToward(obj, out, ctx, 0);
+    if (c->destDist > AM2_AI_ARRIVED_DIST) {
+        o->dest = o->scriptPoint;
+        AiRouteToward(o, out, c, 0);
     } else {
-        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        uint8_t hit = o->hitDir;
 
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            g_zeroPoint;
+        o->scriptPoint = g_zeroXY;
 
         if (hit > 0) {
-            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
-                w[1] = hit;
-            *(o + OBJ_OFF_HIT_DIR) = 0;
+            if (!c->observer)
+                out->aim = hit;
+            o->hitDir = 0;
         }
 
         AiPromoteFound(o, c);
@@ -4012,13 +3901,12 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
 
     AiPromoteFound(o, c);
 
-    if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-        && (uint32_t)(g_gameClockMs
-                      - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+    if (c->observer
+        && (uint32_t)(g_gameClockMs - o->deadlineD0)
            >= AM2_AI_TURN_DELAY_MS)
-        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+        out->aim = c->bearing;
 
-    ConsiderSighting(obj, out, ctx);
+    ConsiderSighting(o, out, c);
 }
 
 /* The sight test 0x004057D0 and 0x00405220 share -- 132 instructions, one run,
@@ -4052,7 +3940,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * single 28: the same source around different surroundings -- in AiAttackBody
  * the bearing lands in ebx and the rank in ebp, the other way round from the
  * rest. All four match byte for byte on it. */
-#define AI_RANK (g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)])
+#define AI_RANK (g_rankRecords[o->rank])
 #define AI_DIR  (g_sightBlockByDir[dir])
 #define AI_SIGHT_GEN (g_sightGeneration)
 /* The original hands AngleOfDelta the distance as a third argument it does
@@ -4062,20 +3950,17 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     ((uint8_t (__cdecl *)(int32_t, int32_t, int32_t))(void (*)(void))AngleOfDelta)(x, y, d)
 #define AM2_AI_SIGHT_TEST(SEEN_IT, NOT_SEEN)                                  \
 {                                                                             \
-    uint8_t        facing = *(const uint8_t *)(o + OBJ_OFF_FACING);           \
+    uint8_t        facing = o->facing;                                        \
     int32_t        viewerAttr, dx, dy, dist, highest, mine, his;              \
     uint8_t        bearing;                                                   \
     uint32_t       dir;                                                       \
                                                                               \
-    if (ObjIsType3((const AM2_Object *)o)                                     \
-        && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)                     \
-        facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);                   \
+    if (ObjIsType3(o) && o->rowSet.count > 1)                                 \
+        facing = o->turretFacing;                                             \
                                                                               \
-    viewerAttr = ObjTileAttr((void *)o);                                      \
-    dx = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS)                      \
-         - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);                      \
-    dy = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS + 2)                  \
-         - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);                  \
+    viewerAttr = ObjTileAttr(o);                                              \
+    dx = (int32_t)seen->pos.x - (int32_t)o->pos.x;                            \
+    dy = (int32_t)seen->pos.y - (int32_t)o->pos.y;                            \
     highest = AM2_AI_SIGHT_FLOOR;                                             \
     dist    = ApproxDistXY(dx, dy);                                           \
     bearing = AI_ANGLE3(dx, dy, dist);                                        \
@@ -4092,8 +3977,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
         int32_t  n, i, reach;                                                 \
                                                                               \
         AI_DIR.trace_stamp = AI_SIGHT_GEN;            \
-        TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),                   \
-                      *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);      \
+        TraceTileLine(o->pos, seen->pos, buf, &n);                            \
                                                                               \
         for (i = 0; i < n; i++) {                                             \
             int32_t a = (int8_t)(*(const uint8_t *const *)                    \
@@ -4125,8 +4009,8 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     }                                                                         \
                                                                               \
     if (AI_DIR.stamp == AI_SIGHT_GEN) {               \
-        mine = ObjHeight((void *)o);                                          \
-        his  = ObjHeight((void *)seen);                                       \
+        mine = ObjHeight(o);                                                  \
+        his  = ObjHeight(seen);                                               \
         if (his >= mine) {                                                    \
             if (dist > AI_DIR.low)                    \
                 goto NOT_SEEN;                                                \
@@ -4170,27 +4054,22 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * it is an ARC; RANK_REC_OFF_FIELD_08 against a distance, so it is a RANGE.
  * Outside the arc a target still counts if it is inside that range -- a unit
  * can be engaged from behind, but only close up. */
-void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
+void __cdecl AiAttackBody(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    uint8_t       *o = (uint8_t *)obj;
-    uint8_t       *w = (uint8_t *)out;
-    uint8_t       *c = (uint8_t *)ctx;
-    const uint8_t *seen;
+    const AM2_Object *seen;
     int32_t        routed = 0;
     uint8_t        hit;
     /* The leader is re-read from the context at every use after the test. */
-#define LEAD (*(uint8_t **)(c + SIGHT_OFF_LEADER))
+#define LEAD (c->leader)
 
-    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiRouteToward(obj, out, ctx, 0);
+    if (c->destDist > AM2_AI_ARRIVED_DIST) {
+        o->dest = o->scriptPoint;
+        AiRouteToward(o, out, c, 0);
         routed = 1;
-        if (*(void *const *)(c + SIGHT_OFF_FOUND))
+        if (c->found)
             AiPromoteFound(o, c);
     } else {
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            g_zeroPoint;
+        o->scriptPoint = g_zeroXY;
     }
 
     seen = LEAD;
@@ -4206,30 +4085,23 @@ engage:
          * unit already at the range it wants still reacts to being hit and still
          * turns toward what the context found. Writing the near arm as the far
          * one's `else` with a shared tail deletes that silently. */
-        if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE)
-            > *(const int32_t *)(c + SIGHT_OFF_WANT_RANGE)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+        if (c->leadRange > c->wantRange) {
+            o->dest = LEAD->pos;
             if (!routed)
-                AiRouteToward(obj, out, ctx, 0);
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-            *(void **)(c + SIGHT_OFF_OBSERVER) = LEAD;
-            *(int32_t *)(c + SIGHT_OFF_RANGE) =
-                *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
-            *(c + SIGHT_OFF_BEARING) =
-                *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
-            w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+                AiRouteToward(o, out, c, 0);
+            o->targetUid = LEAD->uid;
+            c->observer = LEAD;
+            c->range = c->leadRange;
+            c->bearing = c->leadBearing;
+            out->aim = c->leadBearing;
             goto done;
         }
 
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-        *(void **)(c + SIGHT_OFF_OBSERVER) = LEAD;
-        *(int32_t *)(c + SIGHT_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
-        *(c + SIGHT_OFF_BEARING) = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
-        w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+        o->targetUid = LEAD->uid;
+        c->observer = LEAD;
+        c->range = c->leadRange;
+        c->bearing = c->leadBearing;
+        out->aim = c->leadBearing;
 
         /* ---- the CLOSE tail, which is not the no-leader tail below even though
          * both open with the same OBJ_OFF_HIT_DIR block. This one turns on
@@ -4244,62 +4116,56 @@ engage:
          * delayed turn's first test is always true. Both are live when the block
          * is reached the other way, which it is not; reproduced because the
          * original does not know that either. */
-        hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        hit = o->hitDir;
         if (hit > 0) {
-            if (!*(void *const *)(c + SIGHT_OFF_OBSERVER))
-                w[1] = hit;
-            *(o + OBJ_OFF_HIT_DIR) = 0;
+            if (!c->observer)
+                out->aim = hit;
+            o->hitDir = 0;
         }
         if (LEAD
-            && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+            && (uint32_t)(g_gameClockMs - o->deadlineD0)
                >= AM2_AI_TURN_DELAY_MS)
-            w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+            out->aim = c->leadBearing;
 
-        if (!ObjIsType2((const AM2_Object *)LEAD))
+        if (!ObjIsType2(LEAD))
             goto done;
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+        o->dest = LEAD->pos;
         if (routed)
             goto done;
-        AiRouteToward(obj, out, ctx, 0);
+        AiRouteToward(o, out, c, 0);
         goto done;
 
 out_of_sight:
         /* Face it and walk to it, but do not claim it as the observer. */
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+        o->dest = LEAD->pos;
         if (!routed)
-            AiRouteToward(obj, out, ctx, 0);
-        w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
-        if (*(void *const *)(c + SIGHT_OFF_FOUND))
+            AiRouteToward(o, out, c, 0);
+        out->aim = c->leadBearing;
+        if (c->found)
             AiPromoteFound(o, c);
         goto done;
     }
 
     /* No leader. */
-    hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+    hit = o->hitDir;
     if (hit > 0) {
-        if (!*(void *const *)(c + SIGHT_OFF_OBSERVER))
-            w[1] = hit;
-        *(o + OBJ_OFF_HIT_DIR) = 0;
+        if (!c->observer)
+            out->aim = hit;
+        o->hitDir = 0;
     }
-    if (*(void *const *)(c + SIGHT_OFF_FOUND)) {
+    if (c->found) {
         AiPromoteFound(o, c);
-        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+        out->aim = c->bearing;
     }
-    if (*(void *const *)(c + SIGHT_OFF_OBSERVER)) {
-        if ((uint32_t)(g_gameClockMs
-                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+    if (c->observer) {
+        if ((uint32_t)(g_gameClockMs - o->deadlineD0)
             >= AM2_AI_TURN_DELAY_MS)
-            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(*(uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
-                                + OBJ_OFF_UID);
+            out->aim = c->bearing;
+        o->followUid = c->observer->uid;
     }
 
 done:
-    ConsiderSighting(o, w, c);
+    ConsiderSighting(o, out, c);
 #undef LEAD
 }
 
@@ -4324,7 +4190,8 @@ done:
 
 /* The parameters are references: inlined, a by-value parameter is one more
  * variable to VC6, and the image has none (RegionFindPath 96 -> 37). */
-static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &seen,
+static inline void AiSightTrace(const AM2_Object *const &o,
+                                const AM2_Object *const &seen,
                                 const uint32_t &dir, const int32_t &viewerAttr,
                                 const int32_t &gen)
 {
@@ -4334,8 +4201,7 @@ static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &s
     int32_t        n = 0, i = 0, reach;
 
     g_sightBlockByDir[dir].trace_stamp = gen;
-    TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),
-                  *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);
+    TraceTileLine(o->pos, seen->pos, buf, &n);
 
     while (i < n) {
         int32_t a = (int8_t)attrs[buf[i]];
@@ -4348,7 +4214,7 @@ static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &s
     }
 
     reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
-#define rank g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)]
+#define rank g_rankRecords[o->rank]
     if (reach >= rank.sight_range)
         reach = rank.sight_range;
 #undef rank
@@ -4402,127 +4268,116 @@ static inline void AiSightTrace(const uint8_t *const &o, const uint8_t *const &s
  *
  * EVERY PATH ENDS AT ConsiderSightingC, including the ones that already called
  * AiKeepRange or AiHitReact. */
-void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
+void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t       *o = (uint8_t *)obj;
-    uint8_t       *w = (uint8_t *)out;
-    uint8_t       *c = (uint8_t *)ctx;
-    const uint8_t *seen;
-    int32_t        range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
+    const AM2_Object *seen;
+    int32_t        range = c->range;
     /* The leader and the found object are re-read at every use. Each step
      * and promotion is written at its site; VC6 cross-jumps the ones whose
      * registers agree. */
-#define LEAD  (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
-#define FOUND (*(uint8_t **)(c + SIGHTC_OFF_FOUND))
+#define LEAD  (c->leader)
+#define FOUND (c->found)
 #define PROMOTE_FOUND()                                                       \
     do {                                                                      \
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
-            *(const uint32_t *)(FOUND + OBJ_OFF_UID);                         \
-        *(void **)(c + SIGHTC_OFF_OBSERVER) = FOUND;                          \
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =                                  \
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);                   \
-        *(c + SIGHTC_OFF_BEARING) =                                           \
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);                 \
+        o->targetUid =                               \
+            FOUND->uid;                         \
+        c->observer = FOUND;                          \
+        c->range =                                  \
+            c->foundRange;                   \
+        c->bearing =                                           \
+            c->foundBearing;                 \
     } while (0)
 #define PROMOTE_LEAD()                                                        \
     do {                                                                      \
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
-            *(const uint32_t *)(LEAD + OBJ_OFF_UID);                          \
-        *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;                           \
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =                                  \
-            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);                    \
-        *(c + SIGHTC_OFF_BEARING) =                                           \
-            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);                  \
+        o->targetUid =                               \
+            LEAD->uid;                          \
+        c->observer = LEAD;                           \
+        c->range =                                  \
+            c->leadRange;                    \
+        c->bearing =                                           \
+            c->leadBearing;                  \
     } while (0)
 
     if (range > 0) {
-        if (range > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(
-                *(uint8_t *const *)(c + SIGHTC_OFF_OBSERVER) + OBJ_OFF_POS);
-            AiTrooperStep(obj, out, ctx);
+        if (range > c->wantRange) {
+            o->dest = c->observer->pos;
+            AiTrooperStep(o, out, c);
             if (FOUND)
                 PROMOTE_FOUND();
             goto done;
         }
-        if (range < *(const int32_t *)(c + SIGHTC_OFF_DAMAGE)) {
+        if (range < c->damage) {
             /* Too close for its own weapon: back off. The OBSERVER is passed
              * as the mover and this unit as the target, so the point is
              * MAX_RANGE out from the enemy along the line toward us -- a
              * retreat to the weapon's range. With the two swapped it is a
              * point MAX_RANGE from us toward the enemy, a charge. */
-            RandomPointToward(obj, *(void *const *)(c + SIGHTC_OFF_OBSERVER),
-                              *(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE),
-                              (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
-            AiTrooperStep(obj, out, ctx);
+            RandomPointToward(o, c->observer,
+                              c->maxRange,
+                              &o->dest);
+            AiTrooperStep(o, out, c);
             goto done;
         }
-        AiKeepRange(obj, out, ctx);
+        AiKeepRange(o, out, c);
         goto done;
     }
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST_B) > AM2_AI_ENGAGE_DEST_B) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME);
-        AiTrooperStep(obj, out, ctx);
+    if (c->destDistB > AM2_AI_ENGAGE_DEST_B) {
+        o->dest = o->goalPoint;
+        AiTrooperStep(o, out, c);
         if (FOUND)
             PROMOTE_FOUND();
         goto done;
     }
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_ENGAGE_DEST) {
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
-            g_zeroPoint;
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiTrooperStep(obj, out, ctx);
+    if (c->destDist > AM2_AI_ENGAGE_DEST) {
+        o->goalPoint = g_zeroXY;
+        o->dest = o->scriptPoint;
+        AiTrooperStep(o, out, c);
         if (FOUND)
             PROMOTE_FOUND();
         goto done;
     }
 
     /* Arrived: forget both remembered points and look for something to do. */
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
-        g_zeroPoint;
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        g_zeroPoint;
+    o->goalPoint = g_zeroXY;
+    o->scriptPoint = g_zeroXY;
 
     if (LEAD) {
         /* Out of the band the current weapon wants: pick another and rebuild
          * the weapon half of the context around it. */
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-            > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            SelectRankedWeapon((AM2_Object *)obj);
-            UnitWeaponInfo(obj, ctx);
+        if (c->leadRange
+            > c->wantRange) {
+            SelectRankedWeapon(o);
+            UnitWeaponInfo(o, c);
         }
 
         seen = LEAD;
         AM2_AI_SIGHT_TEST(in_sight, out_of_sight);
 
 in_sight:
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-            > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-            AiTrooperStep(obj, out, ctx);
+        if (c->leadRange
+            > c->wantRange) {
+            o->dest = LEAD->pos;
+            AiTrooperStep(o, out, c);
             PROMOTE_LEAD();
             goto done;
         }
 
         /* Close enough to act on. An object that is not one of types 2, 3 or
          * 8 has to carry flag 4 to be worth reacting to at all. */
-        if (!ObjIsTypeIn238((const AM2_Object *)LEAD)
-            && !(*(const uint8_t *)(LEAD + OBJ_OFF_FLAGS) & 4))
+        if (!ObjIsTypeIn238(LEAD)
+            && !(LEAD->flagsLo & 4))
             goto done;
 
         PROMOTE_LEAD();
-        AiHitReact(obj, out, ctx);
-        AiKeepRange(obj, out, ctx);
+        AiHitReact(o, out, c);
+        AiKeepRange(o, out, c);
         goto done;
 
 out_of_sight:
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-        AiTrooperStep(obj, out, ctx);
+        o->dest = LEAD->pos;
+        AiTrooperStep(o, out, c);
         /* A unit that cannot see its leader still adopts it as the observer
          * when nothing was found. */
         if (FOUND)
@@ -4532,17 +4387,16 @@ out_of_sight:
         goto done;
     }
 
-    AiHitReact(obj, out, ctx);
+    AiHitReact(o, out, c);
     if (FOUND)
         PROMOTE_FOUND();
-    AiKeepRange(obj, out, ctx);
-    if (*(void *const *)(c + SIGHTC_OFF_OBSERVER))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_OBSERVER) + OBJ_OFF_UID);
+    AiKeepRange(o, out, c);
+    if (c->observer)
+        o->followUid = c->observer->uid;
 
 done:
-    (void)w;
-    ConsiderSightingC(obj, out, ctx);
+    (void)out;
+    ConsiderSightingC(o, out, c);
 #undef PROMOTE_LEAD
 #undef PROMOTE_FOUND
 #undef FOUND
@@ -4577,93 +4431,80 @@ done:
  * AM2_AI_KEEP_RANGE_MS has passed since OBJ_OFF_DEADLINE_58, it picks a fresh
  * point 360 units toward it and stamps the clock. That is the only use of
  * RandomPointAhead here and the only thing 0x168 means. */
-void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
+void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *c = (uint8_t *)ctx;
-    uint8_t *seen;
-#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+    AM2_Object *seen;
+#define LEAD (c->leader)
 
     /* Save the state point, or remember that there was none. */
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+    if ((uint16_t)o->scriptPoint.x)
+        o->savedPoint = o->scriptPoint;
     else
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            g_zeroPoint;
+        o->savedPoint = g_zeroXY;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) <= 0
-        && !*(const int32_t *)(o + OBJ_OFF_TARGET_UID)) {
+    if (o->fieldF4 <= 0
+        && !o->ammo) {
         /* Nothing to fight: walk the detour, then the state point, then
          * reload. */
-        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+        o->fieldEC = 0;
 
-        if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
-            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+        if ((uint16_t)o->detour.x) {
+            if (ApproxDist(&o->pos,
+                           &o->detour)
                 > AM2_AI_REACHED_DIST) {
-                *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                    *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-                AiTrooperStep(obj, out, ctx);
+                o->dest = o->detour;
+                AiTrooperStep(o, out, c);
                 goto tail;
             }
-            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                g_zeroPoint;
+            o->detour = g_zeroXY;
             goto react;
         }
 
         if (LEAD) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-            AiTrooperStep(obj, out, ctx);
+            o->dest = LEAD->pos;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
 
-        if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                g_zeroPoint;
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            AiTrooperStep(obj, out, ctx);
+        if (c->destDist > AM2_AI_REACHED_DIST) {
+            o->detour = g_zeroXY;
+            o->dest = o->scriptPoint;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
 
         /* Arrived at the state point: clear the detour and reload the state
          * point from the copy the head made. */
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            g_zeroPoint;
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
+        o->detour = g_zeroXY;
+        o->scriptPoint = o->savedPoint;
         goto react;
     }
 
     /* A kind-7 sighting is not worth detouring for. */
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)
-        && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            g_zeroPoint;
+    if (c->found
+        && !IsKind7(c->found))
+        o->detour = g_zeroXY;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
-        if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST)
+    if (o->fieldEC) {
+        if (c->destDist
             > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            AiTrooperStep(obj, out, ctx);
+            o->dest = o->scriptPoint;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
-        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+        o->fieldEC = 0;
         goto react;
     }
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
-        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+    if ((uint16_t)o->detour.x) {
+        if (ApproxDist(&o->pos,
+                       &o->detour)
             > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-            AiTrooperStep(obj, out, ctx);
+            o->dest = o->detour;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            g_zeroPoint;
+        o->detour = g_zeroXY;
         goto react;
     }
 
@@ -4680,86 +4521,68 @@ void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
      * this as one arm with a shared tail gives a chasing unit two calls it
      * does not make. */
 seen_it:
-    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-        >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-        AiTrooperStep(obj, out, ctx);
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+    if (c->leadRange
+        >= c->wantRange) {
+        o->dest = LEAD->pos;
+        AiTrooperStep(o, out, c);
+        o->targetUid = LEAD->uid;
+        c->observer = LEAD;
+        c->range = c->leadRange;
+        c->bearing = c->leadBearing;
         goto tail;
     }
 
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        g_zeroPoint;
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
-    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-    *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+    o->dest = g_zeroXY;
+    o->targetUid = LEAD->uid;
+    c->observer = LEAD;
+    c->range = c->leadRange;
+    c->bearing = c->leadBearing;
 
 react:
-    AiHitReact(obj, out, ctx);
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) =
-            *(void *const *)(c + SIGHTC_OFF_FOUND);
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+    AiHitReact(o, out, c);
+    if (c->found) {
+        o->targetUid = c->found->uid;
+        c->observer = c->found;
+        c->range = c->foundRange;
+        c->bearing = c->foundBearing;
     }
-    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
-    AiKeepRange(obj, out, ctx);
+    if (!o->followUid)
+        o->followUid = o->targetUid;
+    AiKeepRange(o, out, c);
     goto tail;
 
 not_seen:
     /* Out of sight: walk toward it. */
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-    AiTrooperStep(obj, out, ctx);
+    o->dest = LEAD->pos;
+    AiTrooperStep(o, out, c);
 
 tail:
     /* Re-read what the context found: AiHitReact and the steps above may have
      * replaced it. A kind 7 that has held our attention for five seconds gets
      * a fresh detour point 360 units toward it. */
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
-        if (IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND))
+    if (c->found) {
+        if (IsKind7(c->found)
             && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
+                          - o->deadline58)
                > AM2_AI_KEEP_RANGE_MS) {
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                g_gameClockMs;
+            o->deadline58 = g_gameClockMs;
             /* (unused, the object to head toward, distance, out) -- the
              * first argument really is discarded, per air.h, and the original
              * passes the stepping object into it. */
-            RandomPointAhead(obj, *(void *const *)(c + SIGHTC_OFF_FOUND),
+            RandomPointAhead(o, c->found,
                              AM2_AI_PATROL_DETOUR,
-                             (AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT));
+                             &o->detour);
         }
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) =
-            *(void *const *)(c + SIGHTC_OFF_FOUND);
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+        o->targetUid = c->found->uid;
+        c->observer = c->found;
+        c->range = c->foundRange;
+        c->bearing = c->foundBearing;
     }
 
-    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
+    if (!o->followUid)
+        o->followUid = o->targetUid;
 
-    ConsiderSightingC(obj, out, ctx);
+    ConsiderSightingC(o, out, c);
 #undef LEAD
 }
 
@@ -4789,102 +4612,89 @@ tail:
  * AiKeepRange; here both arms adopt the target and fall through to them. Two
  * functions sharing 150 instructions and differing on whether a chasing unit
  * gets to shoot -- which is exactly what merging them would have lost. */
-void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
+void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *c = (uint8_t *)ctx;
-#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+#define LEAD (c->leader)
     int32_t  dest;
     uint16_t state;
 
-    state = *(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE);
+    state = (uint16_t)o->scriptPoint.x;
     if (state)
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        o->savedPoint = o->scriptPoint;
     else
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
-            g_zeroPoint;
+        o->savedPoint = g_zeroXY;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) <= 0) {
-        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
-        dest = *(const int32_t *)(c + SIGHTC_OFF_DEST_DIST);
+    if (o->fieldF4 <= 0) {
+        o->fieldEC = 0;
+        dest = c->destDist;
 
         if (dest > AM2_AI_PATROL_DETOUR) {
             /* Off the leash: drop the detour, restore the post and go back to it,
              * forgetting whatever was being chased. */
-            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                g_zeroPoint;
+            o->detour = g_zeroXY;
             if (!state)
-                *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-                    *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            AiTrooperStep(obj, out, ctx);
-            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+                o->scriptPoint = o->savedPoint;
+            o->dest = o->scriptPoint;
+            AiTrooperStep(o, out, c);
+            o->followUid = 0;
+            o->targetUid = 0;
             goto tail;
         }
 
-        if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
-            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+        if ((uint16_t)o->detour.x) {
+            if (ApproxDist(&o->pos,
+                           &o->detour)
                 > AM2_AI_REACHED_DIST) {
-                *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-                AiTrooperStep(obj, out, ctx);
+                o->dest = o->detour;
+                AiTrooperStep(o, out, c);
                 goto tail;
             }
-            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-                g_zeroPoint;
+            o->detour = g_zeroXY;
             goto react;
         }
 
         if (dest > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            AiTrooperStep(obj, out, ctx);
+            o->dest = o->scriptPoint;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
+        o->scriptPoint = o->savedPoint;
         goto react;
     }
 
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)
-        && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            g_zeroPoint;
+    if (c->found
+        && !IsKind7(c->found))
+        o->detour = g_zeroXY;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
-        if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            AiTrooperStep(obj, out, ctx);
+    if (o->fieldEC) {
+        if (c->destDist > AM2_AI_REACHED_DIST) {
+            o->dest = o->scriptPoint;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
-        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+        o->fieldEC = 0;
         goto react;
     }
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_PATROL_DETOUR) {
-        if (!*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-            *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiTrooperStep(obj, out, ctx);
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+    if (c->destDist > AM2_AI_PATROL_DETOUR) {
+        if (!(uint16_t)o->scriptPoint.x)
+            o->scriptPoint = o->savedPoint;
+        o->dest = o->scriptPoint;
+        AiTrooperStep(o, out, c);
+        o->followUid = 0;
+        o->targetUid = 0;
         goto tail;
     }
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
-        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+    if ((uint16_t)o->detour.x) {
+        if (ApproxDist(&o->pos,
+                       &o->detour)
             > AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-            AiTrooperStep(obj, out, ctx);
+            o->dest = o->detour;
+            AiTrooperStep(o, out, c);
             goto tail;
         }
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            g_zeroPoint;
+        o->detour = g_zeroXY;
         goto react;
     }
 
@@ -4893,93 +4703,73 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
 
     /* Forget who we were following BEFORE looking, so what is seen replaces it
      * outright. AiPatrolStep keeps the old uid and only fills a null one. */
-    *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+    o->followUid = 0;
 
     {
-        const uint8_t *seen = LEAD;
+        const AM2_Object *seen = LEAD;
 
         AM2_AI_SIGHT_TEST(seen_it, not_seen);
 
         /* In sight: BOTH arms adopt and fall into the react block -- see
          * the header. */
 seen_it:
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-            >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-            AiTrooperStep(obj, out, ctx);
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-                *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-            *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
-            *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-                *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-            *(c + SIGHTC_OFF_BEARING) =
-                *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+        if (c->leadRange
+            >= c->wantRange) {
+            o->dest = LEAD->pos;
+            AiTrooperStep(o, out, c);
+            o->targetUid = LEAD->uid;
+            c->observer = LEAD;
+            c->range = c->leadRange;
+            c->bearing = c->leadBearing;
             goto react;
         }
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            g_zeroPoint;
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+        o->dest = g_zeroXY;
+        o->targetUid = LEAD->uid;
+        c->observer = LEAD;
+        c->range = c->leadRange;
+        c->bearing = c->leadBearing;
         goto react;
     }
 
 not_seen:
     /* Out of sight: walk toward it, and DO NOT adopt it -- straight to the
      * react block, as AiPatrolStep's out-of-sight arm skips it too. */
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-    AiTrooperStep(obj, out, ctx);
+    o->dest = LEAD->pos;
+    AiTrooperStep(o, out, c);
 
 react:
-    AiHitReact(obj, out, ctx);
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
-        if (IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND))
+    AiHitReact(o, out, c);
+    if (c->found) {
+        if (IsKind7(c->found)
             && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
+                          - o->deadline58)
                > AM2_AI_KEEP_RANGE_MS) {
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                g_gameClockMs;
-            RandomPointAhead(obj, *(void *const *)(c + SIGHTC_OFF_FOUND),
+            o->deadline58 = g_gameClockMs;
+            RandomPointAhead(o, c->found,
                              AM2_AI_PATROL_DETOUR,
-                             (AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT));
+                             &o->detour);
         }
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) =
-            *(void *const *)(c + SIGHTC_OFF_FOUND);
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+        o->targetUid = c->found->uid;
+        c->observer = c->found;
+        c->range = c->foundRange;
+        c->bearing = c->foundBearing;
     }
-    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
-    AiKeepRange(obj, out, ctx);
+    if (!o->followUid)
+        o->followUid = o->targetUid;
+    AiKeepRange(o, out, c);
     goto tail;
 
 tail:
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) =
-            *(void *const *)(c + SIGHTC_OFF_FOUND);
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+    if (c->found) {
+        o->targetUid = c->found->uid;
+        c->observer = c->found;
+        c->range = c->foundRange;
+        c->bearing = c->foundBearing;
     }
-    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
+    if (!o->followUid)
+        o->followUid = o->targetUid;
 
-    ConsiderSightingC(obj, out, ctx);
+    ConsiderSightingC(o, out, c);
 #undef LEAD
 }
 
@@ -5049,14 +4839,14 @@ typedef void (__cdecl *AM2_LogSixFn)(const char *, ...);
  * And REGIONS ARE SOLVED ONCE: the weapon arm passes a flag to RegionsNear
  * that it clears immediately, so only the first weapon considered pays for a
  * region solve. */
-void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
-                        int32_t *nAllied, int32_t *nOther, int32_t flags)
+AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
+                              uint8_t *outBearing, int32_t *nAllied,
+                              int32_t *nOther, int32_t flags)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *keep;
-    uint8_t *best;
-    uint8_t *alt;
-    uint8_t *it;
+    AM2_Object *keep;
+    AM2_Object *best;
+    AM2_Object *alt;
+    AM2_Object *it;
     int32_t  bestRange;
     int32_t  bestScore;
     uint8_t  bestBearing;
@@ -5068,37 +4858,37 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
 
     if (g_perframeCountA
         > AM2_SIGHT_SCANS_PER_FRAME)
-        return (void *)0;
+        return (AM2_Object *)0;
 
     /* One slot written twice: a type 3 with more than one row aims with its
      * turret. Two displacements four apart, one dword. */
-    facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
-    if (ObjIsType3((const AM2_Object *)o)
-        && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-        facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+    facing = o->facing;
+    if (ObjIsType3(o)
+        && o->rowSet.count > 1)
+        facing = o->turretFacing;
 
     *outRange   = 0;
     *outBearing = 0;
     *nAllied    = 0;
     *nOther     = 0;
 
-    keep        = (uint8_t *)0;
-    best        = (uint8_t *)0;
+    keep        = (AM2_Object *)0;
+    best        = (AM2_Object *)0;
     bestRange   = AM2_SIGHT_SCAN_FAR;
     bestBearing = 0x80;
     slack       = 0x80;
     bestScore   = 0;
-    alt         = (uint8_t *)0;
+    alt         = (AM2_Object *)0;
     solve       = 1;
 
     /* A weapon already earmarked stays the fallback while it is still there,
      * not flagged gone, reachable, and worth taking. */
-    if (ObjIsType2((const AM2_Object *)o)
-        && *(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER)) {
-        uint8_t *w = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER));
+    if (ObjIsType2(o)
+        && o->pickupAfter) {
+        AM2_Object *w = LookupByUID(
+            o->pickupAfter);
 
-        if (w && !(*(const uint8_t *)(w + OBJ_OFF_FLAGS) & 4)
+        if (w && !(w->flagsLo & 4)
             && RegionsNear(w, o, 1)) {
             int32_t n = TryTakeWeapon(w, o);
 
@@ -5109,56 +4899,56 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         }
     }
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_F4) = 0;
-    *(uint32_t *)(o + OBJ_OFF_FIELD_FC) =
+    o->fieldF4 = 0;
+    o->fieldFC =
         g_gameClockMs
         + AM2_AI_TROOPER_RETRY_MS;
     ++g_sightGeneration;
     orig_log_one(o);
 
-    reach = g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)].sight_range;
-    box.right  = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) + reach;
-    box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
-    box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
-    box.bottom = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) + reach;
+    reach = g_rankRecords[o->rank].sight_range;
+    box.right  = (int32_t)o->pos.x + reach;
+    box.left   = (int32_t)o->pos.x - reach;
+    box.top    = (int32_t)o->pos.y - reach;
+    box.bottom = (int32_t)o->pos.y + reach;
 
     if (flags)
-        it = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
+        it = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsHittable);
     else
-        it = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
+        it = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsLiveTarget);
     if (!it)
         goto finish;
 
     /* ---- phase one: split the chain, and build the blockers as we go ---- */
     while (it) {
-        uint8_t *cur;
+        AM2_Object *cur;
 
         if (o == it) {
-            it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
+            it = it->queryNext;
             continue;
         }
-        if (!IsKind7(it) && !ObjIsTypeIn238((const AM2_Object *)it)
-            && !ObjIsType4((const AM2_Object *)it)) {
+        if (!IsKind7(it) && !ObjIsTypeIn238(it)
+            && !ObjIsType4(it)) {
             /* The second call cannot answer yes -- see the header. */
-            if (ObjIsTypeIn238((const AM2_Object *)it))
+            if (ObjIsTypeIn238(it))
                 continue;
             AddSightBlocker(o, it);
-            it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
+            it = it->queryNext;
             continue;
         }
         /* Moved onto the kept list through its link: the walk advances
          * first, then the node is relinked and kept. */
         cur = it;
-        it  = *(uint8_t *const *)(cur + OBJ_OFF_QUERY_NEXT);
-        *(uint8_t **)(cur + OBJ_OFF_QUERY_NEXT) = keep;
+        it  = cur->queryNext;
+        cur->queryNext = keep;
         keep = cur;
         /* The predicate asks about the SCANNING object, not the candidate,
          * so this is constant across the walk and evaluated every time. */
-        if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)cur)) {
-            RevealObj((AM2_Object *)cur);
-            *(uint32_t *)(cur + OBJ_OFF_REVEALED_UNTIL) =
+        if (ObjIsOurs(o, 0) && ObjIsTypeIn238(cur)) {
+            RevealObj(cur);
+            cur->revealedUntil =
                 g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
         }
@@ -5169,24 +4959,24 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
 
     /* ---- phase two: score what survived ---- */
     for (it = keep; it;
-         it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT)) {
-        uint8_t *cand       = (uint8_t *)0;
+         it = it->queryNext) {
+        AM2_Object *cand       = (AM2_Object *)0;
         uint8_t  candBearing = 0x80;
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
-        if (ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)it, 0))
+        if (ObjsAreAllied(o, it, 0))
             goto allied;
 
         if (IsKind7(it)) {
-            candBearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                       (const AM2_Point *)(it + OBJ_OFF_POS));
+            candBearing = AngleBetween(&o->pos,
+                                       &it->pos);
             candRange   = AM2_SIGHT_KIND7_RANGE;
             cand        = it;
 score:
             if (!cand)
                 continue;
             ++*nOther;
-            ++*(int32_t *)(o + OBJ_OFF_FIELD_F4);
+            ++o->fieldF4;
             /* Discarded two instructions later; a call, so it counts. */
             (void)AngleDelta(facing, candBearing);
             if (candRange >= bestRange + slack)
@@ -5201,25 +4991,25 @@ score:
         /* The sight test, inline. Same shape as AM2_AI_SIGHT_TEST and NOT the same
          * code -- a normalised diff finds no shared run of ten. */
         {
-            uint8_t  look = *(const uint8_t *)(o + OBJ_OFF_FACING);
+            uint8_t  look = o->facing;
             int32_t  viewerAttr, dx, dy, delta;
             uint32_t dir;
 
-            if (ObjIsType3((const AM2_Object *)o)
-                && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-                look = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+            if (ObjIsType3(o)
+                && o->rowSet.count > 1)
+                look = o->turretFacing;
 
             viewerAttr = ObjTileAttr(o);
-            dx = (int32_t)*(const int16_t *)(it + OBJ_OFF_POS)
-                 - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
-            dy = (int32_t)*(const int16_t *)(it + OBJ_OFF_POS + 2)
-                 - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
+            dx = (int32_t)it->pos.x
+                 - (int32_t)o->pos.x;
+            dy = (int32_t)it->pos.y
+                 - (int32_t)o->pos.y;
             candRange   = ApproxDistXY(dx, dy);
             candBearing = (uint8_t)AngleOfDelta(dx, dy);
 
             delta = AngleDelta(look, candBearing);
             delta = abs(delta);
-#define rank g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)]
+#define rank g_rankRecords[o->rank]
             if (delta > rank.field_04) {
                 if (rank.field_08 <= candRange)
                     continue;
@@ -5256,17 +5046,17 @@ in_sight:
          * once a second has passed since we were last hit -- and the refusal
          * skips recording it while still revealing it below. */
         cand = it;
-        if ((*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3
-             || *(const int32_t *)(o + OBJ_OFF_AI_MODE) == 2)
+        if ((o->aiMode == 3
+             || o->aiMode == 2)
             && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_HIT_TIME))
+                          - o->hitTime)
                    > AM2_SIGHT_KIND7_RANGE
-            && ObjsAreAllied((const AM2_Object *)it, (const AM2_Object *)o, 0))
-            cand = (uint8_t *)0;
+            && ObjsAreAllied(it, o, 0))
+            cand = (AM2_Object *)0;
 
         if (ObjIsOurs(o, 0)) {
-            RevealObj((AM2_Object *)it);
-            *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
+            RevealObj(it);
+            it->revealedUntil =
                 g_gameClockMs
                 + AM2_SIGHT_REVEAL_MS;
         }
@@ -5274,29 +5064,29 @@ in_sight:
         goto score;
 
 allied:
-        if (ObjIsTypeIn238((const AM2_Object *)it)) {
+        if (ObjIsTypeIn238(it)) {
 
             ++*nAllied;
-            if (!*(const uint32_t *)(it + OBJ_OFF_TARGET_UID))
+            if (!it->targetUid)
                 continue;
-            cand = (uint8_t *)LookupByUID(
-                *(const uint32_t *)(it + OBJ_OFF_TARGET_UID));
+            cand = LookupByUID(
+                it->targetUid);
             if (!cand) {
-                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+                it->targetUid = 0;
                 goto score;                 /* cand is null; score refuses */
             }
-            if (*(const int16_t *)(cand + OBJ_OFF_HEALTH) <= 0
-                || (*(const int32_t *)(cand + OBJ_OFF_FLAGS) & 0x204)) {
-                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+            if (cand->health <= 0
+                || ((int32_t)cand->flags & 0x204)) {
+                it->targetUid = 0;
                 continue;
             }
-            if (ObjsAreAllied((const AM2_Object *)o, (const AM2_Object *)cand, 0))
+            if (ObjsAreAllied(o, cand, 0))
                 continue;
-            DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                         (const AM2_Point *)(cand + OBJ_OFF_POS),
+            DistAndAngle(&o->pos,
+                         &cand->pos,
                          &candRange, &candBearing);
             /* Only mode 1 adopts an ally's target, and only close by. */
-            if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) != 1)
+            if (o->aiMode != 1)
                 goto score;
             if (candRange > AM2_AI_PATROL_DETOUR)
                 continue;
@@ -5304,10 +5094,10 @@ allied:
         }
 
         /* Not a unit: a dropped weapon worth walking to. */
-        if (!flags || !ObjIsType4((const AM2_Object *)it))
+        if (!flags || !ObjIsType4(it))
             continue;
-        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                     (const AM2_Point *)(it + OBJ_OFF_POS),
+        DistAndAngle(&o->pos,
+                     &it->pos,
                      &candRange, &candBearing);
         if (!RegionsNear(it, o, solve)) {
             solve = 0;
@@ -5328,18 +5118,17 @@ allied:
 
 finish:
     orig_log_one(o);
-    if (!*(const int32_t *)(o + OBJ_OFF_FIELD_F4))
-        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+    if (!o->fieldF4)
+        o->fieldEC = 0;
 
     if (best) {
-        uint32_t anchor;
+        AM2_Point anchor;
 
         *outRange   = bestRange;
         *outBearing = bestBearing;
         anchor      = ObjAnchorPoint(o);
         /* Overwrites the store above, and measures from the ANCHOR. */
-        *outBearing = AngleBetween((const AM2_Point *)&anchor,
-                                   (const AM2_Point *)(best + OBJ_OFF_POS));
+        *outBearing = AngleBetween(&anchor, &best->pos);
         goto out;
     }
     /* The fallback, or nothing at all: `alt` is null when there is
@@ -5381,51 +5170,40 @@ out:
  * a packed point from two different sources, which is one more reading under
  * which 0xB4 is a point too.
  */
-void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
+void __cdecl AiStepFollow(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    uint8_t *c = (uint8_t *)ctx;
-
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        g_zeroPoint;
+    o->scriptPoint = g_zeroXY;
 
     /* Two tests, each ending in the same route call -- one block in the
      * image, which both reach. */
-#define LEADER (*(const uint8_t *const *)(c + SIGHT_OFF_LEADER))
 #define ROUTE() do { \
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = \
-            *(const uint32_t *)(c + SIGHT_OFF_DEST); \
-        AiRouteToward(obj, out, ctx, 0); \
+        o->dest = c->dest; \
+        AiRouteToward(o, out, c, 0); \
     } while (0)
-    if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE) > AM2_AI_FOLLOW_SLACK)
+    if (c->leadRange > AM2_AI_FOLLOW_SLACK)
         ROUTE();
-    else if (LEADER
-             && PointsDiffer(*(const uint32_t *)(LEADER + OBJ_OFF_POS),
-                             *(const uint32_t *)(LEADER + OBJ_OFF_PREV_POS)))
+    else if (c->leader && PointsDiffer(c->leader->pos, c->leader->prevPos))
         ROUTE();
     else {
-#undef LEADER
 #undef ROUTE
-        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        uint8_t hit = o->hitDir;
 
         if (hit > 0) {
-            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
-                w[1] = hit;
-            *(o + OBJ_OFF_HIT_DIR) = 0;
+            if (!c->observer)
+                out->aim = hit;
+            o->hitDir = 0;
         }
 
         AiPromoteFound(o, c);
 
-        if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
-            && (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+        if (c->observer
+            && (uint32_t)(g_gameClockMs - o->deadlineD0)
                >= AM2_AI_TURN_DELAY_MS)
-            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+            out->aim = c->bearing;
     }
 
     AiPromoteFound(o, c);
-    ConsiderSighting(obj, out, ctx);
+    ConsiderSighting(o, out, c);
 }
 
 
@@ -5440,9 +5218,9 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
  * here and retyped. The body it forwards to is shared with mode 0, which
  * reaches it directly, so that address is named for neither mode.
  */
-void __cdecl AiStepAttack(void *obj, void *out, void *ctx)
+void __cdecl AiStepAttack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    AiAttackBody(obj, out, ctx);
+    AiAttackBody(o, out, c);
 }
 
 /* AiStep -- original 0x00407F80, two callers, both in ADDR_STEP_TYPE3. One
@@ -5476,31 +5254,28 @@ void __cdecl AiStepAttack(void *obj, void *out, void *ctx)
  * is built and skips the region write with it; that is the original's one
  * guard and its only early exit.
  */
-void __cdecl AiStep(void *obj, void *out)
+void __cdecl AiStep(AM2_Object *o, AM2_SteerOut *out)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t  ctx[AM2_AI_CONTEXT_BYTES];
+    AM2_AiCtx ctx;
 
-    if (!obj)
+    if (!o)
         return;
 
-    AiBuildContext(obj, ctx);
+    AiBuildContext(o, &ctx);
 
     /* Case 2 before case 0: arm bodies are laid out in SOURCE order, and the
      * original's first arm calls the ignore step. Same jump table either way;
      * only the relink, which resolves call targets, could tell. */
-    switch (*(const uint32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 2:  AiStepIgnore(obj, out, ctx);        break;
-    case 0:  AiAttackBody(obj, out, ctx); break;
-    case 3:  AiStepFollow(obj, out, ctx);        break;
-    case 6:  AiStepAttack(obj, out, ctx);        break;
-    case 7:  AiStepDefend(obj, out, ctx);        break;
-    default: AiStepTrack(obj, out, ctx);         break;
+    switch ((uint32_t)o->aiMode) {
+    case 2:  AiStepIgnore(o, out, &ctx); break;
+    case 0:  AiAttackBody(o, out, &ctx); break;
+    case 3:  AiStepFollow(o, out, &ctx); break;
+    case 6:  AiStepAttack(o, out, &ctx); break;
+    case 7:  AiStepDefend(o, out, &ctx); break;
+    default: AiStepTrack(o, out, &ctx);  break;
     }
 
-    *(uint16_t *)(o + OBJ_OFF_REGION) =
-        (g_regionOfCell)
-            [*(const uint16_t *)(o + OBJ_OFF_TILE)];
+    o->region = (g_regionOfCell)[o->tile];
 }
 
 typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
@@ -5516,16 +5291,12 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * `found->OWNER` (+4) took the port down at 0x00741BFB. */
 #define AM2_SIGHTC_PROMOTE_FOUND(o_, c_)                                      \
     do {                                                                      \
-        uint8_t *found_ = *(uint8_t **)((c_) + SIGHTC_OFF_FOUND);             \
+        AM2_Object *found_ = (c_)->found;                                     \
         if (found_) {                                                         \
-            *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                        \
-                *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                  \
-            *(void **)((c_) + SIGHTC_OFF_OBSERVER) =                          \
-                *(void **)((c_) + SIGHTC_OFF_FOUND);                          \
-            *(int32_t *)((c_) + SIGHTC_OFF_RANGE) =                           \
-                *(const int32_t *)((c_) + SIGHTC_OFF_FOUND_RANGE);            \
-            *((c_) + SIGHTC_OFF_BEARING) =                                    \
-                *((c_) + SIGHTC_OFF_FOUND_BEARING);                          \
+            (o_)->targetUid = found_->uid;                                    \
+            (c_)->observer  = (c_)->found;                                    \
+            (c_)->range     = (c_)->foundRange;                               \
+            (c_)->bearing   = (c_)->foundBearing;                             \
         }                                                                     \
     } while (0)
 
@@ -5581,44 +5352,40 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * `if (0)` that only its labels enter, rather than behind a `goto promote`.
  * The leader is re-read from the context at every use, never cached.
  */
-void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
+void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    uint8_t *c = (uint8_t *)ctx;
-#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
-#define RANGE (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE))
-#define HEAD_FOR() (*(uint32_t *)(o + OBJ_OFF_FIELD_C0) = \
-                    *(const uint32_t *)(c + SIGHTC_OFF_DEST))
+#define LEAD (c->leader)
+#define RANGE (c->leadRange)
+#define HEAD_FOR() (o->dest = \
+                    c->dest)
     int32_t  range;
     int32_t  d;
 
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        g_zeroPoint;
+    o->scriptPoint = g_zeroXY;
 
     if (!LEAD)
         goto hitreact;
 
-    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 1))
-        *(int32_t *)(o + OBJ_OFF_FIELD_110) += 1;
+    if (!ArmyAlliedWithObj(o->owner, LEAD, 1))
+        o->field110 += 1;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_110) <= 0) {
+    if (o->field110 <= 0) {
         /* ---- not provoked ---- */
-        if (ObjIsItem((const AM2_Object *)LEAD)
-            && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 0)) {
+        if (ObjIsItem(LEAD)
+            && ArmyAlliedWithObj(o->owner, LEAD, 0)) {
             if (RANGE <= AM2_AI_LEAD_NEAR)
                 goto hitreact;
             HEAD_FOR();
-            AiTrooperStep(obj, out, ctx);
+            AiTrooperStep(o, out, c);
             if (RANGE <= AM2_AI_LEAD_CLOSE
-                && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 2)
-                *(int32_t *)(o + OBJ_OFF_FIELD_584) = 3;
+                && o->sight.state == 2)
+                o->sight.state = 3;
             goto promote;
         }
 
-        if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 0)) {
-            d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)(LEAD + OBJ_OFF_POS));
+        if (ObjsAreAllied(o, LEAD, 0)) {
+            d = ApproxDist(&o->pos,
+                           &LEAD->pos);
             range = RANGE;
             if (range > AM2_AI_LEAD_FAR)
                 goto walk;
@@ -5627,21 +5394,21 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
                 HEAD_FOR();
                 goto step;
             }
-            if (!PointsDiffer(*(const uint32_t *)(LEAD + OBJ_OFF_POS),
-                              *(const uint32_t *)(LEAD + OBJ_OFF_PREV_POS)))
+            if (!PointsDiffer(LEAD->pos,
+                              LEAD->prevPos))
                 goto hitreact;
             HEAD_FOR();
-            AiTrooperStep(obj, out, ctx);
-            if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
-                w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                    (const AM2_Point *)(c + SIGHTC_OFF_DEST));
-                *(int32_t *)(w + 8) = 2;
+            AiTrooperStep(o, out, c);
+            if (out->state != 2 && out->state != 3) {
+                out->bearing = AngleBetween(&o->pos,
+                                    &c->dest);
+                out->state = 2;
             }
             goto promote;
         }
 
-        d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(LEAD + OBJ_OFF_POS));
+        d = ApproxDist(&o->pos,
+                       &LEAD->pos);
         if (d < AM2_AI_LEAD_CLOSE)
             goto hitreact;
         HEAD_FOR();
@@ -5649,8 +5416,8 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
     }
 
     /* ---- provoked ---- */
-    if (ObjIsItem((const AM2_Object *)LEAD)
-        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), (const AM2_Object *)LEAD, 0)) {
+    if (ObjIsItem(LEAD)
+        && ArmyAlliedWithObj(o->owner, LEAD, 0)) {
         range = RANGE;
         if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
             goto hitreact;
@@ -5658,47 +5425,47 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
         goto step;
     }
 
-    if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 1)) {
+    if (ObjsAreAllied(o, LEAD, 1)) {
         if (RANGE > AM2_AI_LEAD_FAR) {
             HEAD_FOR();
             goto step;
         }
-        if (!PointsDiffer(*(const uint32_t *)(LEAD + OBJ_OFF_POS),
-                          *(const uint32_t *)(LEAD + OBJ_OFF_PREV_POS)))
+        if (!PointsDiffer(LEAD->pos,
+                          LEAD->prevPos))
             goto hitreact;
         HEAD_FOR();
-        AiTrooperStep(obj, out, ctx);
-        if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
-            w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                (const AM2_Point *)(c + SIGHTC_OFF_DEST));
-            *(int32_t *)(w + 8) = 2;
+        AiTrooperStep(o, out, c);
+        if (out->state != 2 && out->state != 3) {
+            out->bearing = AngleBetween(&o->pos,
+                                &c->dest);
+            out->state = 2;
         }
         goto promote;
     }
 
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                   (const AM2_Point *)(LEAD + OBJ_OFF_POS));
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC))
+    d = ApproxDist(&o->pos,
+                   &LEAD->pos);
+    if (o->fieldEC)
         goto walk;
-    if (d >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)
+    if (d >= c->wantRange
         && RANGE > AM2_AI_LEAD_CLOSE)
         goto walk;
 
 hitreact:
-    AiHitReact(obj, out, ctx);
+    AiHitReact(o, out, c);
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
-    AiKeepRange(obj, out, ctx);
+    AiKeepRange(o, out, c);
     if (0) {
         /* Entered only by its labels; see the header. */
 walk:
         HEAD_FOR();
 step:
-        AiTrooperStep(obj, out, ctx);
+        AiTrooperStep(o, out, c);
     }
 
 promote:
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
-    ConsiderSightingC(obj, out, ctx);
+    ConsiderSightingC(o, out, c);
 #undef HEAD_FOR
 #undef RANGE
 #undef LEAD
@@ -5741,40 +5508,36 @@ promote:
  * borrow-flag idiom for an unsigned comparison as 0 or 1, written here as the
  * comparison it is.
  */
-void __cdecl AiHitReact(void *obj, void *out, void *ctx)
+void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t       *o = (uint8_t *)obj;
-    uint8_t       *w = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)ctx;
     int32_t        kind;
 
     /* The hit direction is read again where it is copied. */
-    if (!*(const uint8_t *)(o + OBJ_OFF_HIT_DIR))
+    if (!o->hitDir)
         return;
 
-    kind = *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND);
+    kind = o->soldierKind;
     if (kind == 7) {
-        *(int32_t *)(w + 8) = AM2_POSE_KIND7;
+        out->state = AM2_POSE_KIND7;
     } else if (kind != 8
-               && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3) {
+               && c->kind != 3) {
         int32_t limit =
-            g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)].threshold;
-#define V (*(const uint8_t *)(c + SIGHTC_OFF_SEED))
+            g_rankRecords[o->rank].threshold;
+#define V (c->seed)
         if ((int32_t)V < (limit >> 1)) {
-            int32_t slot = *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) * 2
+            int32_t slot = c->klass * 2
                            + (V >= 0x80 ? 1 : 0);
 
-            *(int32_t *)(w + 8) =
-                (g_hitPoseByClass)[slot];
+            out->state = (g_hitPoseByClass)[slot];
         } else if ((int32_t)V < limit) {
-            *(int32_t *)(w + 8) = AM2_POSE_HIT_HEAVY;
+            out->state = AM2_POSE_HIT_HEAVY;
         }
     }
 
-    if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
-        w[4] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+    if (!c->observer)
+        out->bearing = o->hitDir;
 
-    *(o + OBJ_OFF_HIT_DIR) = 0;
+    o->hitDir = 0;
 #undef V
 }
 
@@ -5814,58 +5577,53 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
  * this writes one at out[4] and a pose at out[8]. Same three-argument shape,
  * different record -- worth checking before carrying an offset across.
  */
-void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
+void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t       *o   = (uint8_t *)obj;
-    uint8_t       *w   = (uint8_t *)out;
-    const uint8_t *c   = (const uint8_t *)ctx;
-
     /* The clock is re-read at every use, as the image does. */
 #define now (g_gameClockMs)
 
-    if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) > now) {
-        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_FIELD_C0))
+    if (o->deadline58 > now) {
+        if (ApproxDist(&o->pos,
+                       &o->dest)
             < AM2_AI_REACHED_DIST) {
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+            o->deadline58 = 0;
         } else {
-            AiTrooperStep(obj, out, ctx);
+            AiTrooperStep(o, out, c);
             return;
         }
     }
 
-    if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
+    if (!c->observer)
         return;
 
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < 6
-        && *(const int32_t *)(c + SIGHTC_OFF_RANGE)
-           <= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-        if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) == 0)
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = now;
+    if (o->soldierKind < 6
+        && c->range
+           <= c->wantRange) {
+        if (o->deadline58 == 0)
+            o->deadline58 = now;
 
-        if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+        if (now - o->deadline58
             > AM2_AI_KEEP_RANGE_MS) {
-            RandomPointToward(obj,
-                              *(const void *const *)(c + SIGHTC_OFF_OBSERVER),
-                              *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE),
-                              (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
-            AiTrooperStep(obj, out, ctx);
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
-                now + AM2_AI_KEEP_RANGE_MS;
-        } else if (!*(const int32_t *)(o + OBJ_OFF_FIELD_540)
-                   && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3
-                   && *(const uint8_t *)(c + SIGHTC_OFF_SEED) < 0x10
-                   && *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) == 0) {
-            if (*(const uint8_t *)(c + SIGHTC_OFF_SEED) < 4)
-                *(int32_t *)(w + 8) = 7;
+            RandomPointToward(o,
+                              c->observer,
+                              c->wantRange,
+                              &o->dest);
+            AiTrooperStep(o, out, c);
+            o->deadline58 = now + AM2_AI_KEEP_RANGE_MS;
+        } else if (!o->field540
+                   && c->kind != 3
+                   && c->seed < 0x10
+                   && c->klass == 0) {
+            if (c->seed < 4)
+                out->state = 7;
             else
-                *(int32_t *)(w + 8) = 5;
+                out->state = 5;
         }
     }
 
-    if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
+    if (now - o->deadlineD0
         >= AM2_AI_TURN_DELAY_MS)
-        w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
+        out->bearing = c->bearing;
 #undef now
 }
 
@@ -5894,29 +5652,23 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
  * arms perform. A sixth reading under which both fields hold packed points;
  * still not renamed, for the reason recorded at 0xB4.
  */
-void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
+void __cdecl AiWalkStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    uint8_t       *o = (uint8_t *)obj;
-    uint8_t       *w = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)ctx;
-
-    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiTrooperStep(obj, out, ctx);
+    if (c->destDist > AM2_AI_REACHED_DIST) {
+        o->dest = o->scriptPoint;
+        AiTrooperStep(o, out, c);
         return;
     }
 
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        g_zeroPoint;
+    o->scriptPoint = g_zeroXY;
 
-    AiHitReact(obj, out, ctx);
+    AiHitReact(o, out, c);
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_FOUND)
+    if (c->found
         && g_gameClockMs
-           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
+           - o->deadlineD0
            >= AM2_AI_TURN_DELAY_MS)
-        w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
+        out->bearing = c->bearing;
 }
 
 /* ConsiderSighting -- original 0x004074A0, four callers.
@@ -5964,51 +5716,41 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
  * Nothing here changed. The code is identical and the names now say what it
  * was always doing, which is the whole of the difference.
  */
-void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
+void __cdecl ConsiderSighting(AM2_Object *o, AM2_SteerOut *out,
+                              const AM2_AiCtx *c)
 {
-    uint8_t       *s = (uint8_t *)seen;
-    uint8_t       *o = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)sight;
-    int32_t        range;
-    int32_t        delta;
+    int32_t range;
+    int32_t delta;
 
-    if (!*(const int32_t *)(c + SIGHT_OFF_WEAPON))
+    if (!c->weapon)
         return;
-    if (!*(const int32_t *)(c + SIGHT_OFF_READY))
+    if (!c->ready)
         return;
 
-    range = *(const int32_t *)(c + SIGHT_OFF_RANGE);
-    if (range <= 0 || range >= *(const int32_t *)(c + SIGHT_OFF_MAX_RANGE))
+    range = c->range;
+    if (range <= 0 || range >= c->maxRange)
         return;
 
-    delta = abs(AngleDelta(*(const uint8_t *)(s + OBJ_OFF_FIELD_530),
-                           *(const uint8_t *)(c + SIGHT_OFF_BEARING)));
+    delta = abs(AngleDelta(o->turretFacing, c->bearing));
     if ((uint8_t)delta > AM2_SIGHT_CONE)
         return;
 
-    *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
+    out->hit = 1;
 
     /* The observer is read from the record at every use. */
-#define observer (*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER))
-    if (!observer)
+    if (!c->observer)
         return;
 
-    *(int16_t *)(o + SIGHTOUT_OFF_X) =
-        *(const int16_t *)(observer + OBJ_OFF_X);
-    *(int16_t *)(o + SIGHTOUT_OFF_Y) =
-        *(const int16_t *)(observer + OBJ_OFF_Y);
-    *(int16_t *)(o + SIGHTOUT_OFF_YADJ) =
-        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
-    *(uint32_t *)(o + SIGHTOUT_OFF_UID) =
-        ((const AM2_Object *)observer)->uid;
+    out->spot.at.x   = c->observer->pos.x;
+    out->spot.at.y   = c->observer->pos.y;
+    out->spot.ground = c->observer->row0YAdjust;
+    out->uid         = c->observer->uid;
 
-    if (!ObjIsOurs((void *)observer, 1))
+    if (!ObjIsOurs(c->observer, 1))
         return;
 
-    RevealObj((AM2_Object *)s);
-    *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-        *(const int32_t *)&g_gameClockMs + AM2_REVEAL_MS;
-#undef observer
+    RevealObj(o);
+    o->revealedUntil = g_gameClockMs + AM2_REVEAL_MS;
 }
 
 /* ConsiderSightingB -- original 0x00408580, one caller, and
@@ -6039,54 +5781,41 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
  * as the two branches the original has rather than folded into the success
  * path, because folding would lose that.
  */
-void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
+void __cdecl ConsiderSightingB(AM2_Object *o, AM2_RoachOut *out,
+                               const AM2_RoachCtx *c)
 {
-    uint8_t       *s = (uint8_t *)seen;
-    uint8_t       *o = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)sight;
-
-    if (*(const int32_t *)(c + SIGHTB_OFF_ENABLED)) {
-        int32_t range = *(const int32_t *)(c + SIGHT_OFF_RANGE);
+    if (c->ready) {
+        int32_t range = c->range;
         int32_t delta;
 
         if (range > 0
-            && range < *(const int32_t *)(c + SIGHTB_OFF_MAX_RANGE)) {
+            && range < c->maxRange) {
 
-            delta = abs(AngleDelta(*(const uint8_t *)(o + SIGHTBOUT_OFF_BEARING),
-                                   *(const uint8_t *)(c + SIGHT_OFF_BEARING)));
+            delta = abs(AngleDelta(out->heading, c->bearing));
 
             if ((uint8_t)delta < AM2_SIGHT_CONE_B) {
                 /* The observer is read from the record at every use. */
-#define observer (*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER))
-                *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
+                out->hit = 1;
 
-                if (observer) {
-                    *(int16_t *)(o + SIGHTBOUT_OFF_X) =
-                        *(const int16_t *)(observer + OBJ_OFF_X);
-                    *(int16_t *)(o + SIGHTBOUT_OFF_Y) =
-                        *(const int16_t *)(observer + OBJ_OFF_Y);
-                    *(int16_t *)(o + SIGHTBOUT_OFF_YADJ) =
-                        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
-                    *(uint32_t *)(o + SIGHTBOUT_OFF_UID) =
-                        ((const AM2_Object *)observer)->uid;
+                if (c->observer) {
+                    out->spot.at.x = c->observer->pos.x;
+                    out->spot.at.y = c->observer->pos.y;
+                    out->spot.ground = c->observer->row0YAdjust;
+                    out->uid = c->observer->uid;
 
-                    if (ObjIsOurs((void *)observer, 1)) {
-                        RevealObj((AM2_Object *)s);
-                        *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-                            *(const int32_t *)&g_gameClockMs
-                            + AM2_REVEAL_MS;
+                    if (ObjIsOurs(c->observer, 1)) {
+                        RevealObj(o);
+                        o->revealedUntil = g_gameClockMs + AM2_REVEAL_MS;
                     }
                 }
-#undef observer
             }
         }
     }
 
-    if (*(const int32_t *)(o + SIGHTOUT_OFF_HIT)) {
-        *(uint8_t *)(o + SIGHTBOUT_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHT_OFF_BEARING);
-        *(int32_t *)(o + SIGHTOUT_OFF_HIT)   = 0;
-        *(int32_t *)(o + SIGHTBOUT_OFF_STATE) = AM2_SIGHTB_STATE_HIT;
+    if (out->hit) {
+        out->heading = c->bearing;
+        out->hit   = 0;
+        out->state = AM2_SIGHTB_STATE_HIT;
     }
 }
 
@@ -6120,61 +5849,50 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
  * unlike B this one never writes it back, so the accumulation is somebody
  * else's job here.
  */
-void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
+void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
+                               const AM2_SightCtx *c)
 {
-    uint8_t       *s = (uint8_t *)seen;
-    uint8_t       *o = (uint8_t *)out;
-    const uint8_t *c = (const uint8_t *)sight;
     /* The range cap is read from the record at every use. */
-#define maxRange (*(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE))
+#define maxRange (c->maxRange)
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_WEAPON)
-        && *(const int32_t *)(c + SIGHTC_OFF_READY)) {
-        int32_t range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
+    if (c->weapon
+        && c->ready) {
+        int32_t range = c->range;
 
         if (range > 0 && range < maxRange) {
             int32_t delta =
-                abs(AngleDelta(*(const uint8_t *)(o + SIGHTCOUT_OFF_BEARING),
-                               *(const uint8_t *)(c + SIGHTC_OFF_BEARING)));
+                abs(AngleDelta(out->bearing, c->bearing));
 
             if ((uint8_t)delta < AM2_SIGHT_CONE_B
                 || maxRange == AM2_SIGHT_OMNI_RANGE) {
                 /* The observer is read from the record at every use. */
-#define observer (*(const uint8_t *const *)(c + SIGHTC_OFF_OBSERVER))
-                *(int32_t *)(o + SIGHTCOUT_OFF_HIT) = 1;
+                out->hit = 1;
 
-                if (observer) {
-                    *(int16_t *)(o + SIGHTCOUT_OFF_X) =
-                        *(const int16_t *)(observer + OBJ_OFF_X);
-                    *(int16_t *)(o + SIGHTCOUT_OFF_Y) =
-                        *(const int16_t *)(observer + OBJ_OFF_Y);
-                    *(int16_t *)(o + SIGHTCOUT_OFF_YADJ) =
-                        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
-                    *(uint32_t *)(o + SIGHTCOUT_OFF_UID) =
-                        ((const AM2_Object *)observer)->uid;
+                if (c->observer) {
+                    out->spot.at.x = c->observer->pos.x;
+                    out->spot.at.y = c->observer->pos.y;
+                    out->spot.ground = c->observer->row0YAdjust;
+                    out->uid = c->observer->uid;
 
-                    if (ObjIsOurs((void *)observer, 1)
+                    if (ObjIsOurs(c->observer, 1)
                         && maxRange != AM2_SIGHT_OMNI_RANGE) {
-                        RevealObj((AM2_Object *)s);
-                        *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
-                            *(const int32_t *)&g_gameClockMs
-                            + AM2_REVEAL_MS;
+                        RevealObj(o);
+                        o->revealedUntil = g_gameClockMs + AM2_REVEAL_MS;
                     }
                 }
-#undef observer
             }
         }
     }
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == 3
-        && *(const int32_t *)(c + SIGHTC_OFF_RANGE) > 0
-        && *(const int32_t *)(c + SIGHTC_OFF_RANGE) < maxRange
-        && *(const int32_t *)(o + SIGHTCOUT_OFF_STATE) == 2)
-        *(int32_t *)(o + SIGHTCOUT_OFF_STATE) = 3;
+    if (c->kind == 3
+        && c->range > 0
+        && c->range < maxRange
+        && out->state == 2)
+        out->state = 3;
 
-    if (*(const int32_t *)(o + SIGHTCOUT_OFF_HIT)) {
-        *(int32_t *)(o + SIGHTCOUT_OFF_SEEN)  = 1;
-        *(int32_t *)(s + OBJ_OFF_FIELD_578)   = 1;
+    if (out->hit) {
+        out->seen = 1;
+        o->field578 = 1;
     }
 #undef maxRange
 }
@@ -6288,7 +6006,7 @@ void __cdecl SealMapEdges(void)
  * two guards are separate, so an empty row range skips the whole thing while
  * an empty column range still walks the rows.
  */
-void __cdecl UnrevealArea(int32_t army, uint32_t at)
+void __cdecl UnrevealArea(int32_t army, AM2_Point at)
 {
     /* The map's size is read from its globals at every use. */
 #define MAP_W (g_mapTilesW)
@@ -6737,17 +6455,15 @@ typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
  * path, one pump behind the original. Found by a live side-by-side trace of
  * EnterVehicle's caller: the original's second boarder returned to
  * TrooperAiStep+0x77, a call the port did not have. */
-static inline int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
+static inline int32_t AiStepReact(AM2_Object *o, AM2_SightOut *out,
+                                  AM2_SightCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7) {
-        AiHitReact(obj, out, ctx);
-        if (*(const int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_STATE)
-            == AM2_POSE_KIND7)
+    if (o->soldierKind == 7) {
+        AiHitReact(o, out, c);
+        if (out->state == AM2_POSE_KIND7)
             return 1;
-    } else if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 8) {
-        AiHitReact(obj, out, ctx);
+    } else if (o->soldierKind == 8) {
+        AiHitReact(o, out, c);
     }
     return 0;
 }
@@ -6766,45 +6482,40 @@ static inline int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
  * AiPatrolStep, reached from TrooperAiStep's AI_MODE-6 arm. */
 /* Inlined into both dispatchers, whose arms are laid out 2, 0, 3, 6, 7,
  * default -- the source order below. */
-static inline void AiStepDispatch(void *obj, void *out, uint8_t *ctx,
-                                  int32_t sarge)
+static inline void AiStepDispatch(AM2_Object *o, AM2_SightOut *out,
+                                  AM2_SightCtx *c, int32_t sarge)
 {
-    uint8_t *o = (uint8_t *)obj;
-
-    switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 2:  AiWalkStep(obj, out, ctx);    break;
-    case 0:  AiPatrolStep(obj, out, ctx);  break;
-    case 3:  AiApproachLeader(obj, out, ctx);  break;
+    switch (o->aiMode) {
+    case 2:  AiWalkStep(o, out, c);       break;
+    case 0:  AiPatrolStep(o, out, c);     break;
+    case 3:  AiApproachLeader(o, out, c); break;
     case 6:  if (sarge)
-                 AiEngageStep(obj, out, ctx);
+                 AiEngageStep(o, out, c);
              else                   /* through the thunk, as the image does */
-                 Call4057D0((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
-                            (int32_t)(intptr_t)ctx);
+                 Call4057D0(o, out, c);
              break;
-    case 7:  Call405220((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
-                        (int32_t)(intptr_t)ctx);
-             break;
+    case 7:  Call405220(o, out, c);       break;
     /* 1, 4, 5 and everything above 7 -- `evade` is 5 and takes this arm. */
-    default: AiGuardStep(obj, out, ctx); break;
+    default: AiGuardStep(o, out, c);      break;
     }
 }
 
 /* Sarge's middle: react, then -- unless the shortcut was taken -- dispatch. No
  * board arm; that one is the trooper's, in TrooperAiStep below. Sarge's table
  * is the one whose AI_MODE 6 is AiEngageStep, so this passes sarge=1. */
-static inline void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
+static inline void AiStepReactAndDispatch(AM2_Object *o, AM2_SightOut *out,
+                                          AM2_SightCtx *c)
 {
-    if (!AiStepReact(obj, out, ctx))
-        AiStepDispatch(obj, out, ctx, 1);
+    if (!AiStepReact(o, out, c))
+        AiStepDispatch(o, out, c, 1);
 }
 
 /* Where the unit is standing, recorded on the object every frame. Both
  * dispatchers end with this, and the kind-7 shortcut above jumps straight to
  * it -- so the region is updated even on the frame the AI decides nothing. */
-static inline void AiStepRecordRegion(uint8_t *o)
+static inline void AiStepRecordRegion(AM2_Object *o)
 {
-    *(uint16_t *)(o + OBJ_OFF_REGION) =
-        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+    o->region = kRegionOfCell[o->tile];
 }
 
 /* SargeAiStep -- original 0x00407020, one caller, and that caller is what
@@ -6847,39 +6558,31 @@ static inline void AiStepRecordRegion(uint8_t *o)
  * point handed to two functions that take points. No second spelling was
  * added for it -- checkoffsets' family baseline may only go down.
  */
-void __cdecl SargeAiStep(void *obj, void *out)
+void __cdecl SargeAiStep(AM2_Object *o, AM2_SightOut *out)
 {
-    uint8_t  ctx[AM2_SIGHTC_BYTES];
-    uint8_t *o = (uint8_t *)obj;
+    AM2_SightCtx ctx;
 
-    if (!obj)
+    if (!o)
         return;
 
-    SelectBestWeapon((AM2_Object *)obj);
-    TrooperBuildContext(obj, ctx, 1);
-    UnitWeaponInfo(obj, ctx);
+    SelectBestWeapon(o);
+    TrooperBuildContext(o, &ctx, 1);
+    UnitWeaponInfo(o, &ctx);
 
     /* The found item is read from the context at each use. */
-#define ITEM (*(uint8_t **)(ctx + SIGHTC_OFF_FOUND))
-    if (ITEM && ObjIsType4((const AM2_Object *)ITEM)) {
-#define GOAL (*(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME))
-        GOAL = *(const uint32_t *)(ITEM + OBJ_OFF_POS);
-        *(uint32_t *)(o + OBJ_OFF_PICKUP_AFTER) =
-            *(const uint32_t *)(ITEM + 4);
+    if (ctx.found && ObjIsType4(ctx.found)) {
+        o->goalPoint   = ctx.found->pos;
+        o->pickupAfter = ctx.found->uid;
 
-        SettlePointInRegion(TileOfPoint(GOAL), &GOAL);
+        SettlePointInRegion(TileOfPoint(o->goalPoint), &o->goalPoint);
 
-        *(int32_t *)(ctx + SIGHTC_OFF_DEST_DIST_B) =
-            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)&GOAL);
+        ctx.destDistB = ApproxDist(&o->pos, &o->goalPoint);
 
-        *(uint32_t *)(ctx + SIGHTC_OFF_FOUND) = 0;
+        ctx.found = 0;
     }
 
-    AiStepReactAndDispatch(obj, out, ctx);
+    AiStepReactAndDispatch(o, out, &ctx);
     AiStepRecordRegion(o);
-#undef ITEM
-#undef GOAL
 }
 
 /* TrooperAiStep -- original 0x004062B0, one caller, the other half of the
@@ -6914,19 +6617,17 @@ void __cdecl SargeAiStep(void *obj, void *out)
  * dispatch. Reading a jump as "go to the end" rather than looking at what is
  * AT the target is how that got in; the target here is the middle.
  */
-void __cdecl TrooperAiStep(void *obj, void *out)
+void __cdecl TrooperAiStep(AM2_Object *o, AM2_SightOut *out)
 {
-    uint8_t  ctx[AM2_SIGHTC_BYTES];
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    int32_t  c0;
+    AM2_SightCtx ctx;
+    int32_t      c0;
 
-    if (!obj)
+    if (!o)
         return;
 
-    TrooperBuildContext(obj, ctx, 0);
+    TrooperBuildContext(o, &ctx, 0);
 
-    if (!AiStepReact(obj, out, ctx)) {
+    if (!AiStepReact(o, out, &ctx)) {
         /* BOARD, before the AI dispatch: a claimed vehicle within
          * AM2_BOARD_NEAR is boarded here (0x00406311..0x0040632f), and
          * boarding RETURNS -- skipping the dispatch, the region write and the
@@ -6935,43 +6636,42 @@ void __cdecl TrooperAiStep(void *obj, void *out)
          * boarded only later through UpdateTrooperAction's blocked-by-rect
          * path, one pump behind the original. TrooperBuildContext fills
          * SIGHTC_OFF_VEHICLE and SIGHTC_OFF_VEHICLE_DIST. */
-        uint8_t *veh = *(uint8_t **)(ctx + SIGHTC_OFF_VEHICLE);
+        AM2_Object *veh = ctx.vehicle;
 
-        if (veh
-            && *(const int32_t *)(ctx + SIGHTC_OFF_VEHICLE_DIST) < AM2_BOARD_NEAR) {
-            EnterVehicle(obj, veh);
+        if (veh && ctx.vehicleDist < AM2_BOARD_NEAR) {
+            EnterVehicle(o, veh);
             return;
         }
-        AiStepDispatch(obj, out, ctx, 0);
+        AiStepDispatch(o, out, &ctx, 0);
     }
     AiStepRecordRegion(o);
 
-    c0 = *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_00);
+    c0 = ctx.klass;
 
     /* Laid out 3, 2, 1, each arm an if/else with the else placed last --
      * and arm 2 tests `c0 != 1` before `c0 == 0`, redundantly, as the image
      * does. */
-    switch (*(const int32_t *)(o + OBJ_OFF_FIELD_540)) {
+    switch (o->field540) {
     case 3:
         if (c0 != 2)
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 7;
+            out->state = 7;
         else
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 6;
+            out->state = 6;
         break;
     case 2:
         if (c0 != 1 && c0 == 0)
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 5;
+            out->state = 5;
         else
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 4;
+            out->state = 4;
         break;
     case 1:
         if (c0 != 0) {
             if (c0 == 2)
-                *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 9;
+                out->state = 9;
             else
-                *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 8;
+                out->state = 8;
         } else {
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 1;
+            out->state = 1;
         }
         break;
     }
@@ -6993,26 +6693,27 @@ typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
  * identically, so it is the original's behaviour rather than a slip in one of
  * them -- a single sighting would have read as a typo. Reproduced.
  */
-static inline uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
+static inline AM2_Object *SightResolve(uint32_t *uid, uint32_t *dead_clears,
+                                       AM2_Object **slot)
 {
-    uint8_t *t;
+    AM2_Object *t;
 
     if (!*uid)
         return NULL;
 
-    t = (uint8_t *)LookupByUID(*uid);
+    t = LookupByUID(*uid);
     *slot = t;
 
     if (!t) {
         *uid = 0;
         return NULL;
     }
-    if (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP) {
+    if (t->flags & AM2_SIGHT_DROP) {
         *uid  = 0;
         *slot = NULL;
         return NULL;
     }
-    if (*(const int16_t *)(t + OBJ_OFF_HEALTH) == 0) {
+    if (t->health == 0) {
         *dead_clears = 0;
         *slot        = NULL;
         return NULL;
@@ -7059,90 +6760,59 @@ static inline uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void *
  * Nothing drives this yet -- its dispatcher's arms are reconstructed, so the
  * counter cannot move, and tools/blindspots.py will say so.
  */
-void __cdecl AiBuildContext(void *obj, void *out)
+void __cdecl AiBuildContext(AM2_Object *o, AM2_AiCtx *s)
 {
-    uint8_t  *o = (uint8_t *)obj;
-    uint8_t  *s = (uint8_t *)out;
-    uint32_t  anchor;
-    uint8_t  *leader, *target, *w;
+    AM2_Point   anchor;
+    AM2_Object *leader, *target, *w;
 
-    if (!obj)
+    if (!o)
         return;
 
-    anchor = ObjAnchorPoint(obj);
-    memset(out, 0, AM2_AI_CONTEXT_BYTES);
+    anchor = ObjAnchorPoint(o);
+    memset(s, 0, sizeof *s);
 
-    leader = SightResolve((uint32_t *)(o + OBJ_OFF_FOLLOW_UID),
-                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (void **)(s + SIGHT_OFF_LEADER));
+    leader = SightResolve(&o->followUid, &o->targetUid, &s->leader);
     if (leader) {
         /* A formation point when the leader is an allied 2/3/8, its raw
          * position otherwise -- the same choice the twin makes (0x00407DE6),
          * differing only in ObjsAreAllied's third argument, 0 here against the
          * twin's 1. An earlier reading had this arm copy the leader's position
          * unconditionally, which left a follower ordered into formation
-         * standing where the leader is rather than in its slot. */
-#define LEADER (*(uint8_t **)(s + SIGHT_OFF_LEADER))
-        if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)leader, 0)
-            && ObjIsTypeIn238((const AM2_Object *)LEADER))
-            ResolveFormationPoint(obj, LEADER,
-                                  (AM2_Point *)(s + SIGHT_OFF_DEST));
+         * standing where the leader is rather than in its slot. Past the test
+         * the leader is re-read from its slot in the record. */
+        if (ObjsAreAllied(o, leader, 0) && ObjIsTypeIn238(s->leader))
+            ResolveFormationPoint(o, s->leader, &s->dest);
         else
-            *(uint32_t *)(s + SIGHT_OFF_DEST) =
-                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
-#undef LEADER
-        DistAndAngle((const AM2_Point *)&anchor,
-                     (const AM2_Point *)(s + SIGHT_OFF_DEST),
-                     (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),
-                     s + SIGHT_OFF_LEAD_BEARING);
+            s->dest = s->leader->pos;
+        DistAndAngle(&anchor, &s->dest, &s->leadRange, &s->leadBearing);
     }
 
-    target = SightResolve((uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (void **)(s + SIGHT_OFF_OBSERVER));
+    target = SightResolve(&o->targetUid, &o->targetUid, &s->observer);
     if (target)
-        DistAndAngle((const AM2_Point *)&anchor,
-                     (const AM2_Point *)(target + OBJ_OFF_POS),
-                     (int32_t *)(s + SIGHT_OFF_RANGE),
-                     s + SIGHT_OFF_BEARING);
+        DistAndAngle(&anchor, &target->pos, &s->range, &s->bearing);
 
-    if (g_gameClockMs
-        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
-        *(int32_t *)(s + SIGHT_OFF_FOUND) =
-            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
-                             s + SIGHT_OFF_FOUND_BEARING,
-                             (int32_t *)(o + OBJ_OFF_FIELD_114),
-                             (int32_t *)(o + OBJ_OFF_FIELD_110), 0);
+    if (g_gameClockMs >= (uint32_t)o->fieldFC)
+        s->found = SightScan(o, &s->foundRange, &s->foundBearing,
+                             &o->field114, &o->field110, 0);
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-        *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
-            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+    if ((uint16_t)o->scriptPoint.x)
+        s->destDist = ApproxDist(&o->pos, &o->scriptPoint);
 
-    w = (uint8_t *)WeaponByUid(
-            *(const uint32_t *)(o + UNIT_OFF_INVENTORY + 4));
-    *(void **)(s + SIGHT_OFF_WEAPON) = w;
+    w = WeaponByUid(o->weaponUid);
+    s->weapon = w;
 
     if (!w) {
-        *(int32_t *)(s + SIGHT_OFF_KIND) = 0;
+        s->kind = 0;
     } else {
         /* The weapon's type record is re-read at every use, and so is the
          * range: no local holds either. */
-#define REC (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0))
-        *(int32_t *)(s + SIGHT_OFF_KIND) =
-            *(const int32_t *)(REC + ITEMTYPE_OFF_KIND);
-        *(int32_t *)(s + SIGHT_OFF_WANT_RANGE) =
-            (int32_t)((double)*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE) * kRangeWant);
-        *(int32_t *)(s + SIGHT_OFF_MAX_RANGE) =
-            (int32_t)((double)*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE) * kRangeHi);
-        *(int32_t *)(s + SIGHT_OFF_READY) =
-            (g_gameClockMs
-             - *(const uint32_t *)(w + ITEM_OFF_LAST_USE))
-            > *(const uint32_t *)(REC + ITEMTYPE_OFF_COOLDOWN);
-#undef REC
+        s->kind      = w->itemType->kind;
+        s->wantRange = (int32_t)((double)w->itemType->range * kRangeWant);
+        s->maxRange  = (int32_t)((double)w->itemType->range * kRangeHi);
+        s->ready     = (g_gameClockMs - w->lastUse) > w->itemType->cooldown;
     }
 
-    *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
+    s->seed = (uint8_t)orig_region_rand();
 }
 
 
@@ -7186,75 +6856,47 @@ void __cdecl AiBuildContext(void *obj, void *out)
  * unwatched -- which is the standing CLAUDE.md already gives the whole roach
  * layer, now with a number on it.
  */
-void __cdecl RoachBuildContext(void *obj, void *out)
+void __cdecl RoachBuildContext(AM2_Object *o, AM2_RoachCtx *s)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *s = (uint8_t *)out;
-    uint8_t *leader, *target;
+    AM2_Object *leader, *target;
 
-    if (!obj)
+    if (!o)
         return;
 
-    memset(out, 0, AM2_ROACH_CONTEXT_BYTES);
+    memset(s, 0, sizeof *s);
 
-    leader = SightResolve((uint32_t *)(o + OBJ_OFF_FOLLOW_UID),
-                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (void **)(s + SIGHT_OFF_LEADER));
+    leader = SightResolve(&o->followUid, &o->targetUid, &s->leader);
     if (leader) {
         /* Past the test the leader is re-read from its slot in the record. */
-#define LEADER (*(uint8_t **)(s + SIGHT_OFF_LEADER))
-        if (ObjIsTypeIn238((const AM2_Object *)leader))
-            ResolveFormationPoint(obj, LEADER,
-                                  (AM2_Point *)(s + SIGHT_OFF_DEST));
+        if (ObjIsTypeIn238(leader))
+            ResolveFormationPoint(o, s->leader, &s->dest);
         else
-            *(uint32_t *)(s + SIGHT_OFF_DEST) =
-                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
-#undef LEADER
+            s->dest = s->leader->pos;
 
-        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                     (const AM2_Point *)(s + SIGHT_OFF_DEST),
-                     (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),
-                     s + SIGHT_OFF_LEAD_BEARING);
+        DistAndAngle(&o->pos, &s->dest, &s->leadRange, &s->leadBearing);
     }
 
-    target = SightResolve((uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
-                          (void **)(s + SIGHT_OFF_OBSERVER));
+    target = SightResolve(&o->targetUid, &o->targetUid, &s->observer);
     if (target) {
-        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                     (const AM2_Point *)(target + OBJ_OFF_POS),
-                     (int32_t *)(s + SIGHT_OFF_RANGE),
-                     s + SIGHT_OFF_BEARING);
+        DistAndAngle(&o->pos, &target->pos, &s->range, &s->bearing);
 
-        if (*(const uint8_t *)(s + SIGHT_OFF_BEARING)
-            != AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                            (const AM2_Point *)
-                                (*(uint8_t **)(s + SIGHT_OFF_OBSERVER)
-                                 + OBJ_OFF_POS)))
+        if (s->bearing != AngleBetween(&o->pos, &s->observer->pos))
             orig_log("Bad!\n");
     }
 
-    if (g_gameClockMs
-        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
-        *(int32_t *)(s + SIGHT_OFF_FOUND) =
-            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
-                             s + SIGHT_OFF_FOUND_BEARING,
-                             (int32_t *)(o + OBJ_OFF_FIELD_114),
-                             (int32_t *)(o + OBJ_OFF_FIELD_110), 0);
+    if (g_gameClockMs >= (uint32_t)o->fieldFC)
+        s->found = SightScan(o, &s->foundRange, &s->foundBearing,
+                             &o->field114, &o->field110, 0);
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-        *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
-            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+    if ((uint16_t)o->scriptPoint.x)
+        s->destDist = ApproxDist(&o->pos, &o->scriptPoint);
 
-    *(void **)(s + SIGHT_OFF_WEAPON)          = NULL;
-    *(int32_t *)(s + ROACHCTX_OFF_WANT_RANGE) = AM2_ROACH_WANT_RANGE;
-    *(int32_t *)(s + ROACHCTX_OFF_MAX_RANGE)  = AM2_ROACH_MAX_RANGE;
-    *(int32_t *)(s + ROACHCTX_OFF_READY) =
-        (g_gameClockMs
-         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_ROACH_READY_MS;
+    s->weapon    = NULL;
+    s->wantRange = AM2_ROACH_WANT_RANGE;
+    s->maxRange  = AM2_ROACH_MAX_RANGE;
+    s->ready     = (g_gameClockMs - o->deadline58) > AM2_ROACH_READY_MS;
 
-    *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
+    s->seed = (uint8_t)orig_region_rand();
 }
 
 
@@ -7317,90 +6959,75 @@ void __cdecl RoachBuildContext(void *obj, void *out)
  * yet, and the trooper band's coldness is the open question recorded in
  * STATUS.md rather than a property of this function.
  */
-void __cdecl AiStepAttach(void *obj, void *out)
+void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
 {
-    uint8_t  ctx[AM2_SIGHTC_BYTES];
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
+    AM2_SightCtx ctx;
 
-    if (!obj)
+    if (!o)
         return;
 
-    TrooperBuildContext(obj, ctx, 0);
+    TrooperBuildContext(o, &ctx, 0);
 
-    if (*(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        AiTrooperStep(obj, out, ctx);
+    if (ctx.destDist > AM2_AI_REACHED_DIST) {
+        o->dest = o->scriptPoint;
+        AiTrooperStep(o, out, &ctx);
     } else {
         int32_t r;
 
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
+        o->scriptPoint = g_zeroXY;
 
         r = orig_region_rand();
 
-        if (!(*(const int32_t *)(ctx + SIGHTC_OFF_LEADER)
-              && *(const int32_t *)(ctx + SIGHTC_OFF_LEAD_RANGE)
-                 <= AM2_AI_ATTACH_RANGE
+        if (!(ctx.leader
+              && ctx.leadRange <= AM2_AI_ATTACH_RANGE
               && (uint8_t)r)) {
-            int32_t army = (r & 1) ? (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+            int32_t army = (r & 1) ? (int32_t)o->owner
                                    : (r >> 1) % 4;
             /* The list is re-read from the table after the rand() call. */
 #define list ((uint8_t *)g_armyObjLists[army])
             if (*(const int32_t *)(list + LIST_OFF_COUNT) > 0) {
                 /* The modulus is taken from `army`'s count and the array from
                  * the object's OWN army. See the header: reproduced. */
-                int32_t idx = orig_region_rand()
-                              % *(const int32_t *)(list + LIST_OFF_COUNT);
-                uint8_t *t = (uint8_t *)LookupByUID(
+                int32_t     idx = orig_region_rand()
+                                  % *(const int32_t *)(list + LIST_OFF_COUNT);
+                AM2_Object *t   = LookupByUID(
                     (*(const uint32_t *const *)((uint8_t *)g_armyObjLists
-                        [*(const int8_t *)(o + OBJ_OFF_ARMY)] + LIST_OFF_UIDS))[idx]);
+                        [o->owner] + LIST_OFF_UIDS))[idx]);
 
-                if (t
-                    && ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                                  (const AM2_Point *)(t + OBJ_OFF_POS))
-                       < AM2_AI_ATTACH_RANGE)
-                    ObjAttachTo((AM2_Object *)obj, (AM2_Object *)t);
+                if (t && ApproxDist(&o->pos, &t->pos) < AM2_AI_ATTACH_RANGE)
+                    ObjAttachTo(o, t);
             }
 #undef list
         }
     }
 
-    if ((g_gameClockMs
-         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_AI_IDLE_TIMEOUT_MS
-        && *(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) < AM2_AI_REACHED_DIST) {
-        int32_t   army = *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1;
-        uint32_t  from = 0;
-        uint8_t  *rec  = (uint8_t *)LookupOwnerObj((uint32_t)army);
+    if ((g_gameClockMs - o->deadline58) > AM2_AI_IDLE_TIMEOUT_MS
+        && ctx.destDist < AM2_AI_REACHED_DIST) {
+        int32_t     army = o->field5A4 - 1;
+        uint32_t    from = 0;
+        AM2_Object *rec  = (AM2_Object *)LookupOwnerObj((uint32_t)army);
 
         if (rec)
-            from = *(const uint32_t *)(rec + 4);
+            from = rec->uid;
 
         if (g_mpSession
-            && !AM2_THE_COMM->CommMustBroadcast(
-                                  (int16_t)army)) {
-            DamageBroadcast(obj, from, AM2_AI_TIMEOUT_DAMAGE, 3,
-                            o + OBJ_OFF_POS, 0);
-            DamageObject(obj, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 1);
+            && !AM2_THE_COMM->CommMustBroadcast((int16_t)army)) {
+            DamageBroadcast(o, from, AM2_AI_TIMEOUT_DAMAGE, 3, &o->pos, 0);
+            DamageObject(o, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 1);
         } else {
-            DamageObject(obj, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 0);
+            DamageObject(o, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 0);
         }
     } else {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(ctx + SIGHTC_OFF_DEST);
-        AiTrooperStep(obj, out, ctx);
+        o->dest = ctx.dest;
+        AiTrooperStep(o, out, &ctx);
 
-        if (g_gameClockMs
-                - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
-            > AM2_AI_STATE_MS)
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = AM2_AI_STATE_STALE;
+        if (g_gameClockMs - o->deadline58 > AM2_AI_STATE_MS)
+            out->state = AM2_AI_STATE_STALE;
         else
-            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = AM2_AI_STATE_RECENT;
+            out->state = AM2_AI_STATE_RECENT;
     }
 
-    *(uint16_t *)(o + OBJ_OFF_REGION) =
-        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+    o->region = kRegionOfCell[o->tile];
 }
 
 
@@ -7456,152 +7083,119 @@ void __cdecl AiStepAttach(void *obj, void *out)
  * reached it through an orig_ai_fill seam until now -- so its counter cannot
  * move and tools/blindspots.py will say so.
  */
-void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
+void __cdecl TrooperBuildContext(AM2_Object *o, AM2_SightCtx *c, int32_t sarge)
 {
-    uint8_t  *o = (uint8_t *)obj;
-    uint8_t  *c = (uint8_t *)ctx;
-    uint32_t  anchor;
-    uint8_t  *L, *T, *V;
+    AM2_Point   anchor;
+    AM2_Object *L, *T, *V;
 
-    if (!obj)
+    if (!o)
         return;
 
-    anchor = ObjAnchorPoint(obj);
-    memset(ctx, 0, AM2_SIGHTC_BYTES);
-    *(int32_t *)(c + SIGHTC_OFF_FIELD_00) = ClassifyByCode74(obj);
+    anchor = ObjAnchorPoint(o);
+    memset(c, 0, sizeof *c);
+    c->klass = ClassifyByCode74(o);
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID)) {
-        L = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID));
-        *(void **)(c + SIGHTC_OFF_LEADER) = L;
+    if (o->followUid) {
+        L = LookupByUID(o->followUid);
+        c->leader = L;
 
         if (!L) {
-            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+            o->followUid = 0;
         } else {
-            uint32_t f    = *(const uint32_t *)(L + OBJ_OFF_FLAGS);
+            uint32_t f    = L->flags;
             int32_t  drop = 0;
 
             if (f & OBJ_FLAG_CONCEALED)
                 drop = 1;
-            else if (*(const int16_t *)(L + OBJ_OFF_HEALTH) == 0)
+            else if (L->health == 0)
                 drop = 1;
             else if (f & OBJ_FLAG_DESTROYED) {
-                if (ObjIsType2((const AM2_Object *)L)
-                    && !*(const uint32_t *)(
-                           *(uint8_t **)(c + SIGHTC_OFF_LEADER) + OBJ_OFF_RIDING))
+                if (ObjIsType2(L) && !c->leader->riding)
                     drop = 1;
-                else if (ObjIsType3((const AM2_Object *)
-                                    *(uint8_t **)(c + SIGHTC_OFF_LEADER)))
+                else if (ObjIsType3(c->leader))
                     drop = 1;
             }
             if (drop) {
-                *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
-                *(void **)(c + SIGHTC_OFF_LEADER)     = NULL;
+                o->followUid = 0;
+                c->leader    = NULL;
             }
 
             /* Inside the else: a leader that never resolved jumps straight
-             * past this, as the image's `jmp` over it does. */
-#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
-            /* Read from the context at every use, not held. */
-            if (LEAD) {
-                if (ObjsAreAllied((const AM2_Object *)obj, (const AM2_Object *)LEAD, 1)
-                    && ObjIsTypeIn238((const AM2_Object *)LEAD)) {
-                    ResolveFormationPoint(obj, LEAD,
-                                          (AM2_Point *)(c + SIGHTC_OFF_DEST));
+             * past this, as the image's `jmp` over it does. The leader is
+             * read from the context at every use, not held. */
+            if (c->leader) {
+                if (ObjsAreAllied(o, c->leader, 1)
+                    && ObjIsTypeIn238(c->leader)) {
+                    ResolveFormationPoint(o, c->leader, &c->dest);
                 } else {
-                    *(uint32_t *)(c + SIGHTC_OFF_DEST) =
-                        *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-                    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-                        *(const uint32_t *)(LEAD + OBJ_OFF_OWNER);
+                    c->dest      = c->leader->pos;
+                    o->targetUid = c->leader->uid;
                 }
-#undef LEAD
-                DistAndAngle((const AM2_Point *)&anchor,
-                             (const AM2_Point *)(c + SIGHTC_OFF_DEST),
-                             (int32_t *)(c + SIGHTC_OFF_LEAD_RANGE),
-                             c + SIGHTC_OFF_LEAD_BEARING);
+                DistAndAngle(&anchor, &c->dest, &c->leadRange,
+                             &c->leadBearing);
             }
         }
     }
 
-    if (*(const uint32_t *)(o + OBJ_OFF_TARGET_UID)) {
-        T = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_TARGET_UID));
-        *(void **)(c + SIGHTC_OFF_OBSERVER) = T;
+    if (o->targetUid) {
+        T = LookupByUID(o->targetUid);
+        c->observer = T;
 
         if (!T) {
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-        } else if (*(const uint32_t *)(T + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP) {
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
-        } else if (*(const int16_t *)(T + OBJ_OFF_HEALTH) == 0) {
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
-        } else if (ObjIsItem((const AM2_Object *)T)
-                   && *(const int16_t *)(
-                          *(uint8_t **)(c + SIGHTC_OFF_OBSERVER)
-                          + OBJ_OFF_HEALTH) < 0) {
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
-        } else if (ObjIsType4((const AM2_Object *)
-                              *(uint8_t **)(c + SIGHTC_OFF_OBSERVER))) {
-            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
+            o->targetUid = 0;
+        } else if (T->flags & AM2_SIGHT_DROP) {
+            o->targetUid = 0;
+            c->observer  = NULL;
+        } else if (T->health == 0) {
+            o->targetUid = 0;
+            c->observer  = NULL;
+        } else if (ObjIsItem(T) && c->observer->health < 0) {
+            o->targetUid = 0;
+            c->observer  = NULL;
+        } else if (ObjIsType4(c->observer)) {
+            o->targetUid = 0;
+            c->observer  = NULL;
         } else {
             const AM2_RankRec *rank;
 
-            DistAndAngle((const AM2_Point *)&anchor,
-                         (const AM2_Point *)(
-                             *(uint8_t **)(c + SIGHTC_OFF_OBSERVER)
-                             + OBJ_OFF_POS),
-                         (int32_t *)(c + SIGHTC_OFF_RANGE),
-                         c + SIGHTC_OFF_BEARING);
+            DistAndAngle(&anchor, &c->observer->pos, &c->range, &c->bearing);
 
-            rank = &g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)];
+            rank = &g_rankRecords[o->rank];
 
-            if (*(const int32_t *)(c + SIGHTC_OFF_RANGE)
-                > (rank->sight_range << 1))
-                *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            if (c->range > (rank->sight_range << 1))
+                o->targetUid = 0;
         }
     }
 
-    if (*(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
-        V = (uint8_t *)LookupType3ByUID(
-                *(const uint32_t *)(o + OBJ_OFF_UID_56C));
-        *(void **)(c + SIGHTC_OFF_VEHICLE) = V;
+    if (o->uid56C) {
+        V = LookupType3ByUID(o->uid56C);
+        c->vehicle = V;
 
         if (!V)
-            *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+            o->uid56C = 0;
         else
-            *(int32_t *)(c + SIGHTC_OFF_VEHICLE_DIST) =
-                ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)(V + OBJ_OFF_POS));
+            c->vehicleDist = ApproxDist(&o->pos, &V->pos);
     }
 
-    if (g_gameClockMs
-        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
+    if (g_gameClockMs >= (uint32_t)o->fieldFC)
         /* SightScan's sixth argument is the SARGE flag, ARG3 of this function
          * (espmap: `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the anchor
          * at [esp+0x18]). It gates the weapon arm and the hittable-vs-live
          * predicate, so only Sarge scans for weapons to pick up. Passing
          * `anchor` (a packed point, always non-zero) made every follower target
          * and fire at nearby weapons when no enemy was in sight. */
-        *(int32_t *)(c + SIGHTC_OFF_FOUND) =
-            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(c + SIGHTC_OFF_FOUND_RANGE),
-                             c + SIGHTC_OFF_FOUND_BEARING,
-                             (int32_t *)(o + OBJ_OFF_FIELD_114), (int32_t *)(o + OBJ_OFF_FIELD_110),
-                             sarge);
+        c->found = SightScan(o, &c->foundRange, &c->foundBearing,
+                             &o->field114, &o->field110, sarge);
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-        *(int32_t *)(c + SIGHTC_OFF_DEST_DIST) =
-            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+    if ((uint16_t)o->scriptPoint.x)
+        c->destDist = ApproxDist(&o->pos, &o->scriptPoint);
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_FRAME))
-        *(int32_t *)(c + SIGHTC_OFF_DEST_DIST_B) =
-            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_FRAME));
+    if ((uint16_t)o->goalPoint.x)
+        c->destDistB = ApproxDist(&o->pos, &o->goalPoint);
 
-    UnitWeaponInfo(obj, ctx);
+    UnitWeaponInfo(o, c);
 
-    *(uint8_t *)(c + SIGHTC_OFF_SEED) = (uint8_t)orig_region_rand();
+    c->seed = (uint8_t)orig_region_rand();
 
     /* The third argument is DEAD in the original and the callers vary it
      * anyway -- SargeAiStep passes 1, the other two pass 0. Proved by frame
@@ -7643,27 +7237,19 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
  * here said "its counter can move: the caller is original" until the ratchet
  * pointed out that the caller is ours.
  */
-void __cdecl RoachAliveStepA(void *obj, void *out)
+void __cdecl RoachAliveStepA(AM2_Object *o, AM2_RoachOut *out)
 {
-    uint8_t  ctx[AM2_ROACH_CONTEXT_BYTES];
-    uint8_t *o = (uint8_t *)obj;
+    AM2_RoachCtx ctx;
 
-    if (!obj)
+    if (!o)
         return;
 
-    /* A DWORD 1 at +0x14, so it sets SIGHTCOUT_OFF_X to 1 and
-     * SIGHTCOUT_OFF_Y to 0 in one store -- those two are int16 and
-     * ConsiderSightingC writes them separately, which is what establishes the
-     * names. Written as the single store the original makes. This line said
-     * SIGHTCOUT_OFF_SEEN until the bytes were checked against the name: that
-     * is +0x10, reads perfectly in context, and is four bytes wrong. */
-    *(int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_X) = 1;
+    out->state = 1;
 
-    RoachBuildContext(obj, ctx);
-    RoachBehaviour(obj, out, ctx);
+    RoachBuildContext(o, &ctx);
+    RoachBehaviour(o, out, &ctx);
 
-    *(uint16_t *)(o + OBJ_OFF_REGION) =
-        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+    o->region = kRegionOfCell[o->tile];
 }
 
 
@@ -7754,120 +7340,100 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
  * The follow arm dereferences LookupByUID's answer with no null test, which is
  * the original's; reproduced.
  */
-void __cdecl Type2PlayerStep(void *obj, void *out)
+void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
 {
-    uint8_t *o    = (uint8_t *)obj;
-    uint8_t *w    = (uint8_t *)out;
-    uint8_t *dest;
-    uint8_t  ctx[AM2_SIGHTC_BYTES];
-    uint32_t uid;
-    int32_t  i;
+    AM2_Point   *dest;
+    AM2_SightCtx ctx;
+    uint32_t     uid;
+    int32_t      i;
 
     /* The class, into the field AiTrooperStep reads. See the note above on
      * the pending push that made this look like +4. */
-    *(int32_t *)(ctx + SIGHTC_OFF_FIELD_00) = ClassifyByCode74(obj);
+    ctx.klass = ClassifyByCode74(o);
 
-    uid = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+    uid = o->uid56C;
     if (uid) {
-        uint8_t *veh = (uint8_t *)LookupType3ByUID(uid);
+        AM2_Object *veh = LookupType3ByUID(uid);
 
         if (!veh) {
-            *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
-        } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                              (const AM2_Point *)(veh + OBJ_OFF_POS))
-                       < AM2_BOARD_NEAR
-                   || (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                                  (const AM2_Point *)(veh + OBJ_OFF_POS))
-                           < AM2_BOARD_FAR
-                       && *(const int32_t *)(veh + OBJ_OFF_TABLE_REC_KIND)
-                          == 5)) {
-            EnterVehicle(obj, veh);
+            o->uid56C = 0;
+        } else if (ApproxDist(&o->pos, &veh->pos) < AM2_BOARD_NEAR
+                   || (ApproxDist(&o->pos, &veh->pos) < AM2_BOARD_FAR
+                       && veh->vehicleKind == 5)) {
+            EnterVehicle(o, veh);
             return;
         }
     }
 
-    dest = o + OBJ_OFF_FIELD_C0;
-    if (*(const int16_t *)dest != 0) {
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
-            AiTrooperStep(obj, o + OBJ_OFF_SIGHT_OUT_T2, ctx);
+    dest = &o->dest;
+    if (dest->x != 0) {
+        if (o->field10C) {
+            AiTrooperStep(o, &o->sight, &ctx);
 
-            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                           (const AM2_Point *)dest) < AM2_AI_REACHED_DIST) {
-                *(int32_t *)(w + 8) = 1;
-                *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+            if (ApproxDist(&o->pos, dest) < AM2_AI_REACHED_DIST) {
+                out->state  = 1;
+                o->field10C = 0;
             }
-        } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                              (const AM2_Point *)dest)
-                   > AM2_WALK_START_DIST) {
-            if (g_gameClockMs
-                    - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
-                > AM2_WALK_TURN_MS) {
-                uint8_t a = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                         (const AM2_Point *)dest);
+        } else if (ApproxDist(&o->pos, dest) > AM2_WALK_START_DIST) {
+            if (g_gameClockMs - o->deadlineD0 > AM2_WALK_TURN_MS) {
+                uint8_t a = AngleBetween(&o->pos, dest);
 
-                *(uint8_t *)(w + 4) = a;
-                *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)a;
+                out->bearing = a;
+                o->field574  = (int16_t)a;
             }
-            *(int32_t *)(w + 8) = 2;
+            out->state = 2;
         }
 
-        if (!*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
-            *(uint32_t *)dest =
-                g_zeroPoint;
+        if (!o->field10C)
+            *dest = g_zeroXY;
     }
 
-    if (*(const int32_t *)(w + 8) == 2)
-        *(int32_t *)(w + 8) =
-            (HeldWeaponCode(obj) == AM2_POSE_WEAPON_CODE)
+    if (out->state == 2)
+        out->state =
+            (HeldWeaponCode(o) == AM2_POSE_WEAPON_CODE)
                 ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
 
-    if (RowAnimField4(*(const void *const *)(o + OBJ_OFF_ROWS),
+    if (RowAnimField4(o->rowSet.rows,
                       (uint16_t)*(const int16_t *)((const uint8_t *)g_weaponPoseFrames
-                               + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0)
+                               + (uint32_t)out->state * 4)) <= 0)
         return;
 
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
      * spells the same two fields as AM2_MousePress, privately. */
-    if (orig_get_tick_count()
-            - (g_mousePress)[1]
-        > AM2_VIEW_SNAP_MS
-        && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
+    if (orig_get_tick_count() - (g_mousePress)[1] > AM2_VIEW_SNAP_MS
+        && !o->field10C) {
         g_viewSnap  = 1;
         g_objCtxSet = 1;
     }
 
-    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
+    if (!(o->flags & OBJ_FLAG_SELECTED))
         return;
 
     for (i = 0; i < g_selectedCount; i++) {
-        uint8_t *other = (uint8_t *)LookupByUID(
-            (g_selectedItems)[i]);
+        AM2_Object *other = LookupByUID((g_selectedItems)[i]);
 
         if (!other || other == o)
             continue;
-        if (*(const uint32_t *)(other + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        if (other->flags & OBJ_FLAG_DESTROYED)
             continue;
-        if (*(const int16_t *)(other + OBJ_OFF_HEALTH) == 0)
+        if (other->health == 0)
             continue;
-        if (!ObjIsTypeIn238((const AM2_Object *)other))
+        if (!ObjIsTypeIn238(other))
             continue;
-        if (*(const int32_t *)(other + OBJ_OFF_FIELD_94) != 0)
+        if (other->field94 != 0)
             continue;
 
-        if (ObjIsType2((const AM2_Object *)other)
-            && *(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
-            const uint8_t *veh = (const uint8_t *)LookupByUID(
-                *(const uint32_t *)(o + OBJ_OFF_UID_56C));
+        if (ObjIsType2(other) && o->uid56C) {
+            const AM2_Object *veh = LookupByUID(o->uid56C);
 
-            *(int32_t *)(other + OBJ_OFF_AI_MODE) = 0;
-            *(uint32_t *)(other + OBJ_OFF_UID_56C) =
-                *(const uint32_t *)(o + OBJ_OFF_UID_56C);
-            PointActionA(other, *(const uint32_t *)(veh + OBJ_OFF_POS));
+            other->aiMode = 0;
+            other->uid56C = o->uid56C;
+            PointActionA(other, veh->pos);
             continue;
         }
 
-        *(int32_t *)(other + OBJ_OFF_AI_MODE) = 3;
-        ObjAttachTo((AM2_Object *)other, (AM2_Object *)obj);
+        other->aiMode = 3;
+        ObjAttachTo(other, o);
     }
 }
 
@@ -7902,14 +7468,14 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * OBJ_OFF_SIGHT_OUT_T2 -- written through the OBJECT, as the original does,
  * rather than through the `sight` argument the two callers happen to point at
  * the same place. */
-static inline void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
+static inline void TrooperFaceTo(AM2_Object *o, const AM2_Point *to)
 {
-    uint8_t f = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), to);
+    uint8_t f = AngleBetween(&o->pos, to);
 
-    *(uint8_t *)(o + OBJ_OFF_FACING) = f;
-    *(uint8_t *)(o + OBJ_OFF_SIGHT_OUT_T2 + SIGHTCOUT_OFF_BEARING) = f;
-    *(uint8_t *)(o + OBJ_OFF_FACING_COPY) = f;
-    *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)f;
+    o->facing        = f;
+    o->sight.bearing = f;
+    o->facingCopy    = f;
+    o->field574      = (int16_t)f;
 }
 
 /* FireWeapon AS THIS FILE'S ORIGINAL DECLARED IT: the heading a byte. The
@@ -7987,35 +7553,31 @@ static inline void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
  * COLD IN EVERY CONFIGURATION HERE. Nothing in a Boot Camp drive shoots, so
  * this is verified by reading and by a clean A/B saying nothing else moved.
  */
-void __cdecl TrooperFire(void *obj, void *held, void *sight)
+void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
 {
-    uint8_t     *o     = (uint8_t *)obj;
-    uint8_t     *out   = (uint8_t *)sight;
-    uint8_t     *w;
-    const uint8_t *def;
-    uint8_t     *target;
-    AM2_FireSpot spot;
-    int32_t      kind;
-    int32_t      ready;
-    int32_t      remote;
-    int32_t      fired;
-    uint8_t      heading;
+    AM2_Object         *w;
+    const AM2_ItemType *def;
+    AM2_Object         *target;
+    AM2_FireSpot        spot;
+    int32_t             kind;
+    int32_t             ready;
+    int32_t             remote;
+    int32_t             fired;
+    uint8_t             heading;
 
-    if (*(const int32_t *)(out + SIGHTCOUT_OFF_HIT) == 0
-        && *(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) == 0)
+    if (out->hit == 0 && out->seen == 0)
         return;
 
-    if (*(const uint32_t *)(out + SIGHTCOUT_OFF_WEAPON_UID) != 0)
-        w = (uint8_t *)WeaponByUid(
-                *(const int32_t *)(out + SIGHTCOUT_OFF_WEAPON_UID));
+    if (out->weaponUid != 0)
+        w = WeaponByUid(out->weaponUid);
     else
-        w = (uint8_t *)held;
+        w = held;
 
-    if (w == (uint8_t *)0)
+    if (w == (AM2_Object *)0)
         return;
 
-    def  = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
-    kind = *(const int32_t *)(def + ITEMTYPE_OFF_KIND);
+    def  = w->itemType;
+    kind = def->kind;
 
     switch (kind) {
     case AM2_ITEM_KIND_MSWP:
@@ -8028,18 +7590,13 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         break;                       /* these leave the trooper's state alone */
 
     default:
-        if (o != (uint8_t *)0
-            && *(const int32_t *)(o + OBJ_OFF_FIELD_530)
-               != AM2_TROOP_STATE_NONE) {
-#define rec (*(void *const *)(o + OBJ_OFF_TABLE_REC_SLOT))
-
-            *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_TROOP_STATE_NONE;
-            *(void **)(o + OBJ_OFF_TABLE_REC_KIND) = rec;
-            *(void **)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
-            /* The record just moved to TABLE_REC_KIND -- the slot was zeroed
-             * on the line above, so re-reading it here would hand on 0. */
-            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
-                          *(void *const *)(o + OBJ_OFF_TABLE_REC_KIND));
+        if (o != (AM2_Object *)0 && o->field530 != AM2_TROOP_STATE_NONE) {
+            o->field530  = AM2_TROOP_STATE_NONE;
+            o->tableRec2 = o->tableRec3;
+            o->tableRec3 = 0;
+            /* The record just moved to tableRec2 -- tableRec3 was zeroed on
+             * the line above, so re-reading it here would hand on 0. */
+            SetFieldInAll(&o->rowSet, (void *)o->tableRec2);
         }
         break;
     }
@@ -8049,21 +7606,16 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
      * arrive over the wire rather than being decided here. Computed before
      * anything is fired and read again at the very bottom. */
     remote = 0;
-    if (g_mpSession
-        && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+    if (g_mpSession && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner))
         remote = 1;
 
     /* Unsigned, as the original's `cmp`/`sbb`/`neg` is. */
-    def   = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
-    ready = (*(const uint32_t *)(def + ITEMTYPE_OFF_COOLDOWN)
-             < (uint32_t)(g_gameClockMs
-                          - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)))
-            ? 1 : 0;
+    def   = w->itemType;
+    ready = (def->cooldown < (uint32_t)(g_gameClockMs - w->lastUse)) ? 1 : 0;
 
     SelectFirePose(o, w, out, ready);
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_578) = 1;
+    o->field578 = 1;
 
     if (!remote) {
         if (!ready)
@@ -8072,60 +7624,54 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
             return;
     }
 
-    *(int32_t *)(out + SIGHTCOUT_OFF_SEEN) = 0;
+    out->seen = 0;
 
-    if (!g_mpSession
-        || AM2_THE_COMM->CommMustBroadcast(
-                             (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
-        *(int32_t *)out = 0;
-        *(uint8_t *)(o + TROOPER_OFF_FIRE_FLAG) = (uint8_t)orig_game_rand();
+    if (!g_mpSession || AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)) {
+        out->field00 = 0;
+        o->fireFlag  = (uint8_t)orig_game_rand();
     }
 
-    *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 0;
-    *(uint32_t *)(w + ITEM_OFF_LAST_USE) =
-        g_gameClockMs;
+    out->hit   = 0;
+    w->lastUse = g_gameClockMs;
 
-    target = (uint8_t *)LookupByUID(*(const uint32_t *)(out + SIGHTCOUT_OFF_UID));
+    target = LookupByUID(out->uid);
 
-    if (target != (uint8_t *)0) {
+    if (target != (AM2_Object *)0) {
         int16_t z;
 
-        spot.at.x = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
-        spot.at.y = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
+        spot.at.x = target->pos.x;
+        spot.at.y = target->pos.y;
         z = (int16_t)(int8_t)((uint8_t)ObjHeight(target) - AM2_FIRE_HEIGHT_DROP);
 
-        *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at.x;
-        *(uint16_t *)(o + UNIT_OFF_FIRE_Y) = (uint16_t)spot.at.y;
-        *(int16_t *)(o + UNIT_OFF_FIRE_Z)  = z;
+        /* The trooper's own sight record takes the aim point, whichever
+         * record the caller passed. */
+        o->sight.spot.at.x   = spot.at.x;
+        o->sight.spot.at.y   = spot.at.y;
+        o->sight.spot.ground = z;
         spot.ground = z;
 
-        def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+        def = w->itemType;
         /* One jitter after the optional turn: both kind tests branch to the
          * same JitterFacing at 0x0044A1C2. */
-        if (*(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI
-            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
-            TrooperFaceTo(o, (const AM2_Point *)(target + OBJ_OFF_POS));
-        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+        if (def->kind != AM2_ITEM_KIND_MEDI && def->kind != AM2_ITEM_KIND_WREN)
+            TrooperFaceTo(o, &target->pos);
+        heading = JitterFacing(w, o->facing);
         fired = FireWeaponB(w, o, ObjHeight(o), heading, spot, target);
     } else {
-        const uint8_t *at = out + SIGHTCOUT_OFF_X;
+        const AM2_FireSpot *at = &out->spot;
 
-        if (*(const int16_t *)at != 0
-            && ObjCodeUnmapped(w))
-        {
+        if (at->at.x != 0 && ObjCodeUnmapped(w)) {
             /* Turned to face it only when it is somewhere else: a point
              * we are standing on still gets fired at, unturned. The
              * image's PointsDiffer `je` lands on the jitter below, not on
              * the no-point arm -- this was once one condition, which sent
              * that case one weapon-range down the heading instead. */
-            if (PointsDiffer(*(const uint32_t *)(o + OBJ_OFF_POS),
-                             *(const uint32_t *)at))
-                TrooperFaceTo(o, (const AM2_Point *)at);
-            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
-            fired = FireWeaponB(w, o, ObjHeight(o), heading,
-                                *(const AM2_FireSpot *)at, 0);
+            if (PointsDiffer(o->pos, at->at))
+                TrooperFaceTo(o, &at->at);
+            heading = JitterFacing(w, o->facing);
+            fired = FireWeaponB(w, o, ObjHeight(o), heading, *at, 0);
         } else {
-            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            heading = JitterFacing(w, o->facing);
 
             /* No point at all: put the impact one weapon-range away along
              * the heading. Plain float arithmetic, as the original wrote it
@@ -8135,39 +7681,29 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
              * no rounding to float between the two. Only the low sixteen
              * bits are stored, as the `mov word` says.
              *
-             * The definition pointer is re-read between the two, which is
-             * the original's spelling and not a second value. */
-            if (*(const int16_t *)at == 0) {
-                *(int16_t *)(o + UNIT_OFF_FIRE_X) = (int16_t)(int32_t)
-                    (Cos8(heading)
-                     * *(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
-                     + *(const int16_t *)(o + OBJ_OFF_X));
-
-                *(int16_t *)(o + UNIT_OFF_FIRE_Y) = (int16_t)(int32_t)
-                    (Sin8(heading)
-                     * *(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
-                     + *(const int16_t *)(o + OBJ_OFF_Y));
+             * The type record is re-read between the two, which is the
+             * original's spelling and not a second value. */
+            if (at->at.x == 0) {
+                o->sight.spot.at.x = (int16_t)(int32_t)
+                    (Cos8(heading) * w->itemType->range + o->pos.x);
+                o->sight.spot.at.y = (int16_t)(int32_t)
+                    (Sin8(heading) * w->itemType->range + o->pos.y);
             }
-            fired = FireWeaponB(w, o, ObjHeight(o), heading,
-                                *(const AM2_FireSpot *)at, 0);
+            fired = FireWeaponB(w, o, ObjHeight(o), heading, *at, 0);
         }
     }
 
-    orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n",
-             *(const int32_t *)(o + OBJ_OFF_UID),
-             *(const int32_t *)(w + OBJ_OFF_UID),
-             *(const int32_t *)(w + ITEM_OFF_AMMO));
+    orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n", o->uid, w->uid, w->ammo);
 
     if (g_mpSession) {
         if (!remote)
             TrooperFireSend(o, w);
         else
-            *(uint32_t *)(w + WEAPON_OFF_FLAGS) &= ~AM2_WEAPON_FLAG_FIRED;
+            w->flags &= ~AM2_WEAPON_FLAG_FIRED;
     }
 
     if (fired)
-        UseInventoryItem(o, *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL));
-#undef rec
+        UseInventoryItem(o, o->inventorySel);
 }
 
 /* UpdateTrooperAction -- original 0x0044AFB0, 2,080 bytes, four callers, all
@@ -8205,12 +7741,11 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
  * THE TAIL SWITCHES ON A RELOADED FIELD. StepObjRows answers nothing -- the
  * three-way test after it reads the ROW's animation frame, which that call has
  * just advanced. */
-void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
+void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
+                                 AM2_SightOut *out)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *w = (uint8_t *)out;
-    uint8_t *at;
-    uint8_t *pos;
+    AM2_Object      *at;
+    const AM2_Point *pos;
     int32_t  klass;
     int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
@@ -8220,88 +7755,78 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     int32_t  pose;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
-    uint32_t stepPoint;
+    AM2_Point stepPoint;
     int32_t  d;                /* the enforced turn's delta, taken first */
 
     klass = ClassifyByCode74(o);
-    pos = o + OBJ_OFF_POS;
-    stepPoint = *(const uint32_t *)pos;
-    if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
+    pos = &o->pos;
+    stepPoint = *pos;
+    if (!o->health)
         goto pose;
 
     /* Outside a session, or for an army the comm object does not own, ask how
      * long the facing has been stable; a trooper that has just turned keeps
      * the facing it turned to. */
-    if (g_mpSession
-        && !AM2_THE_COMM->CommMustBroadcast(
-                           (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
+    if (g_mpSession && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)) {
         found = 1;
     } else {
-        found = (uint32_t)(g_gameClockMs
-                             - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
-                  > AM2_TROOPER_SETTLE_MS;
+        found = (uint32_t)(g_gameClockMs - o->deadlineD0) > AM2_TROOPER_SETTLE_MS;
         if (!found)
-            *(o + OBJ_OFF_FIELD_580) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+            o->sight.bearing = o->facing;
     }
 
     /* A row still mid-animation, or one whose animation says so, stops the
      * whole step: take whatever is under the trooper and go to the tail. */
-    if (*(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) + 0x3C) <= 0
-        && RowAnimField4(*(uint8_t *const *)(o + OBJ_OFF_ROWS),
-                         (uint16_t)*(const int16_t *)(
-                             (const uint8_t *)g_weaponPoseFrames
-                             + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0) {
-        *(int16_t *)(o + OBJ_OFF_FIELD_D6) = 0;
-        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = 0;
-        at = (uint8_t *)ObjectsAtPoint((const uint32_t *)pos,
-                                       g_objMapDesc);
+    if (o->rowSet.rows->field3C <= 0
+        && RowAnimField4(o->rowSet.rows,
+                         (uint16_t)*(const int16_t *)
+                             &g_weaponPoseFrames[out->state]) <= 0) {
+        o->fieldD6     = 0;
+        o->stuckCount  = 0;
+        at = (AM2_Object *)ObjectsAtPoint((const AM2_Point *)pos, g_objMapDesc);
         goto settle_facing;
     }
 
     /* Four states become two while the object is still moving. */
     {
-        int32_t st = *(const int32_t *)(w + 8);
+        int32_t st = out->state;
 
         if (st == 2 || st == 3 || st == 0x26 || st == 0x12) {
-            *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+            o->field578 = 0;
             switch (klass) {        /* `dec; je; dec; jne` in the image */
             case 1:
-                *(int32_t *)(w + 8) = 8;
+                out->state = 8;
                 break;
             case 2:
-                *(int32_t *)(w + 8) = 9;
+                out->state = 9;
                 break;
             }
         }
     }
 
-    facing = *(const uint8_t *)(w + 4);
+    facing = out->bearing;
 
     /* An enforced turn, at most one a second and only so far: the delta
      * between where the trooper faces and where it is being sent decides
      * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
-    d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
-    if ((uint32_t)*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT)
-        > (uint32_t)g_gameClockMs) {
+    d = AngleDelta(o->facing, facing);
+    if ((uint32_t)o->stuckCount > (uint32_t)g_gameClockMs) {
         if (d > AM2_TROOPER_TURN_ARC) {
-            facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
-                               + AM2_TROOPER_TURN_STEP);
+            facing = (uint8_t)(o->facing + AM2_TROOPER_TURN_STEP);
         } else if (d < -AM2_TROOPER_TURN_ARC) {
-            facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
-                               - AM2_TROOPER_TURN_STEP);
+            facing = (uint8_t)(o->facing - AM2_TROOPER_TURN_STEP);
         } else {
             goto have_facing;
         }
-        ++*(o + OBJ_OFF_FIELD_D4);
+        ++o->fieldD4;
     }
 
 have_facing:
-    at   = (uint8_t *)0;
-    pose = ObjNextKind538(o, *(const int32_t *)(w + 8));
+    at   = (AM2_Object *)0;
+    pose = ObjNextKind538(o, out->state);
     i    = 0;
     AnimStepPoint(o, facing, pose, &stepPoint, 0);
-    at = (uint8_t *)ObjectsAtPoint(&stepPoint,
-                                   g_objMapDesc);
+    at = (AM2_Object *)ObjectsAtPoint(&stepPoint, g_objMapDesc);
     /* Walkable: take this heading and step, with no sweep at all -- the
      * `i == 0` arm of the dispatch below (0x0044B14B jumps straight to it),
      * so none of the stop arms runs on a clear step. */
@@ -8317,17 +7842,17 @@ have_facing:
      * in the list leaves `at` null. That is what an exhausted sweep then
      * hands the item walk below: nothing, where a separate cursor had left
      * the last swept cell's objects to be picked over. */
-    if (*(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
+    if (o->uid56C) {
         /* Something is claimed: search the blocked cell for it, then sweep.
          * The stop arms are this test's ELSE, laid out after the sweep and
          * jumping back into it (0x0044B159 -> 0x0044B299). */
         {
-            uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+            uint32_t claimed = o->uid56C;
 
             while (at) {
-                if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
+                if (at->uid == claimed)
                     goto board;
-                at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+                at = at->queryNext;
             }
         }
 
@@ -8340,10 +7865,9 @@ sweep:
          * Field548's VALUE against the owner, which matched only sometimes, so
          * Sarge alternately swept three headings and six. */
         tries = AM2_STEP_SWEEP_OTHER;
-        if (ObjType2Field548((const AM2_Object *)o)
-            && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-                   == (int32_t)g_defaultOwner
-            && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
+        if (ObjType2Field548(o)
+            && (int32_t)o->owner == (int32_t)g_defaultOwner
+            && !o->field10C)
             tries = AM2_STEP_SWEEP_PLAYER;
         {
             const int32_t *step = g_stepFacingSweep;
@@ -8356,19 +7880,19 @@ sweep:
 
             while (facing = (uint8_t)(facing + (uint8_t)*step),
                    AnimStepPoint(o, facing, pose, &stepPoint, 0),
-                   (at = (uint8_t *)ObjectsAtPoint(&stepPoint, g_objMapDesc)),
+                   (at = (AM2_Object *)ObjectsAtPoint(&stepPoint, g_objMapDesc)),
                    BlockWeightRoute(o, stepPoint, at, &inside)
                        >= AM2_STEP_ROUTE_OK) {
                 {
-                    uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+                    uint32_t claimed = o->uid56C;
 
                     if (claimed)
                         while (1) {
                             if (!at)
                                 break;
-                            if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
+                            if (at->uid == claimed)
                                 goto board;
-                            at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+                            at = at->queryNext;
                         }
                 }
                 i++;
@@ -8390,18 +7914,17 @@ sweep:
         if (ObjKind538In10To17(o)) {
             turned = 1;
             speed  = 0;
-            *(w + 4) = facing;
-        } else if (*(const int32_t *)(w + 0x0C)
+            out->bearing = facing;
+        } else if (out->hit
                    || !found
                    || (g_mpSession
-                       && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
-                       && ObjType2Field548((const AM2_Object *)o))) {
+                       && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
+                       && ObjType2Field548(o))) {
             /* One block; VC6 copies it into each of the three tests. */
-            *(int32_t *)(w + 8) = 1;
-            turned = 1;
-            *(w + 4) = facing;
-            speed  = 0;
+            out->state   = 1;
+            turned       = 1;
+            out->bearing = facing;
+            speed        = 0;
         } else {
             goto sweep;
         }
@@ -8417,7 +7940,7 @@ swept:
     /* One dispatch for every way out of the step and the sweep. */
     if (i == 0) {
         speed = 0;
-        *(w + 4) = facing;
+        out->bearing = facing;
         goto settle_facing;
     }
     if (i < tries) {
@@ -8427,19 +7950,16 @@ swept:
         int16_t acc;
 
         speed  = 0;
-        *(w + 4) = facing;
-        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) =
-            (int32_t)(g_gameClockMs
-                      + AM2_TROOPER_TURN_MS);
-        *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
-            (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                                *(w + 4));   /* read back, as stored */
-        acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+        out->bearing  = facing;
+        o->stuckCount = (int32_t)(g_gameClockMs + AM2_TROOPER_TURN_MS);
+        o->fieldD6   += (int16_t)AngleDelta(o->facing,
+                                            out->bearing);   /* read back, as stored */
+        acc = o->fieldD6;
         if (acc > 0x100)
-            *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc - 0x100);
-        acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+            o->fieldD6 = (int16_t)(acc - 0x100);
+        acc = o->fieldD6;
         if (acc < (int16_t)0xFF00)
-            *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc + 0x100);
+            o->fieldD6 = (int16_t)(acc + 0x100);
         goto settle_facing;
     }
     /* Exhausted: nothing to walk toward. */
@@ -8449,10 +7969,9 @@ swept:
 
 settle_facing:
     /* A facing that actually changed stamps the settle clock. */
-    if (*(const uint8_t *)(o + OBJ_OFF_FACING) != *(const uint8_t *)(w + 4)) {
-        *(uint32_t *)(o + OBJ_OFF_DEADLINE_D0) =
-            g_gameClockMs;
-        *(o + OBJ_OFF_FACING) = *(const uint8_t *)(w + 4);
+    if (o->facing != out->bearing) {
+        o->deadlineD0 = g_gameClockMs;
+        o->facing     = out->bearing;
     }
     TrooperFire(o, weapon, out);
 
@@ -8460,7 +7979,7 @@ settle_facing:
      * onto, an item to ask for or take, something watched to reveal or bump,
      * and a healer arm. `found` says whether anything was there at all. */
     found = 0;
-    for (; at; at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT)) {
+    for (; at; at = at->queryNext) {
         int32_t slot, qty = 0;   /* slot is only read once CanPickUpWeapon fills it */
 
         if (at == o)
@@ -8470,18 +7989,16 @@ settle_facing:
         /* THE STEP-UP, and it shares its slot with the move value -- see
          * orig.h. Only an item, only one flagged by a negative
          * OBJ_OFF_RANK, and only one within 0x10 of our own height. */
-        if (ObjIsItem((const AM2_Object *)at)
-            && (int8_t)*(const uint8_t *)(at + OBJ_OFF_RANK) < 0) {
-            int32_t theirs = (int8_t)*(const uint8_t *)(at + OBJ_OFF_HEIGHT_SET);
-            int32_t ours   = (int8_t)*(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET);
+        if (ObjIsItem(at) && at->itemFlag < 0) {
+            int32_t theirs = at->heightSet;
+            int32_t ours   = o->heightSet;
             int32_t d      = theirs - ours;
 
             if (abs(d) <= AM2_TROOPER_STEP_UP)
                 speed = theirs;
         }
 
-        if (ObjType2Field548((const AM2_Object *)o)
-            && CanPickUpWeapon(at, o, &slot, &qty)) {
+        if (ObjType2Field548(o) && CanPickUpWeapon(at, o, &slot, &qty)) {
             /* Off-line, or as the host, take it outright. In a session a
              * client ASKS -- and the two comm tests are not each other's
              * negation: the first lets the host through, the second refuses
@@ -8489,17 +8006,13 @@ settle_facing:
             int32_t local = 1;
 
             if (g_mpSession) {
-                void *comm = *(void *const *)&g_commObject;
+                AM2_Comm *comm = AM2_THE_COMM;
 
                 local = 0;
-                if (*(const int32_t *)((const uint8_t *)comm + 0x3D8)
-                    && ((AM2_Comm *)comm)->CommMustBroadcast(
-                           (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+                if (comm->isHost && comm->CommMustBroadcast((int16_t)o->owner))
                     local = 1;
-                else if (!AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
-                         || *(const int32_t *)(
-                                (const uint8_t *)*(void *const *)&g_commObject + 0x3D8))
+                else if (!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
+                         || AM2_THE_COMM->isHost)
                     goto watched;
             }
             if (!local) {
@@ -8509,34 +8022,28 @@ settle_facing:
                  * already in that slot is carrying, and simply the item's own
                  * count when the slot is empty. Passing the out-param instead
                  * asks for the wrong number and looks entirely reasonable. */
-                uint8_t *old;
-                int32_t  cap;
-                int32_t  had = 0;
+                AM2_Object *old;
+                int32_t     cap;
+                int32_t     had = 0;
 
                 /* The hold is stamped BEFORE the quantity is worked out. */
-                *(uint32_t *)(at + OBJ_OFF_PICKUP_AFTER) =
-                    g_gameClockMs
-                    + AM2_SIGHT_REVEAL_MS;
+                at->pickupAfter = g_gameClockMs + AM2_SIGHT_REVEAL_MS;
 
                 /* No slot -- not a weapon -- asks for one, and the slot is
                  * never indexed. */
                 if (slot < 0) {
                     qty = 1;
-                    old = (uint8_t *)0;
+                    old = (AM2_Object *)0;
                     cap = qty;
                 } else {
-                    old = (uint8_t *)WeaponByUid(
-                        *(const uint32_t *)(o + UNIT_OFF_INVENTORY
-                                            + (uint32_t)slot * 4));
-                    cap = *(const int32_t *)(
-                        *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
-                        + ITEMTYPE_OFF_CAPACITY);
+                    old = WeaponByUid(o->inventory[slot]);
+                    cap = at->itemType->capacity;
                     if (!cap)
                         cap = AM2_TROOPER_NO_CAPACITY;
                     if (!old) {
-                        qty = *(const int32_t *)(at + OBJ_OFF_TARGET_UID);
+                        qty = at->ammo;
                     } else {
-                        had = *(const int32_t *)(old + OBJ_OFF_TARGET_UID);
+                        had = old->ammo;
                         qty = cap - had;
                     }
                 }
@@ -8544,18 +8051,13 @@ settle_facing:
                 /* Gated on a comm-object flag, and reached through the folded
                  * `ret` at ADDR_LOG -- which is what NAMES this function. The
                  * last argument is the item's army. */
-                if (*(const int32_t *)(
-                        (const uint8_t *)*(void *const *)&g_commObject + 0x418))
+                if (AM2_THE_COMM->verbose)
                     orig_log_six(
                         (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                         (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
                                                     : AM2_STR_NO)),
-                        cap,
-                        *(const int32_t *)(
-                            *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
-                            + ITEMTYPE_OFF_CAPACITY),
-                        had, qty,
-                        (int32_t)*(const int8_t *)(at + OBJ_OFF_ARMY));
+                        cap, at->itemType->capacity, had, qty,
+                        (int32_t)at->owner);
 
                 TrooperWantItemSend(o, at, 0, slot, qty);
             } else {
@@ -8567,63 +8069,51 @@ watched:
         if (ObjIsWatchedKind(at)) {
             if (HeldWeaponCode(o) == AM2_ITEM_KIND_MSWP) {
                 /* The mine sweeper reveals rather than sets off. */
-                if (*(const int32_t *)(at + OBJ_OFF_FLAGS) & 0x200) {
-                    RevealObj((AM2_Object *)at);
+                if (at->flags & 0x200) {
+                    RevealObj(at);
                     PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
                 }
             } else if ((!g_mpSession
-                        || AM2_THE_COMM->CommMustBroadcast(
-                               (int16_t)*(const int8_t *)(at + OBJ_OFF_ARMY)))
-
-                       && (*(const uint8_t *)(o + OBJ_OFF_ARMY)
-                               != *(const uint8_t *)(at + OBJ_OFF_ARMY)
-                           || (uint32_t)(g_gameClockMs
-                                         - *(const uint32_t *)(
-                                               at + OBJ_OFF_DEADLINE_58))
+                        || AM2_THE_COMM->CommMustBroadcast((int16_t)at->owner))
+                       && ((uint8_t)o->owner != (uint8_t)at->owner
+                           || (uint32_t)(g_gameClockMs - at->deadline58)
                                   > AM2_AI_KEEP_RANGE_MS)) {
                 /* Your own mine is safe for five seconds; anyone else's, and
                  * your own after that, goes off under you. */
-                DamageObject(at, 1, 4,
-                             *(const uint32_t *)(at + OBJ_OFF_UID), 0, 0);
+                DamageObject(at, 1, 4, at->uid, 0, 0);
             }
         }
 
         /* A medic tent heals whoever stands in it, twice a second. */
-        if (*(const int32_t *)at == 1
-            && *(const int32_t *)(*(uint8_t *const *)(at + OBJ_OFF_FIELD_94))
-                   == 0x20
-            && g_gameClockMs
-                   > *(const uint32_t *)(o + OBJ_OFF_FIELD_5B0)
-                     + AM2_TROOPER_HEAL_MS) {
+        if ((int32_t)at->type == 1
+            && *(const int32_t *)at->field94 == 0x20
+            && g_gameClockMs > o->field5B0 + AM2_TROOPER_HEAL_MS) {
             HealObject(o, AM2_TROOPER_HEAL, at);
-            *(uint32_t *)(o + OBJ_OFF_FIELD_5B0) =
-                g_gameClockMs;
+            o->field5B0 = g_gameClockMs;
         }
     }
 
     if (!found)
-        *(void **)(o + OBJ_OFF_HELD_WEAPON_UID) = (void *)0;
+        o->heldWeaponUid = 0;
 
 pose:
-    SetUnitPose(o, *(const int32_t *)(w + 8));
-    *(*(uint8_t **)(o + OBJ_OFF_ROWS) + 0x50) =
-        *(const uint8_t *)(o + OBJ_OFF_FACING);
-    StepObjRows((AM2_Object *)o);
+    SetUnitPose(o, out->state);
+    o->rowSet.rows->heading = o->facing;
+    StepObjRows(o);
     {
         /* The ROW's animation frame, reloaded -- StepObjRows returns nothing. */
-        int32_t f = *(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS)
-                                       + 0x4C);
+        int32_t f = o->rowSet.rows->frame;
 
         if (f == 0x2C)
-            *(int32_t *)(o + OBJ_OFF_POSE) = 0x19;
+            o->pose = 0x19;
         else if (f == 0x2D)
-            *(int32_t *)(o + OBJ_OFF_POSE) = 0x1A;
+            o->pose = 0x1A;
         else if (f == 1)
-            *(int32_t *)(o + OBJ_OFF_POSE) = 1;
+            o->pose = 1;
     }
 
     if (turned)
-        *(int32_t *)(o + OBJ_OFF_FIELD_44) = 0;
+        o->field44 = 0;
     {
         /* WHAT THE MOVE IS HANDED IS NEVER OBJ_OFF_FIELD_44 ITSELF. The
          * original (0x0044B720) tests that field and, when it is set, pushes
@@ -8639,35 +8129,32 @@ pose:
          * Boot Camp's hut. */
         int32_t v;
 
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44)) {
+        if (o->field44) {
             v = speed;
         } else {
-            int8_t h = (int8_t)*(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET);
+            int8_t h = o->heightSet;
 
-            if ((uint8_t)h != (g_tileAttrs)[
-                                  *(const uint16_t *)(o + OBJ_OFF_TILE)])
+            if ((uint8_t)h != g_tileAttrs[o->tile])
                 v = h;
             else
                 v = speed;
         }
-        ObjMoveAlongFacing((AM2_Object *)o, v, 0, 0);
+        ObjMoveAlongFacing(o, v, 0, 0);
     }
 
-    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)(g_trooperClassValue)[klass];
+    o->heightAdj = (int8_t)g_trooperClassValue[klass];
 
     /* DRAG THE HELD WEAPONS ALONG. This is the loop whose absence bootcamp's
      * object dump caught: a dropped weapon left at 0,0 instead of at the
      * trooper's feet, one line, with the pixels and the log identical. */
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE)) {
+    if (o->sarge) {
         int32_t i;
 
         for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-            uint8_t *held = (uint8_t *)WeaponByUid(
-                *(const uint32_t *)(o + UNIT_OFF_INVENTORY + i * 4));
+            AM2_Object *held = WeaponByUid(o->inventory[i]);
 
             if (held)
-                *(uint32_t *)(held + OBJ_OFF_POS) =
-                    *(const uint32_t *)pos;
+                held->pos = *pos;
         }
     }
 
@@ -8676,11 +8163,11 @@ pose:
      * the new one. */
     {
 #define reg (g_regionOfCell)
-        uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
-        uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
+        uint16_t now  = reg[o->tile];
+        uint16_t was  = reg[(int32_t)o->prevTile];
 
-        if (now != was && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
-            *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = was;
+        if (now != was && now != (uint16_t)o->prevRegion)
+            o->prevRegion = (int16_t)was;
     }
 #undef reg
 }
@@ -8720,83 +8207,73 @@ pose:
  * animation has not finished -- so a dying trooper is stepped again next frame
  * rather than destroyed mid-animation.
  */
-void __cdecl StepType2(void *obj)
+void __cdecl StepType2(AM2_Object *o)
 {
-    uint8_t *o   = (uint8_t *)obj;
     /* The sight record is addressed from the object at each use. */
-#define out (o + OBJ_OFF_SIGHT_OUT_T2)
-    uint8_t *w;
+#define out (&o->sight)
+    AM2_Object *w;
 
     /* The held weapon's uid is read TWICE in the original, once inside each
      * branch, and the destroyed path returns before its read for anything that
      * is not Sarge. Hoisting it above the branch is obviously equivalent -- a
      * plain read of an in-range slot with no side effects -- and it is still
      * not what the program does, so it is written as the program has it. */
-#define AM2_STEP2_HELD_UID                                                    \
-    (((const uint32_t *)(o + UNIT_OFF_INVENTORY))                             \
-        [*(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL)])
+#define AM2_STEP2_HELD_UID (o->inventory[o->inventorySel])
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
-        if (!*(const int32_t *)(o + OBJ_OFF_SARGE))
+    if (o->flags & OBJ_FLAG_DESTROYED) {
+        if (!o->sarge)
             return;
-        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0)
+        if (o->health <= 0)
             return;
-        if (!*(const uint32_t *)(o + OBJ_OFF_RIDING))
+        if (!o->riding)
             return;
-        w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+        w = WeaponByUid(AM2_STEP2_HELD_UID);
         if (!w)
             return;
-        TrooperFire(obj, w, out);
+        TrooperFire(o, w, out);
         return;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
-        PlaySoundAt(AM2_SND_KIND7, 1, 0,
-                    *(const int16_t *)(o + OBJ_OFF_POS),
-                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
-    else if (Type2Field5A4Set((const AM2_Object *)obj))
-        PlaySoundAt(AM2_SND_FIELD5A4, 1, 0,
-                    *(const int16_t *)(o + OBJ_OFF_POS),
-                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+    if (o->soldierKind == 7)
+        PlaySoundAt(AM2_SND_KIND7, 1, 0, o->pos.x, o->pos.y);
+    else if (Type2Field5A4Set(o))
+        PlaySoundAt(AM2_SND_FIELD5A4, 1, 0, o->pos.x, o->pos.y);
 
-    w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+    w = WeaponByUid(AM2_STEP2_HELD_UID);
 
-    if (*(const int32_t *)out == 0) {
-        *(int32_t *)out = 0;
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = WeaponPoseIndex(obj, w);
-        *(uint8_t *)(out + SIGHTCOUT_OFF_BEARING) =
-            *(const uint8_t *)(o + OBJ_OFF_FACING);
-        *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 0;
-        *(int32_t *)(out + SIGHTCOUT_OFF_UID) = 0;
+    if (out->field00 == 0) {
+        out->field00 = 0;
+        out->state   = WeaponPoseIndex(o, w);
+        out->bearing = o->facing;
+        out->hit     = 0;
+        out->uid     = 0;
     }
 
-    if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
-        && g_gameClockMs
-           > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
-        if (!ObjIsFriendly(obj))
-            ObjConceal(obj, 0);
-        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) = 0;
+    if (o->revealedUntil > 0 && g_gameClockMs > o->revealedUntil) {
+        if (!ObjIsFriendly(o))
+            ObjConceal(o, 0);
+        o->revealedUntil = 0;
     }
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
-        int32_t pose = *(const int32_t *)(o + OBJ_OFF_POSE);
+    if (o->health == 0) {
+        int32_t pose = o->pose;
 
         /* The image tests pose for zero first (`test eax,eax; je` at
          * 0x0044B909), redundant with the range below but in the program. */
         if (pose != 0 && pose > 0x1F && pose <= 0x24) {
-            void *row = *(void **)(o + OBJ_OFF_ROWS);
+            AM2_MapRow *row = o->rowSet.rows;
 
             if (!RowAnimFinished(row))
                 goto tail;   /* 0x0044B925 is `je 0x0044BA42` -- a trooper
                               * still playing its death animation reaches the
                               * tail too, so its weapon keeps being placed */
             RowFaceSprite(row);
-            *(int32_t *)out = 0;
+            out->field00 = 0;
             LeaveRemainsRow(row);
-            DestroyByType(obj);
+            DestroyByType(o);
         } else {
-            *(int32_t *)out = 0;
-            DestroyByType(obj);
+            out->field00 = 0;
+            DestroyByType(o);
         }
         /* DestroyByType is written in each arm, as the image has it (one
          * stack adjustment covers the arm's calls), and the path then takes
@@ -8820,17 +8297,15 @@ void __cdecl StepType2(void *obj)
      * "decode the first instruction at every jump target" only works if it is
      * applied to every jump, including the ones already believed understood;
      * an unread address cannot fail a test that was never run on it. */
-    if (*(const int32_t *)out != 0)
+    if (out->field00 != 0)
         goto tail;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
-        AiStepAttach(obj, out);
+    if (o->field5A4) {
+        AiStepAttach(o, out);
         goto tail;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE)
-        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-           == (int32_t)g_defaultOwner) {
+    if (o->sarge && (int32_t)o->owner == (int32_t)g_defaultOwner) {
         /* `cmp [0x5122c8], esi; jne` at 0x0044B9B0 -- the test is whether
          * the FOLLOWED OBJECT IS THIS ONE, not whether anything is followed.
          * Written as a test for null, it inverted the gate in practice: the
@@ -8839,35 +8314,32 @@ void __cdecl StepType2(void *obj)
          * a keypress or a click, in either build, while the original walked
          * -- and every A/B was silent, because both sides are driven with
          * the same input and agreed about ignoring it. */
-        if (g_objCtxObjA == obj
-            && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
-            Type2PlayerInput(obj, w, out);
-        Type2PlayerStep(obj, out);
+        if (g_objCtxObjA == o && !o->riding)
+            Type2PlayerInput(o, w, out);
+        Type2PlayerStep(o, out);
         goto tail;                     /* 0x0044B9D4 is `jmp 0x0044BA3F` --
                                         * this converges too, and Boot Camp's
                                         * Sarge takes exactly this path */
     }
 
-    if (g_mpSession
-        && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+    if (g_mpSession && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner))
         goto tail;
 
-    if (*(const uint32_t *)(o + OBJ_OFF_RIDING))
+    if (o->riding)
         goto tail;
 
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE)) {
-        SargeAiStep(obj, out);
+    if (o->sarge) {
+        SargeAiStep(o, out);
         /* AND SARGE RE-READS THE WEAPON. His step is the one that picks items
          * up, so the tail must see what he is holding NOW; the trooper arm
          * falls through with the uid stashed before the step. */
-        w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+        w = WeaponByUid(AM2_STEP2_HELD_UID);
     } else {
-        TrooperAiStep(obj, out);
+        TrooperAiStep(o, out);
     }
 
 tail:
-    UpdateTrooperAction(obj, w, out);
+    UpdateTrooperAction(o, w, out);
 
 #undef AM2_STEP2_HELD_UID
 #undef out
@@ -8902,58 +8374,55 @@ tail:
  * the count is at +0x53C and the uids at +0x540. A first occupant that no
  * longer resolves is removed.
  */
-void __cdecl StepType3(void *obj)
+void __cdecl StepType3(AM2_Object *o)
 {
-    uint8_t *o   = (uint8_t *)obj;
-    /* The record at OBJ_OFF_FIELD_578 is addressed from the object at each
-     * use. */
-#define out (o + OBJ_OFF_FIELD_578)
+    /* The steering record is addressed from the object at each use. */
+#define out (&o->ctl)
 
     /* 0x0045D66B is `jne 0x0045D94D` -- the bare epilogue, PAST both tails.
      * A destroyed vehicle runs neither, and in particular never re-sets its
      * footprint. */
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (o->flagsLo & OBJ_FLAG_DESTROYED)
         return;
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
-        ObjClearFootprint(obj);
+    if (o->health != 0)
+        ObjClearFootprint(o);
 
-    if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
+    if (o->revealedUntil > 0
         && g_gameClockMs
-           > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
-        if (!ObjIsFriendly(obj))
-            ObjConceal(obj, 0);
-        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) = 0;
+           > o->revealedUntil) {
+        if (!ObjIsFriendly(o))
+            ObjConceal(o, 0);
+        o->revealedUntil = 0;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) == 0) {
-        *(uint8_t *)(out + 0) = *(const uint8_t *)(o + OBJ_OFF_FACING);
-        *(uint8_t *)(out + 1) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
-        *(int32_t *)(out + SIGHTCOUT_OFF_HIT)   = 0;
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = 1;
-        *(int32_t *)(out + SIGHTCOUT_OFF_X)     = 0;
-        *(int32_t *)(out + SIGHTCOUT_OFF_SEEN)  = 0;
+    if (o->gate == 0) {
+        out->heading  = o->facing;
+        out->aim      = o->turretFacing;
+        out->field0C  = 0;
+        out->state    = 1;
+        out->approach = 0;
+        out->stop     = 0;
     }
 
     /* 0x0045D6E6: while the record's second word is clear, the vehicle's
      * fire point follows the global aim point every frame, and its local
      * target is cleared. This block was missing. */
-    if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) == 0) {
+    if (out->hit == 0) {
         /* One six-byte x/y/z assignment, as the image copies it. */
-        typedef struct { int16_t x, y, z; } Xyz;
-        *(Xyz *)(o + TROOPER_OFF_POS_X) = *(const Xyz *)&g_aimX;
-        *(int32_t *)(o + TROOPER_OFF_LOCAL_TARGET) = 0;
+        out->spot = *(const AM2_FireSpot *)&g_aimX;
+        out->uid  = 0;
     }
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
+    if (o->health == 0) {
         /* Dead. Kind 0 is destroyed outright (0x0045D7D4: clear the gate, then
          * DestroyByType, then the second tail); this used to send it to the
          * attach arm. Only kind 5 runs the destruction sequence. */
-        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 0) {
-            if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 5)
+        if (o->soldierKind != 0) {
+            if (o->soldierKind != 5)
                 goto post;
             {
-                void *row = *(void **)(o + OBJ_OFF_ROWS);
+                void *row = o->rowSet.rows;
 
                 if (!RowAnimFinished(row))
                     goto post;
@@ -8968,31 +8437,31 @@ void __cdecl StepType3(void *obj)
                  * DestroyObjCommon, 0x00429399) stayed clear, so a half-track killed in
                  * a minefield kept taking damage the original ignores. The table's
                  * order is for the SOUNDS, not the arms. See the header. */
-                switch (*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND)) {
+                switch (o->vehicleKind) {
                 case 1:
                     PlaySoundAt(AM2_SND_VEH_KIND1, 0, 0,
-                                *(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                                o->pos.x,
+                                o->pos.y);
                     break;
                 case 0:
                     PlaySoundAt(AM2_SND_VEH_KIND0, 0, 0,
-                                *(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                                o->pos.x,
+                                o->pos.y);
                     break;
                 case 2: case 3:
                     PlaySoundAt(AM2_SND_VEH_KIND23, 0, 0,
-                                *(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                                o->pos.x,
+                                o->pos.y);
                     break;
                 case 5:
                     /* Sound, then destroy with NO remains row (0x0045D7AE),
                      * and RETURN: 0x0045D7D0 is the epilogue, so neither
                      * tail runs for it. */
                     PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
-                                *(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2));
-                    *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-                    DestroyByType(obj);
+                                o->pos.x,
+                                o->pos.y);
+                    o->gate = 0;
+                    DestroyByType(o);
                     return;
                 default:
                     /* kind 4 and anything above 5: no sound. */
@@ -9000,14 +8469,14 @@ void __cdecl StepType3(void *obj)
                 }
 
                 /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
-                *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+                o->gate = 0;
                 LeaveRemainsRow(row);
-                DestroyByType(obj);
+                DestroyByType(o);
             }
             goto post;
         }
-        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-        DestroyByType(obj);
+        o->gate = 0;
+        DestroyByType(o);
         goto post;
     }
 
@@ -9019,78 +8488,77 @@ void __cdecl StepType3(void *obj)
      * player or the AI: every truck sat where the mission placed it and the
      * player's keys did nothing once Sarge had boarded. Found by loading one
      * save in the native build and in the original and holding D. */
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) == 0
+    if (o->gate == 0
         && (!g_mpSession
             || AM2_THE_COMM->CommMustBroadcast(
-                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))) {
+                   (int16_t)o->owner))) {
         /* No occupant: the attach arm (0x0045D894), laid out after this one. */
-        if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) > 0) {
-            uint8_t *first = (uint8_t *)LookupByUID(
-                ((const uint32_t *)*(void **)(o + OBJ_OFF_POSE + LIST_OFF_UIDS))[0]);
+        if (o->riders.count > 0) {
+            AM2_Object *first = LookupByUID(o->riders.uids[0]);
 
             /* A first occupant that no longer resolves is removed; an order
              * already in the record's second word skips the input. Every
              * case then chooses a facing -- one call, whose short join VC6
              * copies into each arm ahead of the shared call at 0x0045D8D6. */
             if (!first)
-                ((AM2_Rec *)(o + OBJ_OFF_POSE))->ListRemoveAt(0);
-            else if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) == 0) {
+                ((AM2_Rec *)&o->riders)->ListRemoveAt(0);
+            else if (out->hit == 0) {
                 /* The player's vehicle reads the keys and the mouse and
                  * routes; anyone else's runs the AI. */
-                if (ObjType2Field548((const AM2_Object *)first)) {
-                    Step3Input(obj, out);
-                    Step3RouteAndBoard(obj, out);
+                if (ObjType2Field548(first)) {
+                    Step3Input(o, out);
+                    Step3RouteAndBoard(o, out);
                 } else
-                    AiStep(obj, out);
+                    AiStep(o, out);
             }
-            Step3ChooseFacing(obj, out);
-        } else if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
-            AiStep(obj, out);
-            Step3ChooseFacing(obj, out);
+            Step3ChooseFacing(o, out);
+        } else if (o->field94) {
+            AiStep(o, out);
+            Step3ChooseFacing(o, out);
         } else {
-            ObjAttachTo((AM2_Object *)obj, (AM2_Object *)0);
-            *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
-            *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+            ObjAttachTo(o, (AM2_Object *)0);
+            o->fieldC0 = 0;
+            o->fieldC2 = 0;
         }
     } else {
         /* 0x0045D8CF: the gate set, or a remote vehicle -- the chooser
          * alone. Laid out last, so it falls into the second tail and the
          * arms above share its call. */
-        Step3ChooseFacing(obj, out);
+        Step3ChooseFacing(o, out);
     }
 
 post:
     /* The second tail. Everything above reaches it. */
     if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+                              (int16_t)o->owner))
         goto emit;
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) < 0)
+    if (o->health < 0)
         goto emit;
-    if (*(const int32_t *)(out + SIGHTCOUT_OFF_STATE) != 1)
+    if (out->state != 1)
         goto emit;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > AM2_VEH_TURN_LIMIT) {
-        *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 1;
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_VEH_STATE_TURNING;
-    } else if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) < -AM2_VEH_TURN_LIMIT) {
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_VEH_STATE_TURNING;
+    if (o->field44 > AM2_VEH_TURN_LIMIT) {
+        out->field0C = 1;
+        out->state   = AM2_VEH_STATE_TURNING;
+    } else if (o->field44 < -AM2_VEH_TURN_LIMIT) {
+        out->state = AM2_VEH_STATE_TURNING;
     }
 
 emit:
     /* Called by NAME, so Step3Drive's own counter cannot move: its only
      * caller is this one and it no longer crosses the patched entry. The
      * blind-counter case, not a cold one. */
-    Step3Drive(obj, out);
+    Step3Drive(o, out);
 
     /* THE THIRD TAIL, and the footprint is why it matters. The entry clears
      * this vehicle's footprint and this puts it back, so a reconstruction that
      * stops at the second tail leaves OBJ_OFF_FLAGS short of the footprint
      * bits -- which is exactly how this was caught: `flags=0x200861` against
      * `0x821` on two vehicles in the object dump. */
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
-        ObjSetFootprint(obj);
+    if (o->health != 0)
+        ObjSetFootprint(o);
 #undef out
 }
 
@@ -9103,14 +8571,10 @@ emit:
  * about the original. A helper here would read better and record less. */
 #define AM2_ROACH_PROMOTE_FOUND(o_, c_)                                       \
     do {                                                                      \
-        uint8_t *found_ = *(uint8_t **)((c_) + SIGHT_OFF_FOUND);              \
-        *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                            \
-            *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                      \
-        *(void **)((c_) + SIGHT_OFF_OBSERVER) =                               \
-            *(void **)((c_) + SIGHT_OFF_FOUND);                               \
-        *(int32_t *)((c_) + SIGHT_OFF_RANGE) =                                \
-            *(const int32_t *)((c_) + SIGHT_OFF_FOUND_RANGE);                 \
-        *((c_) + SIGHT_OFF_BEARING) = *((c_) + SIGHT_OFF_FOUND_BEARING);      \
+        (o_)->targetUid  = (c_)->found->uid;                                  \
+        (c_)->observer   = (c_)->found;                                       \
+        (c_)->range      = (c_)->foundRange;                                  \
+        (c_)->bearing    = (c_)->foundBearing;                                \
     } while (0)
 
 /* RoachBehaviour -- original 0x00408640, one caller: RoachAliveStepA. The
@@ -9136,11 +8600,9 @@ emit:
  * Not byte-exact: the out-of-sight arm and the far arm share their routing
  * code, and VC6 keeps the far arm's copy where the image keeps the later one.
  */
-void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
+void __cdecl RoachBehaviour(AM2_Object *o, AM2_RoachOut *out, AM2_RoachCtx *c)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *c = (uint8_t *)ctx;
-    uint8_t *seen;
+    AM2_Object *seen;
 
     /* THE FIVE ARMS AND WHICH ONE CALLS CopyByteIfSet. The original nests the
      * two range tests -- `if (RANGE > 0)` first (0x00408654 `test; jle` to the
@@ -9166,7 +8628,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
      * The far and dest-route arms jmp STRAIGHT to 0x00408A42 and never call
      * CopyByteIfSet. That matters: RoachRouteToward writes the route heading
      * into the out record's bearing byte, and CopyByteIfSet would overwrite it
-     * with the sight-context bearing (`if (ctx[OBSERVER]) *out = ctx[BEARING]`).
+     * with the sight-context bearing (`if (c[OBSERVER]) *out = c[BEARING]`).
      * After promote-found that context bearing is the FOUND bearing, so a
      * shared tail calling CopyByteIfSet turned a roach routing toward its
      * destination (heading 0x95) into one facing the object it had just spotted
@@ -9176,49 +8638,43 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
      * FOLLOW_UID (0x00408A3C) is persisted by the NO-LEADER arm alone, gated on
      * the observer slot after the found-promote; the has-leader arm jmps past
      * it, and the two routing arms never reach it. */
-    if (*(const int32_t *)(c + SIGHT_OFF_RANGE) > 0) {
-        if (*(const int32_t *)(c + SIGHT_OFF_RANGE)
-            > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
+    if (c->range > 0) {
+        if (c->range
+            > c->wantRange) {
             /* Far: route toward the observer, promote a fresh sighting, and
              * commit WITHOUT CopyByteIfSet so the route heading survives. */
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
-                                    + OBJ_OFF_POS);
-            RoachRouteToward(obj, out, ctx);
-            if (*(void **)(c + SIGHT_OFF_FOUND))
+            o->dest = c->observer->pos;
+            RoachRouteToward(o, out, c);
+            if (c->found)
                 AM2_ROACH_PROMOTE_FOUND(o, c);
             goto tail;
         }
         /* Within range: commit the sighting through CopyByteIfSet. */
-        CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+        CopyByteIfSet(o, out, c);
         goto tail;
     }
 
-    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
+    if (c->destDist > AM2_AI_REACHED_DIST) {
         /* Not arrived: route toward the remembered destination, promote a
          * fresh sighting, and commit without CopyByteIfSet (as the far arm). */
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        RoachRouteToward(obj, out, ctx);
-        if (*(void **)(c + SIGHT_OFF_FOUND))
+        o->dest = o->scriptPoint;
+        RoachRouteToward(o, out, c);
+        if (c->found)
             AM2_ROACH_PROMOTE_FOUND(o, c);
         goto tail;
     }
 
     /* Arrived. */
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)((void *)&g_zeroPoint);
+    o->scriptPoint = g_zeroXY;
 
-#define LEADER (*(uint8_t *const *)(c + SIGHT_OFF_LEADER))
+#define LEADER (c->leader)
     /* The leader triple into the observer slot, re-reading the leader. */
 #define PROMOTE_LEADER()                                                      \
     do {                                                                      \
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
-            *(const uint32_t *)(LEADER + OBJ_OFF_UID);                        \
-        *(void **)(c + SIGHT_OFF_OBSERVER) = LEADER;                          \
-        *(int32_t *)(c + SIGHT_OFF_RANGE) =                                   \
-            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);                     \
-        *(c + SIGHT_OFF_BEARING) = *(c + SIGHT_OFF_LEAD_BEARING);             \
+        o->targetUid = LEADER->uid;                                           \
+        c->observer  = LEADER;                                                \
+        c->range     = c->leadRange;                                          \
+        c->bearing   = c->leadBearing;                                        \
     } while (0)
     seen = LEADER;
     if (seen) {
@@ -9230,28 +8686,26 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
         AM2_AI_SIGHT_TEST(leader_seen, leader_unseen);
 
 leader_seen:
-        if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE)
-            > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
-            RoachRouteToward(obj, out, ctx);
+        if (c->leadRange
+            > c->wantRange) {
+            o->dest = LEADER->pos;
+            RoachRouteToward(o, out, c);
             PROMOTE_LEADER();
             goto tail;
         }
         PROMOTE_LEADER();
-        ConsumePendingByte(obj, out, ctx);
-        CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+        ConsumePendingByte(o, out, c);
+        CopyByteIfSet(o, out, c);
         goto tail;
 
 leader_unseen:
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEADER + OBJ_OFF_POS);
-        RoachRouteToward(obj, out, ctx);
-        if (*(void **)(c + SIGHT_OFF_FOUND))
+        o->dest = LEADER->pos;
+        RoachRouteToward(o, out, c);
+        if (c->found)
             AM2_ROACH_PROMOTE_FOUND(o, c);
         /* Its own call, not `goto tail`: the far arm's identical block is
          * the one VC6 folds into this, as the image has it. */
-        ConsiderSightingB(obj, out, ctx);
+        ConsiderSightingB(o, out, c);
         return;
     }
 #undef PROMOTE_LEADER
@@ -9260,16 +8714,14 @@ leader_unseen:
     /* No leader (0x004089F3): take whatever is pending, promote what the scan
      * found, commit it, then persist the FOLLOW_UID -- this arm alone writes
      * OBJ_OFF_FOLLOW_UID (0x00408A3C), gated on the observer slot being set. */
-    ConsumePendingByte(obj, out, ctx);
-    if (*(void **)(c + SIGHT_OFF_FOUND))
+    ConsumePendingByte(o, out, c);
+    if (c->found)
         AM2_ROACH_PROMOTE_FOUND(o, c);
-    CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
-    if (*(void *const *)(c + SIGHT_OFF_OBSERVER))
-        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
-            *(const uint32_t *)(*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
-                                + OBJ_OFF_UID);
+    CopyByteIfSet(o, out, c);
+    if (c->observer)
+        o->followUid = c->observer->uid;
 tail:
-    ConsiderSightingB(obj, out, ctx);
+    ConsiderSightingB(o, out, c);
 }
 
 
@@ -9488,7 +8940,7 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define AM2_CHEAT_ABS(v)  abs(v)
 
 #define g_viewRect   ((AM2_Rect *)&g_viewX)
-#define g_defaultPos    (*(const AM2_Point *)&g_zeroPoint)
+#define g_defaultPos    (g_zeroXY)
 
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
@@ -9823,7 +9275,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
                 *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
             *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
 
-            hit = WalkCellWrapper(o, *(const uint32_t *)&aim);
+            hit = WalkCellWrapper(o, aim);
             if (hit != 0) {
                 *(uint16_t *)(w + 0x18) = (uint16_t)(ObjHeight(hit) - 4);
                 *(int32_t *)(o + OBJ_OFF_TARGET_UID) =
@@ -9870,7 +9322,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
         *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
         *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
 
-        hit = WalkCellWrapper(o, *(const uint32_t *)&aim);
+        hit = WalkCellWrapper(o, aim);
         if (hit != 0) {
             *(uint16_t *)(w + 0x18) = (uint16_t)(ObjHeight(hit) - 4);
             *(int32_t *)(o + OBJ_OFF_TARGET_UID) =
@@ -9910,8 +9362,8 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
              * release the drawn facing came off the raw point (218) where the
              * original faces the snapped one (212). Invisible to every replay
              * but a hand-played click; `sessions/aim-3261.txt` reproduces it. */
-            NearestAllowedTile(o, TileOfPoint(*(const uint32_t *)&at),
-                               (uint32_t *)(o + OBJ_OFF_FIELD_C0));
+            NearestAllowedTile((AM2_Object *)o, TileOfPoint(at),
+                               (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
             *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
             *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = 0xFFFF;
@@ -10059,7 +9511,7 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
 
     MoveStepPoint(o, (uint8_t)(*out + *(const uint8_t *)(o + OBJ_OFF_FACING)),
                   0, speed, 0, 0, &pt);
-    return VehicleBlockWeight(o, thenFacing, *(const uint32_t *)&pt, 1) > 0x0E;
+    return VehicleBlockWeight(o, thenFacing, pt, 1) > 0x0E;
 #undef o
 }
 
@@ -10234,33 +9686,31 @@ void __cdecl Step3TurnState(void *obj, void *rec)
  * vehicle at that instruction -- loaded once at 0x0045D4B6 and never
  * reassigned, with LookupByUID's result going to a different register later.
  * Naming it either way asserts something this function cannot settle. */
-void __cdecl Step3RouteAndBoard(void *obj, void *rec)
+void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint8_t *r = (uint8_t *)rec;
-    int32_t  i;
+    int32_t i;
 
-    /* o+0x10C splits this into TWO branches (0x0045D4CF), not one. When a route
-     * is in progress (o+0x10C != 0) the original runs AiRouteToward and ONLY an
-     * arrival check -- if it has not arrived it jumps to the tail, leaving the
-     * heading, the turret and the tolerance flags alone. The heading/turret
-     * block (including `if (o+0x548==0) r[1]=r[0]`, which drags the turret onto
-     * the hull) runs ONLY when o+0x10C == 0. Folding them into one `if arrived
-     * / else` ran that block during a route too, so a half-track under a move
-     * order swung its manually-aimed gun back to the hull -- the turret facing
-     * (o+0x530) then diverged. (0x45d4d9 vs 0x45d51a.) */
-    if (*(const uint16_t *)(o + 0xC0u) != 0) {
+    /* field10C splits this into TWO branches (0x0045D4CF), not one. When a
+     * route is in progress the original runs AiRouteToward and ONLY an
+     * arrival check -- if it has not arrived it jumps to the tail, leaving
+     * the heading, the turret and the tolerance flags alone. The
+     * heading/turret block (including `if (!field548) aim = heading`, which
+     * drags the turret onto the hull) runs ONLY when field10C == 0. Folding
+     * them into one `if arrived / else` ran that block during a route too, so
+     * a half-track under a move order swung its manually-aimed gun back to
+     * the hull -- the turret facing (+0x530) then diverged. (0x45d4d9 vs
+     * 0x45d51a.) */
+    if ((uint16_t)o->dest.x != 0) {
         /* The context AiRouteToward is handed and never reads: 0x44 bytes,
          * the whole of the image's frame. */
-        uint8_t local[0x44];
+        AM2_AiCtx local;
 
-        if (*(const int32_t *)(o + 0x10Cu) != 0) {
-            AiRouteToward(o, o + 0x578u, local, 1);
+        if (o->field10C != 0) {
+            AiRouteToward(o, &o->ctl, &local, 1);
 
-            if (ApproxDist((const AM2_Point *)(o + 0x12u),
-                           (const AM2_Point *)(o + 0xC0u)) < 0x30) {
-                *(int32_t *)(r + 0x08u) = 1;
-                *(int32_t *)(o + 0x10Cu) = 0;
+            if (ApproxDist(&o->pos, &o->dest) < 0x30) {
+                r->state    = 1;
+                o->field10C = 0;
             }
             /* else: routing but not arrived -- do NOT touch heading/turret. */
         } else {
@@ -10269,14 +9719,12 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
 
             /* No local for the bearing: it goes into the record and is
              * read back from there. */
-            *r = AngleBetween((const AM2_Point *)(o + 0x12u),
-                              (const AM2_Point *)(o + 0xC0u));
-            *(int32_t *)(r + 0x08u) = 4;
-            d = abs(AngleDelta(*r, *(const uint8_t *)(o + OBJ_OFF_FACING)));
-            dist = ApproxDist((const AM2_Point *)(o + 0xC0u),
-                              (const AM2_Point *)(o + 0x12u));
-            if (*(const int32_t *)(o + 0x548u) == 0)
-                r[1] = r[0];
+            r->heading = AngleBetween(&o->pos, &o->dest);
+            r->state   = 4;
+            d    = abs(AngleDelta(r->heading, o->facing));
+            dist = ApproxDist(&o->dest, &o->pos);
+            if (o->field548 == 0)
+                r->aim = r->heading;
 
             /* Each distance band compares against its own limit and falls
              * into one shared pair of stores. */
@@ -10289,51 +9737,50 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
             } else if (d < 0x40) {
                 goto banded;
             }
-            *(int32_t *)(r + 0x10u) = 1;
-            *(int32_t *)(r + 0x14u) = 1;
+            r->stop     = 1;
+            r->approach = 1;
         banded:
             ;
         }
     }
 
-    if (*(const int32_t *)(o + 0x10Cu) == 0)
-        *(uint32_t *)(o + 0xC0u) = g_zeroPoint;
+    if (o->field10C == 0)
+        o->dest = g_zeroXY;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
+    if (o->field44 == 0)
         return;
 
     if (orig_get_tick_count() - g_mousePressMs
             > 0x1F4u
-        && *(const int32_t *)(o + 0x10Cu) == 0) {
+        && o->field10C == 0) {
         g_viewSnap = 1;
         g_objCtxSet = 1;
     }
 
-    if ((*(const uint32_t *)(o + 8) & 0x400u) == 0)
+    if ((o->flags & 0x400u) == 0)
         return;
 
     /* Five separate guards in the original, each its own branch to the loop
      * tail. Kept separate rather than ANDed: equivalent today, and the order
      * is what the image states. */
     for (i = 0; i < g_selectedCount; i++) {
-        uint8_t *other = (uint8_t *)LookupByUID(
-            (g_selectedItems)[i]);
+        AM2_Object *other = LookupByUID((g_selectedItems)[i]);
 
         if (other == 0)
             continue;
         if (other == o)
             continue;
-        if ((*(const uint32_t *)(other + 8) & 4u) != 0)
+        if ((other->flags & 4u) != 0)
             continue;
-        if (*(const uint16_t *)(other + 0x62u) == 0)
+        if ((uint16_t)other->health == 0)
             continue;
-        if (!ObjIsTypeIn238((const AM2_Object *)other))
+        if (!ObjIsTypeIn238(other))
             continue;
-        if (*(const int32_t *)(other + 0x94u) != 0)
+        if (other->field94 != 0)
             continue;
 
-        *(int32_t *)(other + 0xE4u) = 3;
-        ObjAttachTo((AM2_Object *)other, (AM2_Object *)o);
+        other->aiMode = 3;
+        ObjAttachTo(other, o);
     }
 }
 
@@ -10403,7 +9850,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
     uint8_t  *r = (uint8_t *)rec;
     int32_t   speed = 0;          /* ebp, spilled to E-28 */
     int32_t   tileArg = 0;        /* E-4, zeroed at entry and read once */
-    uint32_t  step = 0;           /* E-20, MoveStepPoint's out point */
+    AM2_Point  step = {0, 0};      /* E-20, MoveStepPoint's out point */
     uint8_t   facing;             /* E-24, after it stops holding the turn */
     uint8_t   gunFacing;          /* E-16 */
     uint8_t  *animRec;            /* E-12 */
@@ -10886,7 +10333,7 @@ void __cdecl Step3Input(void *obj, void *rec)
     uint8_t  *r = (uint8_t *)rec;
     uint8_t  *weapon;
     uint8_t   bearing;
-    uint32_t  cursorWorld;      /* view origin + cursor, a packed point */
+    AM2_Point  cursorWorld;      /* view origin + cursor, a packed point */
     uint32_t  gunPos;           /* the turret's point, or the hull's */
     int32_t   dist = 0;         /* arg1's slot, reused */
     int32_t   aimDelta = 0;
@@ -10951,7 +10398,7 @@ void __cdecl Step3Input(void *obj, void *rec)
      * reading NextInventorySlot's header records for its call. */
     if (g_gameClockMs
             > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
-        SightScan(o, &range, &bearing, &allied, &other, 0);
+        SightScan((AM2_Object *)o, &range, &bearing, &allied, &other, 0);
     }
 
     weapon = (uint8_t *)WeaponByUid(
@@ -11085,10 +10532,10 @@ void __cdecl Step3Input(void *obj, void *rec)
                  * pixels of where it went down. That orders a move. */
                 if (dist > 0x30) {
                     *r = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                      (const AM2_Point *)&cursorWorld);
-                    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = cursorWorld;
-                    NearestAllowedTile(o, TileOfPoint(cursorWorld),
-                                       (uint32_t *)(o + OBJ_OFF_FIELD_C0));
+                                      &cursorWorld);
+                    *(AM2_Point *)(o + OBJ_OFF_FIELD_C0) = cursorWorld;
+                    NearestAllowedTile((AM2_Object *)o, TileOfPoint(cursorWorld),
+                                       (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
                     *(int32_t *)(o + 0xD0u) = 0;
                     *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
                     *(uint16_t *)(o + 0xDEu) = 0xFFFF;

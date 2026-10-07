@@ -12,7 +12,7 @@
 extern "C" {
 /* 0x0045AAF0, one caller. Where a vehicle puts somebody getting out: the
  * nearest passable tile within AM2_BOAT_EXIT_MAX. 1 and *out, or 0. */
-int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out);
+int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out);
 
 #endif
 

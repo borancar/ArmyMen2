@@ -848,7 +848,7 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  * either; written as the plain loop that means.
  */
 int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
-                               int32_t index, uint32_t at, int32_t orFlags,
+                               int32_t index, AM2_Point at, int32_t orFlags,
                                int32_t a7, int32_t a8)
 {
 #define o ((uint8_t *)obj)
@@ -866,7 +866,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
         (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
     *(uint8_t *)(o + OBJ_OFF_ARMY) = (uint8_t)army;
 
-    ObjInitCommon(o, name, 1, (int32_t)at,
+    ObjInitCommon(o, name, 1, at,
                          (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
     *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
@@ -885,8 +885,8 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
     BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
                      (g_recordLists)
                          [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
-                     (int32_t)((const AM2_Point *)&at)->x,
-                     (int32_t)((const AM2_Point *)&at)->y,
+                     (int32_t)at.x,
+                     (int32_t)at.y,
                      *(const uint32_t *)(o + OBJ_OFF_FLAGS));
 
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
@@ -1063,7 +1063,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
  * that is scheduling, not meaning, and both are written in field order here.
  */
 int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
-                              uint32_t at, const int32_t *box,
+                              AM2_Point at, const int32_t *box,
                               int32_t unused, uint32_t uid)
 {
     uint8_t        *o = (uint8_t *)obj;
@@ -1107,12 +1107,12 @@ named:
         ;
     }
 
-    x = ((const AM2_Point *)&at)->x;
-    y = ((const AM2_Point *)&at)->y;
+    x = at.x;
+    y = at.y;
     *(int16_t *)(o + OBJ_OFF_POS) = x;
     *(int16_t *)(o + OBJ_OFF_POS + 2) = y;
     *(uint16_t *)(o + OBJ_OFF_TILE) =
-        (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+        (uint16_t)TileOfPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
 
     {
 #define keep ((AM2_Rect *)(o + OBJ_OFF_BOX_OFFSETS))

@@ -2920,14 +2920,14 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
  * (startCol - endCol) + mapW - 1 lands it on rowStart + mapW, exactly one row
  * down. ADDR_MAP_TILES_W is re-read inside the loop because the original
  * re-reads it; it cannot change while this runs. */
-int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
+int32_t __cdecl BoatExitPoint(void *vehicle, AM2_Point *out)
 {
     const uint8_t   *v = (const uint8_t *)vehicle;
     const AM2_Point *pos = (const AM2_Point *)(v + OBJ_OFF_POS);
     AM2_Rect  box;
     AM2_Rect  clipped;
     AM2_Point corner;
-    uint32_t  here;
+    AM2_Point here;
     int32_t   x = pos->x;
     int32_t   y = *(const int16_t *)(v + OBJ_OFF_POS + 2);
     int32_t   startTile, endTile, tile, best, d, col, row;
@@ -2946,10 +2946,10 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
      * one point and handed to TileOfPoint by value. */
     corner.x = (int16_t)clipped.left;
     corner.y = (int16_t)clipped.top;
-    startTile = TileOfPoint(*(const uint32_t *)&corner);
+    startTile = TileOfPoint(corner);
     corner.x = (int16_t)clipped.right;
     corner.y = (int16_t)clipped.bottom;
-    endTile = TileOfPoint(*(const uint32_t *)&corner);
+    endTile = TileOfPoint(corner);
 
     /* The rows and columns come from the low words; the row advance below
      * uses the tiles as TileOfPoint returned them. The row shift and the map

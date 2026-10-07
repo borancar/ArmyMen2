@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1547 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1548 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -242,6 +242,22 @@ main result so far (details in `src/vc6/README.md`):
     straight to the call. It used to sit inside the test. The native build
     clears the path buffer first, so that case reads an empty name rather
     than stack garbage.
+  - **Typed AI records and point parameters** (2026-10-07), 1547 -> 1548,
+    nothing lost. The vehicle, trooper and roach AI families take typed
+    records instead of `void *`: AM2_AiCtx (0x44, AiBuildContext),
+    AM2_RoachCtx (0x40), AM2_SightCtx (0x58), and three DIFFERENT output
+    records at +0x578, +0x57C and +0x540 (AM2_SteerOut, AM2_SightOut,
+    AM2_RoachOut), which overlap but do not share a layout. Packed points
+    are AM2_Point throughout: TileOfPoint, BeginMoveTo, PlanPathTo,
+    NearestAllowedTile, the block-weight family, the event point arms and
+    ActionPoint/PointOfTile/ObjAnchorPoint returns. BoatExitPoint matched
+    on the way.
+    - RoachMaskWeight keeps a SCALAR point: as a struct parameter it cost
+      its caller RoachStepTailA its registers.
+    - KEEP_DECLS moved to the 0x00511BC8 block (the CheatLine coin).
+    - A retyped pointer silently scales a surviving `+ *_OFF_*` macro;
+      AM2_SIGHTC_PROMOTE_FOUND did exactly that until a clang-query scan
+      found it.
   - **ArmyMessageSend matched** (2026-10-07), 1546 -> 1547. Same lever:
     the packet append goes through an inline PacketAppend wrapper, which
     puts the saved length in edx as the image has it.

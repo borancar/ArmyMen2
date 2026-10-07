@@ -57,7 +57,7 @@ void __cdecl AirSupportPop(void);
  * UidArmy is called once per CANDIDATE rather than once before the loop, so a
  * query returning forty objects calls it forty times. Reproduced; hoisting it
  * would be a different program. */
-uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
+uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from);
 
 /* Original: 0x00409710, "DoAirSupport paratroopers where: %d, from %d, army
  * %d, count: %d" -- this one really does name itself, on its own line, which
@@ -78,7 +78,7 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
  *
  * The `where` field is written here as one dword and copied by AirSupportPop
  * as two words. Same field, two access widths, and both are reproduced. */
-int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
+int32_t __cdecl DoAirSupport(int32_t kind, AM2_Point where, uint32_t from);
 
 /* Original: 0x004097D0, and the name is ours. Walk every registered object and
  * reveal the ones near `where`, each staying visible until the game clock
@@ -124,8 +124,8 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 /* Original: 0x00456EA0, three callers. Where a formation slot sits, and it
  * caches its own answer into the per-slot tables -- see air.cpp for why that
  * makes the vehicle rule propagate down the tree. */
-void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
-                                uint32_t *out);
+void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, void *obj,
+                                AM2_Point *out);
 
 void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
                             int32_t slot);
@@ -143,7 +143,7 @@ void __cdecl ClearFrameCounts(void);
 /* Original: 0x00403AF0, three callers, and the name is ours. The object's
  * position with its sprite's second anchor pair subtracted. Picks row 1 when
  * there is more than one row and row 0 when there is exactly one. */
-uint32_t __cdecl ObjAnchorPoint(const void *obj);
+AM2_Point __cdecl ObjAnchorPoint(const struct AM2_Object *o);
 
 /* Original: 0x004296E0, eight callers. Reveal one object through the fog. Two
  * flags and they are not symmetric: OBJ_FLAG_REVEALED goes up
@@ -178,8 +178,8 @@ int32_t __cdecl ThingCode(const void *who, const void *owner);
 /* 0x00448E60. How much `obj` obstructs, as seen from `from` and measured
  * against `at`. 0, an item's own byte, or AM2_BLOCK_FULL. The third argument
  * is not read; it is in the signature because the callers pass it. */
-int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
-                               uint32_t at);
+int32_t __cdecl ObjBlockWeight(void *from, void *obj, AM2_Point unused,
+                               AM2_Point at);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded
@@ -269,6 +269,6 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker);
 
 /* 0x00409540, one caller. What an air pass does when its timer expires:
  * drop three paratroopers in a V, each with a weapon and its own facing. */
-void __cdecl AirPassStrike(uint32_t at, int32_t army);
+void __cdecl AirPassStrike(AM2_Point at, int32_t army);
 
 #endif /* AM2_AIR_H */

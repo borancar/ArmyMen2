@@ -16,6 +16,7 @@
 #include "packkey.h" /* KeyLookupTriple -- reconstructed */
 #include "misc.h"    /* CommArmyOfSlot -- reconstructed */
 #include "armymsg.h" /* SendTrooperSetWeapon -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite */
 #include "image.h"
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
 #include "msgslot.h" /* CommMustBroadcast -- reconstructed */
@@ -267,16 +268,16 @@ found:
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                             int32_t (__cdecl *keep)(void *obj));
 
-uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
+uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
 {
     AM2_Rect  box;
     uint8_t  *o;
 
     /* `where` is a packed point, read a half at a time from its own slot. */
-    box.left   = ((const AM2_Point *)&where)->x - AM2_AIR_ENEMY_RADIUS;
-    box.right  = ((const AM2_Point *)&where)->x + AM2_AIR_ENEMY_RADIUS;
-    box.top    = ((const AM2_Point *)&where)->y - AM2_AIR_ENEMY_RADIUS;
-    box.bottom = ((const AM2_Point *)&where)->y + AM2_AIR_ENEMY_RADIUS;
+    box.left   = where.x - AM2_AIR_ENEMY_RADIUS;
+    box.right  = where.x + AM2_AIR_ENEMY_RADIUS;
+    box.top    = where.y - AM2_AIR_ENEMY_RADIUS;
+    box.bottom = where.y + AM2_AIR_ENEMY_RADIUS;
 
     o = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
                                  (int32_t (__cdecl *)(void *))MeetsAllThree);
@@ -502,29 +503,30 @@ void __cdecl ClearFrameCounts(void)
  * position as it stood. The original writes all of this through its own
  * argument slot, which is why the point and the object share a register in
  * the disassembly; a local is the same thing said once. */
-uint32_t __cdecl ObjAnchorPoint(const void *obj)
+AM2_Point __cdecl ObjAnchorPoint(const AM2_Object *o)
 {
-    const uint8_t *p = (const uint8_t *)obj;
-    AM2_Point      pt;
+    const AM2_MapRow *row;
+    const AM2_Sprite *spr;
+    AM2_Point         pt;
 
-    if (!p)
-        return g_zeroPoint;
+    if (!o)
+        return g_zeroXY;
 
-    pt = *(const AM2_Point *)(p + OBJ_OFF_POS);
-    if (*(const int32_t *)(p + OBJ_OFF_ROW_COUNT) == 1)
-        p = *(const uint8_t *const *)(p + OBJ_OFF_ROWS);
-    else if (*(const int32_t *)(p + OBJ_OFF_ROW_COUNT) > 1)
-        p = *(const uint8_t *const *)(p + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE;
+    pt = o->pos;
+    if (o->rowSet.count == 1)
+        row = o->rowSet.rows;
+    else if (o->rowSet.count > 1)
+        row = &o->rowSet.rows[1];
     else
-        p = 0;      /* no rows: the point as it is */
-    if (p) {
-        p = *(const uint8_t *const *)(p + ROW_OFF_SPRITE);
-        if (p) {
-            pt.x -= *(const int16_t *)(p + SPR_OFF_OVX);
-            pt.y -= *(const int16_t *)(p + SPR_OFF_OVY);
+        row = 0;        /* no rows: the point as it is */
+    if (row) {
+        spr = row->sprite;
+        if (spr) {
+            pt.x -= spr->attachX;
+            pt.y -= spr->attachY;
         }
     }
-    return *(const uint32_t *)&pt;
+    return pt;
 }
 
 
@@ -612,8 +614,7 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
     }
 
-    SettlePointInRegion(TileOfPoint(*(const uint32_t *)out),
-                        (uint32_t *)out);
+    SettlePointInRegion(TileOfPoint(*out), out);
 }
 
 /* 0x00404400, two callers. Put `out` where the follower in formation `slot`
@@ -703,8 +704,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
     }
 
-    SettlePointInRegion(TileOfPoint(*(const uint32_t *)out),
-                        (uint32_t *)out);
+    SettlePointInRegion(TileOfPoint(*out), out);
 #undef l
 }
 
@@ -961,7 +961,7 @@ void __cdecl GrowSpriteList(void)
                                               (size_t)g_spriteListCap * 4u);
 }
 
-int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from)
+int32_t __cdecl DoAirSupport(int32_t kind, AM2_Point where, uint32_t from)
 {
     int32_t extra = 0;
 
@@ -980,7 +980,7 @@ int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from)
              where, from, UidArmy(from), g_airCount);
 
     /* One dword, where AirSupportPop moves the same field as two words. */
-    ((uint32_t *)g_airWhere)[g_airCount] = where;
+    ((AM2_Point *)g_airWhere)[g_airCount] = where;
     g_airKind[g_airCount]  = kind;
     g_airFrom[g_airCount]  = from;
     g_airExtra[g_airCount] = extra;
@@ -1138,8 +1138,8 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
  * it would otherwise have been; the sibling commit got exactly that guess
  * wrong in the other direction.
  */
-int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
-                               uint32_t at)
+int32_t __cdecl ObjBlockWeight(void *from, void *obj, AM2_Point unused,
+                               AM2_Point at)
 {
     const uint8_t *o = (const uint8_t *)obj;
     const uint8_t *f = (const uint8_t *)from;
@@ -1165,7 +1165,7 @@ int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
         int32_t d = ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
                                (const AM2_Point *)(o + OBJ_OFF_POS));
 
-        if (ApproxDist((const AM2_Point *)&at,
+        if (ApproxDist(&at,
                        (const AM2_Point *)(o + OBJ_OFF_POS)) >= d)
             return 0;
     }
@@ -1304,7 +1304,7 @@ void __cdecl ToggleFogOfWar(void)
 /* The strike itself, still original -- what a pass does when its timer runs
  * out. Its second argument is an army: it compares it against
  * ADDR_DEFAULT_OWNER, which is the third reading agreeing on that field. */
-typedef void (__cdecl *AM2_AirStrikeFn)(uint32_t at, int32_t army);
+typedef void (__cdecl *AM2_AirStrikeFn)(AM2_Point at, int32_t army);
 
 /* The ten-argument creator is CreateExplosion and is reconstructed in
  * item.cpp, so the two call sites below name it. */
@@ -1452,7 +1452,7 @@ void __cdecl AirPassesDraw(void)
     if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
                              g_airPassArmy[0]))
-        AirPassStrike(*(const uint32_t *)g_airPassWhere,
+        AirPassStrike(*(const AM2_Point *)g_airPassWhere,
                              g_airPassArmy[0]);
 
     for (i = 1; i < g_airPassCount; i++) {
@@ -1487,11 +1487,11 @@ void __cdecl AirPassesDraw(void)
  * Both early exits sit before the original's `push esi`, which is why they pop
  * one register fewer -- the conditional-push shape, the same one that gives
  * StepType6 two returns at different depths. */
-void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
-                                uint32_t *out)
+void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, void *obj,
+                                AM2_Point *out)
 {
     int32_t  *isVehicle = g_slotIsVehicle;
-    uint32_t *slotPos   = g_slotPositions;
+    AM2_Point *slotPos  = g_slotPositions;
     uint8_t  *headings  = g_slotHeadings;
     const uint8_t *o = (const uint8_t *)obj;
     uint8_t   heading;
@@ -1507,7 +1507,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
     if (slot == 0) {
         *out = leaderPos;
         heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                               (const AM2_Point *)&leaderPos);
+                               &leaderPos);
     } else if (slot < 9) {
         const uint8_t *rec = g_slotRecs
                              + (uint32_t)slot * AM2_SLOT_REC_BYTES;
@@ -1526,10 +1526,10 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
                                 [slot * AM2_SLOT_REC_BYTES + SLOT_REC_OFF_ANGLE]
                             + headings[parent]);
         fdist = (float)dist;
-        ((int16_t *)out)[0] =
-            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)((int16_t *)out)[0]);
-        ((int16_t *)out)[1] =
-            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)((int16_t *)out)[1]);
+        out->x =
+            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)out->x);
+        out->y =
+            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)out->y);
     } else {
         int32_t band;
 
@@ -1541,10 +1541,10 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
             dist += dist;
         *out = slotPos[parent];
         fdist = (float)dist;
-        ((int16_t *)out)[0] =
-            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)((int16_t *)out)[0]);
-        ((int16_t *)out)[1] =
-            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)((int16_t *)out)[1]);
+        out->x =
+            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)out->x);
+        out->y =
+            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)out->y);
     }
 
     slotPos[slot]  = *out;
@@ -1798,7 +1798,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
  *
  * A NULL WEAPON SKIPS THE WHOLE TAIL but still leaves the trooper on the map
  * -- the guard is around the four calls, not around the creation. */
-void __cdecl AirPassStrike(uint32_t at, int32_t army)
+void __cdecl AirPassStrike(AM2_Point at, int32_t army)
 {
 #define OFF  (g_airDropOffsets)
 #define FACE (g_airDropFacings)
@@ -1814,14 +1814,14 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
         void *weapon;
 
         trooper = CreateTrooper(g_dirScratch,
-                                ((const AM2_Point *)&at)->x + OFF[i * 2],
-                                ((const AM2_Point *)&at)->y + OFF[i * 2 + 1],
+                                at.x + OFF[i * 2],
+                                at.y + OFF[i * 2 + 1],
                                 AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
         weapon = CreateWeapon(g_dirScratch, army,
                               KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
-                              g_zeroPoint,
+                              g_zeroXY,
                               4, -1, 0, 0);
         if (!weapon)
             continue;

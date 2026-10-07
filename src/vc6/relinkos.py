@@ -95,8 +95,10 @@ def _aggregated(va):
 # beside the sprite list's settled it; with the object table typed the aim
 # sprites' alone did, and with the map descriptor typed the sprite list's
 # rejoins it; the object's route fields (2026-10-07) leave the sprite list's
-# alone again. Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC),)
+# alone again; the typed AI records and AM2_Point parameters (2026-10-07)
+# move it to the 0x00511BC8 block's alone. Search the subsets (empty first)
+# when it flips.
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
 
 
 def _kept(va):

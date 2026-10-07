@@ -224,7 +224,7 @@
 #define g_dirtyPrevHead          (*(uint16_t *)(uintptr_t)ADDR_DIRTY_PREV_HEAD)  /* 0x00508AD4 */
 #define g_dirtyRects             ((AM2_DirtyRec *)(uintptr_t)ADDR_DIRTY_RECTS)  /* 0x00508AC4 */
 #define g_dirtyTail              (*(uint16_t *)(uintptr_t)ADDR_DIRTY_TAIL)  /* 0x00508AC0 */
-#define g_dragAnchor             (*(uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR)  /* 0x004FCF68 */
+#define g_dragAnchor             (*(AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR)  /* 0x004FCF68 */
 #define g_drawTarget             (*(void **)(uintptr_t)ADDR_DRAW_TARGET)  /* 0x00507128 */
 #define g_dropRing               ((int16_t *)(uintptr_t)ADDR_DROP_RING)  /* 0x00489DE8 */
 #define g_dynamic                ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)  /* 0x004FA3C0 */
@@ -727,7 +727,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_sightRangeWant         (*(double *)(uintptr_t)ADDR_SIGHT_RANGE_WANT)  /* 0x0046F2F8 */
 #define g_slotHeadings           ((uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)  /* 0x0065A068 */
 #define g_slotIsVehicle          ((int32_t *)(uintptr_t)ADDR_SLOT_IS_VEHICLE)  /* 0x0065A1A8 */
-#define g_slotPositions          ((uint32_t *)(uintptr_t)ADDR_SLOT_POSITIONS)  /* 0x0065A0A8 */
+#define g_slotPositions          ((AM2_Point *)(uintptr_t)ADDR_SLOT_POSITIONS)  /* 0x0065A0A8 */
 #define g_slotRecs               ((uint8_t *)(uintptr_t)ADDR_SLOT_RECS)  /* 0x0048BD90 */
 #define g_slowMachine            (*(int32_t *)(uintptr_t)ADDR_SLOW_MACHINE)  /* 0x005125C0 */
 #define g_soldierAnims           ((uint8_t *)(uintptr_t)ADDR_SOLDIER_ANIMS)  /* 0x00659F00 */
@@ -899,6 +899,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_windowed               (*(int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)  /* 0x00507344 */
 #define g_winEnabled             (*(int32_t *)(uintptr_t)ADDR_WIN_ENABLED)  /* 0x00512304 */
 #define g_zeroPoint              (*(uint32_t *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0 */
+#define g_zeroXY                 (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0, as the point it is */
 #define g_zeroRect               ((void *)(uintptr_t)ADDR_ZERO_RECT)  /* 0x005125A8 */
 
 #endif /* AM2_GLOBALS_H */

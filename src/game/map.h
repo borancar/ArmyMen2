@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"   /* am2_FILE */
+#include "dist.h"             /* AM2_Point */
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +44,7 @@ int32_t __cdecl LoadMapSection(am2_FILE *fp);
  * pixel extents, and the failure path clears only AX, so the result is
  * sixteen bits; every caller stores it as one. */
 #if !(defined(_MSC_VER) && defined(AM2_MAP_DEFINES_TILEOFPOINT))
-int32_t __cdecl TileOfPoint(uint32_t packed);
+int32_t __cdecl TileOfPoint(AM2_Point pt);
 #endif
 
 /* 0x0043ED40. How many records ADDR_LEVEL_TABLE holds. */
@@ -51,7 +52,7 @@ int32_t __cdecl LevelCount(void);
 
 /* 0x0042E390. The tiles a line crosses, stepped in tile space from the first
  * point's tile. Writes `tiles` and `count`; neither is bounds-checked. */
-void __cdecl TraceTileLine(uint32_t from, uint32_t to,
+void __cdecl TraceTileLine(AM2_Point from, AM2_Point to,
                            uint16_t *tiles, int32_t *count);
 
 /* 0x0042B250, six callers -- the inverse, and it CENTRES: the point it returns
@@ -62,7 +63,7 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
  * ADDR_MAP_ROW_SHIFT. Both halves read the map's width, from two globals that
  * have to agree; that is one of the three readings that settle what
  * 0x00514DDC is. */
-uint32_t __cdecl PointOfTile(int32_t tile);
+AM2_Point __cdecl PointOfTile(int32_t tile);
 
 /* 0x0042B210. The same answer as PointOfTile, written back as two int32
  * rather than packed into one dword. */

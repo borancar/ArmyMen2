@@ -1072,7 +1072,7 @@ int32_t __cdecl PlaceScenario(void)
                 void *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, 9, 0),
-                                       g_zeroPoint,
+                                       g_zeroXY,
                                        4, -1, 1, 0);
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
@@ -1099,7 +1099,7 @@ int32_t __cdecl PlaceScenario(void)
                 void *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, ScenRowWeapon(kind), 0),
-                                       g_zeroPoint,
+                                       g_zeroXY,
                                        4, -1, 1, 0);
 
                 *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
@@ -1304,7 +1304,7 @@ void __cdecl ResetLevelState(void)
  * and steps over it -- so with one toucher it gets a field-numbered name and
  * no claim. What IS evidenced is that the same argument also lands in
  * OBJ_OFF_ROW0_Y_ADJUST and goes through ScaleBy32Blocks into the row. */
-void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
+void *__cdecl CreateMissile(void *weapon, void *source, AM2_Point at,
                             int32_t heading, int32_t a5, int32_t a6,
                             int32_t repairFrame, float speedScale,
                             int32_t initUnused, uint32_t uid,
@@ -1349,7 +1349,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 g_missileRowSpec,
-                (int16_t)at, ((const AM2_Point *)&at)->y,
+                at.x, at.y,
                 g_zeroRect);
 
     *(int32_t *)(o + MISSILE_OFF_GROUND) = a5;
@@ -1461,7 +1461,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 
     ObjInitCommon(o, g_dirScratch,
                          AM2_OBJ_TYPE_MISSILE,
-                         *(const uint32_t *)(h + OBJ_OFF_POS),
+                         *(const AM2_Point *)(h + OBJ_OFF_POS),
                          g_missileBox,
                          1, *(const int32_t *)(h + 4));
 
@@ -2257,7 +2257,7 @@ void *__cdecl LoadType7(am2_FILE *fp, const void *hdr)
 
     (void)fp;
 
-    made = (uint8_t *)MakeKind7(*(const uint32_t *)(h + OBJ_OFF_POS), 1,
+    made = (uint8_t *)MakeKind7(*(const AM2_Point *)(h + OBJ_OFF_POS), 1,
                                       *(const int8_t *)(h + OBJ_OFF_ARMY),
                                       *(const uint8_t *)(h + OBJ_OFF_FACING),
                                       1,
@@ -2557,12 +2557,9 @@ int32_t __cdecl NoteKind31(void *rec)
 
 /* 0x004057B0, two callers. A pass-through and nothing else: three arguments
  * forwarded to a 1,424-byte function that has two other callers of its own. */
-void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
+void __cdecl Call405220(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    /* Same shape as Call4057D0 above: three dwords that are (obj, out, ctx),
-     * declared int32_t because this thunk predates the target having one. */
-    AiGuardStep((void *)(uintptr_t)(uint32_t)a, (void *)(uintptr_t)(uint32_t)b,
-                (void *)(uintptr_t)(uint32_t)c);
+    AiGuardStep(o, out, c);
 }
 
 /* 0x00445FE0. Free, then log -- and the MESSAGE IS AN ARGUMENT.
@@ -2694,13 +2691,9 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
 
 /* 0x00460290 is DefSortMissileRecs now; defparse.h declares it. */
 
-void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
+void __cdecl Call4057D0(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-    /* The three dwords really are (obj, out, ctx); this thunk was written
-     * before the target had a shape, which is why its own prototype is
-     * int32_t. Left as the original declares it and cast at the one call. */
-    AiPatrolStep((void *)(uintptr_t)(uint32_t)a, (void *)(uintptr_t)(uint32_t)b,
-                 (void *)(uintptr_t)(uint32_t)c);
+    AiPatrolStep(o, out, c);
 }
 
 
@@ -2747,7 +2740,7 @@ int32_t __cdecl WalkCellKeepEnemy(void *obj)
     return ArmyAlliedWithObj((int32_t)g_defaultOwner, (const AM2_Object *)obj, 0) == 0;
 }
 
-void *__cdecl WalkCellWrapper(void *unused, uint32_t at)
+void *__cdecl WalkCellWrapper(void *unused, AM2_Point at)
 {
     (void)unused;
 
@@ -3133,7 +3126,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
     if (renumber) {
         w = (uint8_t *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
-                *(const int32_t *)(h + OBJ_OFF_POS),
+                *(const AM2_Point *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1, 0);
         UidRemapAdd(*(const uint32_t *)(h + OBJ_OFF_UID),
@@ -3142,7 +3135,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
     } else {
         w = (uint8_t *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
-                *(const int32_t *)(h + OBJ_OFF_POS),
+                *(const AM2_Point *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1,
                 *(const uint32_t *)(h + OBJ_OFF_UID));
