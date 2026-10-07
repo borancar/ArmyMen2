@@ -2180,8 +2180,8 @@ eos:
         STEP();
         act->code = 0x26;
         WANT(AM2_TOKEN_INTEGER)
-        act->subject = TOKVAL;
         act->n0 = 0;
+        act->subject = TOKVAL;
         (*at)++;
         return 1;
 

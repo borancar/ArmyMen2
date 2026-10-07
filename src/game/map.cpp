@@ -834,8 +834,8 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
         len = (int8_t)*q++;
         if (len) {
             strcpy(row->name, (const char *)q);
-            took += len;
             cur   = q + len;
+            took += len;
         } else {
             row->name[0] = 0;
             cur += 4;

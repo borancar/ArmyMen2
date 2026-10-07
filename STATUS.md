@@ -215,6 +215,18 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Probe sweeps, still 1532** (2026-10-07).
+    - Guarded `swap.py` over every unmatched function:
+      - ScriptParseActionRecon 478 -> 458.
+      - ObjHitMaskAction 163 -> 154.
+      - AiTrooperStep 130 -> 126.
+      - FindPath 378 -> 375.
+      - ListMaskAction 211 -> 208.
+      - ParseScenarioPart 24 -> 22.
+    - `tern.py` (ternary <-> if/else assignments): SelectFirePose 72 -> 70.
+    - A swap that moved a statement into an unbraced `else` scored 12 -> 4
+      in FormationPoint. It changed what the code does, so it was rejected,
+      and swap.py now skips unbraced bodies.
   - **LoadAnimTable matched; two search tools** (2026-10-07), 1531 -> 1532.
     - LoadAnimTable stores -2 only when `next` is zero. The ternary
       stored in both arms. It also takes the count into a local for the

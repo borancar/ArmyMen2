@@ -1384,8 +1384,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 b.stamp  = g_pathGeneration;
                 b.g      = (uint16_t)g;
                 b.h      = (uint16_t)h;
-                b.parent = (uint16_t)cur;
                 b.depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
+                b.parent = (uint16_t)cur;
                 b.state  = 1;
             } else if (!(b.state & 1)) {
                 /* Seen, and not open. Closed nodes are done with; anything
@@ -2168,8 +2168,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 
     phase = world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
-        k        = (1 << AM2_TILE_SHIFT) - phase;
         splitOdd = 0;
+        k        = (1 << AM2_TILE_SHIFT) - phase;
     } else {
         splitOdd = 1;
         k        = 8 - phase;
@@ -2804,8 +2804,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[15] = w + 1;
     ring[17] = 2 * w - 1;
     ring[16] = w + 2;
-    ring[19] = 2 * w + 1;
     ring[18] = 2 * w;
+    ring[19] = 2 * w + 1;
 
     tilew = tile.right - tile.left + 1;
 
@@ -3460,8 +3460,8 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
             *(const int32_t *)&g_gameClockMs
             + AM2_AI_TROOPER_RETRY_MS;
         *(uint32_t *)&pt                      = *(const uint32_t *)dest;
-        ob->routeGoal = *(const uint32_t *)&pt;
         ob->moveFrom  = *(const uint32_t *)pos;
+        ob->routeGoal = *(const uint32_t *)&pt;
         ob->moveTo    = *(const uint32_t *)&pt;
         ob->moveEnd    = 0;
         goto two_waypoints;
@@ -3557,8 +3557,8 @@ after_region:
 
     ob->routeGoal = *(const uint32_t *)&pt;
     if (!PlanPathTo(obj, (uint32_t *)&pt, AM2_AI_PLAN_BUDGET_LONG)) {
-        ob->moveFrom  = *(const uint32_t *)pos;
         ob->routeGoal = *(const uint32_t *)dest;
+        ob->moveFrom  = *(const uint32_t *)pos;
         goto set_move_to;
     }
     /* A route was found; PlanPathTo filled the waypoints itself. */
