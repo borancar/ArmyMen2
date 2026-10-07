@@ -396,18 +396,18 @@
 #define g_menuEnabled            (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)  /* 0x004FCEF8 */
 #define g_menuInk                (*(uint8_t **)(uintptr_t)ADDR_MENU_INK)  /* 0x004FCDB0 */
 #define g_menuMsgList            (*(void **)(uintptr_t)ADDR_MENU_MSG_LIST)  /* 0x0051612C */
-#define g_menuOverlayA           (*(void **)(uintptr_t)ADDR_MENU_OVERLAY_A)  /* 0x004FCDA8 */
+#define g_menuOverlayA           (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_OVERLAY_A)  /* 0x004FCDA8 */
 #define g_menuOverlayADx         (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX)  /* 0x004FCDC0 */
 #define g_menuOverlayAInk        (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)  /* 0x004FCDB4 */
-#define g_menuOverlayB           (*(void **)(uintptr_t)ADDR_MENU_OVERLAY_B)  /* 0x004FCDAC */
+#define g_menuOverlayB           (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_OVERLAY_B)  /* 0x004FCDAC */
 #define g_menuOverlayBDx         (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX)  /* 0x004FCDC4 */
 #define g_menuOverlayBInk        (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)  /* 0x004FCDB8 */
 #define g_menuRequest            (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)  /* 0x00511DC8 */
 #define g_menuRequestSet         (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)  /* 0x00511DC4 */
 #define g_menuRow                (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)  /* 0x004FCAA8 */
 #define g_menuRowStamp           (*(uint32_t *)(uintptr_t)ADDR_MENU_ROW_STAMP)  /* 0x004FCDF0 */
-#define g_menuSprites            (*(void **)(uintptr_t)ADDR_MENU_SPRITES)  /* 0x004FCAAC */
-#define g_menuSpritesEnd         (*(void **)(uintptr_t)ADDR_MENU_SPRITES_END)  /* 0x004FCDA4 */
+#define g_menuSprites            (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES)  /* 0x004FCAAC */
+#define g_menuSpritesEnd         (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES_END)  /* 0x004FCDA4 */
 #define g_messageBmpName         ((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME)  /* 0x005122A4 */
 #define g_messageText            ((char *)(uintptr_t)ADDR_MESSAGE_TEXT)  /* 0x00511EA4 */
 #define g_missileAnims           ((struct AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)  /* 0x00654C90 */

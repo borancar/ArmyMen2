@@ -433,7 +433,7 @@ void __cdecl FreeMenuSprites(void)
             }
         }
     }
-    (*(uint32_t *)&g_menuSpritesEnd) = 0;
+    g_menuSpritesEnd = (AM2_Sprite *)0;
 
     if (g_menuSurface) {
         IDirectDrawSurface_Release(g_menuSurface);
@@ -513,7 +513,7 @@ void __cdecl InitMenuScreen(void)
         rows = 0;
 
     for (row = 0; row <= rows; row++) {
-        AM2_Sprite **dst = (AM2_Sprite * *)&g_menuSprites + row * 10;
+        AM2_Sprite **dst = &g_menuSprites + row * 10;
 
         for (frame = 0; frame < 10; frame++) {
             dst[frame] = PreloadSprite(0, row, frame, 0, 1);
@@ -523,7 +523,7 @@ void __cdecl InitMenuScreen(void)
     }
 
     g_animFrame = 0;
-    (*(uint32_t *)&g_menuSpritesEnd) = *(const uint32_t *)&g_menuSprites;
+    g_menuSpritesEnd = g_menuSprites;
     g_animNext = Ticks() + MENU_ANIM_PERIOD;
 
     r = RectMake(0, 0, 0, 0);

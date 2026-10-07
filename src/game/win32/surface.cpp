@@ -1257,8 +1257,8 @@ void __cdecl DrawMenuOverlay(void)
  */
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
-#define g_menuSprites2  ((uint8_t * *)&g_menuSprites)
-#define g_cursorSprite  (*(uint8_t * *)&g_menuSpritesEnd)
+#define g_menuSprites2  (&g_menuSprites)
+#define g_cursorSprite  (g_menuSpritesEnd)
 #ifdef AM2_STANDALONE
 /* The fixed 32x32 corner of the menu surface the cursor save-under occupies
  * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
@@ -1268,11 +1268,11 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #define g_cursorPrev    ((AM2_Rect *)g_menuCursorPrev)
 #define g_paintObj      (g_paintObject)
 #define g_clipRect      ((const RECT *)g_screenClip)
-#define g_overlayA      (*(uint8_t * *)&g_menuOverlayA)
-#define g_overlayB      (*(uint8_t * *)&g_menuOverlayB)
-#define g_cursorInk    (*(int32_t *)&g_menuInk)
-#define g_overlayAInk   (*(int32_t *)&g_menuOverlayAInk)
-#define g_overlayBInk   (*(int32_t *)&g_menuOverlayBInk)
+#define g_overlayA      (g_menuOverlayA)
+#define g_overlayB      (g_menuOverlayB)
+#define g_cursorInk    (g_menuInk)
+#define g_overlayAInk   (g_menuOverlayAInk)
+#define g_overlayBInk   (g_menuOverlayBInk)
 
 
 /* 0x00412D30, thirty callers -- everything that highlights a menu row goes
@@ -1315,8 +1315,8 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
 
     origin = g_zeroPoint;
 
-    g_overlayA    = (uint8_t *)0;
-    g_overlayB    = (uint8_t *)0;
+    g_overlayA    = (AM2_Sprite *)0;
+    g_overlayB    = (AM2_Sprite *)0;
     g_cursorInk  = 0;
     g_overlayAInk = 0;
     g_overlayBInk = 0;
@@ -1330,9 +1330,6 @@ typedef uint32_t (__cdecl *am2_ticks_fn)(void);
 /* The paint object's first virtual, which takes its rectangle BY VALUE. It is
  * a C++ virtual and not COM -- `this` stays in ecx and is never pushed. */
 
-#define sfld16(s, off) (*(const int16_t *)((const uint8_t *)(s) + (off)))
-#define sfld32(s, off) (*(const int32_t *)((const uint8_t *)(s) + (off)))
-#define swr32(s, off)  (*(int32_t *)((uint8_t *)(s) + (off)))
 
 /* Advance the ten-frame cycle if its 200 ms have elapsed. Inlined into
  * DrawMenuCursor in the image, reading the row itself; the sprite store is
@@ -1374,18 +1371,18 @@ static inline void TickMenuAnimation(void)
 
 /* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
  * point and the overlay's. The original writes this out twice. */
-static inline void DrawMenuOverlaySprite(uint8_t *const &spr, uint32_t dxAddr, int32_t fld)
+static inline void DrawMenuOverlaySprite(AM2_Sprite *const &spr, uint32_t dxAddr, uint8_t *ink)
 {
     int32_t x, y;
 
     if (!spr)
         return;
-    x = g_cursorX + sfld16(g_cursorSprite, SPR_OFF_OVX)
+    x = g_cursorX + g_cursorSprite->attachX
       + *(const int16_t *)(uintptr_t)dxAddr;
-    y = g_cursorY + sfld16(g_cursorSprite, SPR_OFF_OVY)
+    y = g_cursorY + g_cursorSprite->attachY
       + *(const int16_t *)(uintptr_t)(dxAddr + 2);
-    swr32(spr, SPR_OFF_MODE) = fld;
-    DrawSprite((AM2_Sprite *)spr, x, y, g_cursorInk != 0);
+    spr->lut = ink;
+    DrawSprite(spr, x, y, g_cursorInk != 0);
 }
 
 void __cdecl DrawMenuCursor(void)
@@ -1427,10 +1424,10 @@ void __cdecl DrawMenuCursor(void)
         }
 
         /* The sprite pointer is read again for each field. */
-        cur.left   = g_cursorX - sfld16(g_cursorSprite, SPR_OFF_HOTX);
-        cur.top    = g_cursorY - sfld16(g_cursorSprite, SPR_OFF_HOTY);
-        cur.right  = cur.left + sfld32(g_cursorSprite, SPR_OFF_W);
-        cur.bottom = cur.top  + sfld32(g_cursorSprite, SPR_OFF_H);
+        cur.left   = g_cursorX - g_cursorSprite->hotX;
+        cur.top    = g_cursorY - g_cursorSprite->hotY;
+        cur.right  = cur.left + g_cursorSprite->bounds.right;
+        cur.bottom = cur.top  + g_cursorSprite->bounds.bottom;
 
         /* Save what is about to be covered -- the original's call (0x00413172):
          * the clipped cursor rect stretched UP into the whole 32x32 slot, the
@@ -1472,8 +1469,8 @@ void __cdecl DrawMenuCursor(void)
                 int32_t x = g_cursorX + *(const int16_t *)&g_menuCursorDx;
                 int32_t y = g_cursorY + *(const int16_t *)(uintptr_t)(((uintptr_t)&g_menuCursorDx) + 2);
 
-                swr32(g_cursorSprite, SPR_OFF_MODE) = g_cursorInk;
-                DrawSprite((AM2_Sprite *)g_cursorSprite, x, y, g_cursorInk != 0);
+                g_cursorSprite->lut = g_cursorInk;
+                DrawSprite(g_cursorSprite, x, y, g_cursorInk != 0);
                 DrawMenuOverlaySprite(g_overlayA, ((uintptr_t)&g_menuOverlayADx),
                                       g_overlayAInk);
                 DrawMenuOverlaySprite(g_overlayB, ((uintptr_t)&g_menuOverlayBDx),
@@ -1481,7 +1478,7 @@ void __cdecl DrawMenuCursor(void)
             }
             UnlockSurface();
         } else {
-            DrawSprite((AM2_Sprite *)g_cursorSprite, g_cursorX, g_cursorY, 0);
+            DrawSprite(g_cursorSprite, g_cursorX, g_cursorY, 0);
         }
     }
 
@@ -1489,14 +1486,14 @@ void __cdecl DrawMenuCursor(void)
     *g_cursorPrev = *g_cursorRect;
 
     if (g_cursorSprite) {
-        const uint8_t *spr = g_cursorSprite;
+        const AM2_Sprite *spr = g_cursorSprite;
         AM2_Rect       r;
-        int32_t        hy = sfld16(spr, SPR_OFF_HOTY);
-        int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
+        int32_t        hy = spr->hotY;
+        int32_t        hx = spr->hotX;
 
         r = RectMake(g_cursorX - hx, g_cursorY - hy,
-                     g_cursorX + sfld32(spr, SPR_OFF_W) - hx,
-                     g_cursorY + sfld32(spr, SPR_OFF_H) - hy);
+                     g_cursorX + spr->bounds.right - hx,
+                     g_cursorY + spr->bounds.bottom - hy);
         *g_cursorRect = r;
     }
 }

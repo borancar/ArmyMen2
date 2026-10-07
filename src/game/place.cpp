@@ -1097,7 +1097,7 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
-#define SET_CURSOR(x) (g_menuSpritesEnd = (void *)(x))
+#define SET_CURSOR(x) (g_menuSpritesEnd = (AM2_Sprite *)(x))
 
 /* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
  * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump
@@ -1194,8 +1194,8 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
     g_menuRow        = row;
     g_animFrame = -1;
     *(int32_t *)&g_animNext  = 0;
-    g_menuOverlayA    = (void *)0;
-    g_menuOverlayB    = (void *)0;
+    g_menuOverlayA    = (AM2_Sprite *)0;
+    g_menuOverlayB    = (AM2_Sprite *)0;
 
     if (ok) {
         ink = g_objTableRecords
