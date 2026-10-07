@@ -2613,6 +2613,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
 #undef rect
+#undef cells
 }
 
 /* ListBoxAction -- original 0x00438F10, one caller.
