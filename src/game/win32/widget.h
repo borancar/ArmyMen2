@@ -530,7 +530,9 @@ struct AM2_ArrowBar : AM2_Widget {
 
 struct AM2_ScrollBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t     pad58[0x64 - 0x58];
+    int32_t     field58;            /* 0x0058 */
+    struct AM2_Arrow *left;         /* 0x005C  the left arrow, auto-repeating */
+    struct AM2_Arrow *right;        /* 0x0060  the right arrow */
     AM2_Sprite *bar;                /* 0x0064  SCROLLBAR_OFF_BAR, the bar the paint draws */
     int32_t     field68;            /* 0x0068 */
     int32_t     shift;              /* 0x006C  SCROLLBAR_OFF_SHIFT, added to the centred x */
@@ -565,13 +567,14 @@ struct AM2_Edit : AM2_Widget {
 
 struct AM2_MpSpin : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    AM2_Widget *edit;               /* 0x0058  SPIN_OFF_EDIT */
-    AM2_Widget *up;                 /* 0x005C  SPIN_OFF_UP */
-    AM2_Widget *down;               /* 0x0060  SPIN_OFF_DOWN */
+    struct AM2_Edit *edit;          /* 0x0058  SPIN_OFF_EDIT MPFIELD_OFF_EDIT */
+    struct AM2_Arrow *up;           /* 0x005C  SPIN_OFF_UP */
+    struct AM2_Arrow *down;         /* 0x0060  SPIN_OFF_DOWN */
     int32_t     min;                /* 0x0064  SPIN_OFF_MIN */
     int32_t     max;                /* 0x0068  SPIN_OFF_MAX */
     int32_t     step;               /* 0x006C  SPIN_OFF_STEP */
-    uint8_t     pad70[SPIN_OFF_HANDLER - 0x70];
+    int32_t     row;                /* 0x0070  MPSPIN_OFF_ROW MPFIELD_OFF_ROW, which army */
+    char        text[SPIN_OFF_HANDLER - 0x74]; /* 0x0074  MPSPIN_OFF_TEXT, the value as "%d" */
     void  (__cdecl *handler)(AM2_Widget *);   /* SPIN_OFF_HANDLER */
     AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row);
     explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -815,7 +818,7 @@ struct AM2_CommPanelScreen : AM2_ScreenBase {
 };
 struct AM2_ControlsDialogScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    AM2_Widget *rows[21];           /* 0x0064 KEYROW_PARENT_ROWS, one per binding */
+    struct AM2_KeyRow *rows[21];    /* 0x0064 KEYROW_PARENT_ROWS, one per binding */
     AM2_ControlsDialogScreen(const char *bmp);
     ~AM2_ControlsDialogScreen();
 };
@@ -841,7 +844,7 @@ struct AM2_DlgBattleJoinScreen : AM2_ScreenBase {
 };
 struct AM2_DlgGameMenuScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_GAMEMENU_SIZE - sizeof(AM2_ScreenBase)];
+    int32_t     abort;              /* 0x0064  GAMEMENU_OFF_ABORT, set by ABORT */
     AM2_DlgGameMenuScreen(const char *bmp, int32_t flag);
     ~AM2_DlgGameMenuScreen();
 };
@@ -862,7 +865,7 @@ struct AM2_DlgSaveListScreen : AM2_ScreenBase {
 };
 struct AM2_EnterNameScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_ENTER_NAME_SIZE - sizeof(AM2_ScreenBase)];
+    char        text[AM2_ENTER_NAME_SIZE - 0x64]; /* 0x0064  ENTER_NAME_OFF_TEXT */
     AM2_EnterNameScreen(const char *bmp);
     ~AM2_EnterNameScreen();
 };

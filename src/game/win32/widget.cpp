@@ -2157,7 +2157,7 @@ static inline void RequestScreen(int32_t code)
  * is why the test is on the computed value rather than on `pos == 0`. */
 static inline int32_t BarVolume(const AM2_Widget *bar)
 {
-    int32_t pos = *(const int32_t *)((const uint8_t *)bar + SCROLLBAR_OFF_POS);
+    int32_t pos = ((const AM2_ScrollBar *)bar)->pos;
     int32_t vol = (pos - AM2_SCROLLBAR_RANGE) * 100;
 
     if (vol == -2000)
@@ -2232,7 +2232,7 @@ static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
 {
-    AM2_ArrowBar *bar  = (AM2_ArrowBar *)*(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
+    AM2_ArrowBar *bar  = (AM2_ArrowBar *)((AM2_Arrow *)arrow)->owner;
     AM2_ListBox *list = (AM2_ListBox *)bar->list;
 
     /* The list's fields and the bar's are read afresh at every use. */
@@ -2272,7 +2272,7 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
  * each caller compiled to push/call/pop -- the relink found it. */
 static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
 {
-    AM2_Widget *bar = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
+    AM2_Widget *bar = ((AM2_Arrow *)arrow)->owner;
     AM2_ScrollBar    *b   = (AM2_ScrollBar *)bar;
     const AM2_Sprite *thumb;
     void      (__cdecl *onChange)(AM2_Widget *);
@@ -2746,7 +2746,7 @@ static inline void SpinApply(AM2_Widget *spin, AM2_Edit *edit, int32_t value)
 
     orig_sprintf(edit->text, "%i", value);
 
-    fn = *(void (__cdecl **)(AM2_Widget *))((uint8_t *)spin + SPIN_OFF_HANDLER);
+    fn = ((AM2_MpSpin *)spin)->handler;
     if (fn)
         fn(spin);
 }
@@ -9597,13 +9597,13 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
             (*slot)->arrowBar = bar;
             bar->list   = *slot;
-            *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_FLAG50)     = 0;
+            bar->flag50 = 0;
 
             {
-                uint8_t *cb   = (uint8_t *)*slot;
-                void    *rows = *(void **)(cb + LISTBOX_OFF_ROWS);
+                AM2_ListBox  *cb   = *slot;
+                AM2_ListRows *rows = cb->rows;
 
-                *(int32_t *)(cb + 0x58) = *(const int32_t *)rows - 1;
+                cb->selected = rows->count - 1;
             }
 
             /* AND THE LAST ROW IS SCROLLED INTO VIEW, with the thumb put
@@ -10498,7 +10498,7 @@ void __cdecl MpCommitScore(AM2_Widget *w)
     if (!comm->isHost)
         return;
 
-    edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    edit = ((AM2_MpSpin *)w)->edit;
     g_scoreLimit =
         orig_atoi(edit->text);
     SendPlayerMsg(0);
@@ -10513,12 +10513,12 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
     if (!comm->isHost)
         return;
 
-    edit = (AM2_Edit *)*(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    edit = ((AM2_MpSpin *)w)->edit;
     /* The row is read AFTER the atoi, which matters not at all -- but the
      * original reads it there and nothing between the two touches it. */
     value = orig_atoi(edit->text);
     (g_armyPoints)
-        [*(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW)] = value;
+        [((AM2_MpSpin *)w)->row] = value;
     SendPlayerMsg(0);
 }
 
@@ -10913,7 +10913,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNameSetInk(uint8_t ink)
 {
     AM2_Widget *w = this;
 
-    ((uint8_t *)w)[MPNAME_OFF_INK] = ink;
+    ((AM2_MpName *)w)->ink = ink;
 }
 
 /* 0x00432D50 -- the NAME button.  It is not a spinner and it has no guest
@@ -12776,16 +12776,16 @@ void __attribute__((thiscall)) AM2_Widget::FocusLabelDraw(RECT clip)
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_KeyRow *self = (AM2_KeyRow *)w;
 
     if (w->flag44) {
-        self[LABEL_OFF_INK]   = self[FOCUSLABEL_OFF_INK_FOCUS];
-        self[LABEL_OFF_PAPER] = self[FOCUSLABEL_OFF_PAPER_FOCUS];
+        self->ink   = self->focInkFocus;
+        self->paper = self->focPaperFocus;
     } else {
         /* Paper first here and ink first above -- the original's order, and
          * nothing can tell the difference. */
-        self[LABEL_OFF_PAPER] = self[FOCUSLABEL_OFF_PAPER];
-        self[LABEL_OFF_INK]   = self[FOCUSLABEL_OFF_INK];
+        self->paper = self->focPaper;
+        self->ink   = self->focInk;
     }
     ::LabelDraw(w, clip);
 }
@@ -12835,18 +12835,14 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
     {
         /* The rows are a member array of the dialog, re-read after every
          * store -- a local copy of rows[i] makes VC6 keep it in a register. */
-        struct KeyRowParent {
-            uint8_t     pad[KEYROW_PARENT_ROWS];
-            AM2_Widget *rows[KEYROW_ROW_COUNT];
-        };
-        KeyRowParent *parent = (KeyRowParent *)w->parent;
+        AM2_ControlsDialogScreen *parent = (AM2_ControlsDialogScreen *)w->parent;
         const char  *none = "None";
         int32_t      i;
 
         for (i = 0; i < KEYROW_ROW_COUNT; i++) {
-            if (w == parent->rows[i])
+            if (w == (AM2_Widget *)parent->rows[i])
                 continue;
-            if (*(const int32_t *)((uint8_t *)parent->rows[i] + KEYROW_OFF_KEY) != key)
+            if (parent->rows[i]->key != key)
                 continue;
             *(int32_t *)((uint8_t *)parent->rows[i] + KEYROW_OFF_KEY)     = 0;
             *(const char **)((uint8_t *)parent->rows[i] + LABEL_OFF_TEXT) = none;
@@ -12867,7 +12863,7 @@ AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
         int32_t     index = KeyNameIndexOf(g_keyBindings[i * 2]);
-        AM2_Widget *row   = new AM2_KeyRow(index,
+        AM2_KeyRow *row   = new AM2_KeyRow(index,
                                            *(const char *const *)(names + index * 8 + 4),
                                            *RectSet(AM2_TEMP(AM2_Rect), g_keyrowPositions[i * 2], g_keyrowPositions[i * 2 + 1],
                                                     AM2_KEYROW_WIDTH, AM2_KEYROW_HEIGHT),
@@ -12931,13 +12927,13 @@ void __cdecl OnControlsCancel(AM2_Widget *w)
 void __cdecl OnControlsOk(AM2_Widget *w)
 {
     uint8_t *binding = g_keyBindings;
-    AM2_Widget *const *rows =
-        (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+    AM2_KeyRow *const *rows =
+        ((const AM2_ControlsDialogScreen *)w->parent)->rows;
     const AM2_KeyName *keys = g_keyNameTable;
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
-        int32_t k = *(const int32_t *)((const uint8_t *)rows[i] + KEYROW_OFF_KEY);
+        int32_t k = rows[i]->key;
         binding[i * 2] = (uint8_t)keys[k].dik;
     }
     SaveOptions();
@@ -13151,7 +13147,7 @@ AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
     char       *text;
     AM2_CTOR_VTABLE(w, VTABLE_ENTER_NAME);
     SetGameDir("save");
-    text = (char *)w + ENTER_NAME_OFF_TEXT;
+    text = this->text;
     text[0] = '\0';
 
     panel = new AM2_Panel("02_006_00_name.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0xAE, 0x1A7, 0x83));
@@ -13517,7 +13513,7 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
 
     ::WidgetUpdateCancel(w);
 
-    if (!*(const int32_t *)((const uint8_t *)w + GAMEMENU_OFF_ABORT))
+    if (!((const AM2_DlgGameMenuScreen *)w)->abort)
         return;
 
     if (g_commObject->lobbied)
@@ -13691,8 +13687,7 @@ void __cdecl GameMenuAbort(AM2_Widget *w)
 {
     (void)w;
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
-    *(int32_t *)(g_paintObject
-                 + GAMEMENU_OFF_ABORT) = 1;
+    ((AM2_DlgGameMenuScreen *)g_paintObject)->abort = 1;
 }
 
 void __cdecl OpenGameMenu(void)
@@ -14817,10 +14812,10 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
     if (w->parent->focusedChild == w) {
         if (checked) {
             w->sprite = self->sprOnFoc;
-            ink = *(const uint8_t *)((uint8_t *)self + CHECKBOX_OFF_INK_ON_FOC);
+            ink = self->inkOnFoc;
         } else {
             w->sprite = self->sprOffFoc;
-            ink = *(const uint8_t *)((uint8_t *)self + CHECKBOX_OFF_INK_OFF_FOC);
+            ink = self->inkOffFoc;
         }
     } else {
         if (checked) {
@@ -14828,7 +14823,7 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
             ink = self->inkOn;
         } else {
             w->sprite = self->sprOff;
-            ink = *(const uint8_t *)((uint8_t *)self + CHECKBOX_OFF_INK_OFF);
+            ink = self->inkOff;
         }
     }
 
@@ -14904,11 +14899,9 @@ AM2_Panel::~AM2_Panel()
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
-
     AM2_CTOR_VTABLE(w, VTABLE_ICON);
     /* No null test, as in the original. */
-    ReleaseSprite(*(AM2_Sprite **)(self + ICON_OFF_SPRITE));
+    ReleaseSprite(this->panelSprite);
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetPaintFwd1(RECT clip)
@@ -14941,16 +14934,15 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdateThunk()
  */
 void __attribute__((thiscall)) AM2_Widget::MpPreviewSetBitmap(const char *name)
 {
-    void *self = this;
-    uint8_t    *w = (uint8_t *)self;
+    AM2_Panel  *w = (AM2_Panel *)this;
     AM2_Sprite *spr;
 
-    ReleaseSprite(*(AM2_Sprite **)(w + PREVIEW_OFF_SPRITE));
+    ReleaseSprite(w->panelSprite);
 
-    spr = PreloadSpriteName(name, *(const int32_t *)(w + PREVIEW_OFF_FLAGS), 1);
+    spr = PreloadSpriteName(name, w->panelFlag, 1);
 
-    *(AM2_Sprite **)(w + PREVIEW_OFF_SPRITE) = spr;
-    ((AM2_Widget *)w)->sprite = spr;
+    w->panelSprite = spr;
+    w->sprite = spr;
 }
 
 /* 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- every one of the twenty
@@ -15958,25 +15950,23 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
     AM2_Widget *w = this;
 
     AM2_ScrollBar    *self = (AM2_ScrollBar *)w;
-    AM2_Widget *arrow;
+    AM2_Arrow  *arrow;
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     AM2_CTOR_VTABLE(w, VTABLE_SCROLLBAR);
 
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y, 9, 0x13),
                           (const char *)AM2_BMP_LTARROW1,
                           (const char *)AM2_BMP_LTARROW2, kOnArrowLeft);
-    *(AM2_Widget **)((uint8_t *)self + 0x5C) = arrow;
+    self->left = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)self + 0x5C)
-                 + ARROW_OFF_FLAG5C) = 1;
+    self->left->repeats = 1;
 
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + box.right - 9, w->y, 9, 0x13),
                           (const char *)AM2_BMP_RTARROW1,
                           (const char *)AM2_BMP_RTARROW2, kOnArrowRight);
-    *(AM2_Widget **)((uint8_t *)self + 0x60) = arrow;
+    self->right = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)self + 0x60)
-                 + ARROW_OFF_FLAG5C) = 1;
+    self->right->repeats = 1;
 
     self->bar =
         PreloadSpriteName((const char *)((void *)(uintptr_t)(AM2_BMP_HSCROLLBAR)),
@@ -16085,7 +16075,8 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
     AM2_Widget *w = this;
 
     AM2_MpSpin    *self = (AM2_MpSpin *)w;
-    AM2_Widget *kid;
+    AM2_Arrow  *arrow;
+    AM2_Edit   *edit;
     int32_t     inner;
     /* 0x80 IS THE COMMIT HANDLER, NOT THE PARENT, and writing the parent here
      * was a latent crash. SpinApply reads this slot and CALLS it with the
@@ -16108,7 +16099,7 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
 
     inner = box.right - 0x29;
 
-    kid = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + inner + 0x16, w->y, 0x13, 9),
+    arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + inner + 0x16, w->y, 0x13, 9),
                         "03_008_01_uparrow.bmp", "03_008_02_uparrow.bmp", SpinUp);
     /* THE SPIN KEEPS ITS THREE CHILDREN, and this whole layer was missing.
      * The original stores each one BEFORE the ::WidgetAddChild that follows it
@@ -16138,8 +16129,8 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
      * 42+37, the spin's own origin counted twice. A widget added to the wrong
      * parent is not misplaced by a little; it is offset by exactly its
      * parent's position, and that is the signature to look for. */
-    self->up = kid;
-    ::WidgetAddChild(parent, kid);
+    self->up = arrow;
+    ::WidgetAddChild(parent, arrow);
     *(int32_t *)((uint8_t *)self->up
                  + ARROW_OFF_FLAG5C) = 1;
 
@@ -16147,26 +16138,26 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
          * `mov edx,[esi+8]; mov eax,<height>; lea ecx,[edx+eax-9]` at
          * 0x00456431, so it is `y + height - 9`. With `y + 9` the two arrows
      * touch and the pair floats above the box on anything taller than 18. */
-    kid = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + inner + 0x16, w->y + box.bottom - 9, 0x13, 9),
+    arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + inner + 0x16, w->y + box.bottom - 9, 0x13, 9),
                         "03_009_01_dnarrow.bmp", "03_009_02_dnarrow.bmp", SpinDown);
-    self->down = kid;
-    ::WidgetAddChild(parent, kid);
+    self->down = arrow;
+    ::WidgetAddChild(parent, arrow);
     *(int32_t *)((uint8_t *)self->down
                  + ARROW_OFF_FLAG5C) = 1;
 
-    am2_sprintf((char *)((uint8_t *)self + MPSPIN_OFF_TEXT),
+    am2_sprintf(self->text,
                 "%i", value);
 
     /* The edit's commit is SpinCommit, a constant -- which parses the typed
      * text, clamps it and only then calls the caller's handler at
      * SPIN_OFF_HANDLER. Passing `commit` here skipped the parse and handed the
      * handler the EDIT instead of the spinner. */
-    kid = new AM2_Edit((char *)((uint8_t *)self + MPSPIN_OFF_TEXT), 5,
+    edit = new AM2_Edit(self->text, 5,
                        *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y + 5, inner, box.bottom - 0x0A),
                        1, c0, c1, c2, (void (__cdecl *)(AM2_Widget *))0,
                        SpinCommit, w);
-    self->edit = kid;
-    ::WidgetAddChild(parent, kid);
+    self->edit = edit;
+    ::WidgetAddChild(parent, edit);
 }
 
 /* 0x00433350, the TEXT LIST's destructor: one `jmp` to ADDR_LIST_DESTRUCT.
