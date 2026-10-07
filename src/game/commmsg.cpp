@@ -175,31 +175,31 @@ typedef int32_t (__attribute__((stdcall)) *AM2_PostMessageFn)(void *hwnd,
  * member that searches, and what the key and the flags MEAN is not
  * established.
  */
-void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
+AM2_MsgNode *__cdecl MsgListSetFlag(AM2_MsgList *list, int32_t key, int32_t set,
                              uint32_t bits)
 {
-    uint8_t *l     = (uint8_t *)list;
+    AM2_MsgList *l     = (AM2_MsgList *)list;
     uint32_t clear = ~bits;
-    uint8_t *found;
-    uint8_t *node;
+    AM2_MsgNode *found;
+    AM2_MsgNode *node;
 
-    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+    orig_wait_for_object(l->mutex, 0xFFFFFFFFu);
     found = 0;
 
-    for (node = *(uint8_t **)(l + MSGLIST_OFF_HEAD); node;
-         node = *(uint8_t **)(node + MSGNODE_OFF_NEXT)) {
-        if (*(const int32_t *)(node + PACKET_REC_OFF_KEY) == key) {
+    for (node = l->head; node;
+         node = node->next) {
+        if ((int32_t)node->key == key) {
             found = node;
             if (set)
-                *(uint32_t *)(found + PACKET_REC_OFF_FLAGS) |= bits;
+                found->flags |= bits;
             else
-                *(uint32_t *)(found + PACKET_REC_OFF_FLAGS) &= clear;
+                found->flags &= clear;
 
             break;
         }
     }
 
-    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    orig_release_mutex(l->mutex);
     return found;
 }
 
@@ -217,34 +217,34 @@ void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
  * `ret` in this build it is not even that. Reproduced.
  *
  * Note the complaint is issued while the mutex is still held. */
-void __cdecl MsgListAdd(void *list, void *node)
+void __cdecl MsgListAdd(AM2_MsgList *list, AM2_MsgNode *node)
 {
-    uint8_t *l = (uint8_t *)list;
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *tail;
+    AM2_MsgList *l = list;
+    AM2_MsgNode *n = node;
+    AM2_MsgNode *tail;
     int32_t  count;
 
-    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+    orig_wait_for_object(l->mutex, 0xFFFFFFFFu);
 
-    *(void **)(n + MSGNODE_OFF_NEXT) = (void *)0;
+    n->next = (AM2_MsgNode *)0;
 
-    tail = *(uint8_t **)(l + MSGLIST_OFF_TAIL);
-    *(void **)(n + MSGNODE_OFF_PREV) = tail;
+    tail = l->tail;
+    n->prev = tail;
 
-    if (tail == (uint8_t *)0)
-        *(void **)(l + MSGLIST_OFF_HEAD) = n;
+    if (tail == (AM2_MsgNode *)0)
+        l->head = n;
     else
-        *(void **)(tail + MSGNODE_OFF_NEXT) = n;
+        tail->next = n;
 
-    *(void **)(l + MSGLIST_OFF_TAIL) = n;
+    l->tail = n;
 
-    count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) + 1;
-    *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
+    count = l->count + 1;
+    l->count = count;
 
     if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
         orig_log("AddMsg: Impossible List Size %d \n", count);
 
-    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    orig_release_mutex(l->mutex);
 }
 
 /* 0x00402720. Ask the window to close, and say so.
@@ -574,36 +574,36 @@ void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from)
     orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
 }
 
-void *__cdecl MsgListRemHead(void *list)
+AM2_MsgNode *__cdecl MsgListRemHead(AM2_MsgList *list)
 {
-    uint8_t *l = (uint8_t *)list;
-    uint8_t *node;
+    AM2_MsgList *l = list;
+    AM2_MsgNode *node;
 
-    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+    orig_wait_for_object(l->mutex, 0xFFFFFFFFu);
 
-    node = *(uint8_t **)(l + MSGLIST_OFF_HEAD);
+    node = l->head;
     if (node) {
-        uint8_t *next = *(uint8_t **)(node + MSGNODE_OFF_NEXT);
+        AM2_MsgNode *next = node->next;
         int32_t  count;
 
-        *(void **)(l + MSGLIST_OFF_HEAD) = next;
+        l->head = next;
         if (!next)
-            *(void **)(l + MSGLIST_OFF_TAIL) = next;   /* null */
+            l->tail = next;   /* null */
         else
-            *(void **)(next + MSGNODE_OFF_PREV) = (void *)0;
+            next->prev = (AM2_MsgNode *)0;
 
-        count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) - 1;
-        *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
+        count = l->count - 1;
+        l->count = count;
         if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
             orig_log("RemHead: Impossible List Size %d \n", count);
-    } else if (l == (uint8_t *)g_msgListPool) {
+    } else if (l == g_msgListPool) {
         /* Only the POOL is worth complaining about: no message buffers left.
          * An empty ordinary queue is simply an idle one. */
         orig_log("Empty List! l->first = %d listsize = %d \n", node,
-                 *(const int32_t *)(l + MSGLIST_OFF_COUNT));
+                 l->count);
     }
 
-    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    orig_release_mutex(l->mutex);
     return node;
 }
 
@@ -637,52 +637,52 @@ void *__cdecl MsgListRemHead(void *list)
  * All three complaints are made while the mutex is still held, as in the rest
  * of the family.
  */
-void __cdecl MsgListRemove(void *list, void *node)
+void __cdecl MsgListRemove(AM2_MsgList *list, AM2_MsgNode *node)
 {
-    uint8_t *l = (uint8_t *)list;
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *prev;
-    uint8_t *next;
+    AM2_MsgList *l = list;
+    AM2_MsgNode *n = node;
+    AM2_MsgNode *prev;
+    AM2_MsgNode *next;
 
-    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+    orig_wait_for_object(l->mutex, 0xFFFFFFFFu);
 
-    prev = *(uint8_t **)(n + MSGNODE_OFF_PREV);
+    prev = n->prev;
     if (!prev) {
-        next = *(uint8_t **)(n + MSGNODE_OFF_NEXT);
-        *(void **)(l + MSGLIST_OFF_HEAD) = next;
+        next = n->next;
+        l->head = next;
         if (next)
-            *(void **)(next + MSGNODE_OFF_PREV) = (void *)0;
+            next->prev = (AM2_MsgNode *)0;
         else
-            *(void **)(l + MSGLIST_OFF_TAIL) = (void *)0;
+            l->tail = (AM2_MsgNode *)0;
     } else {
-        next = *(uint8_t **)(n + MSGNODE_OFF_NEXT);
+        next = n->next;
         if (!next) {
-            *(void **)(prev + MSGNODE_OFF_NEXT) = (void *)0;
-            *(void **)(l + MSGLIST_OFF_TAIL) = prev;
+            prev->next = (AM2_MsgNode *)0;
+            l->tail = prev;
         } else {
-            *(void **)(prev + MSGNODE_OFF_NEXT) = next;
-            *(void **)(next + MSGNODE_OFF_PREV) = prev;
+            prev->next = next;
+            next->prev = prev;
         }
     }
 
-#define COUNT (*(int32_t *)(l + MSGLIST_OFF_COUNT))
+#define COUNT (l->count)
     if (--COUNT < 0 || COUNT > AM2_MSGLIST_SANE_MAX)
         orig_log("RemMsg: Impossible List Size %d \n", COUNT);
 
-    if (l == (uint8_t *)g_msgListPool) {
+    if (l == g_msgListPool) {
         /* The pool still has buffers: neither remaining complaint applies,
          * and the original jumps straight to the unlock. */
-        if (*(void *const *)(l + MSGLIST_OFF_HEAD))
+        if (l->head)
             goto unlock;
         orig_log("RemMsg has set freelist to EMPTY!! l->numItems = %d\n",
                  COUNT);
     }
 
-    if (!*(void *const *)(l + MSGLIST_OFF_HEAD) && COUNT > 0)
+    if (!l->head && COUNT > 0)
         orig_log("Why is list %x empty?  List Size %d \n", l, COUNT);
 
 unlock:
-    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    orig_release_mutex(l->mutex);
 #undef COUNT
 }
 
@@ -977,8 +977,7 @@ void __cdecl AppendTroopState(void *msg, AM2_Object *o)
     if (!o->health)
         return;
 
-    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              AM2_THE_COMM->selfId) + FLOW_OFF_SEQUENCE);
+    seq = FindPlayerById(AM2_THE_COMM->selfId)->sequence;
 
     if (o->lastSeq == seq)
         return;
@@ -1709,30 +1708,30 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
 
 void __cdecl ReceivePacket(void *packet, int32_t dpid)
 {
-    uint8_t  *pkt = (uint8_t *)packet;
+    AM2_Packet  *pkt = (AM2_Packet *)packet;
     /* The length as it arrived, read before the slot lookup. The loop below
      * decrements the field itself, and the bogus-length test is against
      * THIS, not against the remainder. */
-    int32_t   total = *(const int32_t *)(pkt + PACKET_OFF_LEN);
+    int32_t   total = (int32_t)pkt->len;
     int32_t   slot  = AM2_THE_COMM->CommSlotOfId(dpid);
-    uint8_t  *p     = pkt + PACKET_HEADER_SIZE;
+    uint8_t  *p     = (uint8_t *)packet + PACKET_HEADER_SIZE;
     uint16_t  part;
     int32_t   step;
 
     /* Only the first five packets of a session are logged. */
-    if (*(const uint32_t *)(pkt + PACKET_OFF_SEQ) < 5
+    if (pkt->seq < 5
         && kCommObj->verbose)
         am2_log("Get Packed  %x bytes seq %d Chksum %x \n",
-                *(const int32_t *)(pkt + PACKET_OFF_LEN),
-                *(const int32_t *)(pkt + PACKET_OFF_SEQ),
-                *(const int32_t *)(pkt + PACKET_OFF_CHECKSUM));
+                (int32_t)pkt->len,
+                (int32_t)pkt->seq,
+                (int32_t)pkt->checksum);
 
     /* A bad checksum is counted and complained about, and then the packet is
      * walked anyway. */
     if (XorChecksum(pkt)) {
 #define ERRS (kCommObj->slots[(uint32_t)slot].chksumErrs)
         am2_log("Receive Checksum Error from %x seq %d\n",
-                dpid, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+                dpid, (int32_t)pkt->seq);
         ERRS = ERRS + 1;
 #undef ERRS
     }
@@ -1749,7 +1748,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
      * length exits share the epilogue that follows the bogus complaint --
      * a `while (part != 0)` with the zero complaint after the loop sends
      * them to the zero complaint's epilogue instead. */
-    if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
+    if (pkt->len > PACKET_HEADER_SIZE) {
         for (;;) {
             part = *(const uint16_t *)p;
             if (part == 0) {
@@ -1761,13 +1760,13 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
                 return;
             }
 
-            ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+            ReceiveArmyMsg(p, slot, (int32_t)pkt->seq);
 
             /* Re-read, after the handler has had the bytes, and as an int. */
             step = *(const uint16_t *)p;
             p += step;
-            *(int32_t *)(pkt + PACKET_OFF_LEN) -= step;
-            if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) <= PACKET_HEADER_SIZE)
+            pkt->len -= step;
+            if (pkt->len <= PACKET_HEADER_SIZE)
                 return;
         }
     }
@@ -1915,7 +1914,7 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
     AM2_Comm       *comm = kCommObj;
-    uint8_t       *q;
+    AM2_Flow       *q;
 
     (void)dpid;   /* given, and never read -- alone in this family. */
 
@@ -1927,13 +1926,13 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
         *(const int32_t *)(m + AM2_MSG_VALUE);
 
     /* OUR record, not the sender's. */
-    q = (uint8_t *)FindPlayerById(
+    q = FindPlayerById(
             kCommObj->selfId);
     if (!q)
         return;
 
-    *(int32_t *)(q + FLOW_OFF_LAG_MS) = *(const int32_t *)(m + 0x0C);
-    *(int32_t *)(q + FLOW_OFF_LAG_SPREAD) = *(const int32_t *)(m + 0x10);
+    q->lagMs = *(const int32_t *)(m + 0x0C);
+    q->lagSpread = *(const int32_t *)(m + 0x10);
 }
 
 void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
@@ -2052,15 +2051,15 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
 {
     AM2_Object           *t = (AM2_Object *)trooper;
     AM2_TrooperFireMsg msg;
-    const uint8_t     *flow;
+    const AM2_Flow     *flow;
     int32_t            seq;
 
     if (kCommObj->dplay == 0)
         return;
 
-    flow = (const uint8_t *)FindPlayerById(
+    flow = FindPlayerById(
                (uint32_t)(int32_t)kCommObj->selfId);
-    seq = *(const int32_t *)(flow + FLOW_OFF_SEQUENCE);
+    seq = (int32_t)flow->sequence;
 
     msg.hdr.len  = AM2_MSG_TROOPER_FIRE_LEN;
     msg.hdr.kind = AM2_MSG_TROOPER_FIRE;
@@ -2201,28 +2200,28 @@ void __cdecl Announce(const char *text)
  * list, so a handler that queues more work has it drained in the same pass. */
 void __cdecl CommDrainMsgs(void)
 {
-    uint8_t *node;
+    AM2_MsgNode *node;
 
     if (!kCommObj->active)
         return;
 
-    for (node = (uint8_t *)MsgListRemHead(g_msgListB);
+    for (node = MsgListRemHead(g_msgListB);
          node;
-         node = (uint8_t *)MsgListRemHead(g_msgListB)) {
+         node = MsgListRemHead(g_msgListB)) {
         /* The node: +0x08 sender, +0x0C addressee, +0x20 message, +0x24
          * its length -- what IDirectPlay::Receive filled in. */
-        int32_t  from = *(const int32_t *)(node + MSGNODE_OFF_FROM);
-        void    *msg  = *(void *const *)(node + MSGNODE_OFF_BODY);
-#define to (*(const int32_t *)(node + MSGNODE_OFF_TO))
+        int32_t  from = (int32_t)node->from;
+        void    *msg  = node->body;
+#define to ((int32_t)node->to)
 
         /* DPID_SYSMSG is 0: a system message goes to the system handler. */
         if (from == 0)
             orig_comm_system_msg(msg,
-                                 *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN),
+                                 (int32_t)node->bodyLen,
                                  0, to);
         else
             CommDispatchMessage(msg,
-                                *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN),
+                                (int32_t)node->bodyLen,
                                 from, to);
 
         MsgListAdd(g_msgListPool, node);
@@ -2235,9 +2234,9 @@ void __cdecl CommDrainMsgs(void)
  * both the loop's test and its value. */
 void __cdecl DrainMsgList(void *list)
 {
-    void *node;
+    AM2_MsgNode *node;
 
-    while ((node = MsgListRemHead(list)) != (void *)0)
+    while ((node = MsgListRemHead((AM2_MsgList *)list)) != (void *)0)
         MsgListAdd(g_msgListPool, node);
 }
 
@@ -2407,27 +2406,27 @@ extern "C"
 void __cdecl FlushDelayedSends(void)
 {
     uint32_t  now  = orig_get_tick_count();
-    uint8_t  *list = (uint8_t *)g_msgListDelayed;
+    AM2_MsgList  *list = (AM2_MsgList *)g_msgListDelayed;
 
-    while (*(void *const *)(list + MSGLIST_OFF_HEAD)) {
-        uint8_t *node = (uint8_t *)*(void *const *)(list + MSGLIST_OFF_HEAD);
+    while (list->head) {
+        AM2_MsgNode *node = (AM2_MsgNode *)list->head;
         int32_t  hr;
 
-        if (now < *(const uint32_t *)(node + MSGNODE_OFF_KEY))
+        if (now < node->key)
             return;
 
-        node = (uint8_t *)MsgListRemHead(list);
+        node = MsgListRemHead(list);
 
         hr = AM2_THE_COMM->CommSend(
-                      *(const uint32_t *)(node + MSGNODE_OFF_TO),
-                      *(const uint32_t *)(node + MSGNODE_OFF_FLAGS),
-                      *(void *const *)(node + MSGNODE_OFF_BODY),
-                      *(const uint32_t *)(node + MSGNODE_OFF_BODY_LEN));
+                      node->to,
+                      node->flags,
+                      node->body,
+                      node->bodyLen);
 
         if (hr < 0) {
             am2_log("DPlaySend Failure %x to %x size %d\n", hr,
-                    *(const int32_t *)(node + MSGNODE_OFF_TO),
-                    *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN));
+                    (int32_t)node->to,
+                    (int32_t)node->bodyLen);
 
             if ((uint32_t)hr == AM2_DPERR_BUSY)
                 am2_log("DPLAY ERROR: Busy\n");
@@ -2585,9 +2584,7 @@ void __cdecl CommTuneChangeLimit(void)
     uint32_t seq;
     uint32_t sent;
 
-    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              COMM->selfId)
-          + FLOW_OFF_SEQUENCE);
+    seq = FindPlayerById(COMM->selfId)->sequence;
 
     if (g_bandwidthLastSeq < seq) {
         sent = (uint32_t)AM2_THE_COMM->CommRecentTotal();
@@ -2780,7 +2777,7 @@ int commmsg_install(void)
 
 /* The out-of-order queue at FLOW_OFF_QUEUE is a message list: its head node
  * is the dword after the list's first. */
-#define FLOW_QUEUE_HEAD(f) (*(void *const *)((f) + FLOW_OFF_QUEUE + 4))
+#define FLOW_QUEUE_HEAD(f) (f->queue.head)
 
 /* The NACK message this side sends, kind 0xC: the range lives where a data
  * message keeps its sequence and checksum. */
@@ -2795,9 +2792,9 @@ int commmsg_install(void)
  * PreloadSprite. Including dplay.h would reach DirectPlay's COM types
  * transitively and tools/checksplit.py would fail this file, correctly:
  * nothing below talks to an API, it hands buffers to functions that do. */
-void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
-extern "C" void __cdecl DumpMsgList(void *list);
-void *__cdecl MsgListInsert(void *list, void *node);
+void *__cdecl MsgListCopyByKey(AM2_MsgList *list, int32_t key, void *dst);
+extern "C" void __cdecl DumpMsgList(AM2_MsgList *list);
+void *__cdecl MsgListInsert(AM2_MsgList *list, AM2_MsgNode *node);
 int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
 
 /* 0x004014C0 -- the flow-control receive path. See orig.h for the full
@@ -2839,23 +2836,25 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
 {
 #define comm (g_commObject)
 #define VERBOSE (comm->verbose)
-#define FROM (*(const uint32_t *)(node + MSGNODE_OFF_FROM))
+#define FROM (node->from)
 #define MINE (comm->selfId)
-    uint8_t *node = (uint8_t *)nodev;
-    uint8_t *msg;
-    uint8_t *sender, *me, *sent, *copy;
+    AM2_MsgNode *node = (AM2_MsgNode *)nodev;
+    AM2_FlowMsg *msg;
+    AM2_Flow *sender, *me;
+    AM2_MsgNode *sent;
+    AM2_Packet *copy;
     uint32_t mask, now, seq, expected, last, lat, gap;
     int32_t  resent, any;
 
     if (FROM == 0)
         return NoteKind31(node);
 
-    msg = *(uint8_t **)(node + MSGNODE_OFF_BODY);
+    msg = (AM2_FlowMsg *)node->body;
 
-    switch (*(const uint32_t *)msg) {
+    switch (msg->pkt.kind) {
     case AM2_FLOW_PULSE_ACK:
-        sender = (uint8_t *)FindPlayerById(FROM);
-        me     = (uint8_t *)FindPlayerById(MINE);
+        sender = FindPlayerById(FROM);
+        me     = FindPlayerById(MINE);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
             break;
@@ -2870,16 +2869,16 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         /* THE ACK IS CUMULATIVE: one message retires every sequence from
          * the peer's last acknowledged up to the one it carries. HE_HAS is
          * written once, after the loop, which reads it. */
-        if (*(const uint32_t *)(msg + PACKET_OFF_ACK)
-                > *(const uint32_t *)(sender + FLOW_OFF_HE_HAS)
-            && *(const uint32_t *)(msg + PACKET_OFF_ACK)
-                < *(const uint32_t *)(me + FLOW_OFF_SEQUENCE)) {
-            for (seq = *(const uint32_t *)(sender + FLOW_OFF_HE_HAS) + 1;
-                 seq <= *(const uint32_t *)(msg + PACKET_OFF_ACK); seq++) {
+        if (msg->pkt.ack
+                > sender->heHas
+            && msg->pkt.ack
+                < me->sequence) {
+            for (seq = sender->heHas + 1;
+                 seq <= msg->pkt.ack; seq++) {
                 /* Not behind COMM_OFF_VERBOSE, unlike most of these. */
                 am2_log(" Got Pulse Ack for  seq %d\n", seq);
 
-                sent = (uint8_t *)MsgListSetFlag(
+                sent = MsgListSetFlag(
                     g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
@@ -2888,48 +2887,48 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                                 seq, FROM, FROM, mask);
                     if (VERBOSE)
                         am2_log("Remote %d is acking %d, I had thru %d \n",
-                                FROM, *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                                *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+                                FROM, msg->pkt.ack,
+                                sender->heHas);
                     continue;
                 }
 
                 MsgSlotA0(sender, seq);
-                *(uint32_t *)(sender + FLOW_OFF_ACKS_SEEN) += 1;
-                lat = now - *(const uint32_t *)(sent + MSGNODE_OFF_STAMP);
+                sender->acksSeen += 1;
+                lat = now - sent->stamp;
                 if (lat > AM2_FLOW_RTT_CAP
-                    && seq == *(const uint32_t *)(sender + FLOW_OFF_HE_HAS) + 1)
+                    && seq == sender->heHas + 1)
                     am2_log("??? PULSE seq %6d latency %d acks for %d msgs %d thru %d  nxtSeq = %d \n",
                             seq, lat,
-                            *(const uint32_t *)(msg + PACKET_OFF_ACK)
-                                - *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
-                            *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
-                            *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                            *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
+                            msg->pkt.ack
+                                - sender->heHas,
+                            sender->heHas,
+                            msg->pkt.ack,
+                            me->sequence);
 
                 /* The minimum is taken BEFORE the 10,000 ms clamp and the
                  * maximum after, so a long stall moves the max to exactly
                  * 10,000 and leaves the min alone. */
-                if (*(const uint32_t *)(sender + FLOW_OFF_RTT_MIN) == 0
-                    || lat < *(const uint32_t *)(sender + FLOW_OFF_RTT_MIN))
-                    *(uint32_t *)(sender + FLOW_OFF_RTT_MIN) = lat;
+                if (sender->rttMin == 0
+                    || lat < sender->rttMin)
+                    sender->rttMin = lat;
                 if (lat > AM2_FLOW_RTT_CAP)
                     lat = AM2_FLOW_RTT_CAP;
-                if (lat > *(const uint32_t *)(sender + FLOW_OFF_RTT_MAX))
-                    *(uint32_t *)(sender + FLOW_OFF_RTT_MAX) = lat;
-                *(uint32_t *)(sender + FLOW_OFF_RTT_TOTAL) += lat;
+                if (lat > sender->rttMax)
+                    sender->rttMax = lat;
+                sender->rttTotal += lat;
                 RingPush32(sender, lat);
 
                 /* Nobody else is still waiting on it: the buffer goes home. */
                 if ((g_playerSlotMask
-                     & *(const uint32_t *)(sent + MSGNODE_OFF_FLAGS)) == 0) {
+                     & sent->flags) == 0) {
                     am2_log("PULSE Adding to freelist from sendque Buffer seq %d  elelment %x \n",
-                            *(const uint32_t *)(sent + MSGNODE_OFF_KEY), sent);
+                            sent->key, sent);
                     MsgListRemove(g_msgListSendq, sent);
                     MsgListAdd(g_msgListPool, sent);
                 }
             }
-            *(uint32_t *)(sender + FLOW_OFF_HE_HAS) =
-                *(const uint32_t *)(msg + PACKET_OFF_ACK);
+            sender->heHas =
+                msg->pkt.ack;
         }
 
         /* AND THEN IT FALLS INTO THE NACK ARM. Having acked everything
@@ -2937,7 +2936,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * the same pass -- the fall-through is the protocol, and the NACK
          * arm's two lookups run again. A pulse ack naming nothing simply
          * returns its buffer. */
-        if (*(const uint32_t *)(msg + FLOWMSG_NACK_FIRST) == 0)
+        if (msg->nack.first == 0)
             goto pool;
         /* fall through */
 
@@ -2946,8 +2945,8 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * the send queue's flag to 1 instead, leaving the message for
          * whatever drains that queue. */
         resent = 0;
-        sender = (uint8_t *)FindPlayerById(FROM);
-        me     = (uint8_t *)FindPlayerById(MINE);
+        sender = FindPlayerById(FROM);
+        me     = FindPlayerById(MINE);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
             break;
@@ -2958,43 +2957,43 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         }
         if (VERBOSE)
             am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
-                    *(const uint32_t *)(msg + FLOWMSG_NACK_FIRST),
-                    *(const uint32_t *)(msg + FLOWMSG_NACK_LAST),
-                    FROM, FROM, *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
+                    msg->nack.first,
+                    msg->nack.last,
+                    FROM, FROM, me->sequence);
 
-        mask = *(const uint32_t *)(sender + MSGNODE_OFF_FLAGS);
-        for (seq = *(const uint32_t *)(msg + FLOWMSG_NACK_FIRST);
-             seq <= *(const uint32_t *)(msg + FLOWMSG_NACK_LAST); seq++) {
-            copy = (uint8_t *)MsgListCopyByKey(
+        mask = sender->wantBit;
+        for (seq = msg->nack.first;
+             seq <= msg->nack.last; seq++) {
+            copy = (AM2_Packet *)MsgListCopyByKey(
                 g_msgListSendq, (int32_t)seq,
                 g_resendScratch);
             if (!copy) {
                 /* Unconditional, like the pulse ack line. */
                 am2_log("Flow Nack Resend: Msg not found seq %d hehas %d\n",
-                        seq, *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+                        seq, sender->heHas);
                 continue;
             }
             if (resent < AM2_FLOW_RESEND_BURST) {
                 /* The resent copy carries our CURRENT ack, not the one it was
                  * first sent with, and is re-checksummed for it. */
-                *(uint32_t *)(copy + PACKET_OFF_ACK) =
-                    *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED);
-                *(uint32_t *)(copy + PACKET_OFF_CHECKSUM) = 0;
-                *(uint32_t *)(copy + PACKET_OFF_CHECKSUM) = XorChecksum(copy);
+                copy->ack =
+                    sender->nextExpected;
+                copy->checksum = 0;
+                copy->checksum = XorChecksum(copy);
                 {
                     int32_t rc = ((AM2_Comm *)(void *)comm)->CommSend(
-                        FROM, 0, copy, *(const uint32_t *)(copy + PACKET_OFF_LEN));
+                        FROM, 0, copy, copy->len);
 
                     if (rc < 0)
                         am2_log("DPlaySend Failure %x to %x size %d\n",
-                                rc, FROM, *(const uint32_t *)(copy + PACKET_OFF_LEN));
+                                rc, FROM, copy->len);
                 }
                 MsgSlotA2(sender, seq);
                 if (VERBOSE)
                     am2_log("Resend: seq %d to %d (%x)  nxtSeq = %d\n",
                             seq, FROM, FROM,
-                            *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
-                *(uint32_t *)(sender + FLOW_OFF_RESENDS) += 1;
+                            me->sequence);
+                sender->resends += 1;
                 resent++;
                 MsgListSetFlag(g_msgListSendq,
                                (int32_t)seq, 0, (int32_t)mask);
@@ -3010,30 +3009,30 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
 
     case AM2_FLOW_DATA:
         mask   = GetPlayerMask(FROM);
-        sender = (uint8_t *)FindPlayerById(FROM);
+        sender = FindPlayerById(FROM);
         if (!sender) {
             am2_log("Can't Find FlowQ for id %x  seq \n",
-                    FROM, *(const uint32_t *)(msg + PACKET_OFF_SEQ));
+                    FROM, msg->pkt.seq);
             return 1;
         }
-        me = (uint8_t *)FindPlayerById(MINE);
+        me = FindPlayerById(MINE);
         if (!me) {
             am2_log("Can't Find my FlowQ for id %x\n", MINE);
             return 1;
         }
 
-        seq = *(const uint32_t *)(msg + PACKET_OFF_SEQ);
+        seq = msg->pkt.seq;
         if (seq < AM2_FLOW_TRACE_FIRST)
             am2_log("Received seq %d  expected %d from %x, he has my seqthru  %d\t\n",
-                    seq, *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1,
-                    FROM, *(const uint32_t *)(msg + PACKET_OFF_ACK));
+                    seq, sender->nextExpected + 1,
+                    FROM, msg->pkt.ack);
 
         /* A corrupt message is DROPPED, not queued -- hence the 1. */
         if (XorChecksum(msg)) {
             am2_log("Ack for sequence %d had bad checksum %x\n",
-                    *(const uint32_t *)(msg + PACKET_OFF_SEQ),
-                    *(const uint32_t *)(msg + PACKET_OFF_CHECKSUM));
-            *(uint32_t *)(sender + FLOW_OFF_BAD_CHECKSUMS) += 1;
+                    msg->pkt.seq,
+                    msg->pkt.checksum);
+            sender->badChecksums += 1;
             return 1;
         }
 
@@ -3041,79 +3040,79 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * `NEXT_EXPECTED = seq - 1`. The first fires when our own sequence
          * is still 1, our next-expected is 0 and the flow is not ready, and
          * ONLY when we are not the host -- "Starting Slave Session". */
-        expected = *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1;
-        if (*(const uint32_t *)(me + FLOW_OFF_SEQUENCE) == 1 && expected == 1
-            && *(const uint32_t *)(me + FLOW_OFF_READY) == 0) {
+        expected = sender->nextExpected + 1;
+        if (me->sequence == 1 && expected == 1
+            && me->ready == 0) {
             if (comm->isHost == 0) {
                 if (VERBOSE)
                     am2_log("Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d\n",
-                            FROM, *(const uint32_t *)(msg + PACKET_OFF_SEQ),
-                            *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED),
-                            *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
-                            *(const uint32_t *)(me + FLOW_OFF_READY));
-                *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) =
-                    *(const uint32_t *)(msg + PACKET_OFF_SEQ) - 1;
-                expected = *(const uint32_t *)(msg + PACKET_OFF_SEQ);
-                *(uint32_t *)(me + FLOW_OFF_READY) = 1;
-                *(uint32_t *)(me + FLOW_OFF_READY_AT) = orig_get_tick_count();
+                            FROM, msg->pkt.seq,
+                            sender->nextExpected,
+                            sender->heHas,
+                            me->ready);
+                sender->nextExpected =
+                    msg->pkt.seq - 1;
+                expected = msg->pkt.seq;
+                me->ready = 1;
+                me->readyAt = orig_get_tick_count();
                 /* A SECOND read, deliberately: this one has half a round
                  * trip taken off it, so it estimates the PEER's clock base.
                  * +0x68 has one toucher in this image and stays unnamed. */
-                *(uint32_t *)(me + FLOW_OFF_PEER_CLOCK) =
+                me->peerClock =
                     orig_get_tick_count()
-                    - (*(const uint32_t *)(me + 0x68) >> 1);
+                    - (me->field68 >> 1);
             }
-        } else if (*(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) == 0) {
+        } else if (sender->nextExpected == 0) {
             if (VERBOSE)
                 am2_log("First message received from player %x, Received seq %d\n",
-                        FROM, *(const uint32_t *)(msg + PACKET_OFF_SEQ));
-            *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) =
-                *(const uint32_t *)(msg + PACKET_OFF_SEQ) - 1;
-            expected = *(const uint32_t *)(msg + PACKET_OFF_SEQ);
+                        FROM, msg->pkt.seq);
+            sender->nextExpected =
+                msg->pkt.seq - 1;
+            expected = msg->pkt.seq;
         }
 
-        *(uint32_t *)(sender + FLOW_OFF_RECV_PACKETS) += 1;
-        *(uint32_t *)(sender + FLOW_OFF_RECV_BYTES) +=
-            *(const uint32_t *)(msg + PACKET_OFF_LEN);
+        sender->recvPackets += 1;
+        sender->recvBytes +=
+            msg->pkt.len;
         now = orig_get_tick_count();
-        *(uint32_t *)(sender + FLOW_OFF_RECV_AT) = now;
+        sender->recvAt = now;
 
         /* A JOIN-TIME FILTER, not a window check: past sequence 10 nothing
          * is dropped for being far ahead. The node goes back to the pool. */
-        if (expected < 10 && *(const uint32_t *)(msg + PACKET_OFF_SEQ) > expected
-            && *(const uint32_t *)(msg + PACKET_OFF_SEQ) - expected > 50) {
+        if (expected < 10 && msg->pkt.seq > expected
+            && msg->pkt.seq - expected > 50) {
             if (VERBOSE)
                 am2_log("Residual Message from %x: expected  %d received %d  from %x hehas %d \n",
-                        FROM, expected, *(const uint32_t *)(msg + PACKET_OFF_SEQ),
-                        FROM, *(const uint32_t *)(msg + PACKET_OFF_ACK));
+                        FROM, expected, msg->pkt.seq,
+                        FROM, msg->pkt.ack);
             goto pool;
         }
 
         /* The piggybacked ack: EVERY DATA MESSAGE CARRIES ONE, which is why
          * this arm retires the send queue too -- its own copy of the loop. */
-        if (*(const uint32_t *)(msg + PACKET_OFF_ACK)
-                > *(const uint32_t *)(sender + FLOW_OFF_HE_HAS)
-            && *(const uint32_t *)(msg + PACKET_OFF_ACK)
-                < *(const uint32_t *)(me + FLOW_OFF_SEQUENCE)) {
-            if (*(const uint32_t *)(msg + PACKET_OFF_SEQ) == 1) {
+        if (msg->pkt.ack
+                > sender->heHas
+            && msg->pkt.ack
+                < me->sequence) {
+            if (msg->pkt.seq == 1) {
                 if (VERBOSE)
                     am2_log("New Player joining flow he first got my seq %d hehas was %d  \n",
-                            *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                            *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+                            msg->pkt.ack,
+                            sender->heHas);
                 /* The dump is NOT behind the verbose flag; only the line. */
                 DumpMsgList(g_msgListSendq);
             }
             /* A WARNING, NOT A GUARD: it proceeds either way. */
-            if (*(const uint32_t *)(msg + PACKET_OFF_ACK)
-                    - *(const uint32_t *)(sender + FLOW_OFF_HE_HAS)
+            if (msg->pkt.ack
+                    - sender->heHas
                 > AM2_FLOW_ACK_WARN)
                 am2_log(" No many acks in one packet\t %d thru %d \n",
-                        *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                        *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+                        msg->pkt.ack,
+                        sender->heHas);
 
-            for (seq = *(const uint32_t *)(sender + FLOW_OFF_HE_HAS) + 1;
-                 seq <= *(const uint32_t *)(msg + PACKET_OFF_ACK); seq++) {
-                sent = (uint8_t *)MsgListSetFlag(
+            for (seq = sender->heHas + 1;
+                 seq <= msg->pkt.ack; seq++) {
+                sent = MsgListSetFlag(
                     g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
@@ -3123,60 +3122,60 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                     /* %x here where the PULSE ACK arm prints %d. */
                     if (VERBOSE)
                         am2_log("Remote %x is acking %d, I had thru %d \n",
-                                FROM, *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                                *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+                                FROM, msg->pkt.ack,
+                                sender->heHas);
                     continue;
                 }
 
                 MsgSlotA0(sender, seq);
-                *(uint32_t *)(sender + FLOW_OFF_ACKS_SEEN) += 1;
-                lat = now - *(const uint32_t *)(sent + MSGNODE_OFF_STAMP);
+                sender->acksSeen += 1;
+                lat = now - sent->stamp;
                 if (lat > AM2_FLOW_RTT_CAP
-                    && seq == *(const uint32_t *)(sender + FLOW_OFF_HE_HAS) + 1)
+                    && seq == sender->heHas + 1)
                     am2_log("??? seq %6d from %x latency %d acks for %d msgs %d thru %d  nxtSeq = %d \n",
                             seq, FROM, lat,
-                            *(const uint32_t *)(msg + PACKET_OFF_ACK)
-                                - *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
-                            *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
-                            *(const uint32_t *)(msg + PACKET_OFF_ACK),
-                            *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
+                            msg->pkt.ack
+                                - sender->heHas,
+                            sender->heHas,
+                            msg->pkt.ack,
+                            me->sequence);
 
-                if (*(const uint32_t *)(sender + FLOW_OFF_RTT_MIN) == 0
-                    || lat < *(const uint32_t *)(sender + FLOW_OFF_RTT_MIN))
-                    *(uint32_t *)(sender + FLOW_OFF_RTT_MIN) = lat;
+                if (sender->rttMin == 0
+                    || lat < sender->rttMin)
+                    sender->rttMin = lat;
                 if (lat > AM2_FLOW_RTT_CAP)
                     lat = AM2_FLOW_RTT_CAP;
-                if (lat > *(const uint32_t *)(sender + FLOW_OFF_RTT_MAX))
-                    *(uint32_t *)(sender + FLOW_OFF_RTT_MAX) = lat;
-                *(uint32_t *)(sender + FLOW_OFF_RTT_TOTAL) += lat;
+                if (lat > sender->rttMax)
+                    sender->rttMax = lat;
+                sender->rttTotal += lat;
                 RingPush32(sender, lat);
 
                 /* No "Adding to freelist" line in this copy. */
-                if ((*(const uint32_t *)(sent + MSGNODE_OFF_FLAGS)
+                if ((sent->flags
                      & g_playerSlotMask) == 0) {
                     MsgListRemove(g_msgListSendq, sent);
                     MsgListAdd(g_msgListPool, sent);
                 }
             }
         }
-        *(uint32_t *)(sender + FLOW_OFF_HE_HAS) =
-            *(const uint32_t *)(msg + PACKET_OFF_ACK);
+        sender->heHas =
+            msg->pkt.ack;
 
-        if (*(const uint32_t *)(msg + PACKET_OFF_SEQ)
-                > *(const uint32_t *)(sender + FLOW_OFF_HIGHEST_SEQ))
-            *(uint32_t *)(sender + FLOW_OFF_HIGHEST_SEQ) =
-                *(const uint32_t *)(msg + PACKET_OFF_SEQ);
+        if (msg->pkt.seq
+                > sender->highestSeq)
+            sender->highestSeq =
+                msg->pkt.seq;
 
-        expected = *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1;
+        expected = sender->nextExpected + 1;
 
         /* Below what we already have: a resend we did not need. Returning
          * 1 here is what stops it being played twice. */
-        if (*(const uint32_t *)(msg + PACKET_OFF_SEQ) < expected) {
-            *(uint32_t *)(sender + FLOW_OFF_DUPLICATES) += 1;
+        if (msg->pkt.seq < expected) {
+            sender->duplicates += 1;
             if (VERBOSE)
                 am2_log("Duplicate: expected %d received %d  from %x hehas %d \n",
-                        expected, *(const uint32_t *)(msg + PACKET_OFF_SEQ),
-                        FROM, *(const uint32_t *)(msg + PACKET_OFF_ACK));
+                        expected, msg->pkt.seq,
+                        FROM, msg->pkt.ack);
             goto pool;
         }
 
@@ -3185,13 +3184,13 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * one if the queue was empty. More than fifty missing is logged and
          * the NACK message's own range clipped to ten, but the local loops
          * below still walk the whole gap. */
-        if (*(const uint32_t *)(msg + PACKET_OFF_SEQ) > expected) {
-            *(uint32_t *)(node + MSGNODE_OFF_KEY) =
-                *(const uint32_t *)(msg + PACKET_OFF_SEQ);
-            MsgListInsert(sender + FLOW_OFF_QUEUE, node);
-            last = *(const uint32_t *)(msg + PACKET_OFF_SEQ) - 1;
+        if (msg->pkt.seq > expected) {
+            node->key =
+                msg->pkt.seq;
+            MsgListInsert(&sender->queue, node);
+            last = msg->pkt.seq - 1;
             if (FLOW_QUEUE_HEAD(sender))
-                last = ChainField14(sender + FLOW_OFF_QUEUE) - 1;
+                last = ChainField14(&sender->queue) - 1;
             FLOW_NACK_OUT_FIRST = expected;
             FLOW_NACK_OUT_LAST  = last;
             if (last < expected)
@@ -3207,12 +3206,12 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
                 if (PeerShouldNack(sender, seq))
                     any = 1;
             if (any) {
-                *(uint32_t *)(sender + FLOW_OFF_NACKS_SENT) +=
+                sender->nacksSent +=
                     last - expected + 1;
                 if (VERBOSE)
                     am2_log("Flow Nacking %d thru %d  to %x at time %d I am good thru %d \n",
                             expected, last, FROM, now,
-                            *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED));
+                            sender->nextExpected);
                 SendGameMsg(g_msgKind0c, (int32_t)FROM, 0);
                 for (; expected <= last; expected++)
                     MsgSlotB2(sender, expected);
@@ -3222,44 +3221,44 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
 
         /* EXACTLY WHAT WE EXPECT: deliver it, time it, and then deliver
          * every queued message that now follows on. */
-        if (*(const uint32_t *)(msg + PACKET_OFF_SEQ) != expected)
+        if (msg->pkt.seq != expected)
             return 0;
         MsgListAdd(g_msgListB, node);
         if (expected == 1) {
-            *(uint32_t *)(sender + FLOW_OFF_GAP_TOTAL)    = 0;
-            *(uint32_t *)(sender + FLOW_OFF_GAP_MIN)      = 10000;
-            *(uint32_t *)(sender + FLOW_OFF_GAP_MAX)      = 0;
-            *(uint32_t *)(sender + FLOW_OFF_DELIVERED_AT) = now;
+            sender->gapTotal    = 0;
+            sender->gapMin      = 10000;
+            sender->gapMax      = 0;
+            sender->deliveredAt = now;
         } else {
-            if (*(const uint32_t *)(sender + FLOW_OFF_DELIVERED_AT) == 0)
-                *(uint32_t *)(sender + FLOW_OFF_DELIVERED_AT) = now;
+            if (sender->deliveredAt == 0)
+                sender->deliveredAt = now;
             /* A clock that went BACKWARDS reads as a gap the size of the
              * old timestamp. Reproduced. */
-            if (now < *(const uint32_t *)(sender + FLOW_OFF_DELIVERED_AT))
-                gap = *(const uint32_t *)(sender + FLOW_OFF_DELIVERED_AT);
+            if (now < sender->deliveredAt)
+                gap = sender->deliveredAt;
             else
-                gap = now - *(const uint32_t *)(sender + FLOW_OFF_DELIVERED_AT);
-            *(uint32_t *)(sender + FLOW_OFF_DELIVERED_AT) = now;
-            if (gap < *(const uint32_t *)(sender + FLOW_OFF_GAP_MIN))
-                *(uint32_t *)(sender + FLOW_OFF_GAP_MIN) = gap;
-            if (gap > *(const uint32_t *)(sender + FLOW_OFF_GAP_MAX))
-                *(uint32_t *)(sender + FLOW_OFF_GAP_MAX) = gap;
+                gap = now - sender->deliveredAt;
+            sender->deliveredAt = now;
+            if (gap < sender->gapMin)
+                sender->gapMin = gap;
+            if (gap > sender->gapMax)
+                sender->gapMax = gap;
             if (gap > 100000)
                 am2_log("Unusually large time between messages %d seconds\n",
                         gap / 1000);
-            *(uint32_t *)(sender + FLOW_OFF_GAP_TOTAL) += gap;
+            sender->gapTotal += gap;
         }
-        MsgSlotB1(sender, *(const uint32_t *)(msg + PACKET_OFF_SEQ));
+        MsgSlotB1(sender, msg->pkt.seq);
         CommRemoveKeyed(sender, expected);
-        *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = expected;
+        sender->nextExpected = expected;
         expected++;
-        while (ChainField14(sender + FLOW_OFF_QUEUE) == expected) {
-            void *m = MsgListRemHead(sender + FLOW_OFF_QUEUE);
+        while (ChainField14(&sender->queue) == expected) {
+            AM2_MsgNode *m = MsgListRemHead(&sender->queue);
 
             if (m)
                 MsgListAdd(g_msgListB, m);
             CommRemoveKeyed(sender, expected);
-            *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = expected;
+            sender->nextExpected = expected;
             expected++;
         }
         return 1;

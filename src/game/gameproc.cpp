@@ -2021,7 +2021,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
         (int32_t)hdr->flags, 1,
         hdr->uid);
     if (!obj)
-        return (AM2_Object *)(void *)(AM2_Object *)0;
+        return (AM2_Object *)0;
 
     ownRec = obj->field94;
     memcpy(blockA, &obj->box, sizeof blockA);
@@ -2288,7 +2288,7 @@ AM2_Object *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
                                       1,
                                       (int32_t)h->uid);
     if (!made)
-        return (AM2_Object *)(void *)(AM2_Object *)0;
+        return (AM2_Object *)0;
 
     memcpy(made, h, (size_t)kItemHeaderSize);
     return (AM2_Object *)made;

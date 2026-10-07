@@ -12,7 +12,7 @@
 extern "C" {
 /* 0x004013B0, one caller. Print one message list under its own mutex. Here
  * rather than in msgslot.cpp because the flat half cannot take a mutex. */
-void __cdecl DumpMsgList(void *list);
+void __cdecl DumpMsgList(AM2_MsgList *list);
 
 #endif
 
@@ -177,7 +177,7 @@ int32_t __cdecl RecvThreadProc(void *param);
 int32_t __cdecl StartPacketThread(void);
 
 /* Original: 0x00401000. Clear a message list and give it a mutex. */
-int32_t __cdecl MsgListInit(void *list);
+int32_t __cdecl MsgListInit(AM2_MsgList *list);
 
 /* Original: 0x00402170. Close a handle and forget it. */
 void __cdecl EventClose(void *holder);
@@ -262,11 +262,11 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
 /* 0x004012C0, one caller. Find the node whose key matches, copy its body to
  * dst under the list's mutex, and answer dst or NULL. */
-void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
+void *__cdecl MsgListCopyByKey(AM2_MsgList *list, int32_t key, void *dst);
 
 /* 0x00401330, one caller. Find the first node with any wanted flag set, clear
  * those bits, copy its body to dst, and answer the bits taken. */
-int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
+int32_t __cdecl MsgListTakeFlags(AM2_MsgList *list, void *dst);
 
 /* 0x00403050, one caller. Drain up to THREE messages off the resend list,
  * sending each to every player whose resend mask wants it. Names itself in
@@ -286,7 +286,7 @@ void __cdecl SendPlayerMsg(int32_t arg);
 
 /* 0x00401150, one caller. Insert a node in ascending key order under the
  * list's mutex, and answer the node. */
-void *__cdecl MsgListInsert(void *list, void *node);
+void *__cdecl MsgListInsert(AM2_MsgList *list, AM2_MsgNode *node);
 
 /* 0x0040F790, two callers. Take a departed player out: drop it, clear its
  * slot, release the three pause reasons it held, mark its army ready. */

@@ -340,22 +340,21 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
 {
     /* The records are an array indexed by slot; the answer is a variable
      * the failure path returns unchanged. */
-    struct PlayerRec { uint8_t bytes[AM2_PLAYER_RECORD_BYTES]; };
 #define NRECS AM2_PLAYER_RECORDS
-#define RECAT(i) (((struct PlayerRec *)g_playerRecords)[i].bytes)
+#define RECAT(i) (g_playerRecords[i])
     int32_t  result = 0;
     int32_t  slot;
     uint32_t want;
 
     for (slot = 0; slot < NRECS; slot++)
-        if (*(const uint32_t *)RECAT(slot) == id)
+        if (RECAT(slot).id == id)
             return 1;
 
     /* The search jumps straight into the registration: the image has no
      * second `slot < NRECS` test after the loop. The answer still merges
      * at one exit, so VC6 returns it from a register on both paths. */
     for (slot = 0; slot < NRECS; slot++)
-        if (*(const uint32_t *)RECAT(slot) == 0)
+        if (RECAT(slot).id == 0)
             goto found;
     goto full;
 
@@ -363,55 +362,55 @@ found:
     {
         /* Every store indexes the array afresh rather than holding a record
          * pointer: the image addresses each field as table + slot*stride. */
-    #define rec RECAT(slot)
+    #define rec (&RECAT(slot))
 
         if ((uint32_t)g_commObject->verbose != 0)
             orig_log("Creating Flow Queue for Player id %x\n", id);
 
-        *(uint32_t *)(rec + 0x00) = id;
-        *(uint32_t *)(rec + 0x04) = 0;
-        *(uint32_t *)(rec + 0x08) = 0;
-        *(uint32_t *)(rec + 0x0C) = 0;
-        *(uint32_t *)(rec + PLAYER_REC_OFF_FLAG_94) = 1;
-        *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = 1u << slot;
-        g_playerSlotMask |= *(const uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT);
+        rec->id = id;
+        rec->nextExpected = 0;
+        rec->highestSeq = 0;
+        rec->heHas = 0;
+        rec->sequence = 1;
+        rec->ownBit = 1u << slot;
+        g_playerSlotMask |= rec->ownBit;
         /* Each bit is made where it is stored; `want` is kept for the
          * flags below, the own bit read back from the record. */
         want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
-        *(uint32_t *)(rec + PLAYER_REC_OFF_WANT_BIT) = want;
-        *(uint32_t *)(rec + 0x10) = 0;
-        *(uint32_t *)(rec + 0x1C) = 0;
-        *(uint32_t *)(rec + 0x20) = 0;
-        *(uint32_t *)(rec + 0x28) = 0;
-        *(uint32_t *)(rec + 0x30) = 0;
-        *(uint32_t *)(rec + 0x34) = 0;
-        *(uint32_t *)(rec + 0x38) = 0;
+        rec->wantBit = want;
+        rec->ackSent = 0;
+        rec->sentAt = 0;
+        rec->recvPackets = 0;
+        rec->sentPackets = 0;
+        rec->acksSeen = 0;
+        rec->field34 = 0;
+        rec->nacksSent = 0;
         g_msgWantedFlags |= want;
-        *(uint32_t *)(rec + 0x40) = 0;
-        *(uint32_t *)(rec + 0x44) = 0;
-        *(uint32_t *)(rec + 0x48) = 0;
-        *(uint32_t *)(rec + 0x4C) = 0;
-        *(uint32_t *)(rec + PLAYER_REC_OFF_MADE_AT) = GetTickCount();
-        *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) = 1;
-        *(uint32_t *)(rec + 0x0C) = 0;
-        *(uint32_t *)(rec + 0x8C) = 0;
-        *(uint32_t *)(rec + 0x9C) = 0;
-        *(uint32_t *)(rec + 0xA0) = 0;
-        *(uint32_t *)(rec + 0xA4) = 0;
-        *(uint32_t *)(rec + 0xA8) = 0;
-        *(uint32_t *)(rec + 0xAC) = 0;
-        *(uint32_t *)(rec + 0xB0) = 0;
-        *(uint32_t *)(rec + 0xB4) = 0;
+        rec->duplicates = 0;
+        rec->rttMin = 0;
+        rec->rttMax = 0;
+        rec->rttTotal = 0;
+        rec->readyAt = GetTickCount();
+        rec->ready = 1;
+        rec->heHas = 0;
+        rec->badChecksums = 0;
+        rec->field9C = 0;
+        rec->fieldA0 = 0;
+        rec->lossBurst = 0;
+        rec->lossPct = 0;
+        rec->fieldAC = 0;
+        rec->lagMs = 0;
+        rec->lagSpread = 0;
 
-        *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) =
+        rec->ready =
             (uint32_t)g_commObject->isHost;
 
         {
             int32_t i;
 
             for (i = 0; i < AM2_PLAYER_RING_LEN; i++) {
-                ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
-                ((uint32_t *)(rec + PLAYER_REC_OFF_RING_B))[i] = 0;
+                rec->ringA[i] = 0;
+                rec->ringB[i] = 0;
             }
         }
         result = 1;
@@ -1826,7 +1825,7 @@ void __cdecl GameSrand(int32_t seed);
 
 /* 0x00401000. Clear the list and give it a mutex. Answers 0 if the mutex
  * could not be had, and leaves the list zeroed either way. */
-int32_t __cdecl MsgListInit(void *list)
+int32_t __cdecl MsgListInit(AM2_MsgList *list)
 {
     uint32_t *l = (uint32_t *)list;
 
@@ -1838,7 +1837,7 @@ int32_t __cdecl MsgListInit(void *list)
 }
 
 /* The neighbour RecvThreadProc hands each received node to; still original. */
-typedef int32_t (__cdecl *AM2_RecvMsgFn)(void *node);
+typedef int32_t (__cdecl *AM2_RecvMsgFn)(AM2_MsgNode *node);
 
 /* RecvThreadProc -- original 0x00401F00, 416 bytes, and the thread
  * StartPacketThread below creates. It carried "the thread, stays original" in
@@ -1906,7 +1905,7 @@ int32_t __cdecl RecvThreadProc(void *param)
             break;
 
         for (;;) {
-            uint8_t *node;
+            AM2_MsgNode *node;
 
             if (!msg) {
                 msg = MsgListRemHead(g_msgListPool);
@@ -1938,20 +1937,20 @@ int32_t __cdecl RecvThreadProc(void *param)
                 break;
             }
 
-            node = (uint8_t *)msg;
-            *(DWORD *)(node + MSGNODE_OFF_BODY_LEN) = PACKET_BUFFER_BYTES;
+            node = (AM2_MsgNode *)msg;
+            node->bodyLen = PACKET_BUFFER_BYTES;
 
             if (!CommReceive(*(void * *)&g_commObject,
-                             (DPID *)(node + MSGNODE_OFF_FROM),
-                             (DPID *)(node + MSGNODE_OFF_TO),
+                             (DPID *)&node->from,
+                             (DPID *)&node->to,
                              1,
-                             *(void **)(node + MSGNODE_OFF_BODY),
-                             (DWORD *)(node + MSGNODE_OFF_BODY_LEN)))
+                             node->body,
+                             (DWORD *)&node->bodyLen))
                 break;   /* nothing left -- the node is kept for next time */
 
             /* 0 means the flow layer did not consume it. */
             if (!FlowRecvMessage(msg))
-                MsgListAdd(g_msgListB, msg);
+                MsgListAdd(g_msgListB, (AM2_MsgNode *)msg);
 
             got = 1;
             msg = (void *)0;
@@ -1998,7 +1997,7 @@ int32_t __cdecl StartPacketThread(void)
 {
     /* Indexed: the image's outer test is a signed `jl` on the buffer
      * cursor the two indexes strength-reduce to. */
-#define REC(i) (g_packetRecords + (uint32_t)(i) * PACKET_RECORD_STRIDE)
+#define REC(i) (&g_packetRecords[(uint32_t)(i)])
 #define BUF    (g_packetBuffers)
     int32_t i;
     int32_t j;
@@ -2017,9 +2016,9 @@ void __cdecl PacketSlotReset(uint32_t slot);
     /* 400 buffers: ADDR_PACKET_BUFFERS_END - ADDR_PACKET_BUFFERS is 0x64000,
      * spelled as a number because the relink places those two as symbols. */
     for (i = 0; i < 400; i++) {
-        *(uint32_t *)(REC(i) + PACKET_REC_OFF_SIZE) = PACKET_BUFFER_BYTES;
-        *(uint32_t **)(REC(i) + PACKET_REC_OFF_DATA) =
-            &BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4)];
+        REC(i)->size = PACKET_BUFFER_BYTES;
+        REC(i)->body =
+            (uint8_t *)&BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4)];
 
         for (j = 0; j < (int32_t)(PACKET_BUFFER_BYTES / 4); j++)
             BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4) + j] =
@@ -2377,27 +2376,27 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotOfId(uint32_t id)
 void __cdecl PacketSlotReset(uint32_t slot)
 {
     /* Written out, in the image's order: the ownership bit goes in fifth. */
-#define REC (g_playerRecords + slot * AM2_PLAYER_RECORD_BYTES)
-    *(uint32_t *)(REC + 0x00) = 0;
-    *(uint32_t *)(REC + 0x04) = 0;
-    *(uint32_t *)(REC + 0x08) = 0;
-    *(uint32_t *)(REC + 0x0C) = 0;
-    *(uint32_t *)(REC + 0x10) = 0;
-    *(uint32_t *)(REC + PLAYER_REC_OFF_OWN_BIT) = 1u << slot;
-    *(uint32_t *)(REC + 0x1C) = 0;
-    *(uint32_t *)(REC + 0x20) = 0;
-    *(uint32_t *)(REC + 0x28) = 0;
-    *(uint32_t *)(REC + 0x30) = 0;
-    *(uint32_t *)(REC + 0x34) = 0;
-    *(uint32_t *)(REC + 0x8C) = 0;
-    *(uint32_t *)(REC + 0x38) = 0;
-    *(uint32_t *)(REC + 0x40) = 0;
-    *(uint32_t *)(REC + 0x44) = 0;
-    *(uint32_t *)(REC + 0x48) = 0;
-    *(uint32_t *)(REC + 0x4C) = 0;
-    *(uint32_t *)(REC + 0x5C) = 0;
+#define REC (&g_playerRecords[slot])
+    REC->id = 0;
+    REC->nextExpected = 0;
+    REC->highestSeq = 0;
+    REC->heHas = 0;
+    REC->ackSent = 0;
+    REC->ownBit = 1u << slot;
+    REC->sentAt = 0;
+    REC->recvPackets = 0;
+    REC->sentPackets = 0;
+    REC->acksSeen = 0;
+    REC->field34 = 0;
+    REC->badChecksums = 0;
+    REC->nacksSent = 0;
+    REC->duplicates = 0;
+    REC->rttMin = 0;
+    REC->rttMax = 0;
+    REC->rttTotal = 0;
+    REC->readyAt = 0;
 
-    MsgListInit(REC + PLAYER_REC_OFF_MSGS);
+    MsgListInit(&REC->queue);
 #undef REC
 }
 /* 0x0040FB80, one caller -- ShowMpResult. EIGHT bytes: it forwards to
@@ -2615,33 +2614,33 @@ void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
  * the caller's way of asking "did you find it" without a second output.
  */
 /* The node carrying `key`, or null -- written out inline where it is used. */
-static inline const uint8_t *MsgListFindKey(const uint8_t *l, int32_t key)
+static inline const AM2_MsgNode *MsgListFindKey(const AM2_MsgList *l, int32_t key)
 {
-    const uint8_t *n;
-    const uint8_t *hit = 0;
+    const AM2_MsgNode *n;
+    const AM2_MsgNode *hit = 0;
 
-    for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
-         n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
-        if (*(const int32_t *)(n + MSGNODE_OFF_KEY) == key) {
+    for (n = l->head; n;
+         n = n->next)
+        if ((int32_t)n->key == key) {
             hit = n;
             break;
         }
     return hit;
 }
 
-void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
+void *__cdecl MsgListCopyByKey(AM2_MsgList *list, int32_t key, void *dst)
 {
-    uint8_t       *l = (uint8_t *)list;
-    const uint8_t *found;
+    AM2_MsgList       *l = list;
+    const AM2_MsgNode *found;
 
-    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+    WaitForSingleObject((HANDLE)l->mutex, INFINITE);
 
     found = MsgListFindKey(l, key);
     if (found)
-        memcpy(dst, *(const void *const *)(found + MSGNODE_OFF_BODY),
-               *(const uint32_t *)(found + MSGNODE_OFF_BODY_LEN));
+        memcpy(dst, found->body,
+               found->bodyLen);
 
-    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+    ReleaseMutex((HANDLE)l->mutex);
 
     return found ? dst : (void *)0;
 }
@@ -2673,30 +2672,30 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
  * list, and append past the end -- and left alone on the two that insert
  * before an existing node. Correct, because neither can change the tail.
  */
-void *__cdecl MsgListInsert(void *list, void *node)
+void *__cdecl MsgListInsert(AM2_MsgList *list, AM2_MsgNode *node)
 {
-    uint8_t *l = (uint8_t *)list;
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *at;
+    AM2_MsgList *l = (AM2_MsgList *)list;
+    AM2_MsgNode *n = (AM2_MsgNode *)node;
+    AM2_MsgNode *at;
 
-#define NEXT(p) (*(uint8_t **)((p) + MSGNODE_OFF_NEXT))
-#define PREV(p) (*(uint8_t **)((p) + MSGNODE_OFF_PREV))
-#define KEY(p)  (*(const uint32_t *)((p) + MSGNODE_OFF_KEY))
-#define HEAD    (*(uint8_t **)(l + MSGLIST_OFF_HEAD))
-#define TAIL    (*(uint8_t **)(l + MSGLIST_OFF_TAIL))
-#define COUNT   (*(int32_t *)(l + MSGLIST_OFF_COUNT))
-#define MUTEX   (*(HANDLE *)(l + MSGLIST_OFF_MUTEX))
+#define NEXT(p) (p->next)
+#define PREV(p) (p->prev)
+#define KEY(p)  (p->key)
+#define HEAD    (l->head)
+#define TAIL    (l->tail)
+#define COUNT   (l->count)
+#define MUTEX   ((HANDLE)l->mutex)
     WaitForSingleObject(MUTEX, INFINITE);
 
     at = HEAD;
     if (!at) {
         HEAD = n;
         TAIL = n;
-        PREV(n) = (uint8_t *)0;
-        NEXT(n) = (uint8_t *)0;
+        PREV(n) = (AM2_MsgNode *)0;
+        NEXT(n) = (AM2_MsgNode *)0;
         COUNT++;
     } else if (KEY(at) > KEY(n)) {
-        PREV(n) = (uint8_t *)0;
+        PREV(n) = (AM2_MsgNode *)0;
         NEXT(n) = at;
         HEAD    = n;
         PREV(at) = n;
@@ -2717,7 +2716,7 @@ void *__cdecl MsgListInsert(void *list, void *node)
             if (!NEXT(at)) {                /* past the tail */
                 NEXT(at) = n;
                 PREV(n)  = at;
-                NEXT(n)  = (uint8_t *)0;
+                NEXT(n)  = (AM2_MsgNode *)0;
                 TAIL     = n;
                 COUNT++;
                 break;
@@ -2760,34 +2759,34 @@ void *__cdecl MsgListInsert(void *list, void *node)
  * nothing was found, so the mask is redundant. Reproduced as the plain value,
  * which is what it compiles to either way.
  */
-int32_t __cdecl MsgListTakeFlags(void *list, void *dst)
+int32_t __cdecl MsgListTakeFlags(AM2_MsgList *list, void *dst)
 {
     /* The wanted mask is read afresh on every pass, the node found is kept
      * apart from the cursor, and the result is `found ? taken : 0`. */
 #define WANT (g_msgWantedFlags)
-    uint8_t  *l     = (uint8_t *)list;
-    uint8_t  *n;
-    uint8_t  *found;
+    AM2_MsgList *l  = list;
+    AM2_MsgNode  *n;
+    AM2_MsgNode  *found;
     uint32_t  taken = 0;
 
-    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+    WaitForSingleObject((HANDLE)l->mutex, INFINITE);
     found = 0;
 
-    for (n = *(uint8_t **)(l + MSGLIST_OFF_HEAD); n;
-         n = *(uint8_t **)(n + MSGNODE_OFF_NEXT)) {
-        if (*(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & WANT) {
+    for (n = l->head; n;
+         n = n->next) {
+        if (n->flags & WANT) {
             found = n;
-            taken = *(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & WANT;
-            *(uint32_t *)(n + MSGNODE_OFF_FLAGS) &= ~WANT;
+            taken = n->flags & WANT;
+            n->flags &= ~WANT;
             break;
         }
     }
 
     if (found)
-        memcpy(dst, *(const void *const *)(found + MSGNODE_OFF_BODY),
-               *(const uint32_t *)(found + MSGNODE_OFF_BODY_LEN));
+        memcpy(dst, found->body,
+               found->bodyLen);
 
-    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+    ReleaseMutex((HANDLE)l->mutex);
 
     return found ? (int32_t)taken : 0;
 #undef WANT
@@ -2890,25 +2889,24 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerLeft(int32_t id)
  * whatever MSGNODE_OFF_BODY points at. One dereference further than the
  * first, which is why the two offsets are named separately.
  */
-void __cdecl DumpMsgList(void *list)
+void __cdecl DumpMsgList(AM2_MsgList *list)
 {
-    const uint8_t *l = (const uint8_t *)list;
-    const uint8_t *n;
+    const AM2_MsgList *l = list;
+    const AM2_MsgNode *n;
 
-    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+    WaitForSingleObject((HANDLE)l->mutex, INFINITE);
 
-    n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD);
+    n = l->head;
     orig_log("List: ");
 
-    for (; n; n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
+    for (; n; n = n->next)
         orig_log("(%d %d)",
-                     *(const int32_t *)(n + MSGNODE_OFF_KEY),
-                     *(const int32_t *)(*(const uint8_t *const *)
-                                            (n + MSGNODE_OFF_BODY) + 8));
+                     (int32_t)n->key,
+                     *(const int32_t *)(n->body + 8));
 
     orig_log("\n");
 
-    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+    ReleaseMutex((HANDLE)l->mutex);
 }
 
 /* The comm object is the image's other static C++ global, and these four are
@@ -3125,15 +3123,15 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 {
     /* The comm object is read at every use. */
 #define comm (g_commObject)
-    uint8_t *flow;
-    uint8_t *mine;
+    AM2_Flow *flow;
+    AM2_Flow *mine;
     int32_t  seq;
     int32_t  i;
 
     if (!id || id == 0xFFFFFFFFu)
         return 0;
 
-    flow = (uint8_t *)FindPlayerById(id);
+    flow = FindPlayerById(id);
     if (!flow)
         orig_log("DestroyFlow: Flow queue for Player %x not found\n",
                  comm->selfId);
@@ -3145,7 +3143,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     if (!flow)
         return 0;
 
-    mine = (uint8_t *)FindPlayerById(
+    mine = FindPlayerById(
                comm->selfId);
     if (!mine) {
         orig_log("DestroyFlow: Flow queue for me (%x) not found\n",
@@ -3153,31 +3151,31 @@ int32_t __cdecl DestroyFlow(uint32_t id)
         return 0;
     }
 
-    DrainMsgList(flow + FLOW_OFF_QUEUE);
+    DrainMsgList(&flow->queue);
 
     if (id != comm->selfId) {
         uint32_t mask = GetPlayerMask(id);
 
         if (comm->verbose)
             orig_log(" Simulating Acks for  seq %d thru %d\n",
-                     *(const int32_t *)(flow + FLOW_OFF_HE_HAS) + 1,
-                     *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1);
+                     (int32_t)flow->heHas + 1,
+                     (int32_t)mine->sequence - 1);
 
-        for (seq = *(const int32_t *)(flow + FLOW_OFF_HE_HAS) + 1;
-             seq <= *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1; seq++) {
-            uint8_t *node = (uint8_t *)MsgListSetFlag(
+        for (seq = (int32_t)flow->heHas + 1;
+             seq <= (int32_t)mine->sequence - 1; seq++) {
+            AM2_MsgNode *node = (AM2_MsgNode *)MsgListSetFlag(
                 g_msgListSendq, seq, 0, mask);
 
             if (!node)
                 continue;
             if (g_playerSlotMask
-                & *(const uint32_t *)(node + MSGNODE_OFF_FLAGS))
+                & node->flags)
                 continue;   /* somebody still connected wants it */
 
             if (comm->verbose)
                 orig_log("Adding to freelist from sendque Buffer seq %d "
                          " elelment %x \n",
-                         *(const int32_t *)(node + MSGNODE_OFF_KEY), node);
+                         (int32_t)node->key, node);
 
             MsgListRemove(g_msgListSendq, node);
             MsgListAdd(g_msgListPool, node);
@@ -3199,12 +3197,11 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     }
 
     {
-        struct PlayerRec { uint8_t bytes[AM2_PLAYER_RECORD_BYTES]; };
-#define RECAT(n) (((struct PlayerRec *)g_playerRecords)[n].bytes)
+#define RECAT(n) (g_playerRecords[n])
 
         for (i = 0; i < AM2_PLAYER_RECORDS; i++)
-            if (*(const uint32_t *)RECAT(i) == id) {
-                *(uint32_t *)RECAT(i) = 0;
+            if (RECAT(i).id == id) {
+                RECAT(i).id = 0;
                 return 1;
             }
 #undef RECAT
@@ -3430,7 +3427,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 void __cdecl ProcessResendQueue(void)
 {
 #define comm (g_commObject)
-    uint8_t  *buf = g_resendBuf;
+    AM2_Packet  *buf = g_resendBuf;
     int32_t   taken;
     int32_t   drained = 0;
 
@@ -3443,40 +3440,40 @@ void __cdecl ProcessResendQueue(void)
 
         for (i = 0; i < AM2_COMM_PLAYERS; i++) {
             uint32_t id = comm->slots[i].id;
-            uint8_t *flow;
+            AM2_Flow *flow;
             int32_t  hr;
 
             if (!id || id == 0xFFFFFFFFu
                 || id == comm->selfId)
                 continue;
 
-            flow = (uint8_t *)FindPlayerById(id);
+            flow = FindPlayerById(id);
             if (!flow)
                 continue;
             if (!(taken & (int32_t)GetReSendMask(id)))
                 continue;
-            if (*(const uint32_t *)(buf + PACKET_OFF_SEQ)
-                < *(const uint32_t *)(flow + FLOW_OFF_HE_HAS))
+            if (buf->seq
+                < flow->heHas)
                 continue;
 
-            *(uint32_t *)(buf + PACKET_OFF_ACK) =
-                *(const uint32_t *)(flow + FLOW_OFF_NEXT_EXPECTED);
-            *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = 0;
-            *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = XorChecksum(buf);
+            buf->ack =
+                flow->nextExpected;
+            buf->checksum = 0;
+            buf->checksum = XorChecksum(buf);
 
-            MsgSlotA2(flow, *(const uint32_t *)(buf + PACKET_OFF_SEQ));
+            MsgSlotA2(flow, buf->seq);
 
             hr = AM2_THE_COMM->CommSend(id, 0,
-                          buf, *(const uint32_t *)(buf + PACKET_OFF_LEN));
+                          buf, buf->len);
 
             if (comm->verbose)
                 orig_log("RESENDING %d to %x size %d \n",
-                        *(const int32_t *)(buf + PACKET_OFF_SEQ), id,
-                        *(const int32_t *)(buf + PACKET_OFF_LEN));
+                        (int32_t)buf->seq, id,
+                        (int32_t)buf->len);
 
             if (hr < 0) {
                 orig_log("DPlaySend Failure %x to %x size %d\n", hr, id,
-                        *(const int32_t *)(buf + PACKET_OFF_LEN));
+                        (int32_t)buf->len);
 
                 if ((uint32_t)hr == AM2_DPERR_BUSY)
                     orig_log("DPLAY ERROR: Busy\n");
@@ -3552,10 +3549,10 @@ void __cdecl ProcessResendQueue(void)
 int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
 {
     AM2_Comm *comm = g_commObject;
-    uint8_t *pkt  = (uint8_t *)msg;
-    uint8_t *flow;          /* the DESTINATION's record; only looked up for 0x0B */
-    uint8_t *mine;
-    uint8_t *node;
+    AM2_Packet *pkt  = (AM2_Packet *)msg;
+    AM2_Flow *flow;          /* the DESTINATION's record; only looked up for 0x0B */
+    AM2_Flow *mine;
+    AM2_MsgNode *node;
     int32_t  roll;
     int32_t  hr;
 
@@ -3569,13 +3566,13 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
         return (int32_t)AM2_DPERR_SESSIONLOST;
 
     flow = 0;   /* set after the refusals, as the image does */
-    if (*(const uint32_t *)(pkt + COMMMSG_OFF_KIND) == AM2_COMMMSG_KIND_FLOW) {
+    if (pkt->kind == AM2_COMMMSG_KIND_FLOW) {
         uint32_t mask = GetPlayerMask((uint32_t)to);
 
         if (!MsgListSetFlag(g_msgListSendq,
-                            *(const int32_t *)(pkt + PACKET_OFF_SEQ),
+                            (int32_t)pkt->seq,
                             1, (int32_t)mask)) {
-            node = (uint8_t *)MsgListRemHead(
+            node = MsgListRemHead(
                        g_msgListPool);
             if (!node) {
                 orig_log("Out of Send Buffers \n");
@@ -3583,49 +3580,49 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
                 return (int32_t)AM2_E_OUTOFMEMORY;
             }
 
-            *(uint32_t *)(node + MSGNODE_OFF_KEY) =
-                *(const uint32_t *)(pkt + PACKET_OFF_SEQ);
-            *(uint32_t *)(node + MSGNODE_OFF_FLAGS) = mask;
-            *(uint32_t *)(node + MSGNODE_OFF_STAMP) = GetTickCount();
+            node->key =
+                pkt->seq;
+            node->flags = mask;
+            node->stamp = GetTickCount();
 
-            if (*(const uint32_t *)(pkt + PACKET_OFF_LEN)
-                > *(const uint32_t *)(node + PACKET_REC_OFF_SIZE)) {
+            if (pkt->len
+                > node->size) {
                 orig_log("Message Too Big \n");
                 return (int32_t)AM2_DPERR_SENDTOOBIG;
             }
 
-            memcpy(*(void *const *)(node + MSGNODE_OFF_BODY), pkt,
-                   *(const uint32_t *)(pkt + PACKET_OFF_LEN));
-            *(uint32_t *)(node + MSGNODE_OFF_BODY_LEN) =
-                *(const uint32_t *)(pkt + PACKET_OFF_LEN);
+            memcpy(node->body, pkt,
+                   pkt->len);
+            node->bodyLen =
+                pkt->len;
 
             MsgListAdd(g_msgListSendq, node);
         }
 
-        flow = (uint8_t *)FindPlayerById((uint32_t)to);
+        flow = FindPlayerById((uint32_t)to);
         if (!flow) {
             orig_log("Error Send can't find Flow for Player %x\n", to);
         } else {
             /* The checksum covers the ack, so the order is load-bearing: stamp
              * it, clear the checksum field, then compute over the whole
              * buffer. The same three lines as ProcessResendQueue. */
-            *(uint32_t *)(pkt + PACKET_OFF_ACK) =
-                *(const uint32_t *)(flow + FLOW_OFF_NEXT_EXPECTED);
-            *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = 0;
-            *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = XorChecksum(pkt);
+            pkt->ack =
+                flow->nextExpected;
+            pkt->checksum = 0;
+            pkt->checksum = XorChecksum(pkt);
 
-            *(uint32_t *)(flow + FLOW_OFF_ACK_SENT) =
-                *(const uint32_t *)(pkt + PACKET_OFF_ACK);
-            *(uint32_t *)(flow + FLOW_OFF_SENT_AT) = GetTickCount();
-            *(int32_t *)(flow + FLOW_OFF_SENT_PACKETS) += 1;
-            *(int32_t *)(flow + FLOW_OFF_SENT_BYTES) +=
-                *(const int32_t *)(pkt + PACKET_OFF_LEN);
+            flow->ackSent =
+                pkt->ack;
+            flow->sentAt = GetTickCount();
+            flow->sentPackets += 1;
+            flow->sentBytes +=
+                (int32_t)pkt->len;
 
-            if (*(const int32_t *)(flow + FLOW_OFF_HE_HAS) == 0
-                && *(const uint32_t *)(pkt + PACKET_OFF_SEQ) > 1u) {
-                int32_t hehas = *(const int32_t *)(pkt + PACKET_OFF_SEQ) - 1;
+            if ((int32_t)flow->heHas == 0
+                && pkt->seq > 1u) {
+                int32_t hehas = (int32_t)pkt->seq - 1;
 
-                *(int32_t *)(flow + FLOW_OFF_HE_HAS) = hehas;
+                flow->heHas = hehas;
                 if (g_commObject->verbose)
                     orig_log("SendGameMsg, first message to %x, hehas set "
                              "to %d\n", to, hehas);
@@ -3634,12 +3631,12 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
             /* Not for a broadcast: `to` of 0 is DPID_ALLPLAYERS and there is
              * no one record to mark. */
             if (to)
-                MsgSlotA1(flow, *(const uint32_t *)(pkt + PACKET_OFF_SEQ));
+                MsgSlotA1(flow, pkt->seq);
         }
     }
 
     comm = g_commObject;
-    mine = (uint8_t *)FindPlayerById(
+    mine = FindPlayerById(
                comm->selfId);
     if (!mine)
         orig_log("Error Send can't find My Flow for Player %x\n",
@@ -3651,14 +3648,14 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
     g_sendRoll = roll;
 
     if (mine) {
-#define pct (*(const int32_t *)(mine + FLOW_OFF_LOSS_PCT))
+#define pct (mine->lossPct)
 
-        if (*(const int32_t *)(mine + FLOW_OFF_LOSS_BURST) != 0) {
+        if (mine->lossBurst != 0) {
             /* Drop the LAST `pct` of every hundred packets to this player --
              * a burst rather than a scatter, and it needs a destination
              * record, so a broadcast is never dropped this way. */
             if (pct != 0 && flow != 0
-                && (int32_t)(*(const uint32_t *)(flow + FLOW_OFF_SENT_PACKETS)
+                && (int32_t)(flow->sentPackets
                              % (uint32_t)AM2_SEND_ROLL_MOD)
                    > AM2_SEND_ROLL_MOD - pct
                 && !(flags & AM2_DPSEND_GUARANTEED))
@@ -3669,35 +3666,35 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
                 return 0;
         }
 
-        if (*(const int32_t *)(mine + FLOW_OFF_LAG_MS) != 0) {
+        if (mine->lagMs != 0) {
             int32_t due = RandomAround(
-                              *(const int32_t *)(mine + FLOW_OFF_LAG_MS),
-                              *(const int32_t *)(mine + FLOW_OFF_LAG_SPREAD))
+                              mine->lagMs,
+                              mine->lagSpread)
                           + (int32_t)GetTickCount();
 
-            node = (uint8_t *)MsgListRemHead(
+            node = MsgListRemHead(
                        g_msgListPool);
             if (!node) {
                 orig_log("Latency Emulation is Out of Send Buffers \n");
                 /* and fall through to the plain send */
             } else {
-                *(int32_t *)(node + MSGNODE_OFF_KEY)    = due;
-                *(int32_t *)(node + MSGNODE_OFF_FLAGS)  = flags;
-                *(uint32_t *)(node + MSGNODE_OFF_STAMP) = GetTickCount();
-                *(int32_t *)(node + MSGNODE_OFF_TO)     = to;
-                *(uint32_t *)(node + MSGNODE_OFF_FROM) =
+                node->key    = due;
+                node->flags  = flags;
+                node->stamp = GetTickCount();
+                node->to     = to;
+                node->from =
                     g_commObject->selfId;
 
-                if (*(const uint32_t *)(pkt + PACKET_OFF_LEN)
-                    > *(const uint32_t *)(node + PACKET_REC_OFF_SIZE)) {
+                if (pkt->len
+                    > node->size) {
                     orig_log("Message Too Big \n");
                     return (int32_t)AM2_DPERR_SENDTOOBIG;
                 }
 
-                memcpy(*(void *const *)(node + MSGNODE_OFF_BODY), pkt,
-                       *(const uint32_t *)(pkt + PACKET_OFF_LEN));
-                *(uint32_t *)(node + MSGNODE_OFF_BODY_LEN) =
-                    *(const uint32_t *)(pkt + PACKET_OFF_LEN);
+                memcpy(node->body, pkt,
+                       pkt->len);
+                node->bodyLen =
+                    pkt->len;
 
                 MsgListInsert(g_msgListDelayed, node);
                 return 0;
@@ -3707,12 +3704,12 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
 
     hr = AM2_THE_COMM->CommSend((uint32_t)to,
                   (uint32_t)flags, pkt,
-                  *(const uint32_t *)(pkt + PACKET_OFF_LEN));
+                  pkt->len);
     if (hr >= 0)
         return hr;
 
     orig_log("DPlaySend Failure %x to %x size %d\n", hr, to,
-             *(const int32_t *)(pkt + PACKET_OFF_LEN));
+             (int32_t)pkt->len);
 
     if ((uint32_t)hr == AM2_DPERR_BUSY)
         orig_log("DPLAY ERROR: Busy\n");
@@ -3726,7 +3723,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
         orig_log("DPLAY ERROR: Send too big\n");
 
     orig_log("gpComm->Send Failure2 %x to %x size %d\n", hr, to,
-             *(const int32_t *)(pkt + PACKET_OFF_LEN));
+             (int32_t)pkt->len);
 
     g_exitGameFlag = 1;
     ExitGamePostClose();

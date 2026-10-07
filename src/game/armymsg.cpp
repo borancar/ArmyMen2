@@ -79,7 +79,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
  * observable. */
 int32_t __cdecl ArmyMessageFlush(int32_t least)
 {
-    uint8_t *me;
+    AM2_Flow *me;
     int32_t  payload, seq, i;
     uint32_t elapsed;
 
@@ -99,16 +99,16 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
           || payload > (int32_t)kComm->bufferDefault))
         return 0;
 
-    me = (uint8_t *)FindPlayerById((uint32_t)(int32_t)kComm->selfId);
+    me = FindPlayerById((uint32_t)(int32_t)kComm->selfId);
     if (me == 0) {
         orig_log("myflow null %d\n", (int32_t)kComm->selfId);
         return 0;
     }
 
-    if (*(const int32_t *)(me + FLOW_OFF_READY) == 0)
+    if ((int32_t)me->ready == 0)
         return 0;
 
-    seq = *(const int32_t *)(me + FLOW_OFF_SEQUENCE);
+    seq = (int32_t)me->sequence;
     g_armyPacketSeq = seq;
 
     for (i = 0; i < kComm->playerCount; i++) {
@@ -128,14 +128,14 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
 
         /* Re-read rather than reuse `seq`: nothing in the loop bumps it, so
          * this is the original's spelling and not a second value. */
-        if ((uint32_t)*(const int32_t *)(me + FLOW_OFF_SEQUENCE) < 5u
+        if ((uint32_t)(int32_t)me->sequence < 5u
             && kComm->verbose)
             orig_log("Sending Flow Packet seq %d to %x \n",
-                     *(const int32_t *)(me + FLOW_OFF_SEQUENCE), id);
+                     (int32_t)me->sequence, id);
 #undef id
     }
 
-    *(int32_t *)(me + FLOW_OFF_SEQUENCE) += 1;
+    me->sequence += 1;
     kComm->sendStamp = (int32_t)orig_get_tick_count();
     kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
     (void)MsgField12(g_msgListPool);
@@ -1773,9 +1773,7 @@ void __cdecl VehicleUpdateAppend(void *msg, AM2_Object *obj)
 
     if (o->health == 0)
         return;
-    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
-              comm->selfId)
-              + FLOW_OFF_SEQUENCE);
+    seq = FindPlayerById(comm->selfId)->sequence;
 #define coarse (comm->enoughChangeLimit)
 
     dx = o->pos.x
@@ -2198,7 +2196,7 @@ extern "C" void __cdecl DrawSeqBar(int32_t x, int32_t bottom,
 void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
 {
     const AM2_Comm *comm = g_commObject;
-    const uint8_t *player;
+    const AM2_Flow *player;
     uint32_t       id;
     int32_t        mean;
     uint8_t        colour;
@@ -2210,7 +2208,7 @@ void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
     if (id == 0xFFFFFFFFu)
         return;
 
-    player = (const uint8_t *)FindPlayerById(id);
+    player = FindPlayerById(id);
     if (player == 0)
         return;
 
@@ -2226,6 +2224,6 @@ void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
     DrawSeqBar(((const AM2_Point *)g_mpRowCoords)[slot + row * 4].x + 0x37,
                ((const AM2_Point *)g_mpRowCoords)[slot + row * 4].y + 0x12,
                colour,
-               *(const int32_t *)(player + 0x28u),
-               *(const int32_t *)(player + 0x30u));
+               (int32_t)player->sentPackets,
+               (int32_t)player->acksSeen);
 }

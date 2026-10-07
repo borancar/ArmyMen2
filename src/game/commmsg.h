@@ -101,7 +101,7 @@ void __cdecl Announce(const char *text);
 /* 0x00401240, five callers. Find the node with a given key and set or clear
  * bits in its flags, under the list's mutex. Structural name; see
  * commmsg.cpp. */
-void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
+AM2_MsgNode *__cdecl MsgListSetFlag(AM2_MsgList *list, int32_t key, int32_t set,
                              uint32_t bits);
 
 /* 0x00402F50, one caller -- the frame chain's post-work. Drain the delayed

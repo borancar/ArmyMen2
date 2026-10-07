@@ -10892,7 +10892,7 @@ uint8_t __cdecl MpNameInk(int32_t row)
     uint32_t       id;
     int32_t        ms   = PlayerLatency(g_commObject->slots[(uint32_t)row].id);
     uint8_t        ink  = g_hiliteColour;
-    const uint8_t *player;
+    const AM2_Flow *player;
 
     /* Re-read, as the original does: it loads the comm object again after
      * the call rather than keeping the register. */
@@ -10907,12 +10907,12 @@ uint8_t __cdecl MpNameInk(int32_t row)
     if ((uint32_t)ms > AM2_LATENCY_BAD)
         ink = g_hudColour;
 
-    player = (const uint8_t *)FindPlayerById(id);
+    player = FindPlayerById(id);
     if (!player)
         return ink;
 
     if (orig_get_tick_count()
-        - *(const uint32_t *)(player + AM2_PLAYER_LAST_SEEN) > AM2_SILENCE_BAD)
+        - player->deliveredAt > AM2_SILENCE_BAD)
         ink = g_colourStale;
 
     return ink;

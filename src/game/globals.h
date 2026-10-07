@@ -464,10 +464,10 @@
 #define g_msgKind0c              ((void *)(uintptr_t)ADDR_MSG_KIND0C)  /* 0x004FC388 */
 #define g_msgKind0d              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND0D)  /* 0x004FC788 */
 #define g_msgKind10              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND10)  /* 0x004FAA38 */
-#define g_msgListB               ((void *)(uintptr_t)ADDR_MSG_LIST_B)  /* 0x004F48C8 */
-#define g_msgListDelayed         ((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED)  /* 0x004F8780 */
-#define g_msgListPool            ((void *)(uintptr_t)ADDR_MSG_LIST_POOL)  /* 0x0048D8E8 */
-#define g_msgListSendq           ((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ)  /* 0x0048D8D8 */
+#define g_msgListB               ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_B)  /* 0x004F48C8 */
+#define g_msgListDelayed         ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_DELAYED)  /* 0x004F8780 */
+#define g_msgListPool            ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_POOL)  /* 0x0048D8E8 */
+#define g_msgListSendq           ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_SENDQ)  /* 0x0048D8D8 */
 #define g_msgMap                 ((uint8_t *)(uintptr_t)ADDR_MSG_MAP)  /* 0x004FB770 */
 #define g_msgReadyToLoad         ((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD)  /* 0x004FAA18 */
 #define g_msgTeam                ((uint8_t *)(uintptr_t)ADDR_MSG_TEAM)  /* 0x004FC8A8 */
@@ -530,7 +530,7 @@
 #define g_overlayDirty           (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)  /* 0x00511DC0 */
 #define g_overlayPalette         (*(void **)(uintptr_t)ADDR_OVERLAY_PALETTE)  /* 0x004FE1A4 */
 #define g_packetBuffers          ((uint32_t *)(uintptr_t)ADDR_PACKET_BUFFERS)  /* 0x0048D978 */
-#define g_packetRecords          ((uint8_t *)(uintptr_t)ADDR_PACKET_RECORDS)  /* 0x004F48F8 */
+#define g_packetRecords          ((AM2_MsgNode *)(uintptr_t)ADDR_PACKET_RECORDS)  /* 0x004F48F8 */
 #define g_packetState            (*(int32_t *)(uintptr_t)ADDR_PACKET_STATE)  /* 0x004F877C */
 #define g_packetThreadId         ((uint8_t *)(uintptr_t)ADDR_PACKET_THREAD_ID)  /* 0x004F8B90 */
 #define g_padBitTable            ((int32_t *)(uintptr_t)ADDR_PAD_BIT_TABLE)  /* 0x00486444 */
@@ -588,7 +588,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_placementCount         (*(int32_t *)(uintptr_t)ADDR_PLACEMENT_COUNT)  /* 0x00654C80 */
 #define g_placements             (*(AM2_Placement **)(uintptr_t)ADDR_PLACEMENTS)  /* 0x00654C7C */
 #define g_playerMsg              (*(AM2_PlayerMsg *)(uintptr_t)ADDR_PLAYER_MSG)  /* 0x004FC3B8 */
-#define g_playerRecords          ((uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS)  /* 0x004F1980 */
+#define g_playerRecords          ((AM2_Flow *)(uintptr_t)ADDR_PLAYER_RECORDS)  /* 0x004F1980 */
 #define g_playerSlotMask         (*(uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK)  /* 0x004F48DC */
 #define g_pointerAction          (*(int32_t *)(uintptr_t)ADDR_POINTER_ACTION)  /* 0x005122E4 */
 #define g_pointerF10             (*(int32_t *)(uintptr_t)ADDR_POINTER_F10)  /* 0x005122E8 */
@@ -639,7 +639,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_remapShadeStore        ((uint8_t *)(uintptr_t)ADDR_REMAP_SHADE_STORE)  /* 0x00502CEC */
 #define g_remapTint              (*(uint8_t **)(uintptr_t)ADDR_REMAP_TINT)  /* 0x0047826C */
 #define g_repairHealPct          (*(int32_t *)(uintptr_t)ADDR_REPAIR_HEAL_PCT)  /* 0x006628A0 */
-#define g_resendBuf              ((uint8_t *)(uintptr_t)ADDR_RESEND_BUF)  /* 0x004FAE68 */
+#define g_resendBuf              ((AM2_Packet *)(uintptr_t)ADDR_RESEND_BUF)  /* 0x004FAE68 */
 #define g_resendScratch          ((void *)(uintptr_t)ADDR_RESEND_SCRATCH)  /* 0x004FB780 */
 #define g_respawnKindCount       (*(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT)  /* 0x00662924 */
 #define g_respawnKindMask        ((uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)  /* 0x0048C530 */

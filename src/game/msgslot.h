@@ -34,6 +34,115 @@
 #include <stdint.h>
 #include "globaltypes.h"   /* AM2_PlayerMsg */
 
+/* One queued message, 0x28 bytes: the node every message list links, and
+ * the same record as the 400 packet records at ADDR_PACKET_RECORDS. */
+typedef struct AM2_MsgNode {
+    struct AM2_MsgNode *prev;   /* +0x00 MSGNODE_OFF_PREV */
+    struct AM2_MsgNode *next;   /* +0x04 MSGNODE_OFF_NEXT */
+    uint32_t  from;             /* +0x08 MSGNODE_OFF_FROM */
+    uint32_t  to;               /* +0x0C MSGNODE_OFF_TO */
+    uint32_t  size;             /* +0x10 PACKET_REC_OFF_SIZE */
+    uint32_t  key;              /* +0x14 MSGNODE_OFF_KEY PACKET_REC_OFF_KEY */
+    uint32_t  flags;            /* +0x18 MSGNODE_OFF_FLAGS PACKET_REC_OFF_FLAGS */
+    uint32_t  stamp;            /* +0x1C MSGNODE_OFF_STAMP */
+    uint8_t  *body;             /* +0x20 MSGNODE_OFF_BODY PACKET_REC_OFF_DATA, a 0x400 buffer */
+    uint32_t  bodyLen;          /* +0x24 MSGNODE_OFF_BODY_LEN */
+} AM2_MsgNode;
+
+/* A message list header, 0x10 bytes. */
+typedef struct AM2_MsgList {
+    void        *mutex;         /* +0x00 MSGLIST_OFF_MUTEX, a HANDLE */
+    AM2_MsgNode *head;          /* +0x04 MSGLIST_OFF_HEAD */
+    AM2_MsgNode *tail;          /* +0x08 MSGLIST_OFF_TAIL */
+    int32_t      count;         /* +0x0C MSGLIST_OFF_COUNT */
+} AM2_MsgList;
+
+/* The header every comm packet starts with, 0x14 bytes. */
+typedef struct AM2_Packet {
+    uint32_t kind;              /* +0x00 COMMMSG_OFF_KIND: AM2_FLOW_DATA, _NACK, _PULSE_ACK */
+    uint32_t len;               /* +0x04 PACKET_OFF_LEN COMMMSG_OFF_SIZE, the whole record */
+    uint32_t seq;               /* +0x08 PACKET_OFF_SEQ */
+    uint32_t checksum;          /* +0x0C PACKET_OFF_CHECKSUM */
+    uint32_t ack;               /* +0x10 PACKET_OFF_ACK */
+} AM2_Packet;
+
+/* A NACK, AM2_FLOW_NACK: the range of sequences to send again. It shares
+ * the packet's first two dwords and nothing after them. */
+typedef struct AM2_FlowNack {
+    uint32_t kind;              /* +0x00 AM2_FLOW_NACK */
+    uint32_t len;               /* +0x04 */
+    uint32_t first;             /* +0x08 FLOWMSG_NACK_FIRST */
+    uint32_t last;              /* +0x0C FLOWMSG_NACK_LAST */
+} AM2_FlowNack;
+
+/* What the flow handler receives, told apart by the kind both start with. */
+typedef union AM2_FlowMsg {
+    AM2_Packet   pkt;           /* AM2_FLOW_DATA and AM2_FLOW_PULSE_ACK */
+    AM2_FlowNack nack;          /* AM2_FLOW_NACK */
+} AM2_FlowMsg;
+
+/* One keyed record of a flow, 12 bytes: what CommRemoveKeyed searches. */
+typedef struct AM2_KeyedRec {
+    uint32_t key;               /* +0x00 */
+    uint32_t second;            /* +0x04 */
+    uint32_t kind;              /* +0x08 AM2_KEYED_KIND, tallied by */
+} AM2_KeyedRec;
+
+/* One player's flow queue, 0x7E0 bytes, six at ADDR_PLAYER_RECORDS:
+ * FindPlayerById's answer. */
+typedef struct AM2_Flow {
+    uint32_t    id;             /* +0x000 the DirectPlay id; 0 free */
+    uint32_t    nextExpected;   /* +0x004 FLOW_OFF_NEXT_EXPECTED */
+    uint32_t    highestSeq;     /* +0x008 FLOW_OFF_HIGHEST_SEQ */
+    uint32_t    heHas;          /* +0x00C FLOW_OFF_HE_HAS */
+    uint32_t    ackSent;        /* +0x010 FLOW_OFF_ACK_SENT */
+    uint32_t    ownBit;         /* +0x014 PLAYER_REC_OFF_OWN_BIT AM2_FLOW_PLAYER_MASK, 1 << slot */
+    uint32_t    wantBit;        /* +0x018 PLAYER_REC_OFF_WANT_BIT AM2_FLOW_RESEND_MASK */
+    uint32_t    sentAt;         /* +0x01C FLOW_OFF_SENT_AT */
+    uint32_t    recvPackets;    /* +0x020 FLOW_OFF_RECV_PACKETS */
+    uint32_t    recvBytes;      /* +0x024 FLOW_OFF_RECV_BYTES */
+    uint32_t    sentPackets;    /* +0x028 FLOW_OFF_SENT_PACKETS */
+    uint32_t    sentBytes;      /* +0x02C FLOW_OFF_SENT_BYTES */
+    uint32_t    acksSeen;       /* +0x030 FLOW_OFF_ACKS_SEEN */
+    uint32_t    field34;        /* +0x034 */
+    uint32_t    nacksSent;      /* +0x038 FLOW_OFF_NACKS_SENT */
+    uint32_t    resends;        /* +0x03C FLOW_OFF_RESENDS */
+    uint32_t    duplicates;     /* +0x040 FLOW_OFF_DUPLICATES */
+    uint32_t    rttMin;         /* +0x044 FLOW_OFF_RTT_MIN */
+    uint32_t    rttMax;         /* +0x048 FLOW_OFF_RTT_MAX */
+    uint32_t    rttTotal;       /* +0x04C FLOW_OFF_RTT_TOTAL */
+    uint32_t    gapMin;         /* +0x050 FLOW_OFF_GAP_MIN */
+    uint32_t    gapMax;         /* +0x054 FLOW_OFF_GAP_MAX */
+    uint32_t    gapTotal;       /* +0x058 FLOW_OFF_GAP_TOTAL */
+    uint32_t    readyAt;        /* +0x05C FLOW_OFF_READY_AT PLAYER_REC_OFF_MADE_AT */
+    uint32_t    field60;        /* +0x060 */
+    uint32_t    field64;        /* +0x064 */
+    uint32_t    field68;        /* +0x068 halved into FLOW_OFF_PEER_CLOCK */
+    uint32_t    field6C;        /* +0x06C */
+    uint32_t    deliveredAt;    /* +0x070 FLOW_OFF_DELIVERED_AT AM2_PLAYER_LAST_SEEN */
+    uint32_t    recvAt;         /* +0x074 FLOW_OFF_RECV_AT */
+    AM2_MsgList queue;          /* +0x078 FLOW_OFF_QUEUE PLAYER_REC_OFF_MSGS */
+    uint32_t    ready;          /* +0x088 FLOW_OFF_READY PLAYER_REC_OFF_IS_HOST */
+    uint32_t    badChecksums;   /* +0x08C FLOW_OFF_BAD_CHECKSUMS */
+    uint32_t    peerClock;      /* +0x090 FLOW_OFF_PEER_CLOCK */
+    uint32_t    sequence;       /* +0x094 FLOW_OFF_SEQUENCE PLAYER_REC_OFF_FLAG_94 */
+    uint32_t    field98;        /* +0x098 */
+    uint32_t    field9C;        /* +0x09C */
+    uint32_t    fieldA0;        /* +0x0A0 */
+    int32_t     lossBurst;      /* +0x0A4 FLOW_OFF_LOSS_BURST */
+    int32_t     lossPct;        /* +0x0A8 FLOW_OFF_LOSS_PCT */
+    int32_t     fieldAC;        /* +0x0AC */
+    int32_t     lagMs;          /* +0x0B0 FLOW_OFF_LAG_MS */
+    int32_t     lagSpread;      /* +0x0B4 FLOW_OFF_LAG_SPREAD */
+    int32_t     keyedCount;     /* +0x0B8 AM2_KEYED_COUNT, records in keyed[] */
+    AM2_KeyedRec keyed[60];     /* +0x0BC AM2_KEYED_FIRST */
+    int32_t     keyedTally[4];  /* +0x38C AM2_KEYED_TALLY, removals by kind */
+    int32_t     latencyAt;      /* +0x39C the latency ring's write index */
+    int32_t     latency[32];    /* +0x3A0 ms samples CommMean32 averages */
+    int32_t     ringA[120];     /* +0x420 PLAYER_REC_OFF_RING_A AM2_MSGSLOT_A_OFF */
+    int32_t     ringB[120];     /* +0x600 PLAYER_REC_OFF_RING_B AM2_MSGSLOT_B_OFF */
+} AM2_Flow;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,7 +175,7 @@ uint32_t __cdecl MsgField12(const void *msg);
  * Divided with round-toward-zero rather than an arithmetic shift: the
  * original adds 31 when the sum is negative before shifting by 5, and a plain
  * `sum >> 5` would round the wrong way for negative totals. */
-int32_t __cdecl CommMean32(const void *player);
+int32_t __cdecl CommMean32(const AM2_Flow *player);
 
 /* 0x00402EC0. The same mean by player ID, and 0 for an ID nobody knows. */
 int32_t __cdecl PlayerLatency(uint32_t id);
@@ -85,7 +194,7 @@ int32_t __cdecl PlayerLatency(uint32_t id);
  * The wrap test is signed and reads the index back out of memory after storing
  * it rather than using the register it just wrote. Both are reproduced; neither
  * changes the result. */
-void __cdecl RingPush32(void *comm, uint32_t value);
+void __cdecl RingPush32(AM2_Flow *player, uint32_t value);
 
 /* 0x00402DB0. Remove the first 12-byte record at +0xBC whose leading dword
  * equals `key`, from an array whose count is the dword at +0xB8. On a match it
@@ -100,7 +209,7 @@ void __cdecl RingPush32(void *comm, uint32_t value);
  * send queue and `key` a sequence number -- but that is the CALLER's
  * vocabulary, and this file has been wrong before about names taken from a
  * call site. The reading is recorded; the name does not depend on it. */
-void __cdecl CommRemoveKeyed(void *comm, uint32_t key);
+void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key);
 
 /* 0x00402BD0 and 0x00402C00. Two dwords out of a player's flow record, looked
  * up by id through 0x00402990: the mask at +0x14 and the one at +0x18. Both
@@ -154,7 +263,7 @@ void __cdecl SendChatMsg(char *text, int32_t system);
  *
  * The node's `prev` is cleared on the NEW head but the unlinked node's own
  * links are left alone, so a caller can still read its `next`. */
-void *__cdecl MsgListRemHead(void *list);
+AM2_MsgNode *__cdecl MsgListRemHead(AM2_MsgList *list);
 
 /* Original: 0x00401410, three callers, and it names itself in all three of
  * its complaints -- "RemMsg". Unlink a node the caller already holds,
@@ -162,7 +271,7 @@ void *__cdecl MsgListRemHead(void *list);
  * maintained in both directions and the unlinked node's own links are left
  * alone, so a caller walking while removing can still read its `next`. See
  * commmsg.cpp for which complaint reaches which list. */
-void __cdecl MsgListRemove(void *list, void *node);
+void __cdecl MsgListRemove(AM2_MsgList *list, AM2_MsgNode *node);
 
 /* Original: 0x00410B70, and it names itself -- "ReceiveEndSetupMsg". Log if
  * the comm object's verbosity field is set, then post AM2_WM_SETUP_DONE to the
@@ -480,7 +589,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
  *
  * Kept as PLAYER rather than FLOWQ for the reason orig.h gives: both words are
  * the program's own, from different error messages about the same record. */
-void *__cdecl FindPlayerById(uint32_t id);
+AM2_Flow *__cdecl FindPlayerById(uint32_t id);
 
 int msgslot_install(void);
 
@@ -630,6 +739,12 @@ struct AM2_Comm {
 #include <stddef.h>   /* offsetof: GCC-side only, as in objtable.h */
 static_assert(offsetof(AM2_Comm, slots)       == 0x20C, "slots");
 static_assert(sizeof(AM2_CommSlot)            == 0x70,  "slot stride");
+static_assert(sizeof(AM2_Flow)                == 0x7E0, "flow record");
+static_assert(offsetof(AM2_Flow, latency)     == 0x3A0, "flow latency");
+static_assert(offsetof(AM2_Flow, lagSpread)   == 0xB4,  "flow lag spread");
+static_assert(offsetof(AM2_Flow, queue)       == 0x78,  "flow queue");
+static_assert(sizeof(AM2_MsgNode)             == 0x28,  "msg node");
+static_assert(sizeof(AM2_MsgList)             == 0x10,  "msg list");
 static_assert(offsetof(AM2_Comm, selfId)      == 0x3CC, "selfId");
 static_assert(offsetof(AM2_Comm, connected)   == 0x3E4, "connected");
 static_assert(offsetof(AM2_Comm, playerCount) == 0x3D0, "playerCount");
@@ -715,7 +830,7 @@ static inline int32_t CommMustBroadcast(void *comm, int16_t army)
 /* 0x00401050. Append a node to the tail of a mutex-guarded list. Twelve
  * callers and multi-threaded; the size complaint above 400 or below zero does
  * not stop the append and is issued while the mutex is still held. */
-void __cdecl MsgListAdd(void *list, void *node);
+void __cdecl MsgListAdd(AM2_MsgList *list, AM2_MsgNode *node);
 
 /* 0x00402720. Raise the exit flag, log, and post WM_CLOSE to the game window
  * -- in that order. */

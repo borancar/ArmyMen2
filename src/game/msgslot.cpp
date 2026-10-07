@@ -39,11 +39,11 @@ uint32_t __cdecl MsgField12(const void *msg)
 }
 
 /* cdq/and 0x1F/add/sar is the compiler's signed divide by 32, not a shift. */
-int32_t __cdecl CommMean32(const void *comm)
+int32_t __cdecl CommMean32(const AM2_Flow *player)
 {
     int32_t        sum = 0;
     int32_t        i;
-    const int32_t *p = (const int32_t *)((const uint8_t *)comm + 0x3A0);
+    const int32_t *p = player->latency;
 
     for (i = 0; i < 32; i++)
         sum += p[i];
@@ -58,48 +58,39 @@ int32_t __cdecl PlayerLatency(uint32_t id)
 {
     int32_t        sum = 0;
     int32_t        i;
-    const uint8_t *player = (const uint8_t *)FindPlayerById(id);
+    const AM2_Flow *player = FindPlayerById(id);
     const int32_t *p;
 
     if (!player)
         return 0;
-    p = (const int32_t *)(player + 0x3A0);
+    p = player->latency;
     for (i = 0; i < 32; i++)
         sum += p[i];
     return sum / 32;
 }
 
-#define AM2_RING32_INDEX  0x39C
-#define AM2_RING32_ENTRY  0x3A0
 #define AM2_RING32_COUNT  32
 
-void __cdecl RingPush32(void *comm, uint32_t value)
+void __cdecl RingPush32(AM2_Flow *player, uint32_t value)
 {
-    uint8_t  *base  = (uint8_t *)comm;
-    int32_t  *index = (int32_t *)(base + AM2_RING32_INDEX);
-    uint32_t *ring  = (uint32_t *)(base + AM2_RING32_ENTRY);
+    int32_t  *index = &player->latencyAt;
+    int32_t  *ring  = player->latency;
 
-    ring[*index] = value;
+    ring[*index] = (int32_t)value;
     *index += 1;
     if (*index >= AM2_RING32_COUNT)
         *index = 0;
 }
 
 /* The record array and the four tallies the removal keeps. */
-#define AM2_KEYED_COUNT     0xB8        /* int32_t, how many records */
-#define AM2_KEYED_FIRST     0xBC        /* the records themselves */
-#define AM2_KEYED_STRIDE    12
-#define AM2_KEYED_KIND      8           /* third dword of a record */
-#define AM2_KEYED_TALLY     0x38C       /* four int32_t, indexed by kind */
 #define AM2_KEYED_TALLY_MAX 3
 
-void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
+void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key)
 {
-    /* One record: the key, a dword, the kind. The search holds the count;
-     * the move re-reads it; the records shift down as whole-struct copies. */
-    typedef struct { uint32_t key; uint32_t second; uint32_t kind; } AM2_KeyedRec;
-#define RECS  ((AM2_KeyedRec *)((uint8_t *)comm + AM2_KEYED_FIRST))
-#define COUNT (*(int32_t *)((uint8_t *)comm + AM2_KEYED_COUNT))
+    /* The search holds the count; the move re-reads it; the records shift
+     * down as whole-struct copies. */
+#define RECS  (player->keyed)
+#define COUNT (player->keyedCount)
     int32_t  n = COUNT;
     int32_t  i, j;
     uint32_t kind;
@@ -115,7 +106,7 @@ void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
             kind = RECS[i].kind;
             if (kind > AM2_KEYED_TALLY_MAX)
                 kind = AM2_KEYED_TALLY_MAX;
-            *(int32_t *)((uint8_t *)comm + AM2_KEYED_TALLY + kind * 4) += 1;
+            player->keyedTally[kind] += 1;
 
             for (; j < COUNT; j++) {
                 AM2_KeyedRec *src = &RECS[j];
@@ -140,20 +131,20 @@ typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
 
 uint32_t __cdecl GetPlayerMask(uint32_t id)
 {
-    void *q = FindPlayerById(id);
+    AM2_Flow *q = FindPlayerById(id);
 
     if (q)
-        return *(uint32_t *)((uint8_t *)q + AM2_FLOW_PLAYER_MASK);
+        return q->ownBit;
     am2_log("ERROR: GetPlayerMask: No Flowq for %X\n", id);
     return 0;
 }
 
 uint32_t __cdecl GetReSendMask(uint32_t id)
 {
-    void *q = FindPlayerById(id);
+    AM2_Flow *q = FindPlayerById(id);
 
     if (q)
-        return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
+        return q->wantBit;
     am2_log("ERROR: GetReSendMask: No Flowq for %X\n", id);
     return 0;
 }
@@ -205,7 +196,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
 #define AM2_FLOW_RECORDS 6
 #define AM2_FLOW_STRIDE  0x7E0u
 
-void *__cdecl FindPlayerById(uint32_t id)
+AM2_Flow *__cdecl FindPlayerById(uint32_t id)
 {
     void    *found = 0;
     int32_t  rec = (int32_t)((uintptr_t)g_playerRecords);
@@ -217,7 +208,7 @@ void *__cdecl FindPlayerById(uint32_t id)
     for (; rec < end; rec += AM2_FLOW_STRIDE)
         if (*(const uint32_t *)(uintptr_t)rec == id)
             found = (void *)(uintptr_t)rec;
-    return found;
+    return (AM2_Flow *)found;
 }
 
 /* SendChatMsg lives here rather than beside SendColorMsg and SendTeamMsg,
