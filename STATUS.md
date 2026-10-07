@@ -215,6 +215,10 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **DrawMapObjects fixed, not matched** (2026-10-07, still 92). A cell
+    node with no object is skipped. It used to end the walk of that cell's
+    list, so every object linked after it went undrawn. Found by
+    `$T/callguard.py`.
   - **RowUpdate 150 -> 117** (2026-10-07).
     - The cell loop tests in ObjRemap's order: unlinked, or linked
       elsewhere, else resort.

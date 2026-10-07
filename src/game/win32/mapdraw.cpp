@@ -922,8 +922,10 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
             while (node) {
                 AM2_MapRow *obj = *(AM2_MapRow *const *)(node + CELL_NODE_OFF_OBJ);
 
+                /* An empty node is skipped, not the end of the cell: the
+                 * image's `je` lands on the advance to the next node. */
                 if (!obj)
-                    break;
+                    goto nextNode;
                 if (ObjFlagBit1(obj))
                     goto nextNode;
 
