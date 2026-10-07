@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1538 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1539 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,13 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **CheckMapRules matched** (2026-10-07), 1538 -> 1539.
+    - The complaint line is formatted into the caller's 0x40-byte rules-path
+      buffer: MpComplain takes it as a parameter and has no local of its own.
+    - path, amm and bmp are all function-scope. As block locals, amm and bmp
+      would share a slot. VC6 overlaps sibling-block and inline-local arrays,
+      but not function-scope ones.
+    - The preview pointer is read at the MpPreviewSetBitmap call.
   - **AirPassesDraw matched** (2026-10-07), 1537 -> 1538.
     - Half the pass time is recomputed at each use: no `half` local.
     - x is computed before y.

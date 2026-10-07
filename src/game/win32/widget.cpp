@@ -2483,11 +2483,13 @@ typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 
 /* The panel's complaint, six times over: grey the map preview and announce
  * the failure against the OFFENDING PLAYER's name, which is our own slot's
- * -- this runs on the machine that is failing the check, not on the host. */
-static inline void MpComplain(uint8_t *panel, const char *fmt)
+ * -- this runs on the machine that is failing the check, not on the host.
+ *
+ * The line is formatted into the CALLER's 0x40-byte rules-path buffer: the
+ * original's frame has no other slot for it (0x248 = two ints, the path, the
+ * .amm name and the preview name). */
+static inline void MpComplain(uint8_t *panel, const char *fmt, char *line)
 {
-    char line[AM2_MP_COMPLAINT_BYTES];
-
     if (!panel)
         return;
 
@@ -10409,6 +10411,8 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     uint8_t       *panel = (uint8_t *)0;
     const uint8_t *rec;
     char           path[0x40];
+    char           amm[AM2_MP_COMPLAINT_BYTES];
+    char           bmp[AM2_MP_COMPLAINT_BYTES];
     int32_t        chosen;
     int32_t        i;
 
@@ -10421,7 +10425,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     rec = (const uint8_t *)ScriptListFind(
               &g_mpScriptName);
     if (!rec) {
-        MpComplain(panel, "%s does not have rules.");
+        MpComplain(panel, "%s does not have rules.", path);
         return AM2_MAPCHECK_NO_RULES;
     }
 
@@ -10481,7 +10485,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 #undef NM
 
     if (chosen == -1) {
-        MpComplain(panel, "%s does not have map.");
+        MpComplain(panel, "%s does not have map.", path);
         return AM2_MAPCHECK_NO_MAP;
     }
 
@@ -10493,44 +10497,41 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     }
 
     if (RulesChecksum() != rulesSum) {
-        MpComplain(panel, "%s has a damaged installation.");
+        MpComplain(panel, "%s has a damaged installation.", path);
         return AM2_MAPCHECK_BAD_INSTALL;
     }
 
     SelectLevel(FindLevelByName(&g_mapName_));
 
     if (MpScriptChecksum() != scriptSum) {
-        MpComplain(panel, "%s has a damaged rules file.");
+        MpComplain(panel, "%s has a damaged rules file.", path);
         return AM2_MAPCHECK_BAD_RULES;
     }
     if (MapChecksum() != mapSum) {
-        MpComplain(panel, "%s has a damaged map.");
+        MpComplain(panel, "%s has a damaged map.", path);
         return AM2_MAPCHECK_BAD_MAP;
     }
 
     /* The map is listed and the totals agree; the FILE still has to be there.
      * This is the second exit that answers 2, for a different reason. */
-    {
-        /* Its own buffer, not `path` -- the original's frame has one. */
-        char amm[AM2_MP_COMPLAINT_BYTES];
-
-        SetGameDir(g_tilesetPath);
-        am2_sprintf(amm, "%s.amm",
-                    &g_mapName_);
-        if (!FileExists(amm)) {
-            MpComplain(panel, "%s does not have map.");
-            return AM2_MAPCHECK_NO_MAP;
-        }
+    /* Its own buffer, not `path` -- the original's frame has one. All three
+     * buffers are function-scope: block-scoped, amm and bmp would share. */
+    SetGameDir(g_tilesetPath);
+    am2_sprintf(amm, "%s.amm",
+                &g_mapName_);
+    if (!FileExists(amm)) {
+        MpComplain(panel, "%s does not have map.", path);
+        return AM2_MAPCHECK_NO_MAP;
     }
 
     if (panel) {
-        AM2_Widget *preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
-        char        bmp[AM2_MP_COMPLAINT_BYTES];
+        AM2_Widget *preview;
 
         SetGameDir(g_tilesetPath);
         am2_sprintf(bmp, "%s_prev.bmp",
                     &g_mapName_);
-        MpPreviewSetBitmap(preview, bmp);
+        MpPreviewSetBitmap(*(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW),
+                           bmp);
 
         preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
         WidgetVPaint(preview, preview->rect);
