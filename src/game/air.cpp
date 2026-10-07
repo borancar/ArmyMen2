@@ -1636,10 +1636,10 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
         int32_t bx = b->pos.x;
         int32_t by = b->pos.y;
 
-        l  = b->looseBox.left   + bx;
-        r  = b->looseBox.right  + bx;
-        t  = b->looseBox.top    + by;
-        bo = b->looseBox.bottom + by;
+        l  = b->rowSet.looseBox.left   + bx;
+        r  = b->rowSet.looseBox.right  + bx;
+        t  = b->rowSet.looseBox.top    + by;
+        bo = b->rowSet.looseBox.bottom + by;
     } else {
         /* Through the rect, as objtype.cpp reaches the same four fields:
          * only OBJ_OFF_HIT_RECT has a macro and the other three are its

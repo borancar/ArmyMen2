@@ -1258,13 +1258,13 @@ void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc)
         } else if (!o->rowSet.hitMask) {
             AM2_Rect box;
 
-            box.left   = o->looseBox.left
+            box.left   = o->rowSet.looseBox.left
                          + o->pos.x;
-            box.right  = o->looseBox.right
+            box.right  = o->rowSet.looseBox.right
                          + o->pos.x;
-            box.top    = o->looseBox.top
+            box.top    = o->rowSet.looseBox.top
                          + o->pos.y;
-            box.bottom = o->looseBox.bottom
+            box.bottom = o->rowSet.looseBox.bottom
                          + o->pos.y;
 
             if (!PointInRect(&box, pt))
@@ -2044,7 +2044,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                          g_roachBox, a7, uid);
     BuildRowSet(&o->rowSet, 1,
                 g_roachRowSpec, x, y,
-                (const void *)g_roachBox);
+                g_roachBox);
 
     if ((flags & (int32_t)OBJ_FLAG_DESTROYED) != 0)
         SubrecHideRows(&o->rowSet);
@@ -12052,7 +12052,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     BuildRowSet(&o->rowSet, nrows,
                 g_vehicleRowSpec, x, y,
-                (const void *)g_vehicleBox);
+                g_vehicleBox);
     SetFieldInAll(&o->rowSet,
                   (void *)o->tableRec3);
 

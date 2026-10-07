@@ -756,14 +756,14 @@ void __cdecl FreeAaiTables(void)
 {
     int32_t i;
 
-    if (*(void *const *)&g_recordLists) {
+    if (g_recordLists) {
         for (i = 0; i < g_recordListCount;
              i++)
             FreeRecordList(
                 (g_recordLists)[i]);
 
-        am2_free(*(void * *)&g_recordLists);
-        *(void * *)&g_recordLists         = (void *)0;
+        am2_free(g_recordLists);
+        g_recordLists         = (AM2_RecordList **)0;
         g_recordListCount  = 0;
         g_recordListCap    = 0;
     }

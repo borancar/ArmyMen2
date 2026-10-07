@@ -1490,54 +1490,43 @@ before:
  * row stride; nothing checks it succeeded, as nothing else in this subsystem
  * does.
  */
-void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
-                              uint32_t objFlags)
+void __cdecl BuildRowsFromDef(AM2_RowSet *set, const AM2_RecordList *def,
+                              int32_t x, int32_t y, uint32_t objFlags)
 {
-#define out ((uint8_t *)set)
-    const uint8_t *d   = (const uint8_t *)def;
-    uint8_t       *row;
-    const uint8_t *spr;
+    AM2_MapRow    *row;
+    const AM2_Sprite *spr;
     int32_t        i;
 
     /* The count and the spec array are re-read at every use. */
-#define SPEC(i) (*(const uint8_t *const *)(d + DEFROWS_OFF_SPECS) \
-                 + (size_t)(i) * AM2_DEFSPEC_BYTES)
-    *(const void **)(out + ROWSET_OFF_DEF)   = def;
-    *(int32_t *)(out + ROWSET_OFF_COUNT)     = *(const int32_t *)(d + DEFROWS_OFF_COUNT);
-    *(void **)(out + ROWSET_OFF_ROWS)        =
-        am2_malloc((size_t)*(const int32_t *)(d + DEFROWS_OFF_COUNT)
-                   * AM2_OBJ_ROW_STRIDE);
+    set->list  = def;
+    set->count = def->count;
+    set->rows  = (AM2_MapRow *)
+        am2_malloc((size_t)def->count * AM2_OBJ_ROW_STRIDE);
 
-    for (i = 0; i < *(const int32_t *)(out + ROWSET_OFF_COUNT); i++) {
-        row = *(uint8_t **)(out + ROWSET_OFF_ROWS)
-              + (size_t)i * AM2_OBJ_ROW_STRIDE;
+    for (i = 0; i < set->count; i++) {
+        row = &set->rows[i];
 
-        RowInit((AM2_MapRow *)row, *(AM2_Sprite *const *)(SPEC(i) + DEFSPEC_OFF_SPRITE),
-                (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DX) + x,
-                (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DY) + y);
+        RowInit(row, def->records[i].sprite,
+                (int32_t)def->records[i].dx + x,
+                (int32_t)def->records[i].dy + y);
 
         if (x && !(objFlags & OBJ_FLAG_DESTROYED))
-            ObjFlagSet0((AM2_MapRow *)row);
+            ObjFlagSet0(row);
         else
-            ObjFlagClear0((AM2_MapRow *)row);
+            ObjFlagClear0(row);
 
-        *(int16_t *)(row + ROW_OFF_FIELD_26) =
-            *(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DEPTH);
+        row->depthLayer = (int16_t)def->records[i].depth;
 
-        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
-        RowAlloc(*(const int32_t *)(spr + SPR_OFF_W),
-                 *(const int32_t *)(spr + SPR_OFF_H),
-                 (AM2_MapRow *)row, g_mapDesc);
+        spr = row->sprite;
+        RowAlloc(spr->bounds.right, spr->bounds.bottom, row, g_mapDesc);
     }
-#undef SPEC
 
-    if (*(const int32_t *)(d + DEFROWS_OFF_HAS_SUBREC))
-        *(const void **)(out + ROWSET_OFF_SUBREC) = d + DEFROWS_OFF_SUBREC;
+    if (def->mask.bits)
+        set->hitMask = &def->mask;
     else
-        *(const void **)(out + ROWSET_OFF_SUBREC) = (const void *)0;
+        set->hitMask = (const AM2_ObjMask *)0;
 
-    memcpy(out + ROWSET_OFF_RECT, d + DEFROWS_OFF_RECT, 16);
-#undef out
+    memcpy(&set->looseBox, &def->box, 16);
 }
 
 /* 0x00434DA0, six callers. Build a ROW SET: one block of `count` rows, each
@@ -1570,32 +1559,27 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
  * any of them had a count of zero is not established either. The header
  * writes and the loop are compared; the empty-set case is not claimed.
  */
-void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
-                         int32_t dx, int32_t dy, const void *rect)
+void __cdecl BuildRowSet(AM2_RowSet *set, int32_t count, const AM2_RowSpec *specs,
+                         int32_t dx, int32_t dy, const AM2_Rect *rect)
 {
-#define h ((uint8_t *)set)
     int32_t  i;
 
-    *(int32_t *)h = 0;
-    *(int32_t *)(h + ROWSET_OFF_COUNT) = count;
-    *(void **)(h + ROWSET_OFF_ROWS) =
+    set->list  = (const AM2_RecordList *)0;
+    set->count = count;
+    set->rows  = (AM2_MapRow *)
         am2_malloc((size_t)count * AM2_OBJ_ROW_STRIDE);
 
-    for (i = 0; i < *(const int32_t *)(h + ROWSET_OFF_COUNT); i++) {
-        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
-                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
-        const int32_t *spec =
-            (const int32_t *)((const uint8_t *)specs
-                              + (size_t)i * AM2_ROW_SPEC_BYTES);
+    for (i = 0; i < set->count; i++) {
+        AM2_MapRow *row = &set->rows[i];
+        const AM2_RowSpec *spec = &specs[i];
 
-        RowInit((AM2_MapRow *)row, (AM2_Sprite *)0, spec[0] + dx, spec[1] + dy);
-        ObjFlagSet0((AM2_MapRow *)row);
-        RowAlloc(spec[2], spec[3], (AM2_MapRow *)row, g_mapDesc);
+        RowInit(row, (AM2_Sprite *)0, spec->x + dx, spec->y + dy);
+        ObjFlagSet0(row);
+        RowAlloc(spec->w, spec->h, row, g_mapDesc);
     }
 
-    *(int32_t *)(h + 0x0C) = 0;
-    memcpy(h + ROWSET_OFF_RECT, rect, 16);
-#undef h
+    set->capacity = 0;
+    memcpy(&set->looseBox, rect, 16);
 }
 
 /* 0x004600F0. May this weapon kind respawn?

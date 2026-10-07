@@ -101,9 +101,10 @@ def _aggregated(va):
 # item.cpp parameter typing settles on the 0x00515FD8 block alone; the
 # typed g_objCtxObjA and save-index aliases settle it with none kept; the
 # vehicle's last-sent fields bring back the 0x00515FD8 block; the typed
-# object and tile masks settle on the 0x004F96C0 block alone.
+# object and tile masks settle on the 0x004F96C0 block alone; the typed
+# record lists and row sets settle it with none kept.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x004F96C0, 0x004F96CC),)
+KEEP_DECLS = ()
 
 
 def _kept(va):

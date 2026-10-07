@@ -131,8 +131,9 @@ void __cdecl RowInit(AM2_MapRow *row, struct AM2_Sprite *sprite, int32_t x, int3
 /* 0x00434DA0. One block of `count` rows, each placed at its spec's (x, y)
  * offset from (dx, dy) and given a buffer sized by the spec's (w, h), with a
  * bounding rect copied into the 0x20-byte header. */
-void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
-                         int32_t dx, int32_t dy, const void *rect);
+void __cdecl BuildRowSet(struct AM2_RowSet *set, int32_t count,
+                         const struct AM2_RowSpec *specs,
+                         int32_t dx, int32_t dy, const AM2_Rect *rect);
 
 /* Original: 0x0041D3D0, three callers. Put a new sprite on a row, rebuilding
  * its cell buffer only when the new one needs more cells. */
@@ -155,7 +156,8 @@ int32_t __cdecl RowAnimField4(const void *row, uint16_t id);
 
 /* 0x00434C90, two callers. BuildRowSet's sibling, driven by a def record with
  * twelve-byte specs instead of a count and sixteen-byte ones. */
-void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
+void __cdecl BuildRowsFromDef(struct AM2_RowSet *set, const struct AM2_RecordList *def,
+                              int32_t x, int32_t y,
                               uint32_t objFlags);
 
 /* 0x00460800. Initialise row pool A -- decals and seq step 0. */

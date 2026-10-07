@@ -356,12 +356,14 @@ void __cdecl ObjAfterMove(struct AM2_Object *obj, int32_t unused, int32_t damage
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an
  * argument rather than a field. */
-int32_t __cdecl ListBoxAction(AM2_Point at, void *list, struct AM2_TileMask *out);
+int32_t __cdecl ListBoxAction(AM2_Point at, const struct AM2_RecordList *list,
+                              struct AM2_TileMask *out);
 
 /* 0x004385A0, the bitmask twin of the above -- and ObjHitMaskAction's twin in
  * the other direction, which is the one to read for how the walk works. The
  * mask record is embedded in the header at LISTHDR_OFF_MASK. */
-int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, struct AM2_TileMask *out);
+int32_t __cdecl ListMaskAction(AM2_Point at, const struct AM2_RecordList *hdr,
+                               struct AM2_TileMask *out);
 
 /* 0x0043A6D0, six callers. Could the thing described by key-table slot `slot`
  * stand at world point `at`? Build its tile mask there and answer 0 the moment

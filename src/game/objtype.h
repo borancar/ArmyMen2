@@ -41,16 +41,18 @@ int32_t __cdecl ObjIsItem(const AM2_Object *obj);
 
 /* 0x00434060, eight callers. Make a list header and a copy of `count`
  * twelve-byte records. Structural name; see objtype.cpp. */
-void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner);
+struct AM2_RecordList *__cdecl MakeRecordList(int32_t count,
+                                              const struct AM2_ListRec *src,
+                                              uint32_t owner);
 
 /* 0x00434150. Register one of those headers under its owner, keeping an
  * unsorted array of slots and a sorted {owner, slot} index in step. Returns
  * the slot, or -1 when that owner already has one. */
-int32_t __cdecl AddRecordList(void *list);
+int32_t __cdecl AddRecordList(struct AM2_RecordList *list);
 
 /* 0x00434C40. MakeRecordList's counterpart: free the header's two pointers
  * and then the header. */
-void __cdecl FreeRecordList(void *list);
+void __cdecl FreeRecordList(struct AM2_RecordList *list);
 
 /* 0x00434100. The slot registered for an owner, or -1. AddRecordList's search
  * without the insertion -- note the two disagree about what -1 means. */
@@ -192,7 +194,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index,
  * of the eight are still the original's. `name` is NOT const: the function
  * lower-cases the caller's buffer in place. Arg 6 is never read. */
 int32_t __cdecl ObjInitCommon(struct AM2_Object *obj, char *name, int32_t type,
-                              AM2_Point at, const int32_t *box,
+                              AM2_Point at, const AM2_Rect *box,
                               int32_t unused, uint32_t uid);
 
 #endif /* AM2_OBJTYPE_H */

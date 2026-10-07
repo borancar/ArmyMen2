@@ -16,6 +16,7 @@
 
 #include "objtype.h"
 #include "maprow.h"   /* BuildRowsFromDef -- reconstructed */
+#include "spritetype.h" /* AM2_Sprite: the hot spot, bounds and key */
 #include "crt.h"           /* am2_malloc -- the game's own heap */
 #include "objtable.h"
 #include "rect.h"        /* AM2_Rect -- the box and the hit rect */
@@ -256,37 +257,33 @@ void __cdecl SubrecHideRows(void *subrec)
  * nearest reconstructed neighbour. The band is the only evidence for the home
  * and the records are not identified, so the name is structural.
  */
-void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
+AM2_RecordList *__cdecl MakeRecordList(int32_t count, const AM2_ListRec *src,
+                                       uint32_t owner)
 {
-    uint8_t       *hdr;
-    uint8_t       *recs;
-    int32_t        i;
+    AM2_RecordList *hdr;
+    AM2_ListRec    *recs;
+    int32_t         i;
 
     if (count <= 0)
-        return (void *)0;
+        return (AM2_RecordList *)0;
 
-    hdr = (uint8_t *)am2_malloc(AM2_LISTHDR_BYTES);
+    hdr = (AM2_RecordList *)am2_malloc(AM2_LISTHDR_BYTES);
     memset(hdr, 0, AM2_LISTHDR_BYTES);
 
-    *(int32_t *)(hdr + LISTHDR_OFF_COUNT) = count;
-    *(void **)(hdr + LISTHDR_OFF_OWNER)   = owner;
+    hdr->count = count;
+    hdr->owner = owner;
 
-    recs = (uint8_t *)am2_malloc((size_t)count * AM2_LIST_RECORD_BYTES);
-    *(void **)(hdr + LISTHDR_OFF_RECORDS) = recs;
+    recs = (AM2_ListRec *)am2_malloc((size_t)count * AM2_LIST_RECORD_BYTES);
+    hdr->records = recs;
     memset(recs, 0, (size_t)count * AM2_LIST_RECORD_BYTES);
 
     /* The record array is re-read for every field, as the original does. */
-#define OUT(i) (*(uint8_t **)(hdr + LISTHDR_OFF_RECORDS) \
-                + (uint32_t)(i) * AM2_LIST_RECORD_BYTES)
-#define IN(i)  ((const uint8_t *)src + (uint32_t)(i) * AM2_LIST_RECORD_BYTES)
     for (i = 0; i < count; i++) {
-        *(int32_t *)(OUT(i) + 0) = *(const int32_t *)(IN(i) + 0);
-        *(int16_t *)(OUT(i) + 4) = *(const int16_t *)(IN(i) + 4);
-        *(int16_t *)(OUT(i) + 6) = *(const int16_t *)(IN(i) + 6);
-        *(int32_t *)(OUT(i) + 8) = *(const int32_t *)(IN(i) + 8);
+        hdr->records[i].sprite = src[i].sprite;
+        hdr->records[i].dx     = src[i].dx;
+        hdr->records[i].dy     = src[i].dy;
+        hdr->records[i].depth  = src[i].depth;
     }
-#undef OUT
-#undef IN
 
     return hdr;
 }
@@ -338,7 +335,7 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
  * Grepping the callee rather than the caller is what CLAUDE.md says to do, and
  * doing it late cost the detour.
  */
-int32_t __cdecl AddRecordList(void *list)
+int32_t __cdecl AddRecordList(AM2_RecordList *list)
 {
     uint32_t owner;
     int32_t  lo, hi, grown;
@@ -352,7 +349,7 @@ int32_t __cdecl AddRecordList(void *list)
 #define LISTS (g_recordLists)
 #define INDEX (*(uint32_t * *)&g_recordListIndex)
     hi    = COUNT;
-    owner = *(const uint32_t *)((uint8_t *)list + LISTHDR_OFF_OWNER);
+    owner = list->owner;
     lo    = 0;
 
     /* FindRecordList's search: a shifted midpoint, a `while` on hi > lo. */
@@ -369,14 +366,14 @@ int32_t __cdecl AddRecordList(void *list)
 
     if (COUNT + 1 > CAP) {
         grown = COUNT + AM2_RECORD_LIST_GROW;
-        LISTS = (void **)am2_realloc(LISTS, (size_t)grown * 4);
+        LISTS = (AM2_RecordList **)am2_realloc(LISTS, (size_t)grown * 4);
         memset(LISTS + CAP, 0, AM2_RECORD_LIST_GROW * 4);
         INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
         memset(INDEX + CAP * 2, 0, AM2_RECORD_LIST_GROW * 8);
         CAP = grown;
     }
 
-    *(int32_t *)((uint8_t *)list + LISTHDR_OFF_INDEX) = COUNT;
+    list->index = COUNT;
     LISTS[COUNT] = list;
 
     if (lo < COUNT)
@@ -455,19 +452,18 @@ int32_t __cdecl FindRecordList(uint32_t owner)
  * this is verified by reading and by being the exact inverse of a maker whose
  * 151 calls are compared.
  */
-void __cdecl FreeRecordList(void *list)
+void __cdecl FreeRecordList(AM2_RecordList *list)
 {
-    uint8_t *h = (uint8_t *)list;
     void    *p;
 
     if (!list)
         return;
 
-    p = *(void *const *)(h + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS);
+    p = list->mask.bits;
     if (p)
         am2_free(p);
 
-    p = *(void *const *)(h + LISTHDR_OFF_RECORDS);
+    p = list->records;
     if (p)
         am2_free(p);
 
@@ -528,68 +524,67 @@ void __cdecl BuildAaiBuiltins(void)
     /* The list record is twelve bytes -- LISTREC_OFF_SPRITE and then two
      * int16 and a dword -- and the second singleton reuses the first's
      * without writing it again. */
-#define REC_SPR (*(uint8_t **)(rec + LISTREC_OFF_SPRITE))
-#define REC_A   (*(int16_t *)(rec + 4))
-#define REC_B   (*(int16_t *)(rec + 6))
-#define REC_C   (*(int32_t *)(rec + 8))
+#define REC_SPR (rec[0].sprite)
+#define REC_A   (rec[0].dx)
+#define REC_B   (rec[0].dy)
+#define REC_C   (rec[0].depth)
 #define KEY(a)  (*(int32_t *)(uintptr_t)(a))
-    uint8_t  rec[AM2_LIST_RECORD_BYTES * 2];   /* only [0] used; see above */
-    void    *list;
+    AM2_ListRec rec[2];                        /* only [0] used; see above */
+    AM2_RecordList *list;
     int32_t  slot;
     uint32_t key;
     int32_t  i;
 
     FreeAaiTables();
 
-    REC_SPR = (uint8_t *)PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_SPR = PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = 0;
     REC_B = 0;
     REC_C = 1;
     KEY(((uintptr_t)&g_aaiKey980000)) = 0x980000;
-    list = MakeRecordList(1, rec, (void *)0x980000);
+    list = MakeRecordList(1, rec, 0x980000);
     slot = AddRecordList(list);
     AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)&g_aaiKey980000)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x14, -5, 0x3C, 0x23)));
 
     /* The SAME record again -- no second load -- under another key. */
     KEY(((uintptr_t)g_aaiKey980100)) = 0x980100;
-    list = MakeRecordList(1, rec, (void *)0x980100);
+    list = MakeRecordList(1, rec, 0x980100);
     slot = AddRecordList(list);
     AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)g_aaiKey980100)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 1, 1)));
 
-    REC_SPR = (uint8_t *)PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_SPR = PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = -2;
     REC_B = -2;
     REC_C = 0x5DC;
     KEY(((uintptr_t)g_aaiKey980080)) = 0x980080;
-    list = MakeRecordList(1, rec, (void *)0x980080);
+    list = MakeRecordList(1, rec, 0x980080);
     slot = AddRecordList(list);
     AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)g_aaiKey980080)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -2, -2, 2, 2)));
 
     i = 0;
     for (key = 0x01680000; key < 0x01681600; key += 0x80) {
-        REC_SPR = (uint8_t *)PreloadSprite(0x2D, i, 0,
+        REC_SPR = PreloadSprite(0x2D, i, 0,
                                            AM2_AIM_PRELOAD_FLAGS, 1);
         if (!REC_SPR)
-            REC_SPR = (uint8_t *)PreloadSprite(0x2D, 0x0A, 0,
+            REC_SPR = PreloadSprite(0x2D, 0x0A, 0,
                                                AM2_AIM_PRELOAD_FLAGS, 1);
 
         if (key < 0x01680780 || key > 0x01680980) {
-            *(int16_t *)(REC_SPR + SPR_OFF_HOTX) =
-                (int16_t)(*(const int32_t *)(REC_SPR + SPR_OFF_W) / 2);
-            *(int16_t *)(REC_SPR + SPR_OFF_HOTY) =
-                (int16_t)(*(const int32_t *)(REC_SPR + SPR_OFF_H) / 2);
+            /* SPR_OFF_W and SPR_OFF_H: the bounds' right and bottom. */
+            REC_SPR->hotX = (int16_t)(REC_SPR->bounds.right / 2);
+            REC_SPR->hotY = (int16_t)(REC_SPR->bounds.bottom / 2);
         }
 
         REC_A = 0;
         REC_B = 0;
         REC_C = 0x3E8;
-        list = MakeRecordList(1, rec, (void *)key);
+        list = MakeRecordList(1, rec, key);
 
         /* The loop blocks give the LIST its own box; the singletons do not. */
-        *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+        list->box =
             RectMake(-0x10, -0x10, 0x10, 0x10);
         slot = AddRecordList(list);
         AddAaiRecord(MakeAaiRecord(0x2D, key, slot,
@@ -597,25 +592,25 @@ void __cdecl BuildAaiBuiltins(void)
         i++;
     }
 
-    REC_SPR = (uint8_t *)PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_SPR = PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = 0;
     REC_B = 0;
     REC_C = 3;
     KEY(((uintptr_t)&g_createWatchedKind)) = 0xE80580;
-    list = MakeRecordList(1, rec, (void *)0xE80580);
-    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+    list = MakeRecordList(1, rec, 0xE80580);
+    list->box =
         RectMake(-0x10, -0x10, 0x10, 0x10);
     slot = AddRecordList(list);
     AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_createWatchedKind)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 
-    REC_SPR = (uint8_t *)PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_SPR = PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
     REC_A = 0;
     REC_B = 0;
     REC_C = 3;
     KEY(((uintptr_t)&g_watchedTypeId)) = 0xE80609;
-    list = MakeRecordList(1, rec, (void *)0xE80609);
-    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+    list = MakeRecordList(1, rec, 0xE80609);
+    list->box =
         RectMake(-0x10, -0x10, 0x10, 0x10);
     slot = AddRecordList(list);
     AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_watchedTypeId)), slot,
@@ -710,13 +705,11 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
         if (slot > 0) {
             /* The count and the record array are read afresh each pass: the
              * store could alias either. */
-            uint8_t *list = (uint8_t *)
-                (g_recordLists)[slot];
+            AM2_RecordList *list = g_recordLists[slot];
             int32_t  i;
 
-            for (i = 0; i < *(const int32_t *)(list + LISTHDR_OFF_COUNT); i++)
-                *(int32_t *)(*(uint8_t *const *)(list + LISTHDR_OFF_RECORDS)
-                             + i * AM2_LIST_RECORD_BYTES + 8) =
+            for (i = 0; i < list->count; i++)
+                list->records[i].depth =
                     (int32_t)*(const uint16_t *)(rec + 0x30);
         }
     }
@@ -867,7 +860,7 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
     o->owner = (uint8_t)army;
 
     ObjInitCommon(o, name, 1, at,
-                         (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
+                         (const AM2_Rect *)(const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
     o->field94 = rec;
 
@@ -940,10 +933,10 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     int32_t   slot = KeyLookup(key);
     void     *rec;
     AM2_Sprite *spr;
-    uint8_t  *list;
+    AM2_RecordList *list;
     /* Room for twenty list records, one used: the image's frame is sized
      * for the array, and every stack offset follows from it. */
-    uint8_t   entry[20 * AM2_LIST_RECORD_BYTES];
+    AM2_ListRec entry[20];
     int32_t   i;
 
     if (slot >= 0) {
@@ -955,11 +948,10 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
          * below, made twice more in the same function. */
         const uint8_t *aai = (const uint8_t *)
             (g_aaiRecords)[slot];
-        const uint8_t *l = (const uint8_t *)
-            (g_recordLists)
-                [*(const int32_t *)(aai + AAIREC_OFF_LIST_SLOT)];
+        const AM2_RecordList *l =
+            g_recordLists[*(const int32_t *)(aai + AAIREC_OFF_LIST_SLOT)];
 
-        for (i = 0; i < *(const int32_t *)(l + LISTHDR_OFF_COUNT); i++) {
+        for (i = 0; i < l->count; i++) {
             /* TWO dereferences, and records[0] every time -- see the note
              * above. `mov eax,[esi+0xc]` is the record ARRAY, `mov eax,[eax]`
              * is records[0]'s first dword, which is its sprite, and
@@ -967,12 +959,11 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
              * Stopping one short passes a heap pointer as a sprite key; it
              * cost a campaign and bootcamp A/B, failing exactly the way a
              * broken map load does. */
-            const uint8_t *recs =
-                *(const uint8_t *const *)(l + LISTHDR_OFF_RECORDS);
-            const uint8_t *sp = *(const uint8_t *const *)recs;
+            const AM2_ListRec *recs = l->records;
+            const AM2_Sprite  *sp   = recs->sprite;
 
             if (sp)
-                PreloadSpriteByKey(*(const uint32_t *)sp, 0x1000, 1);
+                PreloadSpriteByKey(sp->id, 0x1000, 1);
         }
         return slot;
     }
@@ -991,21 +982,21 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
      * first eight were -- MakeRecordList copies all twelve, so every list
      * made on this path carried a stale stack dword where the original has
      * the def's value. */
-    *(AM2_Sprite **)entry = spr;
-    *(int16_t *)(entry + 4) = 0;
-    *(int16_t *)(entry + 6) = 0;
-    *(int32_t *)(entry + 8) = *(const int32_t *)((const uint8_t *)rec + 0x20);
+    entry[0].sprite = spr;
+    entry[0].dx     = 0;
+    entry[0].dy     = 0;
+    entry[0].depth  = *(const int32_t *)((const uint8_t *)rec + 0x20);
 
-    list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
-    LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
+    list = MakeRecordList(1, entry, key);
+    LoadMask(&list->mask, set, index, frame);
 
-    if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
+    if (!list->mask.bits) {
         AM2_Rect box, r;
 
         /* Copied out of RectSet's answer and then into the list, through
          * a named local: the image's copy goes via two spill slots. */
         r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-        *(AM2_Rect *)(list + LISTHDR_OFF_BOX_LEFT) = r;
+        list->box = r;
     }
 
     {
@@ -1063,11 +1054,11 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
  * that is scheduling, not meaning, and both are written in field order here.
  */
 int32_t __cdecl ObjInitCommon(AM2_Object *obj, char *name, int32_t type,
-                              AM2_Point at, const int32_t *box,
+                              AM2_Point at, const AM2_Rect *box,
                               int32_t unused, uint32_t uid)
 {
     AM2_Object        *o = obj;
-    const AM2_Rect *b = (const AM2_Rect *)box;
+    const AM2_Rect *b = box;
     char            tried[AM2_SCRIPT_UNIQUE_BUF];
     int32_t         n;
     int32_t         bytes = 0;
@@ -1259,12 +1250,11 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
     key = (uint32_t)((((set << 12) + index) << 7) + frame);
 
     {
-        const uint8_t *cur =
-            (const uint8_t *)o->rowSet.list;
+        const AM2_RecordList *cur = o->rowSet.list;
 
         if (!cur)
             return 0;
-        if (*(const uint32_t *)(cur + LISTHDR_OFF_OWNER) == key)
+        if (cur->owner == key)
             return 1;
     }
 
@@ -1280,30 +1270,30 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
 
     slot = FindRecordList(key);
     if (slot < 0) {
-        uint8_t    entry[20 * AM2_LIST_RECORD_BYTES];  /* one used */
+        AM2_ListRec entry[20];                      /* one used */
         AM2_Sprite *spr;
-        uint8_t    *list;
+        AM2_RecordList *list;
 
         spr = PreloadSprite(set, index, frame, loadFlags, 1);
         if (!spr)
             return 0;
 
-        *(AM2_Sprite **)entry    = spr;
-        *(int16_t *)(entry + 4)  = 0;
-        *(int16_t *)(entry + 6)  = 0;
+        entry[0].sprite = spr;
+        entry[0].dx     = 0;
+        entry[0].dy     = 0;
         /* The DWORD at DEF_OBJ_REC_OFF_DEPTH, not the int16 that name means --
          * see orig.h. */
-        *(int32_t *)(entry + 8)  =
+        entry[0].depth  =
             *(const int32_t *)(rec + DEF_OBJ_REC_OFF_DEPTH);
 
-        list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
-        LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
+        list = MakeRecordList(1, entry, key);
+        LoadMask(&list->mask, set, index, frame);
 
-        if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
+        if (!list->mask.bits) {
             AM2_Rect box, r;
 
             r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-            *(AM2_Rect *)(list + LISTHDR_OFF_BOX_LEFT) = r;
+            list->box = r;
         }
 
         slot = AddRecordList(list);
@@ -1311,7 +1301,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
 
     sub = (uint8_t *)&o->rowSet;
     FreeSubrecordRows((AM2_RowSet *)sub);
-    BuildRowsFromDef(sub,
+    BuildRowsFromDef((AM2_RowSet *)sub,
                      (g_recordLists)[slot],
                      (int32_t)o->pos.x,
                      (int32_t)o->pos.y,

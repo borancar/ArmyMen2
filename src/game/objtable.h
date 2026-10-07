@@ -44,8 +44,9 @@ typedef struct AM2_ObjMask {
     int16_t        originY;       /* +0x02 OBJMASK_OFF_ORIGIN_Y */
     int16_t        width;         /* +0x04 OBJMASK_OFF_WIDTH, in bits */
     int16_t        height;        /* +0x06 OBJMASK_OFF_HEIGHT, in rows */
-    uint8_t        _pad08[4];     /* +0x08 */
-    const uint8_t *bits;          /* +0x0C OBJMASK_OFF_BITS, null means none */
+    uint16_t       loaderOut;     /* +0x08 MASKREC_OFF_LOADER_OUT */
+    uint8_t        _pad0A[2];     /* +0x0A */
+    uint8_t       *bits;          /* +0x0C OBJMASK_OFF_BITS, null means none */
 } AM2_ObjMask;
 
 /* The scratch tile mask BoxAction and its siblings fill: a rectangle in
@@ -55,11 +56,44 @@ typedef struct AM2_TileMask {
     uint8_t        cells[AM2_TILEMASK_CELLS]; /* +0x10 TILEMASK_OFF_CELLS */
 } AM2_TileMask;
 
-/* The sub-list header an object carries at OBJ_OFF_SUBRECORD: the record list
- * its rows were built from, the row count (OBJ_OFF_ROW_COUNT) and the rows
- * themselves (OBJ_OFF_ROWS), AM2_OBJ_ROW_STRIDE apart. */
-typedef struct {
-    const void        *list;      /* +0x00 SUBREC_OFF_LIST */
+/* One twelve-byte record of a record list: a row's sprite, its offset from
+ * the object and its depth. BuildRowsFromDef reads them as DEFSPEC_OFF_*;
+ * MakeRecordList copies them field by field -- int32, int16, int16, int32. */
+typedef struct AM2_ListRec {
+    struct AM2_Sprite *sprite;    /* +0x00 LISTREC_OFF_SPRITE, DEFSPEC_OFF_SPRITE */
+    int16_t            dx;        /* +0x04 DEFSPEC_OFF_DX */
+    int16_t            dy;        /* +0x06 DEFSPEC_OFF_DY */
+    int32_t            depth;     /* +0x08 DEFSPEC_OFF_DEPTH, read as an int16:
+                                   *       the def record's DEF_OBJ_REC_OFF_DEPTH
+                                   *       dword, or the AAI record's +0x30 */
+} AM2_ListRec;
+
+/* BuildRowSet's spec: an offset from the base and a size for RowAlloc. */
+typedef struct AM2_RowSpec {
+    int32_t            x;         /* +0x00 */
+    int32_t            y;         /* +0x04 */
+    int32_t            w;         /* +0x08 */
+    int32_t            h;         /* +0x0C */
+} AM2_RowSpec;
+
+/* MakeRecordList's 0x30-byte header, registered under `owner` (a packed
+ * sprite key) in ADDR_RECORD_LISTS. It EMBEDS a whole object mask at +0x10;
+ * see LISTHDR_OFF_MASK in orig.h. */
+typedef struct AM2_RecordList {
+    uint32_t           owner;     /* +0x00 LISTHDR_OFF_OWNER, the key */
+    int32_t            index;     /* +0x04 LISTHDR_OFF_INDEX, its slot */
+    int32_t            count;     /* +0x08 LISTHDR_OFF_COUNT */
+    AM2_ListRec       *records;   /* +0x0C LISTHDR_OFF_RECORDS */
+    AM2_ObjMask        mask;      /* +0x10 LISTHDR_OFF_MASK */
+    AM2_Rect           box;       /* +0x20 LISTHDR_OFF_BOX_LEFT, world units */
+} AM2_RecordList;
+
+/* The 0x20-byte row set an object carries at OBJ_OFF_SUBRECORD: the record
+ * list its rows were built from, the row count (OBJ_OFF_ROW_COUNT), the rows
+ * themselves (OBJ_OFF_ROWS), AM2_OBJ_ROW_STRIDE apart, and the bounding
+ * rect BuildRowSet and BuildRowsFromDef copy in at ROWSET_OFF_RECT. */
+typedef struct AM2_RowSet {
+    const AM2_RecordList *list;   /* +0x00 SUBREC_OFF_LIST */
     int32_t            count;     /* +0x04 SUBREC_OFF_COUNT */
     struct AM2_MapRow *rows;      /* +0x08 */
     union {                       /* +0x0C */
@@ -67,6 +101,8 @@ typedef struct {
         const AM2_ObjMask *hitMask; /* OBJ_OFF_HIT_MASK on an object: non-null
                                    *   means test the bitmask too */
     };
+    AM2_Rect           looseBox;  /* +0x10 ROWSET_OFF_RECT, OBJ_OFF_BOX_LEFT..:
+                                   *       added to pos when there is no hit mask */
 } AM2_RowSet;
 
 /* AM2_FireSpot is in point.h, beside AM2_Point. */
@@ -247,8 +283,7 @@ typedef struct AM2_Object {
     int8_t         heightSet;       /* +0x65  OBJ_OFF_HEIGHT_SET */
     uint8_t        _pad66[2];       /* +0x66 */
     struct AM2_Object *queryNext;   /* +0x68  OBJ_OFF_QUERY_NEXT, the query result's thread */
-    AM2_RowSet     rowSet;          /* +0x6C OBJ_OFF_SUBRECORD */
-    AM2_Rect       looseBox;        /* +0x7C OBJ_OFF_BOX_LEFT.., added to pos when there is no hit mask */
+    AM2_RowSet     rowSet;          /* +0x6C OBJ_OFF_SUBRECORD, its looseBox at +0x7C */
     uint8_t        cellCount;       /* +0x8C OBJ_OFF_CELL_COUNT */
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
@@ -490,7 +525,7 @@ static_assert(offsetof(AM2_Object, lastUse)       == 0xC4,  "lastUse");
 static_assert(offsetof(AM2_Object, dest)          == 0xC0,  "dest");
 static_assert(offsetof(AM2_Object, prevTile)      == 0x1C,  "prevTile");
 static_assert(offsetof(AM2_Object, queryNext)     == 0x68,  "queryNext");
-static_assert(offsetof(AM2_Object, looseBox)      == 0x7C,  "looseBox");
+static_assert(offsetof(AM2_Object, rowSet.looseBox) == 0x7C,  "looseBox");
 static_assert(offsetof(AM2_Object, heldWeaponUid) == 0x564, "heldWeaponUid");
 static_assert(offsetof(AM2_Object, revealedUntil) == 0x5C,  "revealedUntil");
 static_assert(offsetof(AM2_Object, pickupAfter)   == 0xC8,  "pickupAfter");
@@ -546,6 +581,13 @@ static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
 static_assert(offsetof(AM2_Object, inventorySel)  == 0x568, "inventorySel");
 static_assert(offsetof(AM2_Object, riding)        == 0x570, "riding");
+static_assert(sizeof(AM2_RowSet)                 == 0x20,  "row set");
+static_assert(sizeof(AM2_RowSpec)                == AM2_ROW_SPEC_BYTES, "row spec");
+static_assert(sizeof(AM2_ObjMask)                == 0x10,  "obj mask");
+static_assert(sizeof(AM2_TileMask)               == AM2_TILEMASK_BYTES, "tile mask");
+static_assert(sizeof(AM2_ListRec)                == AM2_LIST_RECORD_BYTES, "list record");
+static_assert(sizeof(AM2_RecordList)             == AM2_LISTHDR_BYTES, "list header");
+static_assert(offsetof(AM2_RecordList, box)      == LISTHDR_OFF_BOX_LEFT, "list box");
 #endif
 
 /* Live globals inside the running image. */

@@ -504,10 +504,10 @@ int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
  * not of anything this one allocated.
  *
  * A zero or negative size skips the malloc entirely and still answers 1. */
-int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
+int32_t __cdecl LoadMaskPacked(AM2_ObjMask *out, int32_t set, int32_t index,
                                int32_t frame)
 {
-    uint8_t *rec = (uint8_t *)out;
+    AM2_ObjMask *rec = out;
     uint8_t *ss;
     uint32_t key;
     uint32_t got;
@@ -515,7 +515,7 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
     int32_t  scratch;
     int32_t  junk;
 
-    *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
+    rec->bits = (uint8_t *)0;
 
     key = (uint32_t)PackKey(set, index, frame);
     ss  = (uint8_t *)SpriteSetForKey(key);
@@ -544,9 +544,9 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
     }
 
     orig_fread_m(&scratch, 4, 1, fp);
-    *(uint16_t *)(rec + MASKREC_OFF_DESC4) = (uint16_t)scratch;
+    rec->width = (int16_t)scratch;
     orig_fread_m(&scratch, 4, 1, fp);
-    *(uint16_t *)(rec + MASKREC_OFF_DESC_BLOCKS) = (uint16_t)scratch;
+    rec->height = (int16_t)scratch;
 
     orig_fread_m(&scratch, 4, 1, fp);   /* three reads whose values are dropped */
     orig_fread_m(&junk, 4, 1, fp);      /* and whose SIDE EFFECT on the file    */
@@ -561,22 +561,22 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
     orig_fread_m(&scratch, 4, 1, fp);
     if (scratch > 0) {
         void *bits = am2_malloc((size_t)scratch);
-        *(void **)(rec + MASKREC_OFF_BITS) = bits;
+        rec->bits = (uint8_t *)bits;
         orig_fread_m(bits, (size_t)scratch, 1, fp);
     }
     return 1;
 
 fail:
-    if (*(void **)(rec + MASKREC_OFF_BITS))
-        am2_free(*(void **)(rec + MASKREC_OFF_BITS));
-    *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
+    if (rec->bits)
+        am2_free(rec->bits);
+    rec->bits = (uint8_t *)0;
     return 0;
 #undef fp
 }
 
-void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
+void __cdecl LoadMask(AM2_ObjMask *out, int32_t set, int32_t index, int32_t frame)
 {
-    uint8_t *rec = (uint8_t *)out;
+    AM2_ObjMask *rec = out;
     char     dir[AM2_MASK_PATH_MAX];
     char     pattern[AM2_MASK_PATH_MAX];
     uint8_t  find[AM2_FINDDATA_BYTES];
@@ -601,17 +601,16 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     if (orig_findfirst(pattern, find) == -1)
         return;
 
-    *(void **)(rec + MASKREC_OFF_BITS) =
+    rec->bits = (uint8_t *)
         LoadDibFlipped((const char *)(find + AM2_FIND_OFF_NAME), desc,
-                       (uint16_t *)(rec + MASKREC_OFF_LOADER_OUT));
-    if (!*(void *const *)(rec + MASKREC_OFF_BITS))
+                       &rec->loaderOut);
+    if (!rec->bits)
         return;
 
-    *(uint16_t *)(rec + MASKREC_OFF_ZERO_A) = 0;
-    *(uint16_t *)(rec + MASKREC_OFF_ZERO_B) = 0;
-    *(uint16_t *)(rec + MASKREC_OFF_DESC_BLOCKS) =
-        *(const uint16_t *)(desc + DIB_OFF_BLOCKS);
-    *(uint16_t *)(rec + MASKREC_OFF_DESC4) = *(const uint16_t *)(desc + 4);
+    rec->originX = 0;
+    rec->originY = 0;
+    rec->height  = *(const int16_t *)(desc + DIB_OFF_BLOCKS);
+    rec->width   = *(const int16_t *)(desc + 4);
 }
 
 /* 0x0041CF20 and 0x0041CEC0 differ only in the row table's entry width: one

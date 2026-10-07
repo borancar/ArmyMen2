@@ -473,10 +473,11 @@ int32_t __cdecl MaskPixelSolid(uint16_t x, uint16_t y, const void *mask);
  * halves are NOT symmetrical -- see misc.cpp. */
 /* 0x00424590, one caller -- LoadMask's non-`-df` branch, which is the
  * DEFAULT. Read a mask record out of the packed archive. */
-int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
+int32_t __cdecl LoadMaskPacked(struct AM2_ObjMask *out, int32_t set, int32_t index,
                                int32_t frame);
 
-void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame);
+void __cdecl LoadMask(struct AM2_ObjMask *out, int32_t set, int32_t index,
+                      int32_t frame);
 
 /* 0x0041CEC0. The same decoder over the same format with ONE difference: the
  * row table holds dword offsets rather than word ones, so it is read at

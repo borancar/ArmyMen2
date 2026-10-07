@@ -1901,10 +1901,10 @@ int32_t __cdecl ObjBoxAction(AM2_Object *obj, AM2_TileMask *out)
         x = o->pos.x;
         y = o->pos.y;
 
-        area.left   = o->looseBox.left   + x;
-        area.right  = o->looseBox.right  + x;
-        area.top    = o->looseBox.top    + y;
-        area.bottom = o->looseBox.bottom + y;
+        area.left   = o->rowSet.looseBox.left   + x;
+        area.right  = o->rowSet.looseBox.right  + x;
+        area.top    = o->rowSet.looseBox.top    + y;
+        area.bottom = o->rowSet.looseBox.bottom + y;
         return BoxAction(area, out);
     }
     return 1;
@@ -2598,17 +2598,16 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
  *
  * Not exercised, for the same reason BoxAction is not -- see the note there.
  */
-int32_t __cdecl ListBoxAction(AM2_Point at, void *list, AM2_TileMask *out)
+int32_t __cdecl ListBoxAction(AM2_Point at, const AM2_RecordList *list,
+                              AM2_TileMask *out)
 {
-    const uint8_t *h = (const uint8_t *)list;
+    const AM2_RecordList *h = list;
     const uint8_t *spr;
     int32_t        x;
     int32_t        y;
     AM2_Rect       area;
 
-    spr = *(const uint8_t *const *)
-              (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
-               + LISTREC_OFF_SPRITE);
+    spr = (const uint8_t *)h->records->sprite;
     if (!spr)
         return 0;
     if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
@@ -2618,10 +2617,10 @@ int32_t __cdecl ListBoxAction(AM2_Point at, void *list, AM2_TileMask *out)
         x = at.x;
         y = at.y;
 
-        area.left   = *(const int32_t *)(h + LISTHDR_OFF_BOX_LEFT)   + x;
-        area.right  = *(const int32_t *)(h + LISTHDR_OFF_BOX_RIGHT)  + x;
-        area.top    = *(const int32_t *)(h + LISTHDR_OFF_BOX_TOP)    + y;
-        area.bottom = *(const int32_t *)(h + LISTHDR_OFF_BOX_BOTTOM) + y;
+        area.left   = h->box.left   + x;
+        area.right  = h->box.right  + x;
+        area.top    = h->box.top    + y;
+        area.bottom = h->box.bottom + y;
         return BoxAction(area, out);
     }
     return 1;
@@ -2676,9 +2675,10 @@ int32_t __cdecl ListBoxAction(AM2_Point at, void *list, AM2_TileMask *out)
  * one arm being taken, and both were nearly written up from blind counters.
  * The rule is the one CLAUDE.md already states and the addition is the
  * control: a probe whose control cannot fire is a test that cannot fail. */
-int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, AM2_TileMask *out)
+int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
+                               AM2_TileMask *out)
 {
-    const uint8_t  *h     = (const uint8_t *)hdr;
+    const AM2_RecordList *h = hdr;
 #define ring (g_tilemaskNeighbours)
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
@@ -2700,16 +2700,14 @@ int32_t __cdecl ListMaskAction(AM2_Point at, void *hdr, AM2_TileMask *out)
     int32_t         marked = 0;
 
     /* The address-of that cannot be null -- see above. */
-    m = (const AM2_ObjMask *)(h + LISTHDR_OFF_MASK);
+    m = &h->mask;
     if (!m)
         return 0;
     bits = m->bits;
     if (!bits)
         return 0;
 
-    spr = *(const uint8_t *const *)
-              (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
-               + LISTREC_OFF_SPRITE);
+    spr = (const uint8_t *)h->records->sprite;
 
     ox = at.x
          - *(const int16_t *)(spr + SPR_OFF_HOTX);
@@ -2943,7 +2941,7 @@ int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
     AM2_TileMask   mask;
 
     const uint8_t *rec;
-    void          *hdr;
+    const AM2_RecordList *hdr;
     int32_t        x, y, n;
 
     if (slot >= g_keyTableN)
@@ -2951,11 +2949,9 @@ int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
 
     rec = ((const uint8_t *const *)
               *(void *const *)&g_aaiRecords)[slot];
-    hdr = ((void *const *)*(void *const *)&g_recordLists)
-              [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)];
+    hdr = g_recordLists[*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)];
 
-    if (*(const void *const *)((const uint8_t *)hdr + LISTHDR_OFF_MASK
-                               + OBJMASK_OFF_BITS))
+    if (hdr->mask.bits)
         ListMaskAction(at, hdr, &mask);
     else
         ListBoxAction(at, hdr, &mask);
