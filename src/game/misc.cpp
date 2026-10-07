@@ -578,7 +578,7 @@ void __cdecl LoadMask(AM2_ObjMask *out, int32_t set, int32_t index, int32_t fram
     AM2_ObjMask *rec = out;
     char     dir[AM2_MASK_PATH_MAX];
     char     pattern[AM2_MASK_PATH_MAX];
-    uint8_t  find[AM2_FINDDATA_BYTES];
+    AM2_FindData  find;
     uint8_t  desc[AM2_DIB_DESC_BYTES];
 
     if (g_optDf) {
@@ -597,11 +597,11 @@ void __cdecl LoadMask(AM2_ObjMask *out, int32_t set, int32_t index, int32_t fram
     am2_sprintf(pattern, "%02d_%03d_%02d_*.msk",
                 set, index, frame);
 
-    if (orig_findfirst(pattern, find) == -1)
+    if (orig_findfirst(pattern, &find) == -1)
         return;
 
     rec->bits = (uint8_t *)
-        LoadDibFlipped((const char *)(find + AM2_FIND_OFF_NAME), desc,
+        LoadDibFlipped(find.name, desc,
                        &rec->loaderOut);
     if (!rec->bits)
         return;

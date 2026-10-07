@@ -18,6 +18,17 @@
  * one class across files; the comm forwarders below need it visible. */
 #include "msgslot.h"
 
+/* What the CRT's _findfirst/_findnext fill, 0x118 bytes: MSVC 6's
+ * _finddata_t with its 32-bit time_t. */
+typedef struct AM2_FindData {
+    uint32_t attrib;                /* +0x00 AM2_FIND_OFF_ATTRIB */
+    int32_t  timeCreate;            /* +0x04 */
+    int32_t  timeAccess;            /* +0x08 */
+    int32_t  timeWrite;             /* +0x0C */
+    uint32_t size;                  /* +0x10 */
+    char     name[260];             /* +0x14 AM2_FIND_OFF_NAME */
+} AM2_FindData;
+
 
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
 #if defined(_MSC_VER) && !defined(__GNUC__)

@@ -132,9 +132,9 @@
 #define g_bitmapAreaW            (*(int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)  /* 0x00485318 */
 #define g_blitRect               ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)  /* 0x00485320 */
 #define g_bufferSize             (*(uint32_t *)(uintptr_t)ADDR_AUDIO_BUFFER_SIZE)  /* 0x004FA444 */
-#define g_buildMenu              ((uint8_t *)(uintptr_t)ADDR_BUILD_MENU)  /* 0x004762D0 */
-#define g_buildMenuEnd           ((uint8_t *)(uintptr_t)ADDR_BUILD_MENU_END)  /* 0x004766C0 */
-#define g_buildMenuRects         ((uint8_t *)(uintptr_t)ADDR_BUILD_MENU_RECTS)  /* 0x004762C0 */
+#define g_buildMenu              ((struct AM2_BuildMenuRec *)(uintptr_t)ADDR_BUILD_MENU)  /* 0x004762D0 */
+#define g_buildMenuEnd           ((struct AM2_BuildMenuRec *)(uintptr_t)ADDR_BUILD_MENU_END)  /* 0x004766C0 */
+#define g_buildMenuRects         ((struct AM2_BuildButtonRec *)(uintptr_t)ADDR_BUILD_MENU_RECTS)  /* 0x004762C0 */
 #define g_cameraX                (*(int32_t *)(uintptr_t)ADDR_CAMERA_X)  /* 0x00514EA8 */
 #define g_cameraY                (*(int32_t *)(uintptr_t)ADDR_CAMERA_Y)  /* 0x00514EAC */
 #define g_cdFoundFlag            (*(int32_t *)(uintptr_t)ADDR_CD_FOUND_FLAG)  /* 0x00512594 */

@@ -4613,11 +4613,7 @@ void __cdecl PlacementScreenClick(AM2_Point at)
     int32_t ok;
 
     /* The selected type, read from the build table at each use. */
-#define TYPE (*(const int32_t *)(g_buildMenu \
-                                 + (uintptr_t)AM2_BUILD_MENU_STRIDE                    \
-                                       * (uintptr_t)*(const int32_t *)(uintptr_t)      \
-                                             ((uintptr_t)&g_hudIndex)                            \
-                                 + BUILD_MENU_OFF_ID))
+#define TYPE (g_buildMenu[(uintptr_t)g_hudIndex].id)
 
     /* The argument's own slot becomes the point -- see above. */
     ((int16_t *)&at)[0] =
@@ -7977,9 +7973,7 @@ void __cdecl BuildOnToggle(AM2_Widget *w)
 
     if (g_ourPoints
             >= (int32_t)UnitTypeCost(
-                   *(const int32_t *)(g_buildMenu
-                                      + row * AM2_BUILD_MENU_STRIDE
-                                      + BUILD_MENU_OFF_ID))) {
+                   g_buildMenu[row].id)) {
         g_hudDirty         = 1;
         g_placeFlag4fcf88 = 1;
     }
@@ -8088,7 +8082,7 @@ AM2_HudPanel::AM2_HudPanel()
      * found by reading ADDR_BUILD_ON_TOGGLE, which indexes an 18-row table
      * with +0x78 -- coherent only if that field is the row. */
     {
-        const uint8_t *menu = g_buildMenu;
+        const AM2_BuildMenuRec *menu = g_buildMenu;
         AM2_Widget   **slot = g_hudWidgetTable;
         int32_t        army = AM2_THE_COMM->CommArmyOfSlot(
                                   (int32_t)g_defaultOwner);
@@ -8102,21 +8096,17 @@ AM2_HudPanel::AM2_HudPanel()
             /* ARMY is the sprite FRAME and the row is arg7, not the
             * other way round -- see the note above the loop. */
             btn = new AM2_CountButton(
-                *(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
-                                   + BUILD_MENU_OFF_KIND),
+                menu[i].kind,
                 army,
-                *(const AM2_Rect *)(menu + i * AM2_BUILD_MENU_STRIDE
-                                    - (((uintptr_t)g_buildMenu) - ((uintptr_t)g_buildMenuRects))),
+                menu[i - 1].nextRect,
                 i,
-                (int32_t)UnitTypeCost(*(const int32_t *)
-                    (menu + i * AM2_BUILD_MENU_STRIDE + BUILD_MENU_OFF_ID)),
+                (int32_t)UnitTypeCost(menu[i].id),
                 BuildOnToggle);
             ::WidgetAddChild(w, btn);
             slot[i] = btn;
 
             /* Writes through btn even when it is null -- the original's. */
-            if (!CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
-                                                  + BUILD_MENU_OFF_ID),
+            if (!CanAffordUnit(menu[i].id,
                                g_ourPoints))
                 btn->disabled = 1;
         }
@@ -8244,14 +8234,13 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
     if (g_netGame) {
         AM2_Widget *const *slot =
             g_hudWidgetTable;
-        const uint8_t     *menu = g_buildMenu;
+        const AM2_BuildMenuRec *menu = g_buildMenu;
         int32_t            i;
 
         /* Indexed, with an if/else: the signed `jl` and the two stores. */
         for (i = 0; i < (int32_t)((((uintptr_t)g_buildMenuEnd) - ((uintptr_t)g_buildMenu))
                                   / AM2_BUILD_MENU_STRIDE); i++) {
-            if (CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
-                                                 + BUILD_MENU_OFF_ID),
+            if (CanAffordUnit(menu[i].id,
                               g_ourPoints))
                 slot[i]->disabled = 0;
             else
@@ -8285,16 +8274,14 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelPaint(RECT clip)
                                   / AM2_BUILD_MENU_STRIDE); i++) {
             AM2_Rect box;
 
-            box.left   = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[0] + w->rect.left;
-            box.top    = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[1] + w->rect.top;
-            box.right  = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[2] + box.left;
-            box.bottom = ((const int32_t *)(g_buildMenuRects + i * AM2_BUILD_MENU_STRIDE))[3] + box.top;
+            box.left   = g_buildMenuRects[i].rect.left + w->rect.left;
+            box.top    = g_buildMenuRects[i].rect.top + w->rect.top;
+            box.right  = g_buildMenuRects[i].rect.right + box.left;
+            box.bottom = g_buildMenuRects[i].rect.bottom + box.top;
 
             if (PointInRect(&box,
                             (const AM2_Point *)&g_cursorPoint))
-                DrawTooltip((const char *)(g_buildMenu
-                                           + i * AM2_BUILD_MENU_STRIDE
-                                           + BUILD_MENU_OFF_NAME),
+                DrawTooltip(g_buildMenu[i].name,
                             g_backgroundColour);
         }
     }
@@ -12657,7 +12644,7 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 {
     char    dir[AM2_DLG_TEXT_BYTES];
     char    pattern[AM2_DLG_TEXT_BYTES];
-    uint8_t find[AM2_FINDDATA_BYTES];
+    AM2_FindData find;
     int32_t h;
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
@@ -12669,16 +12656,16 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
     }
 
     strcpy(pattern, "*.*");
-    h = orig_findfirst(pattern, find);
+    h = orig_findfirst(pattern, &find);
     if (h != -1) {
         do {
-            const char *nm = (const char *)(find + AM2_FIND_OFF_NAME);
+            const char *nm = find.name;
 
             if (nm[0] == '.')
                 continue;
             if (FileHasSaveTag(nm))
                 orig_remove(nm);
-        } while (orig_findnext(h, find) == 0);
+        } while (orig_findnext(h, &find) == 0);
         orig_findclose(h);
     }
 
@@ -13057,7 +13044,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     AM2_ListBox *list;
     AM2_ArrowBar *bar;
     char        pattern[256];
-    uint8_t     found[0x118];     /* a _finddata_t */
+    AM2_FindData     found;     /* a _finddata_t */
     int32_t     handle;
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_PLAYER);
     ReadCampaignLevels();
@@ -13067,16 +13054,16 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     w->list = new AM2_Rec(1);
 
     strcpy(pattern, "*");
-    handle = orig_findfirst(pattern, found);
+    handle = orig_findfirst(pattern, &found);
     if (handle != -1) {
         do {
-            const char *name = (const char *)(found + AM2_FIND_OFF_NAME);
+            const char *name = found.name;
 
-            if ((found[AM2_FIND_OFF_ATTRIB] & AM2_FIND_ATTR_DIR)
+            if ((found.attrib & AM2_FIND_ATTR_DIR)
                     && name[0] != '.')
                 w->list->ListAdd(name,
                         (void *)0);
-        } while (orig_findnext(handle, found) == 0);
+        } while (orig_findnext(handle, &found) == 0);
         orig_findclose(handle);
     }
 
@@ -13335,7 +13322,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     AM2_ArrowBar *bar;
     char        path[256];
     char        pattern[256];
-    uint8_t     found[0x118];     /* a _finddata_t */
+    AM2_FindData     found;     /* a _finddata_t */
     int32_t     handle;
     int32_t     dx;
     int32_t     dy;
@@ -13349,12 +13336,12 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     SetGameDir(path);
 
     strcpy(pattern, "*.sav");
-    handle = orig_findfirst(pattern, found);
+    handle = orig_findfirst(pattern, &found);
     if (handle != -1) {
         do {
             w->list->ListAdd(
-                    (const char *)(found + AM2_FIND_OFF_NAME), (void *)0);
-        } while (orig_findnext(handle, found) == 0);
+                    found.name, (void *)0);
+        } while (orig_findnext(handle, &found) == 0);
         orig_findclose(handle);
     }
 
@@ -13770,7 +13757,7 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
 {
     AM2_DlgSaveListScreen *dlg = (AM2_DlgSaveListScreen *)g_paintObject;
     char    *name;
-    uint8_t  find[AM2_FINDDATA_BYTES];
+    AM2_FindData  find;
     int32_t  h;
 
     (void)w;
@@ -13778,7 +13765,7 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
     if (!dlg)
         return;
 
-    name = (char *)((uint8_t *)dlg + SAVELIST_OFF_NAME);
+    name = dlg->name;
     if (strlen(name) < 1) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         return;
@@ -13788,7 +13775,7 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
     if (!orig_strstr(name, "."))
         strcat(name, ".sav");
 
-    h = orig_findfirst(name, find);
+    h = orig_findfirst(name, &find);
     if (h == -1) {
         /* Nothing of that name: save it and leave. */
         /* Copied to the global, but SaveGame is handed the dialog's own
@@ -13853,12 +13840,12 @@ void __cdecl SaveListOnDelete(AM2_Widget *w)
         return;
 
     /* An empty box is refused with the same sound a list plays at its end. */
-    if (strlen((const char *)((uint8_t *)dlg + SAVELIST_OFF_NAME)) < 1) {
+    if (strlen(dlg->name) < 1) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         return;
     }
 
-    strcpy(g_pendingDelete, (const char *)((uint8_t *)dlg + SAVELIST_OFF_NAME));
+    strcpy(g_pendingDelete, dlg->name);
     strcat(g_pendingDelete, ".sav");
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
@@ -13904,7 +13891,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     AM2_ArrowBar *bar;
     char        dir[AM2_DLG_TEXT_BYTES];
     char        path[AM2_DLG_TEXT_BYTES];
-    uint8_t     find[AM2_FINDDATA_BYTES];
+    AM2_FindData     find;
     int32_t     h;
     AM2_CTOR_VTABLE(w, VTABLE_SAVE_LIST);
     SetGameDir("save");
@@ -13912,11 +13899,11 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     /* Make the player's folder if it is missing, or if the name is taken by
      * something that is not a directory. */
     strcpy(dir, &g_gameprocBlock);
-    h = orig_findfirst(dir, find);
+    h = orig_findfirst(dir, &find);
     if (h == -1) {
         orig_mkdir(dir);
     } else {
-        if (!(find[AM2_FIND_OFF_ATTRIB] & AM2_ATTR_SUBDIR))
+        if (!(find.attrib & AM2_ATTR_SUBDIR))
             orig_mkdir(dir);
         orig_findclose(h);
     }
@@ -13928,25 +13915,25 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     self->list = new AM2_Rec(1);
 
     strcpy(dir, "*.sav");
-    h = orig_findfirst(dir, find);
+    h = orig_findfirst(dir, &find);
     if (h != -1) {
         do {
             ((AM2_Rec *)(void *)self->list)->ListAdd(
-                    (const char *)(find + AM2_FIND_OFF_NAME), 0);
-        } while (orig_findnext(h, find) == 0);
+                    find.name, 0);
+        } while (orig_findnext(h, &find) == 0);
         orig_findclose(h);
     }
 
     w->flag44 = 1;
-    strcpy((char *)((uint8_t *)self + SAVELIST_OFF_NAME),
+    strcpy(self->name,
            &g_gameprocStrB);
 
-    edit = (AM2_Edit *)new AM2_Edit((char *)((uint8_t *)self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
+    edit = (AM2_Edit *)new AM2_Edit(self->name, 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);
     WidgetVFocus(edit, 0);
     edit->charset =
         g_editCharset;
-    *(void **)((uint8_t *)self + SAVELIST_OFF_EDIT) = edit;
+    self->edit = edit;
 
     kid = new AM2_Blinker("03_028_00_green.bmp", "03_028_01_green.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xFC, 0x57, 0x11, 0x10));
     ::WidgetAddChild(w, kid);

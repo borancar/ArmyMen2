@@ -438,6 +438,28 @@ struct AM2_CmdRec {
     int32_t             f14;        /* +0x24 MODE_OFF_F14 */
 };
 
+/* One build-menu entry, 0x38 bytes, from ADDR_BUILD_MENU. Its button's
+ * rectangle is the 0x10 bytes BEFORE it, which is the previous entry's tail;
+ * ADDR_BUILD_MENU_RECTS reads the same records from there. */
+struct AM2_BuildMenuRec {
+    int32_t  id;                    /* +0x00 BUILD_MENU_OFF_ID, into ADDR_UNIT_TYPES */
+    int32_t  kind;                  /* +0x04 BUILD_MENU_OFF_KIND, the button's sprite */
+    char     name[0x18];            /* +0x08 BUILD_MENU_OFF_NAME */
+    int32_t  field20;               /* +0x20 */
+    int32_t  field24;               /* +0x24 */
+    AM2_Rect nextRect;              /* +0x28 BUILD_MENU_OFF_RECT, the NEXT entry's button */
+};
+
+/* The same records as ADDR_BUILD_MENU_RECTS addresses them, 0x10 earlier. */
+struct AM2_BuildButtonRec {
+    AM2_Rect rect;                  /* +0x00 this entry's button */
+    int32_t  id;                    /* +0x10 */
+    int32_t  kind;                  /* +0x14 */
+    char     name[0x18];            /* +0x18 */
+    int32_t  field30;               /* +0x30 */
+    int32_t  field34;               /* +0x34 */
+};
+
 /* The same records as ADDR_POINTER_MODES addresses them, 0x10 in: a mode's
  * fields, then the NEXT command's sprite spec. */
 struct AM2_PointerModeRec {
