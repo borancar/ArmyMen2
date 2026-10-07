@@ -215,6 +215,11 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **DrawEffectLayer fixed, not matched** (2026-10-07), still 1541. The B
+    pair was skipped whenever the A pair was idle: a `continue` where the
+    image jumps on to the B test. Now an `if` around the A part. The
+    remaining diff (230) is the loop's strength-reduced pointer: the image
+    bases it on A's point, ours on B's.
   - **LoadShadowBmp matched** (2026-10-07), 1540 -> 1541.
     - Fixed a real bug: the palette read is biClrUsed * 4 bytes, not
       biHeight * 4. The old count overran the 0x400-byte table for any shadow

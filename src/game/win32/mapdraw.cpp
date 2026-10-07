@@ -2432,6 +2432,10 @@ void __cdecl AirFrameDraw(void)
  * 42-arm weapon dispatcher, so it takes a weapon Sarge is not carrying.
  * Reaching it needs a mission that issues that weapon, which is a drive this
  * project does not have -- not a defect and not a dead path.
+ *
+ * THE B PAIR DOES NOT DEPEND ON THE A PAIR. With A not live the image jumps
+ * straight to the B test (`je 0x4126C8`). This was once a `continue`, which
+ * skipped B whenever A was idle.
  */
 /* The image's own LCG, spelled as audio.cpp and event.cpp spell it. libc's
  * would be a different sequence and the flicker is observable. */
@@ -2446,83 +2450,82 @@ void __cdecl DrawEffectLayer(void)
     int32_t             army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
-        const AM2_Point *ptA = &((const AM2_Point *)g_aimPointA)[army];
-        int32_t frame;
-        RECT    box, hit;
+        if ((g_aimLiveA)[army]) {
+            const AM2_Point *ptA = &((const AM2_Point *)g_aimPointA)[army];
+            int32_t frame;
+            RECT    box, hit;
 
-        if (!(g_aimLiveA)[army])
-            continue;
+            frame = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampA)[army])
+                              / AM2_AIM_STEP_MS) + 1;
+            if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
+                frame = AM2_AIM_FRAMES_A;
 
-        frame = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampA)[army])
-                          / AM2_AIM_STEP_MS) + 1;
-        if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
-            frame = AM2_AIM_FRAMES_A;
+            box.left   = ptA->x + AM2_AIM_BOX_LEFT;
+            box.right  = ptA->x + AM2_AIM_BOX_RIGHT;
+            box.top    = ptA->y + AM2_AIM_BOX_TOP;
+            box.bottom = ptA->y + AM2_AIM_BOX_BOTTOM;
 
-        box.left   = ptA->x + AM2_AIM_BOX_LEFT;
-        box.right  = ptA->x + AM2_AIM_BOX_RIGHT;
-        box.top    = ptA->y + AM2_AIM_BOX_TOP;
-        box.bottom = ptA->y + AM2_AIM_BOX_BOTTOM;
+            if (IntersectRect(&hit, &box, (const RECT *)g_screenClip)) {
+                int32_t row, col;
 
-        if (IntersectRect(&hit, &box, (const RECT *)g_screenClip)) {
-            int32_t row, col;
+                /* Read: every pixel of the visible part of the block, taken from
+                 * wherever the map points, out of the OFFSCREEN surface. */
+                SetDrawTarget(g_offscreen);
+                if (!LockSurface(g_offscreen))
+                    return;
 
-            /* Read: every pixel of the visible part of the block, taken from
-             * wherever the map points, out of the OFFSCREEN surface. */
-            SetDrawTarget(g_offscreen);
-            if (!LockSurface(g_offscreen))
-                return;
+                for (row = hit.top; row < hit.bottom; row++) {
+                    for (col = hit.left; col < hit.right; col++) {
+                        int32_t   at = (row - box.top) * AM2_AIM_BLOCK
+                                       + (col - box.left);
+                        /* The pair is copied as one dword and clamped in place,
+                         * in 16 bits: the image's `xor cx, cx` and `add cx, bp`. */
+                        AM2_Point d  = ((const AM2_Point *)map)[at];
 
-            for (row = hit.top; row < hit.bottom; row++) {
-                for (col = hit.left; col < hit.right; col++) {
-                    int32_t   at = (row - box.top) * AM2_AIM_BLOCK
-                                   + (col - box.left);
-                    /* The pair is copied as one dword and clamped in place,
-                     * in 16 bits: the image's `xor cx, cx` and `add cx, bp`. */
-                    AM2_Point d  = ((const AM2_Point *)map)[at];
+                        if (d.x + box.left > g_bitmapAreaW - 1)
+                            d.x = (int16_t)(g_bitmapAreaW - 1);
+                        else if (d.x + box.left < 0)
+                            d.x = 0;
+                        else
+                            d.x += (int16_t)box.left;
 
-                    if (d.x + box.left > g_bitmapAreaW - 1)
-                        d.x = (int16_t)(g_bitmapAreaW - 1);
-                    else if (d.x + box.left < 0)
-                        d.x = 0;
-                    else
-                        d.x += (int16_t)box.left;
+                        if (d.y + box.top > g_bitmapAreaH - 1)
+                            d.y = (int16_t)(g_bitmapAreaH - 1);
+                        else if (d.y + box.top < 0)
+                            d.y = 0;
+                        else
+                            d.y += (int16_t)box.top;
 
-                    if (d.y + box.top > g_bitmapAreaH - 1)
-                        d.y = (int16_t)(g_bitmapAreaH - 1);
-                    else if (d.y + box.top < 0)
-                        d.y = 0;
-                    else
-                        d.y += (int16_t)box.top;
-
-                    block[at] = g_frameBuf[d.y * g_pitch + d.x];
+                        block[at] = g_frameBuf[d.y * g_pitch + d.x];
+                    }
                 }
+
+                UnlockSurface();
+
+                /* Write: the same rows, straight back to the draw target. */
+                SetDrawTarget(target);
+                if (!LockSurface(target))
+                    return;
+
+                for (row = hit.top; row < hit.bottom; row++)
+                    memcpy(g_frameBuf + row * g_pitch + hit.left,
+                           block + (row - box.top) * AM2_AIM_BLOCK
+                                 + (hit.left - box.left),
+                           (size_t)(hit.right - hit.left));
+
+                UnlockSurface();
             }
 
-            UnlockSurface();
-
-            /* Write: the same rows, straight back to the draw target. */
             SetDrawTarget(target);
             if (!LockSurface(target))
                 return;
 
-            for (row = hit.top; row < hit.bottom; row++)
-                memcpy(g_frameBuf + row * g_pitch + hit.left,
-                       block + (row - box.top) * AM2_AIM_BLOCK
-                             + (hit.left - box.left),
-                       (size_t)(hit.right - hit.left));
+            DrawSprite((g_aimSpritesA)[frame], ptA->x, ptA->y, 0);
+            DrawSprite((g_aimSpritesA)[0],
+                       ptA->x + AM2_AIM_BOX_LEFT, ptA->y + AM2_AIM_BOX_TOP, 0);
 
             UnlockSurface();
         }
-
-        SetDrawTarget(target);
-        if (!LockSurface(target))
-            return;
-
-        DrawSprite((g_aimSpritesA)[frame], ptA->x, ptA->y, 0);
-        DrawSprite((g_aimSpritesA)[0],
-                   ptA->x + AM2_AIM_BOX_LEFT, ptA->y + AM2_AIM_BOX_TOP, 0);
-
-        UnlockSurface();
 
         if ((g_aimLiveB)[army]) {
             const int16_t *ptB = (const int16_t *)(g_aimPointB + army * 4);
