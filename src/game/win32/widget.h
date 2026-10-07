@@ -316,7 +316,8 @@ AM2_CLASS_VTABLE(AM2_MpPanelScreen, VTABLE_MP_PANEL)
 
 struct AM2_Panel : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_Panel[AM2_PANEL_SIZE - sizeof(AM2_Widget)];
+    AM2_Sprite *panelSprite;        /* 0x0058  PANEL_OFF_SPRITE, the same sprite as 0x0038 */
+    int32_t     panelFlag;          /* 0x005C  PANEL_OFF_FLAG */
     AM2_Panel(const char *bmp, int32_t flag, AM2_Rect box);
     explicit AM2_Panel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Panel();
@@ -324,7 +325,7 @@ struct AM2_Panel : AM2_Widget {
 
 struct AM2_ScreenBase : AM2_Panel {
     typedef AM2_Panel Base;       /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_ScreenBase[0x64 - sizeof(AM2_Panel)];
+    void (__cdecl *escape)(AM2_Widget *); /* 0x0060  DLG_OFF_ESCAPE, dismisses the dialog */
     AM2_ScreenBase(const char *bmp, int32_t flag);
     explicit AM2_ScreenBase(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
     ~AM2_ScreenBase();
