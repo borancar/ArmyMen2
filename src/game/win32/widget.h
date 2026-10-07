@@ -356,7 +356,8 @@ struct AM2_KeyRow : AM2_Label {
 
 struct AM2_ButtonBase : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_ButtonBase[0x68 - sizeof(AM2_Widget)];
+    int32_t row;                    /* 0x0058  MPBTN_OFF_ROW, which player row */
+    uint8_t pad_AM2_ButtonBase[0x68 - 0x5C];
     AM2_ButtonBase();
     explicit AM2_ButtonBase(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };
@@ -583,7 +584,7 @@ struct AM2_HudEdge : AM2_Widget {
  * destructor of its own -- the other two share WidgetDeleteAlt. */
 struct AM2_MpName : AM2_ButtonBase {
     typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
-    const char *text;               /* 0x0068  MPNAME_OFF_TEXT */
+    char       *text;               /* 0x0068  MPNAME_OFF_TEXT */
     int32_t     flag;               /* 0x006C  MPNAME_OFF_FLAG */
     uint8_t     ink;                /* 0x0070  MPNAME_OFF_INK */
     uint8_t     paper;              /* 0x0071  MPNAME_OFF_PAPER */
