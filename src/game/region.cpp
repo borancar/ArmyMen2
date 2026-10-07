@@ -2495,7 +2495,8 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     uint8_t        mask[AM2_TILEMASK_BYTES];
     /* The rectangle is read out of the mask at each use: no local. */
 #define rect ((const int32_t *)(mask + TILEMASK_OFF_RECT))
-    const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
+/* The cell flags and the tile are re-derived at each use. */
+#define cells (mask + TILEMASK_OFF_CELLS)
     /* A byte, unlike ItemTeardown's int32: it is then a stack variable, as
      * the image keeps it (stored at +0x1C, its low byte re-read for the add),
      * where an int32 takes ebx from the row loop's scratch. */
@@ -2569,14 +2570,13 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
 
         for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
 #define weights (*(uint8_t *const *)&g_cellWeights)
-            uint16_t tile;
             int8_t   h;
             int8_t   nh;
 
             if (!cells[idx] || !(cells[idx] & 1))
                 continue;
 
-            tile = (uint16_t)cell;
+#define tile ((uint16_t)cell)
             h  = (int8_t)weights[tile];
             nh = (int8_t)(h + height);
 
@@ -2586,6 +2586,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
                 ShiftTileCover(tile, -2, -1);   /* `add dl, 0xFE`: two off the centre */
 
             weights[tile] = (uint8_t)nh;
+#undef tile
 #undef weights
 
             if (damage) {

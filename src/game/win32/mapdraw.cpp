@@ -1185,8 +1185,8 @@ void __cdecl ScrollMapCache(void)
 
     g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
     g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
-    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
     g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
+    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
         PaintMapTiles(g_camera);
@@ -1208,14 +1208,15 @@ void __cdecl ScrollMapCache(void)
      * directions. */
     {
         int32_t  sx = (dx > 0) ? dx : 0;
-        int32_t  sy = (dy > 0) ? dy : 0;
         AM2_Rect tiles;
+        /* The positive part of dy is recomputed at each use. */
+#define sy ((dy > 0) ? dy : 0)
         int32_t  dstX, dstY;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
         tiles.left   = sx;
-        tiles.top    = sy;
+        tiles.top    = (0 < dy) ? dy : 0;   /* spelled as the image compares it */
         tiles.bottom = g_camera->bottom - ady - g_camera->top + sy;
         tiles.right  = g_camera->right - adx - g_camera->left + sx;
 
@@ -1229,6 +1230,7 @@ void __cdecl ScrollMapCache(void)
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
                                    cache, (LPRECT)&src, DDBLTFAST_WAIT);
+#undef sy
     }
 
     wide.left  = g_camera->left;

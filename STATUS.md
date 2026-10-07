@@ -215,6 +215,15 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Probe sweep over all remaining functions** (2026-10-07). This was
+    unhoist, hoist, swap, commute and ternary, in a second scratch tree.
+    Gains:
+    - ObjAfterMove 23 -> 17: the cell flags and the tile are re-derived at
+      each use.
+    - ScrollMapCache 98 -> 75: the clamps go left, right, top, bottom; the
+      positive part of dy is recomputed at each use; `tiles.top` is
+      compared as `0 < dy`.
+    Everything else was unchanged, or moved by 1-3 bytes and not taken.
   - **ObjMoveAlongFacing 30 -> 7** (2026-10-07).
     - The row count is re-read at each use; there is no `nrows` local.
     - The sub-row loop reads row 0 through a `lead` pointer. It is
