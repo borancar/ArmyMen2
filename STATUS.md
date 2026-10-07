@@ -263,8 +263,16 @@ main result so far (details in `src/vc6/README.md`):
       layouts: the runtime table at ADDR_MISSILE_DEFS is the parsed
       record with five fields permuted (AM2_ItemType vs
       AM2_MissileDefRec), so its +0x1C is the base damage.
-    - Code-offset uses left: about 1,870, mostly the comm layer and the
-      widget classes.
+    - The comm layer is typed end to end: AM2_Comm and AM2_CommSlot in
+      full (g_commObject is an AM2_Comm *), the flow queue AM2_Flow
+      (FindPlayerById's answer), AM2_MsgNode/AM2_MsgList for every message
+      list and the packet pool, AM2_Packet and the AM2_FlowMsg union the
+      flow handler switches on, and one struct per army message kind.
+      The HUD and screen widget classes carry their members too.
+    - Code-offset uses left: about 310, mostly the widget list/dialog/edit
+      families. The two comm flag walks spell the slot id twice, which is
+      what puts VC6's induction pointer on the id; a pointer-to-member
+      helper put it on the flag.
     - A struct-by-value parameter changes the CALLER's register
       allocation; RoachMaskWeight keeps its scalar point.
     - KEEP_DECLS flipped four times on the way and settles between empty
