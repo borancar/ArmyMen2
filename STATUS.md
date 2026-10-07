@@ -249,10 +249,22 @@ main result so far (details in `src/vc6/README.md`):
     typed. New records replace the offset families they named:
     AM2_ObjMask (OBJMASK_/MASKREC_), AM2_TileMask (TILEMASK_), the record
     list AM2_RecordList and its AM2_ListRec (LISTHDR_/LISTREC_/DEFSPEC_),
-    AM2_RowSpec, AM2_SpriteGroupC, AM2_ParticleKind and AM2_UidList.
+    AM2_RowSpec, AM2_SpriteGroupC, AM2_ParticleKind, AM2_UidList, the
+    effect sequences (AM2_Seq/AM2_SeqCtx), the routing graph (AM2_Region),
+    pads (AM2_Pad/AM2_PadNumber), sounds (AM2_Sound/AM2_SoundSlot), the
+    map descriptor queries, unit types, levels and the name registry
+    (AM2_Level/AM2_NameRec), AAI records (AM2_AaiRec) and the air block.
     AM2_RowSet is the full 0x20-byte set, so the object's loose box is
     rowSet.looseBox. Map-row and sprite reads go through AM2_MapRow and
     AM2_Sprite; the anim, sprite and army-list globals are typed.
+    - Several offset families turned out to be one record under two
+      names: SOUND_REC/SOUND_SLOT/FreeSound's SOUND_*, NAMEREC and
+      MP_GAMETYPE, AAIREC and AAI. The missile-def names mixed two
+      layouts: the runtime table at ADDR_MISSILE_DEFS is the parsed
+      record with five fields permuted (AM2_ItemType vs
+      AM2_MissileDefRec), so its +0x1C is the base damage.
+    - Code-offset uses left: about 1,870, mostly the comm layer and the
+      widget classes.
     - A struct-by-value parameter changes the CALLER's register
       allocation; RoachMaskWeight keeps its scalar point.
     - KEEP_DECLS flipped four times on the way and settles between empty
