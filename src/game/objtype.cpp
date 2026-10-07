@@ -202,7 +202,7 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
     if (!ObjIsType2(obj))
         return 0;
 
-    return *(const int32_t *)((const uint8_t *)obj + OBJ_OFF_FIELD_5A4) > 0;
+    return obj->field5A4 > 0;
 }
 
 

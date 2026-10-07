@@ -295,7 +295,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
  * where the function writes only al and the vectors needed a byte_ret flag. */
 int32_t __cdecl ObjTileHook(void *obj)
 {
-    uint8_t       *o = (uint8_t *)obj;
+    AM2_Object       *o = (AM2_Object *)obj;
 #define padLayer (g_mapPadLayer)
     const uint8_t *bitLayer;
     uint32_t tile;
@@ -307,7 +307,7 @@ int32_t __cdecl ObjTileHook(void *obj)
 
     /* The damage pass, before the early exit. The original indexes the
      * pad layer here WITHOUT the null test both later passes make. */
-    tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
+    tile = o->tile;
     if (padLayer[tile] > 0) {
         const uint8_t *num = g_padNumbers
                              + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
@@ -326,7 +326,7 @@ int32_t __cdecl ObjTileHook(void *obj)
                 if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
                     && g_gameClockMs
                        > *(const uint32_t *)(pad + PAD_OFF_DAMAGE_DUE))
-                    DamageObject((AM2_Object *)o,
+                    DamageObject(o,
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE),
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE_KIND),
                                  0, 0, 0);
@@ -335,8 +335,8 @@ int32_t __cdecl ObjTileHook(void *obj)
     }
 
     /* The tile is read from the object again for the compare. */
-    prev = *(const uint32_t *)(o + OBJ_OFF_PREV_TILE);
-    if (*(const uint16_t *)(o + OBJ_OFF_TILE) == prev)
+    prev = o->prevTile;
+    if (o->tile == prev)
         return 0;
 
     /* The eight-bit layer. */

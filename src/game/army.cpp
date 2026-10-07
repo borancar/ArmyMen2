@@ -57,7 +57,7 @@ int32_t __cdecl ObjIsFriendly(const AM2_Object *obj)
     int8_t            owner;
 
     if (g_mpSession && ObjIsType2Inline(obj)
-        && *(const int32_t *)((const uint8_t *)o + OBJ_OFF_SOLDIER_KIND) == 7)
+        && o->soldierKind == 7)
         return 0;
 
     /* The null test above guards only the block, and this read is on the path
@@ -131,7 +131,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(AM2_Object *obj))
 void __cdecl SetMaxHealth(AM2_Object *obj, int32_t amount)
 {
     AM2_Object *o   = (AM2_Object *)obj;
-    int16_t    *max = (int16_t *)((uint8_t *)o + OBJ_OFF_MAX_HEALTH);
+    int16_t    *max = &o->maxHealth;
     int32_t     scaled;
 
     if (*max > AM2_MAX_HEALTH_CAP)
@@ -303,7 +303,7 @@ void __cdecl ExitAllFromVehicle(AM2_Object *vehicle, uint32_t damageOwner)
 
     for (seat = v->riders.count - 1;
          seat >= 0; seat--) {
-        void    *rider = LookupByUID(
+        AM2_Object *rider = LookupByUID(
             (v->riders.uids)[seat]);
         int32_t  kind;
 
@@ -341,13 +341,13 @@ void __cdecl ExitAllFromVehicle(AM2_Object *vehicle, uint32_t damageOwner)
                 DamageBroadcast(rider, damageOwner,
                                       AM2_VEHICLE_DEATH_DAMAGE,
                                       AM2_VEHICLE_DEATH_KIND,
-                                      (const uint8_t *)rider + OBJ_OFF_POS, 0);
-                DamageObject((AM2_Object *)rider, AM2_VEHICLE_DEATH_DAMAGE,
+                                      &rider->pos, 0);
+                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 1);
             } else {
                 am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
                         "damage owner is me\n");
-                DamageObject((AM2_Object *)rider, AM2_VEHICLE_DEATH_DAMAGE,
+                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 0);
             }
         }

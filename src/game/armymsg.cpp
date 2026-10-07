@@ -271,7 +271,7 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
  * both UidOnWire calls and the log line are verified by reading. That is the
  * same ceiling every sender in this family has, and the counter moving at all
  * is only visible because the ten callers are still the original's. */
-void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
+void __cdecl SendTrooperSetWeapon(const AM2_Object *trooper, uint32_t weaponUid,
                                   int32_t weapon)
 {
     uint8_t         msg[AM2_MSG_TROOPER_WEAPON_LEN];
@@ -283,13 +283,13 @@ void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
     *(uint16_t *)(msg + 0)    = AM2_MSG_TROOPER_WEAPON_LEN;
     *(uint16_t *)(msg + 2)    = AM2_MSG_TROOPER_WEAPON;
     *(uint32_t *)(msg + 4)    =
-        UidOnWire(*(const uint32_t *)((const uint8_t *)trooper + 4));
+        UidOnWire(trooper->uid);
     *(uint32_t *)(msg + 8)    = UidOnWire(weaponUid);
     *(int32_t  *)(msg + 0x18) = weapon;
 
     ArmyMessageSend(msg);
     orig_log("Send TrooperSetWeapon message, trooper: %08x, weapon:%08x\n",
-             *(const uint32_t *)((const uint8_t *)trooper + 4), weaponUid);
+             trooper->uid, weaponUid);
 }
 
 /* 0x0042AA10. Tell the other players an object was destroyed.
@@ -309,7 +309,7 @@ void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
  * cold. Reaching it needs a mission driven long enough for something to be
  * killed, which is a drive this project does not yet have. Not a missing code
  * path; a missing drive. Verified by reading. */
-void __cdecl SendObjDestroyed(const void *obj)
+void __cdecl SendObjDestroyed(const AM2_Object *obj)
 {
     uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
 
@@ -319,7 +319,7 @@ void __cdecl SendObjDestroyed(const void *obj)
     *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
     *(uint16_t *)(msg + 2) = AM2_MSG_OBJ_DESTROYED;
     *(uint32_t *)(msg + 4) =
-        UidOnWire(*(const uint32_t *)((const uint8_t *)obj + 4));
+        UidOnWire(obj->uid);
 
     ArmyMessageSend(msg);
 }
@@ -359,12 +359,12 @@ void __cdecl SendObjDestroyed(const void *obj)
  * The two logs are gated on COMM_OFF_VERBOSE and the SEND is not, so a quiet
  * build still sends and simply says nothing.
  */
-void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
+void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot,
                                  int32_t quantity, AM2_Point at)
 {
     uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
-    uint8_t *u = (uint8_t *)unit;
-    uint8_t *it = (uint8_t *)item;
+    AM2_Object *u = unit;
+    AM2_Object *it = item;
 
     if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
         orig_log("<--Trooper Drop Item Send: Trooper: %x, item: %x,  slot: %d,"
@@ -424,11 +424,11 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
  * header log dereferences the item before the `if (!item)` guard below it,
  * which is the same shape the other three functions in this family have.
  */
-void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
+void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quantity)
 {
     uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
-    uint8_t *t = (uint8_t *)trooper;
+    AM2_Object *t = trooper;
     AM2_Object *it = (AM2_Object *)item;
 
     if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
@@ -595,7 +595,7 @@ void __cdecl TellOneSlot(int32_t slot)
  * would cross the patch and be counted. Zero here means the function is simply
  * never called in that window -- the sweep frees only items flagged for it,
  * and nothing in a Boot Camp mission is. Verified by reading. */
-void __cdecl ItemGoneMessageSend(const void *obj)
+void __cdecl ItemGoneMessageSend(const AM2_Object *obj)
 {
     uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
 
@@ -608,11 +608,11 @@ void __cdecl ItemGoneMessageSend(const void *obj)
 
     *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
     *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_GONE;
-    *(uint32_t *)(msg + 4) = UidOnWire(*(const uint32_t *)((const uint8_t *)obj + 4));
+    *(uint32_t *)(msg + 4) = UidOnWire(obj->uid);
 
     if (*(const int32_t *)((const uint8_t *)kComm + COMM_OFF_VERBOSE))
         orig_log("itemGoneMessageSend uid %x item_type %d\n",
-                 *(const uint32_t *)((const uint8_t *)obj + 4),
+                 obj->uid,
                  *(const int32_t *)obj);
 
     ArmyMessageSend(msg);
@@ -725,16 +725,16 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
  *
  * The name is structural. Kind 0x18 has no receiver reconstructed yet and
  * nothing read so far says what the pair means. */
-void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
+void __cdecl SendPairMessage(const AM2_Object *a, const AM2_Object *b, int32_t byteArg,
                              int32_t arg)
 {
     uint8_t        msg[AM2_MSG_PAIR_LEN];
-    const uint8_t *pa = (const uint8_t *)a;
+    const AM2_Object *pa = a;
     const AM2_Object *pb = (const AM2_Object *)b;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_PAIR_LEN;
     *(uint32_t *)(msg + MSG_PAIR_OFF_A) =
-        UidOnWire(*(const uint32_t *)(pa + 4));
+        UidOnWire(pa->uid);
     *(uint16_t *)(msg + 2) = AM2_MSG_PAIR;
     *(uint32_t *)(msg + MSG_PAIR_OFF_B) =
         UidOnWire(pb->uid);
@@ -746,7 +746,7 @@ void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
     ArmyMessageSend(msg);
 }
 
-void __cdecl SendItemDeploy(const void *item, int32_t arg)
+void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
 {
     uint8_t        msg[AM2_MSG_ITEM_DEPLOY_LEN];
     const AM2_Object *it = (const AM2_Object *)item;
@@ -1062,7 +1062,7 @@ void __cdecl ItemPostCreate(int32_t army, AM2_Point where)
  * The whole function is behind ADDR_MP_SESSION, so in single player it is one
  * compare and a return.
  */
-void __cdecl SendItemCreate(void *obj)
+void __cdecl SendItemCreate(AM2_Object *obj)
 {
     AM2_Object       *o = (AM2_Object *)obj;
     uint8_t        msg[AM2_MSG_ITEM_CREATE_LEN];
@@ -1276,8 +1276,8 @@ void __cdecl RecvItemCreate(void *msg)
  * HEALTH, which is in neither the message nor the arguments -- it is read
  * back off the object, so it is the health AFTER whatever the caller already
  * did to it. */
-void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
-                             int32_t kind, const void *where, int32_t unused)
+void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
+                             int32_t kind, const AM2_Point *where, int32_t unused)
 {
     uint8_t        msg[AM2_MSG_DAMAGE_LEN];
     const AM2_Object *o = (const AM2_Object *)obj;
@@ -1337,7 +1337,7 @@ void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
  * vehicle faults in the first log line and again in the send. Its two callers
  * both have one; reproduced as it stands.
  */
-void __cdecl SendVehicleExit(void *vehicle, void *occupant)
+void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
 {
     struct {
         AM2_ArmyMsgHdr hdr;
@@ -1642,7 +1642,7 @@ int armymsg_install(void)
  * project has -- armymsg.cpp records why -- so the double application is
  * harmless and is reproduced because the original does it, not because
  * anything is converted. */
-void __cdecl SendVehicleEnter(void *vehicle, void *unit)
+void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
 {
     AM2_Object  *veh  = (AM2_Object *)vehicle;
     AM2_Object  *unt  = (AM2_Object *)unit;
@@ -1689,7 +1689,7 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
  * message and sending it. So the send is also the acknowledgement: whoever
  * set the flag to ask for a shot has it taken away here, and a reconstruction
  * that only emitted the packet would fire every frame. */
-void __cdecl SendVehicleFire(void *vehicle)
+void __cdecl SendVehicleFire(AM2_Object *vehicle)
 {
     AM2_Object  *veh  = (AM2_Object *)vehicle;
     /* The comm object is read at every use. */
@@ -2107,7 +2107,7 @@ void __cdecl SendAllVehicleUpdates(void)
  *
  * The null check is on the ITEM, not the vehicle, and it sits AFTER the log:
  * a null item is announced and then not sent. */
-void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
+void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quant)
 {
     AM2_Object  *veh  = (AM2_Object *)vehicle;

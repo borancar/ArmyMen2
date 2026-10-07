@@ -22,7 +22,7 @@
 extern "C" {
 /* 0x0045E3C0, two callers, both a unit leaving a vehicle. Twelve bytes: the
  * header's uid is the VEHICLE and the dword after it is the occupant. */
-void __cdecl SendVehicleExit(void *vehicle, void *occupant);
+void __cdecl SendVehicleExit(struct AM2_Object *vehicle, struct AM2_Object *occupant);
 
 /* 0x0043A210, four callers. Increment the reveal count on the 5x5 block of
  * tiles around a new object, in every allied army's grid. Its first argument
@@ -33,7 +33,7 @@ void __cdecl ItemPostCreate(int32_t army, AM2_Point where);
 /* 0x0042AB50, four callers, all of them creators. Declared here now that
  * CreateItem is reconstructed and calls it by name; it had no header
  * declaration for as long as its only C++ caller was in armymsg.cpp itself. */
-void __cdecl SendItemCreate(void *obj);
+void __cdecl SendItemCreate(struct AM2_Object *obj);
 
 /* 0x0044C480, one caller. The SENDER of the kind-0x16 batch RecvTroopBatch
  * receives: walk one comm slot's army object list and append every live
@@ -47,14 +47,14 @@ void __cdecl TellOneSlot(int32_t slot);
  * every time, and its second log puts the uids through UidOnWire a SECOND
  * time -- harmless only because that function is the identity here. See
  * armymsg.cpp. */
-void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
+void __cdecl TrooperDropItemSend(struct AM2_Object *unit, struct AM2_Object *item, int8_t slot,
                                  int32_t quantity, AM2_Point at);
 
 /* 0x0044BFA0, two callers, one of them the kind-0x19 receiver turning a WANT
  * into a DO. The same 0x1C record under kind 0x19, with the point taken from
  * the ITEM's position and the request as an argument. Its four log lines are
  * what name AM2_WANT_PICKUP, AM2_WANT_DROP, AM2_DO_PICKUP and AM2_DO_DROP. */
-void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
+void __cdecl TrooperWantItemSend(struct AM2_Object *trooper, struct AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quantity);
 
 #endif
@@ -80,16 +80,16 @@ void __cdecl SendGamePause(int32_t pause, int32_t mask);
 
 /* 0x0044C370, ten callers. Tell the other players a trooper's weapon changed.
  * Silent unless a DirectPlay session exists. */
-void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
+void __cdecl SendTrooperSetWeapon(const struct AM2_Object *trooper, uint32_t weaponUid,
                                   int32_t weapon);
 
 /* 0x0042AA10, two callers. Tell the other players an object was destroyed.
  * Silent outside a multiplayer session. */
-void __cdecl SendObjDestroyed(const void *obj);
+void __cdecl SendObjDestroyed(const struct AM2_Object *obj);
 
 /* 0x0042A9A0. Tell the other players an ITEM is gone. Silent outside a
  * multiplayer session, and only for object types 1..4. */
-void __cdecl ItemGoneMessageSend(const void *obj);
+void __cdecl ItemGoneMessageSend(const struct AM2_Object *obj);
 
 /* 0x0042ACE0. Routes an army message to its receiver; 1 if it took it. Six
  * codes, and the middle of the range is NOT among them -- 0x13..0x22 get 0.
@@ -99,17 +99,17 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army);
 /* 0x0042AA50. Tell the other players an item was deployed. Sixteen bytes; the
  * two trailing bytes are the item's facing and the caller's argument, in that
  * order. Guarded on the SESSION pointer, not COMM_OFF_DPLAY. */
-void __cdecl SendItemDeploy(const void *item, int32_t arg);
+void __cdecl SendItemDeploy(const struct AM2_Object *item, int32_t arg);
 
 /* 0x0042A880. The only sender of the damage message. The position it carries
  * is the VICTIM's own -- every caller passes that -- and the sixth argument
  * is never read. */
-void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
-                             int32_t kind, const void *where, int32_t unused);
+void __cdecl DamageBroadcast(struct AM2_Object *obj, uint32_t attacker, int32_t amount,
+                             int32_t kind, const AM2_Point *where, int32_t unused);
 
 /* 0x0044C0F0, five callers. A 28-byte kind-0x18 message naming two objects.
  * Structural name; see armymsg.cpp, and note the hole at +0x10. */
-void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
+void __cdecl SendPairMessage(const struct AM2_Object *a, const struct AM2_Object *b, int32_t byteArg,
                              int32_t arg);
 
 /* 0x00410420. Send the accumulated packet to everyone else, if the rate limit
@@ -126,11 +126,11 @@ int armymsg_install(void);
 
 /* 0x0045E300. Kind 0x24, twelve bytes: tell the other players a unit got
  * into a vehicle. */
-void __cdecl SendVehicleEnter(void *vehicle, void *unit);
+void __cdecl SendVehicleEnter(struct AM2_Object *vehicle, struct AM2_Object *unit);
 
 /* 0x0045E220. Kind 0x1C, twenty-four bytes: a vehicle fired. Also CLEARS
  * UNIT_OFF_FIRE_ACTIVE, so the send is the acknowledgement too. */
-void __cdecl SendVehicleFire(void *vehicle);
+void __cdecl SendVehicleFire(struct AM2_Object *vehicle);
 
 /* 0x0045E480. The vehicle batch sender -- TellOneSlot compiled a second time
  * for type 3, differing in the kind, the predicate and the appender. */
@@ -146,7 +146,7 @@ void __cdecl SendAllVehicleUpdates(void);
 
 /* 0x0045E0D0. Kind 0x1D, 28 bytes: a vehicle asks to pick an item up or
  * drop one, or is told the answer. The receive half is RecvVehicle1D. */
-void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
+void __cdecl SendVehicleWantItem(struct AM2_Object *vehicle, struct AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quant);
 
 /* 0x004623D0. Paint one player's latency bar, its colour stepping through

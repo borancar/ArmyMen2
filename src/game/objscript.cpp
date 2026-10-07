@@ -776,7 +776,7 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
  */
 int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = (AM2_Object *)obj;
 
     if (byName) {
 #define SCRIPT_NAME(i) ((*(const AM2_ScriptName *const *) \
@@ -791,28 +791,28 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
     }
 
     if ((sel & AM2_SEL_TYPE_1OR4)
-        && !ObjType2Field548((const AM2_Object *)o))
+        && !ObjType2Field548(o))
         return 0;
-    if ((sel & AM2_SEL_TYPE_238) && !ObjIsTypeIn238((const AM2_Object *)o))
+    if ((sel & AM2_SEL_TYPE_238) && !ObjIsTypeIn238(o))
         return 0;
-    if ((sel & AM2_SEL_TYPE_2) && !ObjIsType2((const AM2_Object *)o))
+    if ((sel & AM2_SEL_TYPE_2) && !ObjIsType2(o))
         return 0;
-    if ((sel & AM2_SEL_TYPE_3) && !ObjIsType3((const AM2_Object *)o))
+    if ((sel & AM2_SEL_TYPE_3) && !ObjIsType3(o))
         return 0;
 
     if ((sel & AM2_SEL_VEHICLE_KIND_1)
-        && *(const int32_t *)(o + VEHICLE_OFF_KIND) != 1)
+        && o->vehicleKind != 1)
         return 0;
 
     if ((sel & AM2_SEL_ARMY_LOCAL)
-        && *(const int8_t *)(o + OBJ_OFF_ARMY)
+        && o->owner
            != *(const int32_t *)&g_defaultOwner)
         return 0;
-    if ((sel & AM2_SEL_ARMY_1) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 1)
+    if ((sel & AM2_SEL_ARMY_1) && (uint8_t)o->owner != 1)
         return 0;
-    if ((sel & AM2_SEL_ARMY_2) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 2)
+    if ((sel & AM2_SEL_ARMY_2) && (uint8_t)o->owner != 2)
         return 0;
-    if ((sel & AM2_SEL_ARMY_3) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 3)
+    if ((sel & AM2_SEL_ARMY_3) && (uint8_t)o->owner != 3)
         return 0;
 
     return 1;
