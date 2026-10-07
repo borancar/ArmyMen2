@@ -730,8 +730,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
-            made->field54C =
-                (int32_t)weapon->uid;
+            made->inventory[0] =
+                weapon->uid;
             SoldierKindForWeapon(made,
                 (uint32_t)weapon->typeRec->kind);
             SendTrooperSetWeapon(made, weapon->uid, 0);
@@ -850,8 +850,8 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {
-                occupant->field54C =
-                    (int32_t)weapon->uid;
+                occupant->inventory[0] =
+                    weapon->uid;
                 SoldierKindForWeapon(occupant,
                     (uint32_t)weapon->typeRec->kind);
                 SendTrooperSetWeapon(occupant,

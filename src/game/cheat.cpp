@@ -199,14 +199,14 @@ again:
         HudMessage("Flame On!", kColour(((uintptr_t)&g_hudColour)));
         g_flameOn = 1;
         (*(int32_t *)&g_flameNextMs) = 0;
-        old = WeaponByUid(u->field54C);
+        old = WeaponByUid(u->inventory[0]);
         fresh = CHEAT_NEW_WEAPON(3);
         if (old) {
             if (fresh == 0)
                 return;
             old->flags |= 2;
             fresh->owner = u->owner;
-            u->field54C = (int32_t)fresh->uid;
+            u->inventory[0] = fresh->uid;
             SoldierKindForWeapon(u, fresh->typeRec->kind);
             SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
             SetFieldInAll(&u->rowSet,
@@ -225,14 +225,14 @@ again:
         SetFieldInAll(&u->rowSet, (void *)u->tableRec2);
         RowUpdate((AM2_MapRow *)(u->rowSet.rows), 1,
                   g_mapDesc);
-        old = WeaponByUid(u->field54C);
+        old = WeaponByUid(u->inventory[0]);
         fresh = CHEAT_NEW_WEAPON(9);
         if (old) {
             if (fresh == 0)
                 return;
             old->flags |= 2;
             fresh->owner = u->owner;
-            u->field54C = (int32_t)fresh->uid;
+            u->inventory[0] = fresh->uid;
             SoldierKindForWeapon(u, fresh->typeRec->kind);
             SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
             return;

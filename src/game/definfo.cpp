@@ -715,14 +715,14 @@ void __cdecl AddMissileDef(const void *rec)
  *
  * The record size is AM2_VEHICLE_DEF_REC_SIZE, the same 0x24 AddVehicleDef
  * appends and DefFreeTables frees -- three functions agreeing on it. */
-void *__cdecl VehicleDefFind(int32_t id)
+AM2_VehicleDef *__cdecl VehicleDefFind(int32_t id)
 {
     /* A whole record as the key, id in its first field -- the original's
      * `sub esp, 0x24` is one record, not one dword. */
     uint8_t key[AM2_VEHICLE_DEF_REC_SIZE];
 
     *(int32_t *)key = id;
-    return (AM2_ItemType *)orig_bsearch(key,
+    return (AM2_VehicleDef *)orig_bsearch(key,
                         *(void *const *)&g_vehicleDefs,
                         (size_t)g_vehicleDefCount,
                         AM2_VEHICLE_DEF_REC_SIZE,

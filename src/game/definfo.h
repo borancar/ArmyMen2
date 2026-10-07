@@ -95,7 +95,7 @@ void __cdecl AddMissileDef(const void *rec);
 /* 0x0045EBF0 and 0x004602C0. Binary-search the vehicle and missile def
  * tables by id. Each is the FIRST function in a merged functions.tsv entry;
  * the rest of each entry is a keyword parser. */
-void *__cdecl VehicleDefFind(int32_t id);
+struct AM2_VehicleDef *__cdecl VehicleDefFind(int32_t id);
 struct AM2_MissileDefRec *__cdecl MissileDefFind(int32_t id);
 
 #endif /* AM2_DEFINFO_H */

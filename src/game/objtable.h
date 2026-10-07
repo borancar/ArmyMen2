@@ -214,6 +214,20 @@ typedef struct AM2_UnitType {
     uint32_t gameMask;              /* +0x24 UNIT_TYPE_OFF_GAME_MASK */
 } AM2_UnitType;
 
+/* One vehicle definition (AM2_VEHICLE_DEF_BYTES), VehicleDefFind's answer:
+ * CreateVehicle copies everything after the kind onto the vehicle. */
+typedef struct AM2_VehicleDef {
+    int32_t  kind;                  /* +0x00 the bsearch key */
+    int32_t  seats;                 /* +0x04 VEHDEF_OFF_SEATS */
+    int32_t  field08;               /* +0x08 VEHDEF_OFF_FIELD_08 -> +0x558 */
+    int32_t  field0C;               /* +0x0C VEHDEF_OFF_FIELD_0C -> +0x55C */
+    int32_t  accelRate;             /* +0x10 VEHDEF_OFF_FIELD_10 -> accelRate */
+    int32_t  turnInterval;          /* +0x14 VEHDEF_OFF_FIELD_14 -> turnInterval */
+    int32_t  health;                /* +0x18 VEHDEF_OFF_HEALTH, SetMaxHealth's */
+    int32_t  field1C;               /* +0x1C VEHDEF_OFF_FIELD_1C -> +0x568 */
+    int32_t  armour;                /* +0x20 VEHDEF_OFF_ARMOUR */
+} AM2_VehicleDef;
+
 /* The PARSED missile definition, as MissileDefFind finds it in the def table
  * (AM2_MISSILE_DEF_REC_SIZE). ADDR_MISSILE_DEFS is built from these with five
  * fields permuted -- +0x10 and +0x14 swap, and +0x1C -> +0x24 -> +0x20 -> +0x1C
@@ -565,7 +579,7 @@ typedef struct AM2_Object {
             AM2_UidList riders;     /* +0x538 VEHICLE_OFF_PTR_LIST, its riders */
             int32_t   deathKind;    /* +0x544 0 destroyed outright, 5 the burn-out */
             int32_t   field548;     /* +0x548 0 drags the turret onto the hull */
-            int32_t   field54C;     /* +0x54C */
+            int32_t   armour;       /* +0x54C VEHICLE_OFF_ARMOUR */
             uint32_t  weaponUid;    /* +0x550 VEHICLE_OFF_WEAPON_UID, its gun */
             int32_t   seats;        /* +0x554 VEHICLE_OFF_SEATS */
             int32_t   field558;     /* +0x558 VEHICLE_OFF_FIELD_558 */

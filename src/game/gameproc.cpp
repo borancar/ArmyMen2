@@ -1849,7 +1849,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
     uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
     const AM2_Object *h = (const AM2_Object *)hdr;
     AM2_Object       *o;
-    const uint8_t *def;
+    const AM2_VehicleDef *def;
     int32_t        i;
     uint32_t       uid;
     float          part;
@@ -1911,7 +1911,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
         o->health = 0;
     }
 
-    def = (const uint8_t *)VehicleDefFind(
+    def = VehicleDefFind(
               o->vehicleKind);
 
     if (o->health > 0 && def) {
@@ -1919,7 +1919,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
         part = (float)o->health
                / o->maxHealth;
-        SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+        SetMaxHealth(o, def->health);
 
         now = o->maxHealth;
         o->health = (int16_t)(int32_t)(now * part);

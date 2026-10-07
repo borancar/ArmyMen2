@@ -5347,14 +5347,14 @@ void __cdecl DamageVehicle(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
         g_gameClockMs;
 
     /* The armour is read afresh at every use. */
-    if (amount <= o->field54C
+    if (amount <= o->armour
         && (int32_t)(orig_game_rand() & 0xFF) < amount * 8)
-        amount = o->field54C + 1;
+        amount = o->armour + 1;
 
-    if (o->field54C > amount)
+    if (o->armour > amount)
         return;
 
-    amount -= o->field54C;
+    amount -= o->armour;
     if (amount < 0)
         amount = 0;
     if (amount > o->health)
@@ -5915,7 +5915,7 @@ void __cdecl Type2ActionB(AM2_Object *obj)
     if (weapon)
         weapon->flags |= OBJ_FLAG_REPLACED;
 
-    o->field54C = 0;
+    o->inventory[0] = 0;
     SoldierKindForWeapon(o, 0);
 }
 
@@ -11958,7 +11958,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t remote, uint32_t uid, uint8_t facing)
 {
     AM2_Object       *o;
-    const uint8_t *def;
+    const AM2_VehicleDef *def;
     AM2_AnimTable *turret;
     AM2_Point      at;
     int32_t        weaponKind;
@@ -11970,8 +11970,8 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                               (int16_t)army))
         return (void *)0;
 
-    def = (const uint8_t *)VehicleDefFind(kind);
-    if (def == (const uint8_t *)0) {
+    def = VehicleDefFind(kind);
+    if (def == (const AM2_VehicleDef *)0) {
         orig_log("Vehicle aai entry not found for type %d\n", kind);
         return (void *)0;
     }
@@ -12040,27 +12040,27 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                 (void *)(uintptr_t)o->uid);
 
     o->seats =
-        *(const int32_t *)(def + VEHDEF_OFF_SEATS);
+        def->seats;
     o->field558 =
-        *(const int32_t *)(def + VEHDEF_OFF_FIELD_08);
+        def->field08;
     o->field55C =
-        *(const int32_t *)(def + VEHDEF_OFF_FIELD_0C);
+        def->field0C;
     o->accelRate =
-        *(const int32_t *)(def + VEHDEF_OFF_FIELD_10);
-    o->heldWeaponUid =
-        *(const int32_t *)(def + VEHDEF_OFF_FIELD_14);
+        def->accelRate;
+    o->turnInterval =
+        (uint32_t)def->turnInterval;
 
     o->maxHealth =
-        (int16_t)*(const int32_t *)(def + VEHDEF_OFF_HEALTH);
-    SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+        (int16_t)def->health;
+    SetMaxHealth(o, def->health);
     /* Re-read AFTER the call, which is the original's order and the whole
      * reason the two stores are not one: SetMaxHealth scales it. */
     o->health = o->maxHealth;
 
-    o->inventorySel =
-        *(const int32_t *)(def + VEHDEF_OFF_FIELD_1C);
-    o->field54C =
-        *(const int32_t *)(def + VEHDEF_OFF_ARMOUR);
+    o->field568 =
+        def->field1C;
+    o->armour =
+        def->armour;
     o->heightSet =
         HeightAtPoint(o->pos);
 

@@ -6550,7 +6550,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 
         /* Armour is clamped to two digits; nothing else here is. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "AR:");
-        a = obj->field54C;
+        a = obj->armour;
         if (a >= 99) a = 99;
         am2_sprintf(line, "%d mm", a);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
