@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1532 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1533 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,21 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **PointerPickRepair matched with the minimal-clone lab** (2026-10-07),
+    1532 -> 1533.
+    - The function was copied into a standalone file with raw offsets and
+      compiled by `tools/vc6lab.py`. The clone reproduced the relink's
+      diff, so the tie was local.
+    - Deleting statements one at a time, at a second per compile, found
+      the cause. A private copy of the leader lookup,
+      `OurLeaderUnitUidLocal`, held the uid in a local. That one extra
+      temporary shifted every later scratch register.
+    - The shared `OurLeaderUnit()` from item.h matches. The private copy
+      is deleted.
+    - Lesson: a register difference far from the code that causes it, in
+      blocks that compile identically, comes from a temporary that never
+      appears in the output. The lab finds it quickly. The source-wide
+      probes cannot.
   - **Step3Drive 419 -> 372, still 1532** (2026-10-07).
     - A combined pass (hoist, swap, operand order, ternary, each repeated
       until nothing improves) found little more: the remap choice in

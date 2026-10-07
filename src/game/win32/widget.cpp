@@ -17710,30 +17710,6 @@ int32_t __cdecl PointerPickHeal(AM2_Object *o)
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table.
  *
  * Not exercised: no drive here opens menu row 0xC. */
-static inline AM2_Object *OurLeaderUnitUidLocal(void)
-{
-    int32_t owner = *(const int32_t *)&g_defaultOwner;
-    uint32_t uid;
-
-    if (owner == *(const int32_t *)&g_defaultOwner) {
-        uid = g_ourLeaderUid;
-        return LookupByUID(uid);
-    }
-    if (owner >= 0 && owner < AM2_COMM_SLOTS) {
-        AM2_PtrList *const *slot =
-            &((AM2_PtrList *const *)g_armyObjLists)[owner];
-        int32_t i;
-
-        for (i = 0; i < (*slot)->count; i++) {
-            AM2_Object *o = LookupByUID(
-                (uint32_t)(uintptr_t)(*slot)->items[i]);
-
-            if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
-                return o;
-        }
-    }
-    return (AM2_Object *)0;
-}
 int32_t __cdecl PointerPickRepair(AM2_Object *o)
 {
     AM2_Object *leader;
@@ -17765,7 +17741,7 @@ int32_t __cdecl PointerPickRepair(AM2_Object *o)
     /* Neither an item nor a vehicle: no health test at all -- see above. */
 
 
-    leader = OurLeaderUnitUidLocal();
+    leader = OurLeaderUnit();
     if (!leader)
         return 0;
 
