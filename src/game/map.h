@@ -69,6 +69,25 @@ AM2_Point __cdecl PointOfTile(int32_t tile);
  * rather than packed into one dword. */
 void __cdecl TileToXY(uint16_t tile, int32_t *x, int32_t *y);
 
+/* One placed object of a map's OLAY chunk (AM2_MAPREC_BYTES in memory, 0x10
+ * of it from the file): a type, a kind and a position, then the attributes
+ * the ATTR chunk fills in by index. The position is two dwords on disk and
+ * the builder reads each as a short. */
+typedef struct AM2_MapRec {
+    int32_t type;                   /* +0x00 MAPREC_OFF_TYPE */
+    int32_t kind;                   /* +0x04 MAPREC_OFF_KIND */
+    union { int32_t x; int16_t x16; };  /* +0x08 MAPREC_OFF_X */
+    union { int32_t y; int16_t y16; };  /* +0x0C MAPREC_OFF_Y */
+    uint8_t trig;                   /* +0x10 MAPREC_OFF_TRIG */
+    uint8_t field11;                /* +0x11 written 0 */
+    uint8_t elev;                   /* +0x12 MAPREC_OFF_ELEV */
+    uint8_t owner;                  /* +0x13 MAPREC_OFF_OWNER, 0 = none */
+    uint8_t move;                   /* +0x14 MAPREC_OFF_MOVE */
+    int8_t  numb;                   /* +0x15 MAPREC_OFF_NUMB */
+    uint8_t _pad16[2];
+    char   *script;                 /* +0x18 MAPREC_OFF_SCRIPT, owned */
+} AM2_MapRec;
+
 /* One map of the level table (ADDR_LEVEL_TABLE, AM2_LEVEL_RECORD_SIZE):
  * a line of campaign.txt, bootcamp.txt or mpmaps.txt, whose header comment
  * names the columns. Every string is 0x40 bytes (AM2_LEVEL_STR_BYTES). */

@@ -1499,7 +1499,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     uint32_t  size, formSize;
     int32_t   consumed, plane, i;
     int32_t   tlayDone = 0;
-    uint8_t  *objs = 0;
+    AM2_MapRec *objs = 0;
     int32_t   objCount = 0, nfields;
 
     SetGameDir(folder);
@@ -1692,7 +1692,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
          * that the tail turns into objects and frees. */
         case AM2_IFF_OLAY: {
             int32_t first = 0, n, recCount, item, junk1, junk2;
-            uint8_t *rec;
+            AM2_MapRec *rec;
 
             /* The record count goes through v, and `first` stays 0 when a
              * chunk declares none -- the indices below are then absolute. */
@@ -1701,10 +1701,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (v > 0) {
                 first = objCount;
                 objCount += v;
-                objs = (uint8_t *)am2_realloc(objs, (size_t)objCount * 0x1C);
-                rec  = objs + (size_t)first * 0x1C;
+                objs = (AM2_MapRec *)am2_realloc(objs, (size_t)objCount * 0x1C);
+                rec  = &objs[first];
                 memset(rec, 0, (size_t)v * 0x1C);
-                for (n = first; n < objCount; n++, rec += 0x1C) {
+                for (n = first; n < objCount; n++, rec++) {
                     orig_map_fread(rec, 0x10, 1, f);
                     consumed += 0x10;
                 }
@@ -1760,26 +1760,26 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 }
 
                 if (index >= 0) {
-                    uint8_t *r = objs + (size_t)index * 0x1C;
+                    AM2_MapRec *r = &objs[index];
                     uint8_t  owner;
 
-                    r[0x14] = (uint8_t)move;
+                    r->move = (uint8_t)move;
                     if (elow != 0) {
-                        r[0x12] = (uint8_t)((elow >> 4) & 0xF);
+                        r->elev = (uint8_t)((elow >> 4) & 0xF);
                         owner   = (uint8_t)(elow & 0xF);
                     } else {
-                        r[0x12] = (uint8_t)elev;
+                        r->elev = (uint8_t)elev;
                         owner   = (uint8_t)ownr;
                     }
-                    r[0x10] = (uint8_t)trig;
-                    r[0x13] = owner;
-                    r[0x11] = 0;
-                    r[0x15] = (uint8_t)numb;
+                    r->trig = (uint8_t)trig;
+                    r->owner = owner;
+                    r->field11 = 0;
+                    r->numb = (int8_t)numb;
 
                     if (strlen(scri) != 0) {
-                        *(char **)(r + 0x18) =
+                        r->script =
                             (char *)am2_malloc(strlen(scri) + 1);
-                        strcpy(*(char **)(r + 0x18), scri);
+                        strcpy(r->script, scri);
                     }
                 } else {
                     am2_log("Missing index attribute for item #%d!\n", item);
@@ -1853,19 +1853,19 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (objCount > 0 && objs != 0) {
     if (g_loadPending == 0)
         for (i = 0; i < objCount; i++) {
-            uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
-#define type ((int32_t)*(const int32_t *)(r + MAPREC_OFF_TYPE))
-#define kind (*(const int32_t *)(r + MAPREC_OFF_KIND))  /* re-read at each use */
+            AM2_MapRec *r     = &objs[i];
+#define type (r->type)
+#define kind (r->kind)  /* re-read at each use */
             int32_t   army;
             int32_t   flags = 0;
             void     *obj = 0;
             AM2_Point at;
 
-            if (r[MAPREC_OFF_TRIG] & 0x20)
+            if (r->trig & 0x20)
                 flags = 4;
-            if (r[MAPREC_OFF_TRIG] & 0x08)
+            if (r->trig & 0x08)
                 flags |= 0x810;
-            army  = r[MAPREC_OFF_OWNER] == 0 ? 4 : (int32_t)r[MAPREC_OFF_OWNER] - 1;
+            army  = r->owner == 0 ? 4 : (int32_t)r->owner - 1;
 
             /* The point is read from the record after each arm's sprite
              * lookup, not before it. */
@@ -1874,13 +1874,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 int32_t key = PackKey(type + 0x14, kind, 0);
                 void   *spr = PreloadSpriteByKey(key, 0x1000, 1);
 
-                at.x = *(const int16_t *)(r + MAPREC_OFF_X);
-                at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
+                at.x = r->x16;
+                at.y = r->y16;
                 if (spr != 0) {
                     at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
                     at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
                 }
-                obj = CreateItem(*(char **)(r + MAPREC_OFF_SCRIPT), army,
+                obj = CreateItem(r->script, army,
                                  PackKey(type + 0x14, kind, 0),
                                  at, flags, 1, 0);
                 /* No null test of its own: ObjIsWatchedKind answers 0 for one. */
@@ -1904,7 +1904,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                  * it through the same local. (A prior reconstruction passed
                  * zero, which CreateWeapon turns into 3 rounds, and a crate
                  * with NUMB=30 came out under-stocked.) */
-                int32_t  numb = *(const int8_t *)(r + MAPREC_OFF_NUMB);
+                int32_t  numb = r->numb;
                 int32_t  aai, key = PackKey(type + 0x14, kind, 0);
                 int32_t  code = kind;
                 void    *spr;
@@ -1932,8 +1932,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     continue;
 
                 spr = PreloadSpriteByKey(key, 0x1000, 1);
-                at.x = *(const int16_t *)(r + MAPREC_OFF_X);
-                at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
+                at.x = r->x16;
+                at.y = r->y16;
                 if (spr != 0) {
                     at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
                     at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
@@ -1948,7 +1948,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                  * returns a word, and its own callers here would widen it. */
                 SettlePointInRegion(((int32_t (__cdecl *)(AM2_Point))(void *)TileOfPoint)(at),
                                     &settled);
-                obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
+                obj = CreateWeapon(r->script, 4,
                                       aai, at, flags,
                                       numb, 1, 0);
             }
@@ -1961,13 +1961,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     g_tileAttrs;
                 int32_t tile = ((AM2_Object *)obj)->tile;
 
-                ApplyHeightItem((AM2_Object *)obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
+                ApplyHeightItem((AM2_Object *)obj, (int8_t)attrs[tile] + r->elev);
             }
         }
 
     am2_log("freeing temporary map load data...\n");
     for (i = 0; i < objCount; i++) {
-        char **owned = (char **)(objs + (size_t)i * 0x1C + 0x18);
+        char **owned = &objs[i].script;
 
         if (*owned != 0)
             am2_free(*owned);
