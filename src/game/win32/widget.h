@@ -450,7 +450,14 @@ struct AM2_TextList : AM2_ListBox {
 
 struct AM2_ArrowBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_ArrowBar[AM2_ARROWBAR_SIZE - sizeof(AM2_Widget)];
+    AM2_Widget *list;               /* 0x0058  ARROWBAR_OFF_LIST, the list it scrolls */
+    AM2_Widget *up;                 /* 0x005C  ARROWBAR_OFF_UP */
+    AM2_Widget *down;               /* 0x0060  ARROWBAR_OFF_DOWN */
+    AM2_Sprite *sprite0;            /* 0x0064  ARROWBAR_OFF_SPRITE0, the thumb */
+    AM2_Sprite *sprite1;            /* 0x0068  ARROWBAR_OFF_SPRITE1 */
+    int32_t     field6C;            /* 0x006C */
+    int32_t     shift;              /* 0x0070  ARROWBAR_OFF_SHIFT, where the thumb sits */
+    int32_t     span;               /* 0x0074  ARROWBAR_OFF_SPAN */
     AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
     explicit AM2_ArrowBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ArrowBar();
@@ -458,7 +465,14 @@ struct AM2_ArrowBar : AM2_Widget {
 
 struct AM2_ScrollBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_ScrollBar[AM2_SCROLLBAR_SIZE - sizeof(AM2_Widget)];
+    uint8_t     pad58[0x64 - 0x58];
+    AM2_Sprite *bar;                /* 0x0064  SCROLLBAR_OFF_BAR, the bar the paint draws */
+    int32_t     field68;            /* 0x0068 */
+    int32_t     shift;              /* 0x006C  SCROLLBAR_OFF_SHIFT, added to the centred x */
+    int32_t     span;               /* 0x0070  SCROLLBAR_OFF_SPAN, taken off the width first */
+    int32_t     pos;                /* 0x0074  SCROLLBAR_OFF_POS, 0..range */
+    int32_t     range;              /* 0x0078  SCROLLBAR_OFF_RANGE */
+    void (__cdecl *onChange)(AM2_Widget *); /* 0x007C  SCROLLBAR_OFF_ONCHANGE */
     AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span);
     explicit AM2_ScrollBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ScrollBar();
@@ -672,7 +686,10 @@ struct AM2_DlgMessageScreen : AM2_ScreenBase {
 };
 struct AM2_AudioDialogScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_AUDIO_OPTIONS_SIZE - sizeof(AM2_ScreenBase)];
+    AM2_ScrollBar *bars[3];         /* 0x0064  AUDIO_OFF_BARS: effects, music, voice;
+                                     *         the base ends at 0x64 */
+    int32_t        saved[3];        /* 0x0070  AUDIO_OFF_SAVED, the volumes on entry */
+    uint8_t        pad7C_[AM2_AUDIO_OPTIONS_SIZE - 0x7C];
     AM2_AudioDialogScreen(const char *bmp, int32_t flag);
     ~AM2_AudioDialogScreen();
 };

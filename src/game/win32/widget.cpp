@@ -757,6 +757,10 @@ static_assert(sizeof(AM2_HudSquad)           == AM2_HUD_SQUAD_BYTES, "hud squad 
 static_assert(offsetof(AM2_ListBox, topRow)  == LIST_OFF_TOP_ROW,   "list top row");
 static_assert(offsetof(AM2_ListBox, blinker) == LIST_OFF_BLINKER,   "list blinker");
 static_assert(sizeof(AM2_ListBox)            == AM2_LISTBOX_SIZE,   "list box size");
+static_assert(offsetof(AM2_ArrowBar, span)    == ARROWBAR_OFF_SPAN,  "arrow bar span");
+static_assert(sizeof(AM2_ArrowBar)           == AM2_ARROWBAR_SIZE,  "arrow bar size");
+static_assert(offsetof(AM2_ScrollBar, onChange) == SCROLLBAR_OFF_ONCHANGE, "scroll bar change");
+static_assert(sizeof(AM2_ScrollBar)          == AM2_SCROLLBAR_SIZE, "scroll bar size");
 static_assert(offsetof(AM2_MpOptionsScreen, boxes) == OPTION_PARENT_BOXES, "option boxes");
 static_assert(sizeof(AM2_MpOptionsScreen)    == AM2_MP_OPTIONS_SIZE, "mp options size");
 static_assert(offsetof(AM2_MpPanelScreen, names) == MP_PANEL_OFF_NAMES, "mp panel names");
@@ -2274,13 +2278,13 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
 static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
 {
     AM2_Widget *bar = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
-    uint8_t    *b   = (uint8_t *)bar;
+    AM2_ScrollBar    *b   = (AM2_ScrollBar *)bar;
     const AM2_Sprite *thumb;
     void      (__cdecl *onChange)(AM2_Widget *);
 
     /* The position and range are re-read from the bar at each use. */
-#define POS   (*(int32_t *)(b + SCROLLBAR_OFF_POS))
-#define RANGE (*(const int32_t *)(b + SCROLLBAR_OFF_RANGE))
+#define POS   (b->pos)
+#define RANGE (b->range)
     /* The guard skips the MOVE and not the NOTIFICATION -- both arms fall
      * into the same tail in the original, so holding an arrow against the end
      * of the track keeps calling onChange with an unchanged position. */
@@ -2290,18 +2294,17 @@ static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
 
         /* Not ThumbShift: this one multiplies in float with the travel
          * last, and the image loads its operands in that order. */
-        thumb = *(const AM2_Sprite *const *)(b + SCROLLBAR_OFF_BAR);
-        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+        thumb = b->bar;
+        b->shift =
             (int32_t)((float)POS / RANGE
-                      * (*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                      * (b->span
                          - thumb->bounds.right));
         RepaintAncestor(bar, bar->rect);
     }
 #undef POS
 #undef RANGE
 
-    onChange = *(void (__cdecl *const *)(AM2_Widget *))
-                   (b + SCROLLBAR_OFF_ONCHANGE);
+    onChange = b->onChange;
     if (onChange)
         onChange(bar);
 }
@@ -4134,8 +4137,7 @@ static inline int32_t HudSquadVehicleIcon(const AM2_Object *veh)
 
 
 
-#define AUDIO_BAR(i)       (((AM2_Widget **)((uint8_t *)w + AUDIO_OFF_BARS))[i])
-#define SB_FIELD(bar, off) (*(int32_t *)((uint8_t *)(bar) + (off)))
+#define AUDIO_BAR(i)       (this->bars[i])
 
 /* AimInit -- original 0x00412090, one caller.
  *
@@ -10795,13 +10797,13 @@ AM2_MpName::AM2_MpName(const char *text_, AM2_Rect box, int32_t flag_, uint8_t i
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_ButtonBase *self = (AM2_ButtonBase *)w;
 
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     AM2_CTOR_VTABLE(w, VTABLE_MP_NAME);
     ::WidgetScreenRect(w);
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpName;
-    *(int32_t *)(self + MPBTN_OFF_ROW) = row;
+    *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpName;
+    self->row = row;
 }
 
 /* 0x00432A70, vtable slot 1 of VTABLE_MP_NAME -- one row of the multiplayer
@@ -11039,7 +11041,7 @@ AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_ButtonBase *self = (AM2_ButtonBase *)w;
 
     AM2_CTOR_VTABLE(w, VTABLE_MP_COLOUR);
     {
@@ -11050,8 +11052,8 @@ AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
         *(AM2_Rect *)&w->x = box;
     }
     ::WidgetScreenRect(w);
-    *(int32_t *)(self + MPBTN_OFF_ROW)       = row;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpColour;
+    self->row       = row;
+    *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpColour;
 }
 
 void __cdecl OnMpColour(AM2_Widget *w)
@@ -11116,9 +11118,9 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
 {
     AM2_Widget *w = this;
 
-    const uint8_t *self = (const uint8_t *)w;
+    const AM2_ButtonBase *self = (const AM2_ButtonBase *)w;
     uint8_t       *comm = g_commObject;
-    int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
+    int32_t        row  = self->row;
     int32_t        which = 4;
 
     if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
@@ -11134,7 +11136,7 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_ButtonBase *self = (AM2_ButtonBase *)w;
 
     AM2_CTOR_VTABLE(w, VTABLE_MP_TEAM);
     {
@@ -11145,10 +11147,10 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
         *(AM2_Rect *)&w->x = box;
     }
     ::WidgetScreenRect(w);
-    *(int32_t *)(self + MPBTN_OFF_ROW)        = row;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = (uint32_t)(uintptr_t)OnMpTeamLeft;
-    *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) = (uint32_t)(uintptr_t)OnMpTeamRight;
-    *(int32_t *)(self + BUTTON_OFF_REPEATS)   = 1;
+    self->row        = row;
+    *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_LEFT)  = (uint32_t)(uintptr_t)OnMpTeamLeft;
+    *(uint32_t *)((uint8_t *)self + BUTTON_OFF_ON_RIGHT) = (uint32_t)(uintptr_t)OnMpTeamRight;
+    *(int32_t *)((uint8_t *)self + BUTTON_OFF_REPEATS)   = 1;
 }
 
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
@@ -11228,9 +11230,9 @@ void __attribute__((thiscall)) AM2_Widget::MpTeamPaint(RECT clip)
 {
     AM2_Widget *w = this;
 
-    const uint8_t *self = (const uint8_t *)w;
+    const AM2_ButtonBase *self = (const AM2_ButtonBase *)w;
     const uint8_t *comm = g_commObject;
-    int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
+    int32_t        row  = self->row;
     int32_t        team = *(const int32_t *)(comm + COMM_OFF_PLAYERS
                                              + row * COMM_PLAYER_STRIDE
                                              + COMM_SLOT_OFF_TEAM);
@@ -12128,61 +12130,61 @@ AM2_AudioDialogScreen::AM2_AudioDialogScreen(const char *bmp, int32_t flag)
                             parent, 0x92);
     ::WidgetAddChild(parent, AUDIO_BAR(0));
     parent->focusedChild = AUDIO_BAR(0);
-    SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) = (g_volumeAtZero + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
-    if (SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) < 0)
-        SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) = 0;
+    AUDIO_BAR(0)->pos = (g_volumeAtZero + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (AUDIO_BAR(0)->pos < 0)
+        AUDIO_BAR(0)->pos = 0;
     {
-        uint8_t *b = (uint8_t *)AUDIO_BAR(0);
+        AM2_ScrollBar *b = AUDIO_BAR(0);
 
-        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
-                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
-                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
-                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+        b->shift =
+            (int32_t)((long double)b->pos
+                      / (long double)b->range
+                      * (long double)(b->span
+                          - (b->bar)->bounds.right));
     }
-    SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_FLAG50) = 0;
-    *(uint32_t *)((uint8_t *)AUDIO_BAR(0) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeEffects;
+    AUDIO_BAR(0)->flag50 = 0;
+    AUDIO_BAR(0)->onChange = OnVolumeEffects;
 
     AUDIO_BAR(1) = new AM2_ScrollBar(*RectSet(AM2_TEMP(AM2_Rect), offX + 0x25, offY + 0x7D, 0xBA, 0x15),
                             parent, 0x92);
     ::WidgetAddChild(parent, AUDIO_BAR(1));
-    SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) = (g_streamVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
-    if (SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) < 0)
-        SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) = 0;
+    AUDIO_BAR(1)->pos = (g_streamVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (AUDIO_BAR(1)->pos < 0)
+        AUDIO_BAR(1)->pos = 0;
     {
-        uint8_t *b = (uint8_t *)AUDIO_BAR(1);
+        AM2_ScrollBar *b = AUDIO_BAR(1);
 
-        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
-                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
-                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
-                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+        b->shift =
+            (int32_t)((long double)b->pos
+                      / (long double)b->range
+                      * (long double)(b->span
+                          - (b->bar)->bounds.right));
     }
-    SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_FLAG50) = 0;
-    *(uint32_t *)((uint8_t *)AUDIO_BAR(1) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeMusic;
+    AUDIO_BAR(1)->flag50 = 0;
+    AUDIO_BAR(1)->onChange = OnVolumeMusic;
 
     AUDIO_BAR(2) = new AM2_ScrollBar(*RectSet(AM2_TEMP(AM2_Rect), offX + 0x25, offY + 0xC2, 0xBA, 0x15),
                             parent, 0x92);
     ::WidgetAddChild(parent, AUDIO_BAR(2));
-    SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) = (g_voiceVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
-    if (SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) < 0)
-        SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) = 0;
+    AUDIO_BAR(2)->pos = (g_voiceVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (AUDIO_BAR(2)->pos < 0)
+        AUDIO_BAR(2)->pos = 0;
     {
-        uint8_t *b = (uint8_t *)AUDIO_BAR(2);
+        AM2_ScrollBar *b = AUDIO_BAR(2);
 
-        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
-                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
-                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
-                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+        b->shift =
+            (int32_t)((long double)b->pos
+                      / (long double)b->range
+                      * (long double)(b->span
+                          - (b->bar)->bounds.right));
     }
-    SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_FLAG50) = 0;
-    *(uint32_t *)((uint8_t *)AUDIO_BAR(2) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeVoice;
+    AUDIO_BAR(2)->flag50 = 0;
+    AUDIO_BAR(2)->onChange = OnVolumeVoice;
 
     /* Kept so CANCEL can put them back. */
-    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[0] = g_volumeAtZero;
-    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[1] = g_streamVolume;
-    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[2] = g_voiceVolume;
+    this->saved[0] = g_volumeAtZero;
+    this->saved[1] = g_streamVolume;
+    this->saved[2] = g_voiceVolume;
 
     ::WidgetAddChild(parent, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                    (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -12239,7 +12241,7 @@ void __cdecl OnAudioCancel(AM2_Widget *w)
     PlaySoundAt(2, 0, 0, 0, 0);
 
     if (screen) {
-        saved = (const int32_t *)((const uint8_t *)screen + AUDIO_OFF_SAVED);
+        saved = ((const AM2_AudioDialogScreen *)screen)->saved;
         g_volumeAtZero = saved[0];
         g_streamVolume = saved[1];
         g_voiceVolume  = saved[2];
@@ -12256,7 +12258,7 @@ void __cdecl OnAudioCancel(AM2_Widget *w)
 void __cdecl OnAudioOk(AM2_Widget *w)
 {
     AM2_Widget       *screen;
-    AM2_Widget *const *bars;
+    AM2_ScrollBar *const *bars;
 
     if (g_gameState == 2)
         screen = w->parent;
@@ -12267,13 +12269,13 @@ void __cdecl OnAudioOk(AM2_Widget *w)
 
     /* NOT BarVolume: the OK path passes the raw (pos - 20) * 100, so a bar
      * at the left end commits -2000 here where dragging it played silence. */
-    bars = (AM2_Widget *const *)((const uint8_t *)screen + AUDIO_OFF_BARS);
+    bars = ((const AM2_AudioDialogScreen *)screen)->bars;
     ApplyVolumes(
-        (*(const int32_t *)((const uint8_t *)bars[0] + SCROLLBAR_OFF_POS)
+        (bars[0]->pos
          - AM2_SCROLLBAR_RANGE) * 100,
-        (*(const int32_t *)((const uint8_t *)bars[1] + SCROLLBAR_OFF_POS)
+        (bars[1]->pos
          - AM2_SCROLLBAR_RANGE) * 100,
-        (*(const int32_t *)((const uint8_t *)bars[2] + SCROLLBAR_OFF_POS)
+        (bars[2]->pos
          - AM2_SCROLLBAR_RANGE) * 100);
     SetStreamVolume(0, 0);
     ReturnToOptions();
@@ -14831,8 +14833,7 @@ void __cdecl CheckboxToggle(AM2_Widget *w)
     PlaySoundAt(1, 0, 0, 0, 0);
     WidgetVPaint(w, w->rect);
 
-    onChange = *(void (__cdecl *const *)(AM2_Widget *))
-                   ((uint8_t *)self + CHECK_OFF_ON_CHANGE);
+    onChange = self->onChange;
     if (onChange)
         onChange(w);
 }
@@ -15669,16 +15670,16 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
         bar = lb->arrowBar;
         if (bar) {
-            uint8_t          *b = (uint8_t *)bar;
+            AM2_ArrowBar          *b = (AM2_ArrowBar *)bar;
             const AM2_Sprite *thumb =
-                *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
+                b->sprite0;
             const AM2_ListRows *r =
                 lb->rows;
 
-            *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+            b->shift =
                 ThumbShift(lb->topRow,
                            r->count - lb->visible,
-                           *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                           b->span
                            - thumb->bounds.bottom);
 
             bar = lb->arrowBar;
@@ -15744,7 +15745,7 @@ void __cdecl OnArrowDown(AM2_Widget *w)
 AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50)
 {
     AM2_Widget *w = this;
-    uint8_t    *self = (uint8_t *)w;
+    AM2_ArrowBar    *self = (AM2_ArrowBar *)w;
     AM2_Widget *arrow;
 
     AM2_CTOR_VTABLE(w, VTABLE_ARROWBAR);
@@ -15753,29 +15754,29 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y, 0x13, 9),
                           (const char *)AM2_BMP_UPARROW1,
                           (const char *)AM2_BMP_UPARROW2, kOnArrowUp);
-    *(AM2_Widget **)(self + ARROWBAR_OFF_UP) = arrow;
+    self->up = arrow;
     ::WidgetAddChild(parent, arrow);
-    (*(AM2_Widget **)(self + ARROWBAR_OFF_UP))->flag50 = flag50;
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + ARROWBAR_OFF_UP) + ARROW_OFF_FLAG5C) = 1;
+    (self->up)->flag50 = flag50;
+    *(int32_t *)((uint8_t *)self->up + ARROW_OFF_FLAG5C) = 1;
 
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y + box.bottom - 9, 0x13, 9),
                           (const char *)AM2_BMP_DNARROW1,
                           (const char *)AM2_BMP_DNARROW2, kOnArrowDown);
-    *(AM2_Widget **)(self + ARROWBAR_OFF_DOWN) = arrow;
+    self->down = arrow;
     ::WidgetAddChild(parent, arrow);
-    (*(AM2_Widget **)(self + ARROWBAR_OFF_DOWN))->flag50 = flag50;
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + ARROWBAR_OFF_DOWN) + ARROW_OFF_FLAG5C) = 1;
+    (self->down)->flag50 = flag50;
+    *(int32_t *)((uint8_t *)self->down + ARROW_OFF_FLAG5C) = 1;
 
     w->flag50 = flag50;
-    *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0) = PreloadSpriteName(b0, 1, 1);
-    *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1) = PreloadSpriteName(b1, 1, 1);
+    self->sprite0 = PreloadSpriteName(b0, 1, 1);
+    self->sprite1 = PreloadSpriteName(b1, 1, 1);
     ::WidgetScreenRect(w);
 
-    *(int32_t *)(self + ARROWBAR_OFF_SPAN) = span;
-    *(int32_t *)(self + ARROWBAR_OFF_LIST) = 0;
+    self->span = span;
+    *(int32_t *)((uint8_t *)self + ARROWBAR_OFF_LIST) = 0;
     w->unknown48              = 0;
-    *(int32_t *)(self + ARROWBAR_OFF_SHIFT) = 0;
-    *(int32_t *)(self + 0x6C) = 0;
+    self->shift = 0;
+    *(int32_t *)((uint8_t *)self + 0x6C) = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowDelete(int32_t flags)
@@ -15818,16 +15819,16 @@ AM2_ArrowBar::~AM2_ArrowBar()
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self = (uint8_t *)w;
+    AM2_ArrowBar    *self = (AM2_ArrowBar *)w;
     AM2_Sprite *spr;
 
     AM2_CTOR_VTABLE(w, VTABLE_ARROWBAR);
 
-    spr = *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0);
+    spr = self->sprite0;
     if (spr)
         ReleaseSprite(spr);
 
-    ReleaseSprite(*(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1));
+    ReleaseSprite(self->sprite1);
 }
 
 /* 0x00455C10, thiscall, `ret 0x10`. Repaint a widget through the nearest
@@ -15920,11 +15921,11 @@ void __attribute__((thiscall)) AM2_Widget::MultiUpdateThunk()
 void __attribute__((thiscall)) AM2_ArrowBarOps::ArrowBarFollowEnd()
 {
     AM2_Widget *bar = (AM2_Widget *)(void *)this;
-    uint8_t    *b   = (uint8_t *)bar;
+    AM2_ArrowBar    *b   = (AM2_ArrowBar *)bar;
 
     /* The list pointer is read at every use, and the store through it is
      * what makes VC6 load it again for the paint -- the image does too. */
-#define LIST    (*(AM2_Widget **)(b + ARROWBAR_OFF_LIST))
+#define LIST    (b->list)
 #define TOP     (*(int32_t *)((uint8_t *)LIST + LIST_OFF_TOP_ROW))
 #define COUNT   (**(const int32_t *const *)((uint8_t *)LIST + LIST_OFF_ROWS))
 #define VISIBLE (*(const int32_t *)((uint8_t *)LIST + LIST_OFF_VISIBLE))
@@ -15936,10 +15937,10 @@ void __attribute__((thiscall)) AM2_ArrowBarOps::ArrowBarFollowEnd()
 
     WidgetVPaint(LIST, LIST->rect);
 
-    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+    b->shift =
         ThumbShift(TOP, COUNT - VISIBLE,
-                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
-                   - (*(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0))
+                   b->span
+                   - (b->sprite0)
                          ->bounds.bottom);
     RepaintAncestor(bar, bar->rect);
 #undef LIST
@@ -15973,7 +15974,7 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
     AM2_Widget       *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
     const AM2_Sprite *thumb;
     uint8_t          *l;
-    uint8_t          *b = (uint8_t *)bar;
+    AM2_ArrowBar          *b = (AM2_ArrowBar *)bar;
     int32_t           top;
     int32_t           visible;
     int32_t           count;
@@ -15992,19 +15993,19 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
         /* already visible -- nothing stored, and still repainted */
     }
 
-    list = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);   /* re-read, as the original */
+    list = b->list;   /* re-read, as the original */
     WidgetVPaint(list, list->rect);
 
-    list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
+    list    = b->list;
     l       = (uint8_t *)list;
     top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
     visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
     count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
 
-    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
-    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+    thumb = b->sprite0;
+    b->shift =
         ThumbShift(top, count - visible,
-                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                   b->span
                    - thumb->bounds.bottom);
     ::RepaintAncestor(bar, bar->rect);
 }
@@ -16043,7 +16044,7 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
 {
     AM2_Widget *w = this;
 
-    uint8_t    *self = (uint8_t *)w;
+    AM2_ScrollBar    *self = (AM2_ScrollBar *)w;
     AM2_Widget *arrow;
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     AM2_CTOR_VTABLE(w, VTABLE_SCROLLBAR);
@@ -16051,32 +16052,32 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y, 9, 0x13),
                           (const char *)AM2_BMP_LTARROW1,
                           (const char *)AM2_BMP_LTARROW2, kOnArrowLeft);
-    *(AM2_Widget **)(self + 0x5C) = arrow;
+    *(AM2_Widget **)((uint8_t *)self + 0x5C) = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x5C)
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)self + 0x5C)
                  + ARROW_OFF_FLAG5C) = 1;
 
     arrow = new AM2_Arrow(w, *RectSet(AM2_TEMP(AM2_Rect), w->x + box.right - 9, w->y, 9, 0x13),
                           (const char *)AM2_BMP_RTARROW1,
                           (const char *)AM2_BMP_RTARROW2, kOnArrowRight);
-    *(AM2_Widget **)(self + 0x60) = arrow;
+    *(AM2_Widget **)((uint8_t *)self + 0x60) = arrow;
     ::WidgetAddChild(parent, arrow);
-    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x60)
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)self + 0x60)
                  + ARROW_OFF_FLAG5C) = 1;
 
-    *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR) =
+    self->bar =
         PreloadSpriteName((const char *)((void *)(uintptr_t)(AM2_BMP_HSCROLLBAR)),
                              1, 1);
     ::WidgetScreenRect(w);
 
-    *(int32_t *)(self + SCROLLBAR_OFF_SPAN)  = span;
-    *(int32_t *)(self + 0x58)                = 0;
+    self->span  = span;
+    *(int32_t *)((uint8_t *)self + 0x58)                = 0;
     w->unknown48                             = 0;
-    *(int32_t *)(self + SCROLLBAR_OFF_POS)   = 0;
-    *(int32_t *)(self + SCROLLBAR_OFF_RANGE) = AM2_SCROLLBAR_RANGE;
-    *(int32_t *)(self + SCROLLBAR_OFF_SHIFT) = 0;
-    *(int32_t *)(self + 0x68)                = 0;
-    *(uint32_t *)(self + SCROLLBAR_OFF_ONCHANGE) = 0;
+    self->pos   = 0;
+    self->range = AM2_SCROLLBAR_RANGE;
+    self->shift = 0;
+    *(int32_t *)((uint8_t *)self + 0x68)                = 0;
+    *(uint32_t *)((uint8_t *)self + SCROLLBAR_OFF_ONCHANGE) = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScrollBarDelete(int32_t flags)
@@ -16093,8 +16094,8 @@ AM2_ScrollBar::~AM2_ScrollBar()
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
-    AM2_Sprite *bar = *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR);
+    AM2_ScrollBar *self = (AM2_ScrollBar *)w;
+    AM2_Sprite *bar = self->bar;
 
     AM2_CTOR_VTABLE(w, VTABLE_SCROLLBAR);
     /* Tested here, where the icon's identical release is not. */
@@ -16106,7 +16107,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
 {
 #define w this
 
-    uint8_t    *self = (uint8_t *)w;
+    AM2_ScrollBar    *self = (AM2_ScrollBar *)w;
     AM2_Sprite *bar;
     int32_t     x;
     int32_t     y;
@@ -16116,7 +16117,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
 
     ::WidgetScreenRect(w);
 
-    bar = *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR);
+    bar = self->bar;
     if (!bar)
         return;
 
@@ -16127,9 +16128,9 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
      * uses. A bar shifted past its track is clipped by its own extent. Each
      * axis is finished before the next is started. */
     x = box.left = w->rect.left
-        + ((w->rect.right - *(const int32_t *)(self + SCROLLBAR_OFF_SPAN)
+        + ((w->rect.right - self->span
             - w->rect.left) >> 1)
-        + *(const int32_t *)(self + SCROLLBAR_OFF_SHIFT);
+        + self->shift;
     box.right  = bar->bounds.right + x;
     y = box.top = w->rect.top
         + ((w->rect.bottom - w->rect.top - bar->bounds.bottom) >> 1);
