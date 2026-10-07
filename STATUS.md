@@ -215,6 +215,15 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **ObjMoveAlongFacing 30 -> 7** (2026-10-07).
+    - The row count is re-read at each use; there is no `nrows` local.
+    - The sub-row loop reads row 0 through a `lead` pointer. It is
+      initialised to null and set inside the row-0 block: the image's
+      `xor ebp, ebp` at entry.
+    - The final heading is a new variable written after `reverse`'s last
+      read, so VC6 homes it in that dead parameter slot.
+    - Left: `angle` is spilled around RoundTo8, where the image keeps it in
+      al.
   - **AppendTroopState matched** (2026-10-07), 1541 -> 1542. The position
     and facing ages are recomputed from `seq` at each test, with no `age`
     locals. The extra uses of `seq` give it the lower stack slot, as in the

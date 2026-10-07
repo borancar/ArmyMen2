@@ -10891,18 +10891,16 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
 {
     AM2_MapRow *row0;
     AM2_Anim   *anim;
-    int32_t     nrows;
-    int32_t     i = 0;
+    AM2_MapRow *lead = (AM2_MapRow *)0;
+    int32_t     i;
 
     (void)unused;   /* the original never reads its third argument */
 
     if (g_frameDeltaMs == 0)
         return;
 
-    /* The row count is read once and bounds the loop below. */
-    nrows = o->rowSet.count;
     row0 = (AM2_MapRow *)0;
-    if (nrows > 0)
+    if (o->rowSet.count > 0)
         row0 = o->rowSet.rows;
 
     /* Read off a null row0 when there are no rows -- the original's. */
@@ -10910,6 +10908,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
     if (anim != (AM2_Anim *)0) {
 #define scale (g_frameDeltaSec)
         uint8_t     angle = o->facing;
+        uint8_t     heading;
         int32_t     speed;
 
         if ((uint8_t)o->flags & OBJ_FLAG_SNAP_HEADING && row0 != (AM2_MapRow *)0) {
@@ -10919,9 +10918,10 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
                               << (8u - row0->animPlaying->directionBits));
         }
 
+        heading = angle;
         if (reverse != 0)
-            angle = (uint8_t)(angle + 0x80u);
-        angle = (uint8_t)(angle + row0->headingBias);
+            heading = (uint8_t)(heading + 0x80u);
+        heading = (uint8_t)(heading + row0->headingBias);
 
         speed = o->field44;
         if (speed != 0) {
@@ -10932,10 +10932,10 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
             step = speed * scale;
 
             /* Stored and read back: X rounds to float here. */
-            o->subpixelX = (float)((long double)Cos8(angle) * (long double)step
+            o->subpixelX = (float)((long double)Cos8(heading) * (long double)step
                                    + (long double)o->subpixelX);
             /* Never stored: Y stays at 80 bits until its own store below. */
-            ny = (long double)Sin8(angle) * (long double)step
+            ny = (long double)Sin8(heading) * (long double)step
                  + (long double)o->subpixelY;
 
             ix = (int32_t)o->subpixelX;
@@ -10972,6 +10972,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
     }
 
     if (row0 != (AM2_MapRow *)0) {
+        lead = row0;
         if (row0->sprite == (AM2_Sprite *)0)
             return;
         row0->pos     = o->pos;
@@ -10979,12 +10980,12 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
         RowUpdate(row0, 0, g_mapDesc);
     }
 
-    for (i = 1; i < nrows; i++) {
+    for (i = 1; i < o->rowSet.count; i++) {
         AM2_MapRow *r = &o->rowSet.rows[i];
 
         r->pos    = o->pos;
-        r->pos.x += row0->sprite->attachX;
-        r->pos.y += row0->sprite->attachY;
+        r->pos.x += lead->sprite->attachX;
+        r->pos.y += lead->sprite->attachY;
         RowUpdate(r, 0, g_mapDesc);
     }
 
