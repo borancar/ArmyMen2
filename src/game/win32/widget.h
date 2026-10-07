@@ -485,9 +485,15 @@ struct AM2_Edit : AM2_Widget {
 
 struct AM2_MpSpin : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_MpSpin[SPIN_OFF_HANDLER - sizeof(AM2_Widget)];
+    AM2_Widget *edit;               /* 0x0058  SPIN_OFF_EDIT */
+    AM2_Widget *up;                 /* 0x005C  SPIN_OFF_UP */
+    AM2_Widget *down;               /* 0x0060  SPIN_OFF_DOWN */
+    int32_t     min;                /* 0x0064  SPIN_OFF_MIN */
+    int32_t     max;                /* 0x0068  SPIN_OFF_MAX */
+    int32_t     step;               /* 0x006C  SPIN_OFF_STEP */
+    uint8_t     pad70[SPIN_OFF_HANDLER - 0x70];
     void  (__cdecl *handler)(AM2_Widget *);   /* SPIN_OFF_HANDLER */
-    AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
+    AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row);
     explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };
 
@@ -1638,7 +1644,7 @@ static inline AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(AM2_Wi
 
 /* 0x00456300, thiscall. The SPIN control: two arrows and a numeric edit,
  * all laid out from the widget's own rect. */
-static inline AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
+static inline AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row)
 { AM2_Rect box = { left, top, width, height };
   return ::new (w) AM2_MpSpin(box, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
 

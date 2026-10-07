@@ -767,6 +767,10 @@ static_assert(offsetof(AM2_MoviesScreen, buttons) == MOVIES_OFF_BUTTONS, "movies
 static_assert(sizeof(AM2_MoviesScreen)       == AM2_MOVIES_SIZE,    "movies size");
 static_assert(offsetof(AM2_ControlsDialogScreen, rows) == KEYROW_PARENT_ROWS, "controls rows");
 static_assert(sizeof(AM2_ControlsDialogScreen) == AM2_CONTROLS_SIZE,  "controls size");
+static_assert(offsetof(AM2_MpSpin, edit)    == SPIN_OFF_EDIT,      "spin edit");
+static_assert(offsetof(AM2_MpSpin, down)    == SPIN_OFF_DOWN,      "spin down");
+static_assert(offsetof(AM2_MpSpin, step)    == SPIN_OFF_STEP,      "spin step");
+static_assert(offsetof(AM2_MpSpin, handler) == SPIN_OFF_HANDLER,   "spin handler");
 static_assert(offsetof(AM2_Button, spriteNormal) == BUTTON_OFF_SPRITE_NORMAL, "button normal");
 static_assert(offsetof(AM2_Button, ownsSprites)  == BUTTON_OFF_OWNS_SPRITES,  "button owns");
 static_assert(sizeof(AM2_Button)                 == AM2_BUTTON_SIZE,          "button size");
@@ -1292,7 +1296,7 @@ void __attribute__((thiscall)) am2_dtor_AM2_Edit(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
-AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpSpin(void *mem, AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpSpin(void *mem, AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row)
 { return ::new (mem) AM2_MpSpin(box, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
 #endif
 
@@ -9367,12 +9371,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
-        char       *name = (char *)(p + 0x64) + (size_t)i * 0x20;
-        AM2_Widget **names   = (AM2_Widget **)(p + MP_PANEL_OFF_NAMES);
-        AM2_Widget **colours = (AM2_Widget **)(p + MP_PANEL_OFF_COLOURS);
-        AM2_Widget **teams   = (AM2_Widget **)(p + MP_PANEL_OFF_TEAMS);
-        AM2_Widget **rows    = (AM2_Widget **)(p + MP_PANEL_OFF_ARMY_ROWS);
+        char       *name = this->playerNames[i];
         AM2_Widget  *child;
+        AM2_MpSpin  *spin;
+        int32_t      last;        /* the image takes (i == 3) before the new */
         AM2_Rect     box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
 
         name[0] = '\0';
@@ -9391,7 +9393,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * Sixth and last of the fields ::MpPanelConstruct never wrote. It was
          * listed as "apparently unread" and that was wrong -- widget.cpp
          * reads it; the grep that found the six only asked who WRITES. */
-        *(int32_t *)(p + MP_PANEL_OFF_COLOUR_SEL + (uint32_t)i * 4) = -1;
+        this->colourSel[i] = -1;
 
         /* The row's own name: the comm slot's player, or `-- Open --`. */
         {
@@ -9406,16 +9408,16 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 am2_sprintf(name, (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
         }
 
-        names[i] = new AM2_MpName(name,
+        this->names[i] = new AM2_MpName(name,
                                   box,
                                   1,
                                   g_hudColour,
                                   g_backgroundColour,
                                   i);
-        ::WidgetAddChild(w, names[i]);
+        ::WidgetAddChild(w, this->names[i]);
 
-        colours[i] = new AM2_MpColour(0x86, 39 + i * 32, i);
-        ::WidgetAddChild(w, colours[i]);
+        this->colours[i] = new AM2_MpColour(0x86, 39 + i * 32, i);
+        ::WidgetAddChild(w, this->colours[i]);
 
         /* 39, not 37. The colour swatch and the team button are two halves
          * of ONE row -- x 0x86 and 0xBF, the same y -- and the original's own
@@ -9427,8 +9429,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * sixteen times and gives up, and every step after it runs against a
          * panel in the wrong state. The pixels were never going to show this;
          * the widget tree did. */
-        teams[i] = new AM2_MpTeam(0xBF, 39 + i * 32, i);
-        ::WidgetAddChild(w, teams[i]);
+        this->teams[i] = new AM2_MpTeam(0xBF, 39 + i * 32, i);
+        ::WidgetAddChild(w, this->teams[i]);
 
         /* THE ARMY-POINTS SPINNER -- the fourth quarter of this loop, and the
          * one that was missing. The original walks all four arrays off one
@@ -9454,9 +9456,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * 0x515FE0 outright at 0x004305FA -- and that is the SAME array
          * ::MpPanelUpdate prints back into each row, so the constructor seeds
          * what the update displays. */
+        last = i == 3;
         child = (AM2_Widget *)orig_operator_new(0x84);
-        rows[i] = child
-                ? ::new (child) AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + (i == 3)),
+        spin = child
+                ? ::new (child) AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
                                   (g_armyPoints)[i],
                                   0, 0x1388, 0x64, w, MpCommitPoints,
                                   g_hiliteColour,
@@ -9464,32 +9467,33 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                   g_backgroundColour,
                                   i)
                 : 0;
-        ::WidgetAddChild(w, rows[i]);
+        ::WidgetAddChild(w, spin);
+        this->armyRows[i] = spin;
 
         /* Unguarded on purpose. `mov [edi+0x50], 0` at 0x00430842 runs on the
          * constructor's result with no null test, so a failed allocation
          * faults here in the original too -- the same defect orig.h already
          * describes for this constructor and the same policy as LockSurface's
          * uninitialised descriptor: reproduced, not repaired. */
-        rows[i]->flag50 = 0;
+        spin->flag50 = 0;
 
-        /* THE JOINER-DISABLE ARM IS NOT REPRODUCED, and that is a
-         * MEASUREMENT rather than an omission. The original at 0x00430849
-         * reads the comm object's +0x3D8 and, when it is zero, clears flag50
-         * and sets `disabled` on names[i] and the spin's three children.
-         * Written that way, `ctl widgets` came back with 22 disabled nodes
-         * against the original's 2 -- on a run where BOTH sides read that
-         * field as 0, measured through the control socket with the same comm
-         * pointer on each.
-         *
-         * So the arm as transcribed cannot be what the original executes, and
-         * the field being 0 at panel-open on both sides says the condition is
-         * not simply "are we the host" the way COMM_OFF_IS_HOST's name reads.
-         * The original also logs six handshake checksums here where we log
-         * none, so something upstream differs and this block is downstream of
-         * it. Leaving it out costs two disabled nodes; putting it in costs
-         * twenty, and a wrong arm that LOOKS transcribed is worse than an
-         * absent one that is documented. */
+        /* THE JOINER ARM. A panel built while COMM_OFF_IS_HOST is clear
+         * clears flag50 on the row's name and greys the spinner's three
+         * children (flag50 cleared, `disabled` set): the edit, the up arrow
+         * and the down arrow, in the image's order up, down, edit. The name
+         * itself is NOT disabled. An earlier reading disabled it too, and
+         * the resulting count of disabled nodes against the original's was
+         * what got the arm left out. This is the image's arm, store for
+         * store (0x00430849). */
+        if (!AM2_THE_COMM->isHost) {
+            this->names[i]->flag50 = 0;
+            spin->up->flag50 = 0;
+            spin->down->flag50 = 0;
+            spin->edit->flag50 = 0;
+            spin->up->disabled = 1;
+            spin->down->disabled = 1;
+            spin->edit->disabled = 1;
+        }
     }
 
     /* THE RULES-TEXT LIST and its scrollbar. Its rows start EMPTY and are
@@ -16179,7 +16183,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
  * with the spin itself in `b`. That is the reverse of how the battle-join
  * edit is wired and is not a transcription slip: the pushes are in that
  * order and the counts agree either way. */
-AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
+AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row)
     : handler(commit)
 {
     AM2_Widget *w = this;

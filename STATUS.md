@@ -215,6 +215,23 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **The MpPanel constructor gets its joiner arm: 422 -> 339** (2026-10-07),
+    no count change.
+    - The per-row arm that greys the points spinner for a joiner is
+      written as the image has it. It was left out after a transcription
+      that also disabled the row's name, which the image does not do (see
+      docs/screen-mpoptions.md).
+    - The row loop stores through the typed member arrays (names, colours,
+      teams, armyRows, colourSel, playerNames).
+    - The spinner is added before it is stored in armyRows[i].
+    - `i == 3` is taken into a local before the allocation.
+    - AM2_MpSpin's three colours are uint8_t: the image pushes the bytes
+      without zero-extending them. The spinner's own constructor still
+      matches. Its child pointers, range and step are typed fields now.
+    - Still differing: the image walks g_armyPoints with a pointer of its
+      own, which also drives the loop's exit. Ours reaches it relative to
+      the `this` arrays, because the relink folds it into the 0x515FD8
+      aggregate. Splitting the aggregate made it worse.
   - **DrawEffectLayer clamps in 16 bits; RowUpdate 166 -> 150** (2026-10-07),
     no count change.
     - DrawEffectLayer copies each displacement pair as one dword and clamps
@@ -896,10 +913,10 @@ main result so far (details in `src/vc6/README.md`):
     list AND stepped past, so the next rider is skipped for that frame.
     MpPanelScreen's score limit is a spinner for the host OR a label for a
     joiner (one child, its +0x50 cleared); ours gave the host both. The
-    per-row joiner-disable arm at 0x00430849 is still deliberately left
-    out (see the note in the constructor): the image clears names[i]'s
-    +0x50 and sets +0x4C on the spinner's three children (+0x58/+0x5C/
-    +0x60) -- not on names[i] -- if anyone revisits the measurement.
+    per-row joiner-disable arm at 0x00430849 is in since 2026-10-07: the
+    image clears names[i]'s +0x50 and sets +0x4C on the spinner's three
+    children (+0x58/+0x5C/+0x60) -- not on names[i]. See
+    docs/screen-mpoptions.md.
   - **FireWeapon: the flat arm 2 never passes spot.ground** (2026-10-02):
     weapon kind 3 hands CreateMissile the HEIGHT for both a5 and a6
     (`push eax; push eax` at 0x0045FA24), so a ground the caller supplied

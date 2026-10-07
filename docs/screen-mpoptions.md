@@ -320,21 +320,21 @@ With that and the down arrow's `y + height - 9` -- `lea ecx,[edx+eax-9]` at
 0x00456431, where `y + 9` had the two arrows touching -- **every rectangle on
 the panel now matches the original exactly.**
 
-**AND THE JOINER-DISABLE ARM IS LEFT OUT ON PURPOSE, which is a measurement.**
-Transcribed as it reads -- clear flag50 and set `disabled` on names[i] and the
-spin's three children when the comm object's +0x3D8 is zero -- it produced
-**22 disabled nodes against the original's 2**, on a run where BOTH sides read
-that field as 0 through the control socket with the same comm pointer. So the
-arm as written is not what the original executes, and `COMM_OFF_IS_HOST` being
-0 at panel-open on both sides says the condition is not simply "are we the
-host" the way the name reads. The original also logs six handshake checksums
-here where we log none, so something upstream differs and this arm is
-downstream of it. **A wrong arm that LOOKS transcribed is worse than an absent
-one that is documented**, and the count is what settles which you have.
+**THE JOINER-DISABLE ARM IS IN, as the image has it (2026-10-07).** It was
+left out for a while, and the measurement behind that was against a wrong
+transcription. That version set `disabled` on names[i] as well. The image
+(0x00430849) only clears names[i]'s flag50. It sets flag50 = 0 and
+`disabled` = 1 on the spinner's up arrow, down arrow and edit
+(+0x5C/+0x60/+0x58, in that order), and only when COMM_OFF_IS_HOST is zero.
+The byte match required it, and it takes the constructor from 422 to 339 with
+the typed arrays.
 
-Ten disabled nodes remain against two, and the other eight are `MpPanelUpdate`
-applying the same test per row -- pre-existing code, the same open question,
-not a second bug.
+The 22-against-2 count it was dropped for does not argue against the code
+either. MpPanelUpdate applies the same test per row, and ours already showed
+eight more disabled nodes from it than the original did. Where the original
+runs both, it evidently reads the flag as set. So the difference is upstream
+state (the handshake the original logs and ours does not), not this arm. That
+is the open question to chase; the arm is the original's.
 
 **THAT FINDING WAS WRONG AND THE CONTROL WAS UNMATCHED -- SECOND TIME THIS
 SESSION, SAME CAUSE.** It was recorded here that `ADDR_MP_SCRIPT_NAME` reads
