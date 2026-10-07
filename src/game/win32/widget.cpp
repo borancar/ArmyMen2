@@ -5453,7 +5453,7 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 #define mapH (g_mapExtentY)
     const uint8_t  *pal   = g_radarColours;
     AM2_Rect        box;
-    uint8_t        *obj;
+    AM2_Object        *obj;
 
     ::WidgetPaint(w, clip);
 
@@ -5482,56 +5482,56 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 #define phase ((int32_t)((g_gameClockMs \
                           >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES))
 
-    for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
-        const AM2_Object *o = (const AM2_Object *)obj;
+    for (obj = (AM2_Object *)(uint8_t *)FirstItem(); obj; obj = (AM2_Object *)(uint8_t *)NextItem()) {
+        const AM2_Object *o = obj;
         uint32_t          flags;
         int32_t           x;
         int32_t           y;
         int32_t           colour;
         int32_t           blink;
 
-        if (ObjIsTypeIn238(o) && (*(const uint32_t *)(obj + OBJ_OFF_FLAGS)
+        if (ObjIsTypeIn238(o) && (obj->flags
                                 & OBJ_FLAG_DESTROYED)) {
-            const uint8_t *veh;
+            const AM2_Object *veh;
             uint32_t       ride;
 
             if (!ObjIsType2(o))
                 continue;
 
-            ride = *(const uint32_t *)(obj + OBJ_OFF_RIDING);
+            ride = obj->riding;
             if (!ride)
                 continue;
 
-            veh = (const uint8_t *)LookupByUID(ride);
+            veh = LookupByUID(ride);
 
             /* The object's OWN bit 4 short-circuits the vehicle test. The
              * original dereferences `veh` without checking it; reproduced. */
-            if (!(*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4)) {
-                uint32_t vf = *(const uint32_t *)(veh + OBJ_OFF_FLAGS);
+            if (!(obj->flags & OBJ_FLAG_BIT4)) {
+                uint32_t vf = veh->flags;
 
                 if ((vf & OBJ_FLAG_REVEALED) && !(vf & OBJ_FLAG_CONCEALED))
                     continue;
             }
         }
 
-        flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS);
+        flags = obj->flags;
 
         if ((flags & OBJ_FLAG_CONCEALED) && !(flags & OBJ_FLAG_BIT4))
             continue;
         if (!(flags & OBJ_FLAG_REVEALED))
             continue;
-        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0)
+        if (obj->health == 0)
             continue;
 
-        x = *(const int16_t *)(obj + OBJ_OFF_POS)     * w->w / mapW
+        x = obj->pos.x     * w->w / mapW
             + w->rect.left;
-        y = *(const int16_t *)(obj + OBJ_OFF_POS + 2) * w->h / mapH
+        y = obj->pos.y * w->h / mapH
             + w->rect.top;
 
         colour = RadarBlipColour(o, &blink);
 
         /* The flags are read again for this test. */
-        if ((*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4)
+        if ((obj->flags & OBJ_FLAG_BIT4)
             && !blink) {
             uint8_t a = pal[colour * 2];
             uint8_t b = pal[colour * 2 + 1];
@@ -5545,7 +5545,7 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
              * POINTER, not a uid, so distinct objects land on distinct phases
              * and the blips do not all flash together. */
             uint32_t t = g_gameClockMs
-                         + *(const uint32_t *)(obj + OBJ_OFF_OWNER) * 8;
+                         + obj->uid * 8;
 
             DrawBlip3(x, y, pal[((~t) >> AM2_RADAR_BLINK_SHIFT & 1)
                                 + colour * 2]);
@@ -5761,7 +5761,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     AM2_Widget *w = this;
 
     uint8_t        *self = (uint8_t *)w;
-    uint8_t        *obj;
+    AM2_Object        *obj;
     int32_t         i;
 
     if (g_charHandler
@@ -5770,7 +5770,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
 
     ::WidgetUpdate(w);
 
-    obj = (uint8_t *)LookupOwnerObj(g_defaultOwner);
+    obj = (AM2_Object *)(uint8_t *)LookupOwnerObj(g_defaultOwner);
     if (!obj)
         return;
 
@@ -5778,17 +5778,17 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     /* Pass one: the six weapon keys, a ladder whose first match wins and
      * skips the mouse pass. Pass two: the mouse, while the panel is open. */
     if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 0))
-        SelectWeapon((AM2_Object *)obj, 0);
+        SelectWeapon(obj, 0);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 1))
-        SelectWeapon((AM2_Object *)obj, 1);
+        SelectWeapon(obj, 1);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 2))
-        SelectWeapon((AM2_Object *)obj, 2);
+        SelectWeapon(obj, 2);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 3))
-        SelectWeapon((AM2_Object *)obj, 3);
+        SelectWeapon(obj, 3);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 4))
-        SelectWeapon((AM2_Object *)obj, 4);
+        SelectWeapon(obj, 4);
     else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 5))
-        SelectWeapon((AM2_Object *)obj, 5);
+        SelectWeapon(obj, 5);
     else if (*(const int32_t *)((const uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_OPEN)) {
 /* The row's record, indexed afresh at each use: a local pointer moves the
@@ -5824,7 +5824,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (!g_mouseButton
                 && g_mouseChanged
                 && *(AM2_Widget * *)&g_mouseGrab == w)
-                SelectWeapon((AM2_Object *)obj, i);
+                SelectWeapon(obj, i);
 
             /* The tooltip, and it is gated on STILLNESS rather than on the
              * click. ADDR_MOUSE_ACTIVITY is stamped from the clock on any
@@ -5833,20 +5833,20 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (g_gameClockMs
                 - g_mouseActivity
                 > AM2_HUD_TOOLTIP_DWELL) {
-                const uint8_t *item;
+                const AM2_Object *item;
 
-                uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
+                uid = obj->inventory[i];
                 if (!uid)
                     continue;
 
-                item = (const uint8_t *)WeaponByUid(uid);
+                item = WeaponByUid(uid);
                 if (!item)
                     continue;
 
                 strcpy((char *)((uint8_t *)g_hudWidgetB
                                 + HUDPANEL_OFF_CAPTION),
                        ItemTypeName(
-                           **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
+                           *((const uint32_t *)item->typeRec)));
             }
         }
     }
@@ -5854,17 +5854,17 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
 #undef SARGE_REC
     /* Pass three: rebuild every record from the inventory. */
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        const uint8_t *item;
+        const AM2_Object *item;
         int32_t        sprite;
         int32_t        ammo;
 
-        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4)) {
-            item = (const uint8_t *)WeaponByUid(
-                *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4));
+        if (obj->inventory[i]) {
+            item = WeaponByUid(
+                obj->inventory[i]);
             if (item) {
                 /* Which icon: a switch on the item kind, and the image's jump
                  * table at 0x004154F0 lists the arms in this order. */
-                switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
+                switch (*((const uint32_t *)item->typeRec)) {
                 case 2: sprite = 2; break;
                 case 3: sprite = 3; break;
                 case 4: sprite = 1; break;
@@ -5899,15 +5899,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
                 }
                 *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = sprite;
 
-                ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
+                ammo = item->ammo;
                 if (ammo > AM2_HUD_SARGE_AMMO_MAX)
                     ammo = AM2_HUD_SARGE_AMMO_MAX;
                 *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_COUNT) = ammo;
 
                 /* 1 or 2, never a boolean -- see the header comment. */
-                if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL))
+                if (i == obj->inventorySel)
                     *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) =
-                        (ItemIsReady((const AM2_Object *)item) != 0) + 1;
+                        (ItemIsReady(item) != 0) + 1;
                 else
                     *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) = 0;
             } else {
@@ -6442,13 +6442,13 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         2.3, 2.6, 2.3, 2.4, 2.1, 2.4, 2.3, 2.5, 2.2
     };
     int32_t  speed[6] = { 5, 3, 4, 4, 2, 4 };
-    uint8_t *obj;
+    AM2_Object *obj;
     char     line[AM2_SQUAD_TEXT_BYTES];
     char     name[AM2_SQUAD_TEXT_BYTES];
     int32_t  a, c;
     RECT     box;
 
-    obj = (uint8_t *)LookupByUID((uint32_t)uid);
+    obj = LookupByUID((uint32_t)uid);
     if (!obj)
         return;
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
@@ -6460,14 +6460,14 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
                                      *(const uint8_t *)(uintptr_t)            \
                                          ((uintptr_t)&g_hiliteColour))
 #define SQD_HP()                                                              \
-        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH) < AM2_SQUAD_HP_CAP       \
-            ? *(const int16_t *)(obj + OBJ_OFF_HEALTH) : AM2_SQUAD_HP_CAP;    \
-        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) < AM2_SQUAD_HP_CAP   \
-            ? *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) : AM2_SQUAD_HP_CAP;\
+        a = obj->health < AM2_SQUAD_HP_CAP       \
+            ? obj->health : AM2_SQUAD_HP_CAP;    \
+        c = obj->maxHealth < AM2_SQUAD_HP_CAP   \
+            ? obj->maxHealth : AM2_SQUAD_HP_CAP;\
         am2_sprintf(line, "%3d/%3d", a, c);                                   \
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line)
 
-    if (ObjType2Field548((const AM2_Object *)obj)) {
+    if (ObjType2Field548(obj)) {
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, "Sarge");
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1,    "HT:");
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1,    "4.6 cm");
@@ -6478,7 +6478,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP,   "HP:");
         SQD_HP();
 
-    } else if (ObjIsType2((const AM2_Object *)obj)) {
+    } else if (ObjIsType2(obj)) {
         /* The scripted name UNLESS it is an internal "green..." id (e.g.
          * "greensarge1"): the original jumps to the SoldierNameOf path when
          * the name STARTS WITH "green" (0x004166FE: strncmp; je 0x0041677F).
@@ -6486,34 +6486,34 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
          * "wildblood" behind a random soldier name. */
 #define SCRIPT_NAME (*(const char *const *)                                   \
             ((const uint8_t *)g_scriptNames     \
-             + (uint32_t)*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX)        \
+             + (uint32_t)obj->nameIdx        \
                * AM2_NAME_TABLE_STRIDE))
-        if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0
+        if (obj->nameIdx >= 0
             && orig_strncmp(SCRIPT_NAME, "green", 5) != 0) {
             strcpy(name, SCRIPT_NAME);
             TitleCaseName(name);
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
-        } else if (*(const int32_t *)(obj + OBJ_OFF_NAME_INDEX) >= 0) {
-            SoldierNameOf((const AM2_Object *)obj, name);
+        } else if (obj->nameIndex >= 0) {
+            SoldierNameOf(obj, name);
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
         } else {
-            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName((AM2_Object *)obj));
+            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName(obj));
         }
 #undef SCRIPT_NAME
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "HT:");
         am2_sprintf(line, "%3.1lf cm",
-                    height[*(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND)]);
+                    height[obj->soldierKind]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "WT:");
         am2_sprintf(line, "%3.1lf g",
-                    weight[*(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND)]);
+                    weight[obj->soldierKind]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
 
-        a = *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME);
+        a = obj->repairFrame;
         if (a >= AM2_SQUAD_STAT_CAP) a = AM2_SQUAD_STAT_CAP;
         c = *(const int32_t *)(g_rankExpTable
-              + (size_t)*(const int32_t *)(obj + OBJ_OFF_RANK)
+              + (size_t)obj->rank
                 * AM2_RANK_EXP_STRIDE);
         if (c >= AM2_SQUAD_STAT_CAP) c = AM2_SQUAD_STAT_CAP;
         am2_sprintf(line, "%4d/%4d", a, c);
@@ -6526,7 +6526,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         /* Rank pips: rank + 1 of them, capped at five, each clipped from a
          * fresh {0, 0, w, h} of the pip sprite. */
         if (*(void *const *)((uint8_t *)w + HUD_SQUAD_ICON_SPRITE)) {
-            int32_t n = *(const int32_t *)(obj + OBJ_OFF_RANK) + 1;
+            int32_t n = obj->rank + 1;
             int32_t i;
 
             if (n >= AM2_SQUAD_MAX_PIPS)
@@ -6549,24 +6549,24 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
             }
         }
 
-    } else if (ObjIsType3((const AM2_Object *)obj)) {
-        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName((const AM2_Object *)obj));
+    } else if (ObjIsType3(obj)) {
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName(obj));
 
         /* Armour is clamped to two digits; nothing else here is. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "AR:");
-        a = *(const int32_t *)(obj + VEHICLE_OFF_ARMOUR);
+        a = obj->field54C;
         if (a >= 99) a = 99;
         am2_sprintf(line, "%d mm", a);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "CR:");
-        am2_sprintf(line, "%d", *(const int32_t *)(obj + VEHICLE_OFF_SEATS));
+        am2_sprintf(line, "%d", obj->seats);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
 
         /* MV is the per-kind speed table, indexed by VEHICLE_OFF_KIND. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "MV:");
         am2_sprintf(line, "%d cm/s",
-                    speed[*(const int32_t *)(obj + VEHICLE_OFF_KIND)]);
+                    speed[obj->vehicleKind]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");
@@ -6602,8 +6602,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
      * much health a unit has in absolute terms and not merely what fraction
      * is left, and a weak unit's full bar is shorter than a strong one's. */
     {
-#define MAXHP (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH))
-#define HP    (*(const int16_t *)(obj + OBJ_OFF_HEALTH))
+#define MAXHP (obj->maxHealth)
+#define HP    (obj->health)
         int32_t wide = MAXHP / 2 < SQD_BAR_MAX_W ? MAXHP / 2 : SQD_BAR_MAX_W;
         int32_t fill;
         uint8_t bar;
