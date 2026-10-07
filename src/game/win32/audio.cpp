@@ -1233,13 +1233,13 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     /* An owner overrides the caller's coordinates -- and stops being an owner
      * if it has gone away. */
     if (owner) {
-        uint8_t *obj = (uint8_t *)LookupByUID(owner);
+        AM2_Object *obj = LookupByUID(owner);
 
         if (!obj) {
             owner = 0;
         } else {
-            x = *(const int16_t *)(obj + 0x12);
-            y = *(const int16_t *)(obj + 0x14);
+            x = obj->pos.x;
+            y = obj->pos.y;
         }
     }
 

@@ -4856,7 +4856,7 @@ void __cdecl HudPostUpdate(void)
         }
     }
     if (ActionKeyDown(AM2_ACTION_EXIT_VEHICLE))
-        VehicleDismountAll((void *)0, at);
+        VehicleDismountAll((AM2_Object *)0, at);
 
     /* ---- what the leader is holding ----------------------------------- */
     leader = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
@@ -6299,7 +6299,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             slot++;
 
         } else if (ObjIsType2(obj)) {
-            const uint8_t *weapon;
+            const AM2_Object *weapon;
 
             if (obj->riding)
                 goto next;
@@ -6309,10 +6309,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             {
                 uint32_t uid = obj->inventory[0];
 
-                weapon = (const uint8_t *)WeaponByUid(uid);
+                weapon = WeaponByUid(uid);
             }
             if (weapon)
-                sq->recs[slot].index = HudSquadWeaponIcon((const AM2_Object *)weapon);
+                sq->recs[slot].index = HudSquadWeaponIcon(weapon);
             else
                 sq->recs[slot].index = 1;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
@@ -6361,13 +6361,13 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                         SQUAD_INK(sq->recs[slot].barColour, rider);
                         slot++;
                     } else if (ObjIsType2(rider)) {
-                        const uint8_t *weapon = (const uint8_t *)WeaponByUid(
+                        const AM2_Object *weapon = WeaponByUid(
                             rider->inventory[0]);
 
                         if (!weapon)
                             continue;
 
-                        sq->recs[slot].index = HudSquadWeaponIcon((const AM2_Object *)weapon);
+                        sq->recs[slot].index = HudSquadWeaponIcon(weapon);
                         sq->recs[slot].detailArg =
                             (int32_t)rider->uid;
                         sq->recs[slot].eject = 1;
@@ -17075,16 +17075,16 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
  * lines. This one attaches the leavers to the driver and that one does not.
  *
  * Not exercised: its key is not one any drive here presses. */
-void __cdecl VehicleDismountAll(void *a, AM2_Point b)
+void __cdecl VehicleDismountAll(AM2_Object *a, AM2_Point b)
 {
     AM2_Object *veh;
-    uint8_t *driver;
+    AM2_Object *driver;
     int32_t  i;
 
     (void)a;
     (void)b;
 
-    veh = (AM2_Object *)*(uint8_t * *)&g_objCtxObjA;
+    veh = g_objCtxObjA;
     if (!veh)
         return;
     if (!ObjIsType3Inline(veh))
@@ -17092,15 +17092,15 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
     if ((int32_t)Field53C(veh) <= 0)
         return;
 
-    driver = (uint8_t *)LookupByUID(
+    driver = LookupByUID(
         *veh->riders.uids);
 
     while ((int32_t)Field53C(veh) > 1) {
-        uint8_t *o = (uint8_t *)LookupByUID(
+        AM2_Object *o = LookupByUID(
             (veh->riders.uids)[1]);
 
         if (ObjIsType2Inline(o))
-            ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
+            ObjAttachTo(o, driver);
 
         if (!ExitOneFromVehicle(1, veh))
             break;
@@ -17109,7 +17109,7 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
     ExitOneFromVehicle(0, veh);
 
     for (i = 0; i < veh->followers.count; ) {
-        uint8_t *o = (uint8_t *)LookupByUID(
+        AM2_Object *o = LookupByUID(
             (veh->followers.uids)[i]);
 
         if (!o) {
@@ -17117,7 +17117,7 @@ void __cdecl VehicleDismountAll(void *a, AM2_Point b)
             ((AM2_Rec *)&veh->followers)->ListRemoveAt(i);
             continue;
         }
-        ObjAttachTo((AM2_Object *)o, (AM2_Object *)driver);
+        ObjAttachTo(o, driver);
         i++;
     }
 }

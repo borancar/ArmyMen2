@@ -71,7 +71,7 @@ int32_t __cdecl ObjIsFriendly(const AM2_Object *obj)
     return 1;
 }
 
-void *__cdecl LookupOwnerObj(uint32_t owner)
+AM2_Object *__cdecl LookupOwnerObj(uint32_t owner)
 {
     void   **list;
     int32_t  i;

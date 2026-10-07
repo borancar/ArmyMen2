@@ -2792,7 +2792,7 @@ int32_t __cdecl PointerPickEnemyTrooper(AM2_Object *o);
 
 /* 0x00458930. Empty the current vehicle, attaching each leaver to whoever was
  * in seat 0. Both arguments are ignored -- see the note in widget.cpp. */
-void __cdecl VehicleDismountAll(void *a, AM2_Point b);
+void __cdecl VehicleDismountAll(struct AM2_Object *a, AM2_Point b);
 
 /* 0x00413E70, one caller: the per-frame mouse dispatch. It clears the hover
  * uid, runs the selection click, maintains the drag rectangle and then fans

@@ -3876,19 +3876,19 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, AM2_Point at)
 #define PTS   ((const AM2_Point *)((const uint8_t *)g_vehicleMasks[0].pts + slot))
     for (i = 0; i < COUNT; i++) {
         AM2_Point    here;
-        void *chain;
+        AM2_Object *chain;
 
         /* Both halves of the packed base, summed with the mask offset. */
         here.x = PTS[i].x + at.x;
         here.y = PTS[i].y + at.y;
 
         /* NOTE: the BASE point, not `here`. */
-        chain = (uint8_t *)ObjectsAtPoint(&at,
+        chain = (AM2_Object *)ObjectsAtPoint(&at,
                                       g_objMapDesc);
 
         total += (kind == AM2_MASK_CHAIN_KIND)
-                 ? BlockWeightChain((AM2_Object *)(void *)0, here, (AM2_Object *)chain, at)
-                 : BlockWeightTroops((AM2_Object *)(void *)0, here, (AM2_Object *)chain, at);
+                 ? BlockWeightChain((AM2_Object *)(void *)0, here, chain, at)
+                 : BlockWeightTroops((AM2_Object *)(void *)0, here, chain, at);
     }
 #undef COUNT
 #undef PTS
@@ -12478,9 +12478,9 @@ have:
         return;
 
     if (ObjIsWatchedKind((const AM2_Object *)obj)) {
-        uint8_t *owner = (uint8_t *)LookupOwnerObj(
+        AM2_Object *owner = (AM2_Object *)LookupOwnerObj(
             (uint32_t)o->owner);
-        uint32_t who = owner ? ((const AM2_Object *)owner)->uid
+        uint32_t who = owner ? (owner)->uid
                              : ((const AM2_Object *)o)->uid;
         int32_t  sixth;
 

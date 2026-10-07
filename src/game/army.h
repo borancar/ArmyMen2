@@ -77,7 +77,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, const AM2_Object *b, int32_t use
  * the army's leader and `ArmyLeader` would have been right. The name stays as
  * the image's own, but the caution can go. What IS known is what audio.cpp
  * uses it for: `LookupOwnerObj(g_defaultOwner)` is where the ear is. */
-void *__cdecl LookupOwnerObj(uint32_t owner);
+struct AM2_Object *__cdecl LookupOwnerObj(uint32_t owner);
 
 /* 0x00457820, seven callers, and it went in as ADDR_SPRITE_DROP_NAMED -- named
  * from the one call site, which passes 0x0045A030 as the second argument. That

@@ -232,13 +232,13 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
 }
 
 /* Stamp the current script onto one object. */
-static inline void ScriptAttachTo(uint8_t *obj)
+static inline void ScriptAttachTo(AM2_Object *obj)
 {
-    *(int32_t *)(obj + AM2_OBJ_SCRIPT) =
+    obj->scriptId =
         g_currentObjScript;
-    *(int32_t *)(obj + AM2_OBJ_SCRIPT_PC) = 0;
-    *(int32_t *)(obj + AM2_OBJ_SCRIPT_WAIT) = -1;
-    *(int32_t *)(obj + AM2_OBJ_SCRIPT_STATE) = 0;
+    obj->scriptState = 0;
+    obj->scriptFrame = -1;
+    obj->scriptNext = 0;
 }
 
 int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
@@ -276,10 +276,10 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 
         target->u.name = name;
 
-        uint8_t *obj = (uint8_t *)LookupByUID(
+        AM2_Object *obj = LookupByUID(
             (uint32_t)(uintptr_t)kScriptNames[name].value);
 
-        if (!obj || !ObjIsItem((const AM2_Object *)obj)) {
+        if (!obj || !ObjIsItem(obj)) {
             am2_log("Token %s is not a valid object.\n",
                     kScriptNames[name].name);
             return 0;
@@ -316,7 +316,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
         for (uint8_t *obj = (uint8_t *)FirstItem(); obj;
              obj = (uint8_t *)NextItem()) {
             if (ObjIsItem((const AM2_Object *)obj))
-                ScriptAttachTo(obj);
+                ScriptAttachTo((AM2_Object *)obj);
         }
 
     } else {

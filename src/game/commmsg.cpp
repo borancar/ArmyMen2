@@ -3678,12 +3678,12 @@ void __cdecl RecvVehicle1F(void *msg)
     if (item == 0) {
         /* The item is already gone. Ask the VEHICLE's weapon, not the item:
          * flag 2 on it is what says the drop was dealt with locally. */
-        const uint8_t *w = (const uint8_t *)WeaponByUid(
+        const AM2_Object *w = WeaponByUid(
             vehicle->weaponUid);
 
         if (w == 0)
             return;
-        if ((*(const uint32_t *)(w + 8) & 2u) == 0)
+        if ((w->flags & 2u) == 0)
             return;
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             am2_log((const char *)(uintptr_t)"Weapon destroyed before dropping; but we handled it\n");

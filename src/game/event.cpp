@@ -255,16 +255,16 @@ void __cdecl EvtSetMode94(uint32_t uid, int32_t value)
 
 void __cdecl EvtSetFlag810(uint32_t uid, int32_t on)
 {
-    uint8_t *o;
+    AM2_Object *o;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
     /* The object, not a pointer to its +8: the original addresses [eax+8]. */
-    o = (uint8_t *)LookupByUID(uid);
+    o = LookupByUID(uid);
     if (on)
-        *(uint32_t *)(o + 8) |= AM2_EVT_FLAG810;
+        o->flags |= AM2_EVT_FLAG810;
     else
-        *(uint32_t *)(o + 8) &= ~AM2_EVT_FLAG810;
+        o->flags &= ~AM2_EVT_FLAG810;
 }
 
 /* +0x10 is AM2_Object.owner, which objtable.h reads with movsx as int8_t. */
@@ -320,24 +320,24 @@ void __cdecl EvtSetWord60(uint32_t uid, int32_t value)
 
 void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode)
 {
-    uint8_t *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
-    obj = (uint8_t *)LookupByUID(uid);
-    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+    obj = LookupByUID(uid);
+    if (!ObjIsTypeIn238(obj))
         return;
 
-    *(int32_t *)(obj + 0xE8) = *(int32_t *)(obj + 0xE4);
-    *(int32_t *)(obj + 0xE4) = mode;
+    obj->aiModePrev = obj->aiMode;
+    obj->aiMode = mode;
 
     if (mode != AM2_AI_MODE_DEFEND)
         return;
     /* Tests sixteen bits and writes thirty-two -- the original's asymmetry,
      * not a transcription slip. */
-    if (*(int16_t *)(obj + 0xB4) != 0)
+    if (obj->scriptPoint.x != 0)
         return;
-    *(int32_t *)(obj + 0xB4) = *(const int32_t *)(obj + 0x12);
+    obj->scriptPoint = obj->pos;
 }
 
 /* PlayDynamicSound is reconstructed, in win32/audio.cpp with the rest of the
@@ -2022,9 +2022,9 @@ void __cdecl EvtType238Action(uint32_t uid, int32_t arg)
  * from the object. */
 void __cdecl EvtPushObjCtx(uint32_t uid)
 {
-    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+    AM2_Object *obj = LookupByUID(uid);
 
-    if (obj == (uint8_t *)0)
+    if (obj == 0)
         return;
 
     g_objCtxObjPrev =
@@ -2032,7 +2032,7 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
     g_objCtxValPrev =
         g_objCtxVal;
     g_objCtxObj  = obj;
-    g_objCtxVal = *(const int32_t *)(obj + 4);
+    g_objCtxVal = (int32_t)obj->uid;
     g_objCtxSetPrev =
         g_objCtxSet;
     g_objCtxSet = 1;
@@ -2159,7 +2159,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 {
     AM2_Object *a;
-    uint8_t *b;
+    AM2_Object *b;
 
     if (uidA < AM2_UID_COUNTER_MIN || uidB < AM2_UID_COUNTER_MIN)
         return;
@@ -2168,14 +2168,14 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
     if (a == 0)
         return;
 
-    b = (uint8_t *)LookupByUID(uidB);
-    if (b == (uint8_t *)0)
+    b = LookupByUID(uidB);
+    if (b == 0)
         return;
 
     if (ObjIsType2(a))
         a->field540 = 0;
 
-    ObjAttachTo(a, (AM2_Object *)b);
+    ObjAttachTo(a, b);
 }
 
 /* --------------------------------------------------- bitmaps ---- */
