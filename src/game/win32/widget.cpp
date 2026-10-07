@@ -849,9 +849,6 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * the reconstructions that go into them -- PointerPickMode0.. and
  * PointerActionMode4.. -- so these agree with widget.h rather than restating
  * it loosely. */
-typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
-typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
-
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
  * or destroyed while a DIFFERENT field holds the focus, and wiping a newer
@@ -5099,8 +5096,7 @@ void __cdecl HudPaint(void)
  */
 void __cdecl SetPointerMode(int32_t mode)
 {
-#define REC (g_pointerModes \
-             + (size_t)mode * AM2_POINTER_MODE_SIZE)
+#define REC (&g_pointerModes[(size_t)mode])
 #define PICK (*(AM2_PointerPickFn *)&g_pointerPick)
 #define ACT  (*(AM2_PointerActionFn *)&g_pointerAction)
 #define F14  (g_pointerF14)
@@ -5108,11 +5104,11 @@ void __cdecl SetPointerMode(int32_t mode)
 
     /* Straight from the record into the globals, then tested from them --
      * in the statement order that schedules into the image's stores. */
-    PICK = *(AM2_PointerPickFn const *)(REC + MODE_OFF_PICK);
-    ACT  = *(AM2_PointerActionFn const *)(REC + MODE_OFF_ACTION);
-    g_pointerF10 = *(const int32_t *)(REC + MODE_OFF_F10);
-    F14  = *(const int32_t *)(REC + MODE_OFF_F14);
-    g_pointerOverlay = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
+    PICK = REC->pick;
+    ACT  = REC->action;
+    g_pointerF10 = REC->f10;
+    F14  = REC->f14;
+    g_pointerOverlay = REC->overlay;
 
     if (!PICK && !F14 && ACT) {
         ACT((AM2_Object *)(void *)0, g_zeroXY);
@@ -6825,14 +6821,13 @@ AM2_HudCmd::AM2_HudCmd()
      * an eighth record would. */
     for (i = 0; i < (int32_t)((((uintptr_t)g_buildMenuRects) - ((uintptr_t)g_hudCmdSpec))
                               / AM2_HUD_CMD_SPR_STRIDE); i++) {
-        uint8_t *rec = g_hudCmdSpec
-                       + i * AM2_HUD_CMD_SPR_STRIDE;
+        AM2_CmdRec *rec = &g_hudCmdSpec[i];
 
-        *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = PreloadArmySprite(
-            *(const int32_t *)(rec + HUDCMDSPR_OFF_SET),
-            *(const int32_t *)(rec + HUDCMDSPR_OFF_INDEX),
-            *(const int32_t *)(rec + HUDCMDSPR_OFF_FRAME), 0);
-        if (!*(void **)(rec + HUDCMDSPR_OFF_SPRITE))
+        rec->sprite = (AM2_Sprite *)PreloadArmySprite(
+            rec->set,
+            rec->index,
+            rec->frame, 0);
+        if (!rec->sprite)
             return;                 /* the tail below is SKIPPED */
     }
 
@@ -6915,10 +6910,8 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdInvoke(int32_t mode)
 
         SetPointerMode(mode);
         {
-            const uint8_t *rec = g_hudCmdSpec
-                               + (size_t)mode * AM2_HUD_CMD_SPR_STRIDE;
-            void (*handler)(void) =
-                *(void (**)(void))(rec + HUDCMDSPR_OFF_HANDLER);
+            const AM2_CmdRec *rec = &g_hudCmdSpec[(size_t)mode];
+            void (*handler)(void) = rec->handler;
             if (handler)
                 handler();
         }
@@ -6988,8 +6981,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
             AM2_Rect cell;
 
 /* The slot's sprite spec, looked up again at each use. */
-#define CMD_SPEC(s) (g_hudCmdSpec \
-                     + (uint32_t)(s) * AM2_HUD_CMD_SPR_STRIDE)
+#define CMD_SPEC(s) (g_hudCmdSpec[(uint32_t)(s)])
             if (slots[i] < 0)
                 continue;
 
@@ -6997,9 +6989,9 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
                           + w->rect.left;
             cell.top    = w->rect.top
                           + (g_hudSquadSlotXy)[i * 2 + 1];
-            cell.right  = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
+            cell.right  = CMD_SPEC(slots[i]).sprite
                               ->bounds.right + cell.left;
-            cell.bottom = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
+            cell.bottom = CMD_SPEC(slots[i]).sprite
                               ->bounds.bottom + cell.top;
 
             if (!PointInRect(&cell,
@@ -7020,10 +7012,8 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 
             /* Re-read the slot: SetPointerMode is handed the same value but
              * the handler comes from a SECOND load of it. */
-            if (*(void (__cdecl *const *)(void))(CMD_SPEC(slots[i])
-                                                 + HUDCMDSPR_OFF_HANDLER))
-                (*(void (__cdecl *const *)(void))(CMD_SPEC(slots[i])
-                                                  + HUDCMDSPR_OFF_HANDLER))();
+            if (CMD_SPEC(slots[i]).handler)
+                CMD_SPEC(slots[i]).handler();
 #undef CMD_SPEC
         }
     }
@@ -9012,7 +9002,7 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
     AM2_ListBox  *self = (AM2_ListBox *)w;
     uint32_t  now  = orig_get_tick_count();
 
-    if (now - *(const uint32_t *)((uint8_t *)self + TEXTLIST_OFF_POLLED)
+    if (now - self->polled
             <= AM2_BATTLE_POLL_MS)
         return;
 
@@ -9020,7 +9010,7 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
     CommEnumSessions(g_commObject, (void *)self->rows);
 
     WidgetVPaint(w, w->rect);
-    *(uint32_t *)((uint8_t *)self + TEXTLIST_OFF_POLLED) = now;
+    self->polled = now;
 }
 
 void __cdecl BattleJoinOk(void)
@@ -11214,11 +11204,11 @@ AM2_TextList::AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t o
 
     AM2_CTOR_VTABLE(w, VTABLE_TEXT_LIST);
 
-    *(int32_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + 0) = g_colourDarkGreen;
-    *(int32_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + 4) = g_colourOlive;
-    *(int32_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + 8) = g_colourSteelBlue;
-    *(int32_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + 12) = g_colourDarkGrey;
-    *(int32_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + 16) = g_hudColour;
+    self->colours[0] = g_colourDarkGreen;
+    self->colours[1] = g_colourOlive;
+    self->colours[2] = g_colourSteelBlue;
+    self->colours[3] = g_colourDarkGrey;
+    self->colours[4] = g_hudColour;
 
     *(int32_t *)((uint8_t *)self + LISTBOX_OFF_READ_ONLY) = 1;
     self->chosen  = -1;
@@ -11291,22 +11281,22 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 
     src = (const uint8_t *)self->rows;
 
-    for (row = *(const int32_t *)((uint8_t *)self + TEXTLIST_OFF_FIRST);
+    for (row = self->topRow;
          row < *(const int32_t *)(src + TEXTLIST_SRC_COUNT);
          row++) {
-        int32_t        first = *(const int32_t *)((uint8_t *)self + TEXTLIST_OFF_FIRST);
+        int32_t        first = self->topRow;
         int32_t        idx;
         uint8_t        colour;
         int32_t        y;
 
-        if (row >= first + *(const int32_t *)((uint8_t *)self + TEXTLIST_OFF_VISIBLE))
+        if (row >= first + self->visible)
             return;
 
         /* The row's record is indexed afresh for the colour and again,
          * through the list re-read, for the draw. */
         idx    = *(const int32_t *)(*(const uint8_t *const *)(src + TEXTLIST_SRC_RECORDS)
                                     + row * TEXTLIST_REC_SIZE + TEXTLIST_REC_COLOUR);
-        colour = *(const uint8_t *)((uint8_t *)self + TEXTLIST_OFF_COLOURS + idx * 4);
+        colour = (uint8_t)self->colours[idx];
 
         y = w->rect.top + (row - first) * AM2_TEXT_LIST_ROW_H + AM2_TEXT_LIST_PAD;
 

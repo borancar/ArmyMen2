@@ -288,7 +288,7 @@
 #define g_hostMaskB              (*(uint32_t *)(uintptr_t)ADDR_HOST_MASK_B)  /* 0x0051607C */
 #define g_hostValue3e8           (*(int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8)  /* 0x00516090 */
 #define g_hudCmdOffsets          ((int16_t *)(uintptr_t)ADDR_HUD_CMD_OFFSETS)  /* 0x004766F8 */
-#define g_hudCmdSpec             ((uint8_t *)(uintptr_t)ADDR_HUD_CMD_SPEC)  /* 0x004761A8 */
+#define g_hudCmdSpec             ((struct AM2_CmdRec *)(uintptr_t)ADDR_HUD_CMD_SPEC)  /* 0x004761A8 */
 #define g_hudCmdSprites          ((AM2_Sprite **)(uintptr_t)ADDR_HUD_CMD_SPRITES)  /* 0x004761B4 */
 #define g_hudCmdSpritesEnd       ((uint8_t *)(uintptr_t)ADDR_HUD_CMD_SPRITES_END)  /* 0x004762CC */
 #define g_hudColour              (*(uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)  /* 0x00507234 */
@@ -595,7 +595,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_pointerF14             (*(int32_t *)(uintptr_t)ADDR_POINTER_F14)  /* 0x005122EC */
 #define g_pointerHoverUid        (*(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID)  /* 0x004854B8 */
 #define g_pointerMode            (*(int32_t *)(uintptr_t)ADDR_POINTER_MODE)  /* 0x004FCF80 */
-#define g_pointerModes           ((uint8_t *)(uintptr_t)ADDR_POINTER_MODES)  /* 0x004761B8 */
+#define g_pointerModes           ((struct AM2_PointerModeRec *)(uintptr_t)ADDR_POINTER_MODES)  /* 0x004761B8 */
 #define g_pointerOverlay         (*(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY)  /* 0x005122F4 */
 #define g_pointerPick            (*(int32_t *)(uintptr_t)ADDR_POINTER_PICK)  /* 0x005122E0 */
 #define g_pointRule              (*(uint32_t *)(uintptr_t)ADDR_POINT_RULE)  /* 0x00523DDC */

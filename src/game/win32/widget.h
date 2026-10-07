@@ -418,6 +418,38 @@ struct AM2_CheckBox : AM2_ButtonBase {
 
 struct AM2_ListRows;
 
+/* The six pointer/weapon slots hold two shapes: a PICK answers whether the
+ * pointer may take an object, an ACTION acts on release. */
+typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
+typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
+
+/* One HUD command, 0x28 bytes, seven at ADDR_HUD_CMD_SPEC: the sprite the
+ * command panel draws, and the pointer mode SetPointerMode installs. */
+struct AM2_CmdRec {
+    int32_t             set;        /* +0x00 HUDCMDSPR_OFF_SET, PreloadArmySprite's arguments */
+    int32_t             index;      /* +0x04 HUDCMDSPR_OFF_INDEX */
+    int32_t             frame;      /* +0x08 HUDCMDSPR_OFF_FRAME */
+    AM2_Sprite         *sprite;     /* +0x0C HUDCMDSPR_OFF_SPRITE, where it is loaded */
+    AM2_PointerPickFn   pick;       /* +0x10 MODE_OFF_PICK */
+    AM2_PointerActionFn action;     /* +0x14 MODE_OFF_ACTION */
+    void (__cdecl      *handler)(void); /* +0x18 HUDCMDSPR_OFF_HANDLER, may be null */
+    int32_t             overlay;    /* +0x1C MODE_OFF_OVERLAY, OverlayPrepare's row */
+    int32_t             f10;        /* +0x20 MODE_OFF_F10 */
+    int32_t             f14;        /* +0x24 MODE_OFF_F14 */
+};
+
+/* The same records as ADDR_POINTER_MODES addresses them, 0x10 in: a mode's
+ * fields, then the NEXT command's sprite spec. */
+struct AM2_PointerModeRec {
+    AM2_PointerPickFn   pick;       /* +0x00 MODE_OFF_PICK */
+    AM2_PointerActionFn action;     /* +0x04 MODE_OFF_ACTION */
+    void (__cdecl      *handler)(void); /* +0x08 */
+    int32_t             overlay;    /* +0x0C MODE_OFF_OVERLAY */
+    int32_t             f10;        /* +0x10 MODE_OFF_F10, installed, unread */
+    int32_t             f14;        /* +0x14 MODE_OFF_F14, part of the guard */
+    int32_t             nextSpec[4]; /* +0x18 the next AM2_CmdRec's set..sprite */
+};
+
 struct AM2_ListBox : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
     int32_t       selected;         /* 0x0058  LIST_OFF_SELECTED, the moving highlight */
@@ -426,15 +458,23 @@ struct AM2_ListBox : AM2_Widget {
     int32_t       ownsRows;         /* 0x0064  LIST_OFF_OWNS_ROWS */
     void         *callback;         /* 0x0068  LIST_OFF_CALLBACK, or ADDR_LOG for none */
     void (__cdecl *onTick)(AM2_Widget *); /* 0x006C  LIST_OFF_ON_TICK */
-    int32_t       arg70;            /* 0x0070  LIST_OFF_ARG70 */
+    union {
+        int32_t   arg70;            /* 0x0070  LIST_OFF_ARG70, constructed 0 */
+        uint32_t  polled;           /* 0x0070  TEXTLIST_OFF_POLLED, GetTickCount of the last refresh */
+    };
     int32_t       topRow;           /* 0x0074  LIST_OFF_TOP_ROW, first row drawn */
     int32_t       visible;          /* 0x0078  LIST_OFF_VISIBLE, rows that fit */
     AM2_Widget   *arrowBar;         /* 0x007C  LIST_OFF_ARROWBAR */
-    int32_t       ink;              /* 0x0080  LIST_OFF_INK, an ordinary row */
-    int32_t       inkSel;           /* 0x0084  LIST_OFF_INK_SEL */
-    int32_t       inkSelDown;       /* 0x0088  LIST_OFF_INK_SEL_DOWN */
-    int32_t       inkHotSel;        /* 0x008C  LIST_OFF_INK_HOT_SEL */
-    int32_t       field90;          /* 0x0090 */
+    union {
+        struct {
+            int32_t ink;            /* 0x0080  LIST_OFF_INK, an ordinary row */
+            int32_t inkSel;         /* 0x0084  LIST_OFF_INK_SEL */
+            int32_t inkSelDown;     /* 0x0088  LIST_OFF_INK_SEL_DOWN */
+            int32_t inkHotSel;      /* 0x008C  LIST_OFF_INK_HOT_SEL */
+            int32_t field90;        /* 0x0090 */
+        };
+        int32_t   colours[5];       /* 0x0080  TEXTLIST_OFF_COLOURS, low byte used */
+    };
     AM2_Widget   *blinker;          /* 0x0094  LIST_OFF_BLINKER */
     AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
     explicit AM2_ListBox(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
