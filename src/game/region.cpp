@@ -10419,9 +10419,12 @@ void __cdecl Step3Drive(void *obj, void *rec)
                      -8, 8);
 
         animRec = gun + 0x44u;
-        first  = RoundTo8((*(const uint8_t *)(gun + 0x5Cu)
-                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF,
-                          *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
+        {
+            int32_t heading = *(const uint8_t *)(gun + 0x50u);
+
+            first  = RoundTo8((*(const uint8_t *)(gun + 0x5Cu) + heading) & 0xFF,
+                              *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
+        }
         second = RoundTo8((*(const uint8_t *)(gun + 0x5Cu) + turn
                            + *(const uint8_t *)(gun + 0x50u)) & 0xFF,
                           *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
@@ -10566,9 +10569,13 @@ void __cdecl Step3Drive(void *obj, void *rec)
                           turn - 0x0F, turn + 0x0F);
 
             animRec = turret + 0x44u;
-            first  = RoundTo8((*(const uint8_t *)(turret + 0x5Cu)
-                               + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
-                              *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
+            {
+                int32_t dirBits = *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
+                int32_t bias    = *(const uint8_t *)(turret + 0x5Cu);
+
+                first  = RoundTo8((bias + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
+                                  dirBits);
+            }
             second = RoundTo8((*(const uint8_t *)(turret + 0x5Cu) + swing
                                + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
                               *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
@@ -10656,9 +10663,12 @@ void __cdecl Step3Drive(void *obj, void *rec)
                                spot, 0);
                 }
 
-                if (AM2_THE_COMM->CommMustBroadcast(
-                                      (int16_t)*(const int8_t *)(o + 0x10u)))
-                    SendVehicleFire(o);
+                {
+                    int32_t army = *(const int8_t *)(o + 0x10u);
+
+                    if (AM2_THE_COMM->CommMustBroadcast((int16_t)army))
+                        SendVehicleFire(o);
+                }
 
                 *(int32_t *)(r + 4) = 0;
                 *(uint32_t *)(r + 0x18u) =
@@ -10674,11 +10684,15 @@ void __cdecl Step3Drive(void *obj, void *rec)
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
     SetKindFrames(o, *(const int32_t *)(r + 8));
 
+    {
+    /* The y is read once, ahead of the sound-list lookup. */
+    int32_t engineY = *(const int16_t *)(o + 0x14u);
+
     /* The engine sound for the state, two tables of it -- wheeled (kind 1)
      * and tracked (kinds 2, 3, 4, 6, 7) -- where states 2 and 3 share an arm
      * and state 4 is silent. Each arm is its own call, which VC6 merges. */
 #define ENGINE(snd) PlaySoundAt((snd), 1, 0, *(const int16_t *)(o + 0x12u), \
-                                *(const int16_t *)(o + 0x14u))
+                                engineY)
     if (ListFirstField548(o)) {
         int32_t kind = *(const int32_t *)(o + 0x544u);
 
@@ -10703,6 +10717,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
     *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0x50u) =
         *(const uint8_t *)(o + OBJ_OFF_FACING);
+    }
     if (*(const int32_t *)(o + 0x70u) > 1)
         *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0xB0u) =
             *(const uint8_t *)(o + 0x530u);

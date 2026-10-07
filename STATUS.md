@@ -215,6 +215,14 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Step3Drive 419 -> 377, still 1532** (2026-10-07).
+    - A second hoist round, in apply mode, found four reads in Step3Drive
+      that the image takes ahead of their statement:
+      - the gun's heading;
+      - the turret's direction bits and bias;
+      - the army byte for CommMustBroadcast;
+      - the y for the engine sound, read ahead of ListFirstField548,
+        which takes a const object and only reads.
   - **Constructor and operand-order sweeps, still 1532** (2026-10-07).
     - All three probes can now find constructors (`??0Class` names).
     - HudPanel 64 -> 19: the panel's height goes through a local.
