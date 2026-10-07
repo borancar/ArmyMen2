@@ -6504,7 +6504,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
             SoldierNameOf(obj, name);
             SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
         } else {
-            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName(obj));
+            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName((AM2_Object *)obj));
         }
 #undef SCRIPT_NAME
 

@@ -420,7 +420,7 @@ int32_t __cdecl SaveDefaultCof(void)
         }
 
         if (ObjIsType2Inline(obj)) {
-            ObjDropAltRecord(obj);
+            ObjDropAltRecord((AM2_Object *)obj);
 
             Type238Action(obj, (g_levelId * 5 + 5) * 2);
             *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
@@ -1128,7 +1128,7 @@ int32_t __cdecl PlaceScenario(void)
             g_leaderPos;
         *(uint8_t *)(lead + OBJ_OFF_FACING) =
             g_leaderFacing;
-        ObjTileChanged(lead, 0, 0);
+        ObjTileChanged((AM2_Object *)lead, 0, 0);
         SetUnitPose(lead, 1);
         DeselectAll();
         SelectUnit(lead);
@@ -1169,7 +1169,7 @@ int32_t __cdecl PlaceScenario(void)
                         *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
                         *(uint8_t *)(obj + OBJ_OFF_FACING) =
                             g_leaderFacing;
-                        ObjTileChanged(obj, 0, 0);
+                        ObjTileChanged((AM2_Object *)obj, 0, 0);
                         SetUnitPose(obj, 1);
                         formed++;
                     }
@@ -2420,7 +2420,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
         *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
     *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
 
-    ApplyObjHeight(made,
+    ApplyObjHeight((AM2_Object *)made,
                           (int32_t)*(const int8_t *)(made + OBJ_OFF_HEIGHT_SET));
     return made;
 }

@@ -725,7 +725,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
-        ObjSetFieldA(made, (uint32_t)group);
+        ObjSetFieldA((AM2_Object *)made, (uint32_t)group);
 
         weapon = (uint8_t *)CreateWeapon(
                      g_dirScratch, slot,
@@ -745,7 +745,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         *(uint8_t *)(rows + ROW_OFF_HEADING) =
             *(const uint8_t *)(made + OBJ_OFF_FACING);
         StepObjRows((AM2_Object *)made);
-        ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+        ObjTileChanged((AM2_Object *)made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
         return;
     }
 
@@ -773,7 +773,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 *(const uint8_t *)(made + OBJ_OFF_FIELD_530);
 
         StepObjRows((AM2_Object *)made);
-        ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+        ObjTileChanged((AM2_Object *)made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
 
         n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
         rows = 0;
@@ -797,7 +797,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
         }
 
-        ObjSetFieldA(made, (uint32_t)group);
+        ObjSetFieldA((AM2_Object *)made, (uint32_t)group);
         return;
     }
 
@@ -848,7 +848,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                            where.y,
                            AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                            0, 0, 0, 1, facing);
-            ObjSetFieldA(occupant, (uint32_t)group);
+            ObjSetFieldA((AM2_Object *)occupant, (uint32_t)group);
 
             weapon = (uint8_t *)CreateWeapon(
                          g_dirScratch, slot,
@@ -884,7 +884,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;
             *(int32_t *)(occupant + OBJ_OFF_FIELD_540) = 1;
 
-            ObjTileChanged(occupant,
+            ObjTileChanged((AM2_Object *)occupant,
                            *(const int8_t *)(occupant + OBJ_OFF_HEIGHT_SET), 1);
         }
     }

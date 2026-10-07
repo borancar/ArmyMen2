@@ -165,7 +165,7 @@ again:
 
         CreateExplosion(where.x, where.y, 0x85, 0, 0, 0, 0, 0, 0, 0);
         *(uint32_t *)(u + OBJ_OFF_POS) = *(const uint32_t *)&where;
-        ObjTileChanged(u, 0, 0);
+        ObjTileChanged((AM2_Object *)u, 0, 0);
         return;
     case 4:                                     /* spidey senses tingling */
         HudMessage("I see everything!", kColour(((uintptr_t)&g_whiteInk)));

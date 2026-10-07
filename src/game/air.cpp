@@ -1627,8 +1627,8 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         && *(const int32_t *)(v + OBJ_OFF_ROW_COUNT) > 1)
         heading = *(const uint8_t *)(v + OBJ_OFF_FIELD_530);
 
-    hb = ObjHeight(b);
-    hv = ObjHeight(v);
+    hb = ObjHeight((const AM2_Object *)b);
+    hv = ObjHeight((const AM2_Object *)v);
     if (hb + AM2_SIGHT_OVERHEAD < hv)
         return;
 

@@ -1283,7 +1283,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
         if (!(*(const uint8_t *)(held + OBJ_OFF_FLAGS) & OBJ_FLAG_REPLACED))
             return;
 
-        RemoveInventoryItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
+        RemoveInventoryItem((AM2_Object *)trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
         if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
             am2_log("Weapon destroyed before dropping; but we handled it\n");
         return;
@@ -1544,7 +1544,7 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle)
     unit = (uint8_t *)LookupByUID(uid);
 
     *(int32_t *)(unit + OBJ_OFF_RIDING) = 0;
-    ApplyObjHeight(unit, *(const int8_t *)(v + OBJ_OFF_HEIGHT_SET));
+    ApplyObjHeight((AM2_Object *)unit, *(const int8_t *)(v + OBJ_OFF_HEIGHT_SET));
 }
 
 /* RecvVehicleExit -- original 0x0045EAA0, one caller.

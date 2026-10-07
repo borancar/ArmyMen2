@@ -1893,7 +1893,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                                  PackKey(type + 0x14, kind, 0),
                                  at, flags, 1, 0);
                 /* No null test of its own: ObjIsWatchedKind answers 0 for one. */
-                if (ObjIsWatchedKind(obj)
+                if (ObjIsWatchedKind((const AM2_Object *)obj)
                     && (int32_t)g_defaultOwner != army)
                     ObjConceal(obj, 1);
                 /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL

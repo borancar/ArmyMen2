@@ -150,7 +150,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
  * being declared here, because its only caller was in the same file. */
 void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot);
 
-void __cdecl StepType5(void *obj);
+void __cdecl StepType5(struct AM2_Object *obj);
 
 void __cdecl StepType6(void *obj);
 
@@ -159,7 +159,7 @@ int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
 
 void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 
-void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
+void __cdecl DeployVehicle(struct AM2_Object *obj, int32_t x, int32_t y,
                            int32_t resurrect);
 
 void __cdecl DeployItem(void *obj, AM2_Point where, int32_t resurrect,
@@ -215,7 +215,7 @@ static inline AM2_Object *OurLeaderUnit(void)
  * percentage, crediting our leader as the source. */
 void __cdecl MedkitHeal(void *obj);
 
-void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
+void __cdecl RemoveInventoryItem(struct AM2_Object *unit, int32_t slot);
 
 /* 0x00448D60, and it names itself in both log lines. Drop one inventory slot
  * on the ground. THE SLOT RANGE IS 1..5, not 0..5 -- slot 0 can never be
@@ -257,14 +257,14 @@ uint32_t __cdecl UidOnWire(uint32_t uid);
  * -1 for "any", which is how you filter a list by team. Against that,
  * AM2_Object already has an `owner` at +0x10, so if this is also an owner the
  * object carries two, and that wants explaining before it goes in a name. */
-uint32_t __cdecl ObjFieldA(const void *obj);
-void     __cdecl ObjSetFieldA(void *obj, uint32_t value);
+uint32_t __cdecl ObjFieldA(const struct AM2_Object *obj);
+void     __cdecl ObjSetFieldA(struct AM2_Object *obj, uint32_t value);
 
 /* Signed byte at +0x64. Read by three callers in 0x00420xxx, each passing it
  * straight to 0x0045F460 -- 3,200 bytes, no strings, unidentified. Sign
  * matters: the original uses movsx, so the field is int8_t and negative values
  * are meaningful. */
-int32_t __cdecl ObjFieldB(const void *obj);
+int32_t __cdecl ObjFieldB(const struct AM2_Object *obj);
 
 /* AM2_FireSpot, FireWeapon's spot argument, is objtable.h's: the sight
  * record embedded in AM2_Object carries one. */
@@ -306,7 +306,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp);
  * The index is read as a word and used unsigned, so an object with 0xFFFF
  * there reads 64K into the table. Nothing bounds it; the original does not
  * either. */
-int32_t __cdecl ObjTileAttr(const void *obj);
+int32_t __cdecl ObjTileAttr(const struct AM2_Object *obj);
 
 /* 0x00429540, three callers. The same byte taken by tile INDEX rather than by
  * object -- masked to 16 bits here where its neighbour reads a word, which is
@@ -467,7 +467,7 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
 
 /* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_FIELD_94
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
-int32_t __cdecl ObjIsWatchedKind(const void *obj);
+int32_t __cdecl ObjIsWatchedKind(const struct AM2_Object *obj);
 
 /* 0x00457DA0, one caller -- ShotStrike, once a shot has damaged something it
  * is not allied with. Award the shooter experience: 1 for anything, the
@@ -513,7 +513,7 @@ void __cdecl NextInventorySlot(void *obj);
  * "DamageTrooper: droping armor uid:%x". Take `amount` off a trooper, through
  * its ARMOUR if it is carrying any, and run the death tail if that empties it.
  * `d` is the direction the hit came from. */
-void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
+void __cdecl DamageTrooper(struct AM2_Object *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
 void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
@@ -552,18 +552,18 @@ void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc);
 
 /* 0x004294C0, fifteen callers. Recompute an object's tile from its position
  * and, if anything moved, put it back on the map. */
-void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force);
+void __cdecl ObjTileChanged(struct AM2_Object *obj, int32_t height, int32_t force);
 
 /* 0x0045B630. A vehicle has died. Its second argument is unused; see
  * item.cpp. */
-void __cdecl VehicleDied(void *obj, uint32_t by);
+void __cdecl VehicleDied(struct AM2_Object *obj, uint32_t by);
 
 /* 0x00447E50. A trooper has died; what it leaves belongs to the KILLER. */
-void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by);
+void __cdecl TrooperDied(struct AM2_Object *obj, int32_t a, uint32_t by);
 
 /* 0x004278E0. Give an object a height and push it into the depth sort. A ZERO
  * height means "take the tile's own"; see item.cpp. */
-void __cdecl ApplyObjHeight(void *obj, int32_t height);
+void __cdecl ApplyObjHeight(struct AM2_Object *obj, int32_t height);
 
 /* 0x00428F80. Move an object to a point, taking every one of its rows with
  * it. The secondary rows are offset by the first sprite's attach point. */
@@ -579,14 +579,14 @@ void *__cdecl UnitByUid(uint32_t uid);
 /* 0x004355D0, one caller. A second deadline on the mission clock, at +0x58:
  * once the clock is PAST it, bit 1 of the object's flags goes on. Unsigned
  * compare, and nothing clears the bit here. Both names are ours. */
-void __cdecl ObjMarkIfOverdue(void *obj);
+void __cdecl ObjMarkIfOverdue(struct AM2_Object *obj);
 
 /* 0x00429590, 24 callers. How high an object stands: the byte at +0x65 is an
  * absolute floor when it is non-zero and otherwise the tile's own attribute
  * byte is used; either way the SIGNED byte at +0x64 is added. So +0x64 is an
  * offset and +0x65 an override -- neither name is the program's, and the
  * override is read unsigned where the offset is read signed. */
-int32_t __cdecl ObjHeight(const void *obj);
+int32_t __cdecl ObjHeight(const struct AM2_Object *obj);
 
 /* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
  * still original -- both arguments go straight through. */
@@ -657,19 +657,19 @@ AM2_Object *__cdecl WeaponByUid(uint32_t uid);
 
 /* 0x00448880. The code of the weapon in a unit's selected inventory slot, or 0
  * when the slot is empty or does not hold a weapon. */
-int32_t __cdecl HeldWeaponCode(void *unit);
+int32_t __cdecl HeldWeaponCode(struct AM2_Object *unit);
 
 /* 0x0044BAF0. A unit's class name: "Sarge" when OBJ_OFF_SARGE is set, else
  * the name for its weapon's code, else entry 0. */
-const char *__cdecl UnitClassName(void *unit);
+const char *__cdecl UnitClassName(struct AM2_Object *unit);
 
 /* 0x004337C0. Can this item be picked up: a weapon, past its
  * OBJ_OFF_PICKUP_AFTER, with a code of 0x1F, 0x20 or 0x21. */
-int32_t __cdecl CanPickUp(void *obj);
+int32_t __cdecl CanPickUp(struct AM2_Object *obj);
 
 /* 0x00449200. Put an object into state 5 and give up its alternate table
  * record; idempotent, and what stops ObjsAreAllied choosing REC3 again. */
-void __cdecl ObjDropAltRecord(void *obj);
+void __cdecl ObjDropAltRecord(struct AM2_Object *obj);
 
 /* 0x00447570. An unused index into ADDR_SOLDIER_NAMES, marked taken. Returns
  * the random starting index unmarked when every name is gone. */

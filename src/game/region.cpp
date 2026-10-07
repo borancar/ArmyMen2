@@ -9272,7 +9272,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
             hit = WalkCellWrapper(o, aim);
             if (hit != 0) {
-                out->spot.ground = (uint16_t)(ObjHeight(hit) - 4);
+                out->spot.ground = (uint16_t)(ObjHeight((const AM2_Object *)hit) - 4);
                 o->ammo =
                     *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
             } else {
@@ -9319,7 +9319,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
         hit = WalkCellWrapper(o, aim);
         if (hit != 0) {
-            out->spot.ground = (uint16_t)(ObjHeight(hit) - 4);
+            out->spot.ground = (uint16_t)(ObjHeight((const AM2_Object *)hit) - 4);
             o->ammo =
                 *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
         } else {

@@ -172,14 +172,14 @@ uint32_t __cdecl UidOnWire(uint32_t uid)
 /* OBJ_OFF_FLAGS moved to orig.h, where air.cpp needs it too -- a local
  * copy of a shared offset is how two definitions of one field start. */
 
-uint32_t __cdecl ObjFieldA(const void *obj)
+uint32_t __cdecl ObjFieldA(const AM2_Object *obj)
 {
     const uint32_t *flags = (const uint32_t *)((const uint8_t *)obj + OBJ_OFF_FLAGS);
 
     return (*flags >> OBJ_FIELDA_SHIFT) & OBJ_FIELDA_MASK;
 }
 
-void __cdecl ObjSetFieldA(void *obj, uint32_t value)
+void __cdecl ObjSetFieldA(AM2_Object *obj, uint32_t value)
 {
     uint32_t *flags = (uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS);
 
@@ -188,9 +188,9 @@ void __cdecl ObjSetFieldA(void *obj, uint32_t value)
 }
 
 /* 0x00429560. movsx, so signed. */
-int32_t __cdecl ObjFieldB(const void *obj)
+int32_t __cdecl ObjFieldB(const AM2_Object *obj)
 {
-    return *(const int8_t *)((const uint8_t *)obj + 0x64);
+    return obj->heightAdj;
 }
 
 /* The three below stay original: writing one item, reading one item, and the
@@ -260,15 +260,13 @@ void __cdecl ItemsReset(void)
  * earlier: predicting a counter is not measuring it, and a prediction costs
  * nothing to check.
  */
-int32_t __cdecl HeldWeaponCode(void *unit)
+int32_t __cdecl HeldWeaponCode(AM2_Object *unit)
 {
-    const uint8_t *u = (const uint8_t *)unit;
+    const AM2_Object *u = unit;
     uint32_t       uid;
     AM2_Object    *obj;
 
-    uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                              + (size_t)*(const int32_t *)
-                                    (u + UNIT_OFF_INVENTORY_SEL) * 4);
+    uid = u->inventory[u->inventorySel];
     if (uid) {
         obj = LookupByUID(uid);
         if (ObjIsType4(obj))
@@ -308,18 +306,18 @@ int32_t __cdecl HeldWeaponCode(void *unit)
  * depend on the function running -- it rests on what the table holds, which is
  * six class names with "Sarge" in the slot before them.
  */
-const char *__cdecl UnitClassName(void *unit)
+const char *__cdecl UnitClassName(AM2_Object *unit)
 {
-    const uint8_t      *u = (const uint8_t *)unit;
+    const AM2_Object      *u = unit;
     const char *const  *names =
         g_unitClassNames;
     const uint8_t      *w;
 
-    if (*(const int32_t *)(u + OBJ_OFF_SARGE))
+    if (u->sarge)
         return g_unitNameSarge;
 
     w = (const uint8_t *)WeaponByUid(
-            *(const uint32_t *)(u + TROOPER_OFF_WEAPON_UID));
+            u->inventory[0]);
     if (w)
         return names[**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)];
     return names[0];
@@ -352,20 +350,20 @@ const char *__cdecl UnitClassName(void *unit)
  * type test on nearly all of them, so the cooldown comparison and the
  * three-code chain may be reached far less often than the count suggests.
  */
-int32_t __cdecl CanPickUp(void *obj)
+int32_t __cdecl CanPickUp(AM2_Object *obj)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
 
     if (!ObjIsType4((const AM2_Object *)obj))
         return 0;
 
-    if (*(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER)
+    if (o->pickupAfter
         > g_gameClockMs)
         return 0;
 
     /* Three arms that each return 1, not one arm with three labels: that is
      * the `sub; je; dec; je; dec; je` chain rather than a range test. */
-    switch (**(const int32_t *const *)(o + OBJ_OFF_FIELD_C0)) {
+    switch (*o->typeRec) {
     case 0x1F:
         return 1;
     case 0x20:
@@ -401,23 +399,23 @@ int32_t __cdecl CanPickUp(void *obj)
  * -- STATUS.md's standing ask for "a mission with something in it to kill".
  * One more function waiting on it.
  */
-void __cdecl ObjDropAltRecord(void *obj)
+void __cdecl ObjDropAltRecord(AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
 
     if (!obj)
         return;
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) == AM2_OBJ_STATE_5)
+    if (o->field530 == AM2_OBJ_STATE_5)
         return;
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_OBJ_STATE_5;
+    o->field530 = AM2_OBJ_STATE_5;
 
     /* The argument is the field just written, read back -- the original's
      * `mov edx, ecx` is that second value, not the first reused. */
-    *(void **)(o + SAVED_OFF_TABLE_REC2) = *(void *const *)(o + SAVED_OFF_TABLE_REC3);
-    *(void **)(o + SAVED_OFF_TABLE_REC3) = (void *)0;
+    o->tableRec2 = o->tableRec3;
+    o->tableRec3 = 0;
 
-    SetFieldInAll(o + OBJ_OFF_SUBRECORD, *(void *const *)(o + SAVED_OFF_TABLE_REC2));
+    SetFieldInAll(&o->rowSet, (void *)o->tableRec2);
 }
 
 /* 0x00447570, one caller. Take an unused soldier name.
@@ -1130,9 +1128,9 @@ int32_t __cdecl FreeItem(AM2_Object *item, int32_t unlink)
  * keeps a role name rather than a claim. */
 typedef void (__cdecl *AM2_SelectSlotFn)(void *unit, int32_t slot);
 
-void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
+void __cdecl RemoveInventoryItem(AM2_Object *unit, int32_t slot)
 {
-    uint8_t *u = (uint8_t *)unit;
+    AM2_Object *u = unit;
     int32_t  sel;
 
     /* The same comm field msgslot.cpp calls AM2_COMM_LOG_ENABLED, reached the
@@ -1148,22 +1146,21 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
 
     /* Only the entries ABOVE `slot` move, so the last slot shifts nothing. */
     if (slot < AM2_INVENTORY_SLOTS - 1)
-        orig_memmove(u + UNIT_OFF_INVENTORY + slot * 4,
-                     u + UNIT_OFF_INVENTORY + (slot + 1) * 4,
+        orig_memmove(&u->inventory[slot], &u->inventory[slot + 1],
                      (size_t)(0x14 - slot * 4));
 
     /* Cleared whether or not anything shifted, which is what stops the shift
      * leaving a duplicate at the top. */
-    *(int32_t *)(u + UNIT_OFF_INVENTORY_LAST) = 0;
+    u->inventory[AM2_INVENTORY_SLOTS - 1] = 0;
 
 /* Defined below, beside WeaponByUid. */
 void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 
-    sel = *(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL);
+    sel = u->inventorySel;
     if (sel == slot) {
         /* What was in hand has gone: reset and re-select, if the object
          * agrees it should. */
-        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = 0;
+        u->inventorySel = 0;
         if (ObjType2Field548((const AM2_Object *)unit))
             SelectInventorySlot(unit, 0);
         return;
@@ -1171,13 +1168,13 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
     /* Above the hole slides down; below is left alone. Equal was handled
      * above and cannot reach here. */
     if (sel > slot)
-        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = sel - 1;
+        u->inventorySel = sel - 1;
 }
 
 
-int32_t __cdecl ObjTileAttr(const void *obj)
+int32_t __cdecl ObjTileAttr(const AM2_Object *obj)
 {
-    uint32_t tile = *(const uint16_t *)((const uint8_t *)obj + OBJ_OFF_TILE);
+    uint32_t tile = obj->tile;
 
     return *(const int8_t *)(g_tileAttrs + tile);
 }
@@ -1522,18 +1519,18 @@ done:
  *
  * The second call re-reads OBJ_OFF_HEIGHT_SET rather than reusing the value it
  * just stored. Same number either way; written as the original has it. */
-void __cdecl ApplyObjHeight(void *obj, int32_t height)
+void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
 
     am2_height_log("ApplyObjHeight", obj, height);
 
     /* TileAttrAt's body, inline. */
     if (height == 0)
-        height = *(const int8_t *)(g_tileAttrs + *(const uint16_t *)(o + OBJ_OFF_TILE));
+        height = *(const int8_t *)(g_tileAttrs + o->tile);
 
     /* The row pointer is re-read at every use. */
-#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
+#define ROWS (((uint8_t *)o->rowSet.rows))
     switch (*(const int32_t *)o) {
     case 1:
     case 4:
@@ -1541,22 +1538,22 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
         return;
 
     case 2:
-        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        o->heightSet = (uint8_t)height;
         break;
 
     case 3:
-        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        o->heightSet = (uint8_t)height;
         *(int16_t *)(ROWS + OBJ_OFF_DEPTH_LAYER) =
             (int16_t)ScaleBy32Blocks((int8_t)height);
-        if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        if (o->rowSet.count > 1)
             *(int16_t *)(ROWS + AM2_OBJ_ROW_STRIDE + OBJ_OFF_DEPTH_LAYER) =
                 (int16_t)ScaleBy32Blocks(
-                    *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+                    o->heightSet);
         return;
 
     default:
-        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
-        if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 0)
+        o->heightSet = (uint8_t)height;
+        if (o->rowSet.count <= 0)
             return;
         break;
     }
@@ -1582,23 +1579,23 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
  *
  * The middle argument is read nowhere here and passed straight to the tail --
  * unlike VehicleDied's, which is read nowhere at all. */
-void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by)
+void __cdecl TrooperDied(AM2_Object *obj, int32_t a, uint32_t by)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
 
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE) {
+    if (o->flagsLo & MAPOBJ_FLAG_VISIBLE) {
         ItemPreDestroyAlias(o, (int32_t)((uintptr_t)g_objMapDesc));
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
+        o->flags &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
+    if (o->field5A4) {
         const uint8_t *killer = (const uint8_t *)LookupByUID(by);
         int16_t        army   = killer   /* a short: movsx ax, then movsx edx */
                                 ? *(const int8_t *)(killer + OBJ_OFF_ARMY)
                                 : AM2_ARMY_NEUTRAL;
 
-        orig_spawn_at(*(const int16_t *)(o + OBJ_OFF_X),
-                      *(const int16_t *)(o + OBJ_OFF_Y),
+        orig_spawn_at(o->pos.x,
+                      o->pos.y,
                       AM2_SPAWN_KIND_95, army, 0,
                       g_spawnExtra6628d4,
                       0, 0, 0, 0);
@@ -1624,23 +1621,23 @@ void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by)
  * vehicle that dies twice is taken off the map once. That idempotence is the
  * flag's, not the caller's.
  */
-void __cdecl VehicleDied(void *obj, uint32_t by)
+void __cdecl VehicleDied(AM2_Object *obj, uint32_t by)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
 
     (void)by;
 
-    *(int32_t *)(o + VEHICLE_OFF_DEATH_STATE) = 5;
-    *(int32_t *)(o + VEHICLE_OFF_DEAD)        = 1;
+    o->ctl.state = 5;
+    o->gate        = 1;
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-        ObjFlagClear0((AM2_MapRow *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE));
+    if (o->rowSet.count > 1)
+        ObjFlagClear0((AM2_MapRow *)(((uint8_t *)o->rowSet.rows) + AM2_OBJ_ROW_STRIDE));
 
     ObjClearFootprint(o);
 
-    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE) {
+    if (o->flagsLo & MAPOBJ_FLAG_VISIBLE) {
         ItemPreDestroyAlias(o, (int32_t)((uintptr_t)g_objMapDesc));
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
+        o->flags &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
     }
 }
 
@@ -1672,7 +1669,7 @@ void __cdecl VehicleDied(void *obj, uint32_t by)
  * The `force` arm has no such check. Ignoring it entirely leaves `mission` at
  * 281 and `bootcamp` at 76, and it writes no field to read back, so that one
  * stays verified by reading. */
-void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
+void __cdecl ObjTileChanged(AM2_Object *obj, int32_t height, int32_t force)
 {
     AM2_Object *o = (AM2_Object *)obj;   /* callers not typed yet */
 
@@ -1850,9 +1847,9 @@ int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref)
  * orig.h already records as a type id being matched rather than a count; its
  * neighbour 0x00516164 holds 0xE80609 and is matched against the same field.
  */
-int32_t __cdecl ObjIsWatchedKind(const void *obj)
+int32_t __cdecl ObjIsWatchedKind(const AM2_Object *obj)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
 
     if (!o)
         return 0;
@@ -1860,7 +1857,7 @@ int32_t __cdecl ObjIsWatchedKind(const void *obj)
         return 0;
 
     return *(const int32_t *)
-               (*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94) + 8)
+               (o->field94 + 8)
            == g_createWatchedKind;
 }
 
@@ -2929,7 +2926,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
         if (total >= AM2_BLOCK_FULL)
             return total;
 
-        if (ObjIsWatchedKind(o)
+        if (ObjIsWatchedKind((const AM2_Object *)o)
             && (!g_mpSession
                 || AM2_THE_COMM->CommMustBroadcast(
                                      (int16_t)*(const int8_t *)
@@ -3983,25 +3980,25 @@ void *__cdecl UnitByUid(uint32_t uid)
     return (void *)0;
 }
 
-int32_t __cdecl ObjHeight(const void *obj)
+int32_t __cdecl ObjHeight(const AM2_Object *obj)
 {
-    const uint8_t *o   = (const uint8_t *)obj;
-    uint8_t        set = *(o + OBJ_OFF_HEIGHT_SET);
+    const AM2_Object *o   = obj;
+    uint8_t        set = ((uint8_t)o->heightSet);
 
     if (set)
-        return *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) + (int32_t)(int8_t)set;
+        return o->heightAdj + (int32_t)(int8_t)set;
     /* TileAttrAt's body, inline as the image has it. */
-    return *(const int8_t *)(g_tileAttrs + *(const uint16_t *)(o + OBJ_OFF_TILE))
-           + *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ);
+    return *(const int8_t *)(g_tileAttrs + o->tile)
+           + o->heightAdj;
 }
 
-void __cdecl ObjMarkIfOverdue(void *obj)
+void __cdecl ObjMarkIfOverdue(AM2_Object *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+    AM2_Object *o = obj;
 
     if (g_gameClockMs
-        > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+        > o->deadline58)
+        o->flags |= OBJ_FLAG_REPLACED;
 }
 
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
@@ -4312,7 +4309,7 @@ void __cdecl PlaceObj(void *obj, AM2_Point where)
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
 
-    ObjTileChanged(obj, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 1);
+    ObjTileChanged((AM2_Object *)obj, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 1);
 
     if (ObjIsItem((const AM2_Object *)obj))
         ObjAfterMove(obj, 1, 0);
@@ -4384,7 +4381,7 @@ void __cdecl DeployItem(void *obj, AM2_Point where, int32_t resurrect,
         DeployTrooper(obj, WHERE.x, WHERE.y, resurrect);
         break;
     case 3:
-        DeployVehicle(obj, WHERE.x, WHERE.y, resurrect);
+        DeployVehicle((AM2_Object *)obj, WHERE.x, WHERE.y, resurrect);
         break;
     default:
         PlaceObj(obj, WHERE);
@@ -5107,10 +5104,10 @@ raise_k:
  * idiom TrooperFire has; AngleDelta masks both arguments with 0xFF, so the byte
  * is passed clean here.
  */
-void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
+void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
-#define o ((uint8_t *)obj)
+#define o (obj)
     uint8_t  *armour = (uint8_t *)0;
     AM2_Point at;
     int32_t   slot;
@@ -5120,45 +5117,45 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
     int32_t   limit;
     int32_t   odds;
 
-    if (o == (uint8_t *)0)
+    if (o == 0)
         return;
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+    if (o->health == 0)
         return;
 
-    *(o + OBJ_OFF_HIT_DIR) = (uint8_t)((d & 0xFF) < 1 ? 1 : (d & 0xFF));
-    *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
+    o->hitDir = (uint8_t)((d & 0xFF) < 1 ? 1 : (d & 0xFF));
+    o->hitTime =
         g_gameClockMs;
 
     /* The effect goes at the trooper's position raised by its own height. */
-    at = *(const AM2_Point *)(o + OBJ_OFF_POS);
+    at = o->pos;
     at.y -= (int16_t)ObjHeight(o);
 
 
     if (kind != 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE) {
         /* A kind-7 trooper picks one of four records at random; the pick is
          * a signed `% 4` of the roll. One call per arm. */
-        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+        if (o->soldierKind
             == AM2_SOLDIER_KIND_ACTION_A)
             SpawnHitEffect(&at,
                            (int32_t)((uintptr_t)g_objTableRecords)
                                + orig_game_rand() % 4 * AM2_OBJ_TABLE_REC_SIZE,
-                           *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
-                           *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+                           o->hitDir,
+                           o->heightSet);
         else
-            SpawnHitEffect(&at, *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
-                           *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
-                           *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+            SpawnHitEffect(&at, o->vehicleKind,
+                           o->hitDir,
+                           o->heightSet);
     }
 
     if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+                              (int16_t)o->owner))
         return;
 
     left   = 0;
     slot   = -1;
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-#define uid (((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i])
+#define uid ((&o->inventory[0])[i])
 
         if (uid != 0) {
             uint8_t *w = (uint8_t *)WeaponByUid((int32_t)uid);
@@ -5174,7 +5171,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         }
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_SOLDIER_KIND_3) {
+    if (o->soldierKind == AM2_SOLDIER_KIND_3) {
         if (amount > 0)
             amount--;
         if (kind == 1 && amount > 0)
@@ -5196,7 +5193,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
             RemoveInventoryItem(o, slot);
 
             if (AM2_THE_COMM->CommMustBroadcast(
-                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
+                                  (int16_t)o->owner)) {
                 const uint8_t *comm =
                     g_commObject;
 
@@ -5205,7 +5202,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                              *(const uint32_t *)(armour + OBJ_OFF_UID));
 
                 TrooperDropItemSend(o, armour, slot, 0,
-                                    *(const AM2_Point *)(o + OBJ_OFF_POS));
+                                    o->pos);
             }
 
             *(uint32_t *)(armour + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
@@ -5215,8 +5212,8 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         }
     }
 
-    if (amount > *(const int16_t *)(o + OBJ_OFF_HEALTH))
-        amount = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+    if (amount > o->health)
+        amount = o->health;
 
     /* Two of 256 rolls under 0x40, zero otherwise -- and it is a FLAGS word to
      * PlaySoundAt, not a volume. The original spells it setge/dec/and 2. */
@@ -5224,43 +5221,43 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
     if (!g_mpSession
         && g_invulnerable
-        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+        && (int32_t)o->owner
            == *(const int32_t *)&g_defaultOwner)
         return;
 
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0) {
+    if (o->sarge != 0) {
         if (amount > 0)
             SpeakLine(AM2_SPEECH_SARGE_HURT,
-                      *(const int8_t *)(o + OBJ_OFF_ARMY));
+                      o->owner);
     } else {
-        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+        if (o->soldierKind
             == AM2_SOLDIER_KIND_ACTION_A)
             PlaySoundAt(AM2_SND_HURT_KIND7, flags, 0,
-                        *(const int16_t *)(o + OBJ_OFF_X),
-                        *(const int16_t *)(o + OBJ_OFF_Y));
+                        o->pos.x,
+                        o->pos.y);
         else
             PlaySoundAt(AM2_SND_HURT, flags, 0,
-                        *(const int16_t *)(o + OBJ_OFF_X),
-                        *(const int16_t *)(o + OBJ_OFF_Y));
+                        o->pos.x,
+                        o->pos.y);
     }
 
-    *(int16_t *)(o + OBJ_OFF_HEALTH) =
-        (int16_t)(*(const int16_t *)(o + OBJ_OFF_HEALTH) - (int16_t)amount);
+    o->health =
+        (int16_t)(o->health - (int16_t)amount);
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
-        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
+    if (o->health == 0) {
+        if (o->flags & OBJ_FLAG_BIT0) {
             ItemPreDestroyAlias(o, (int32_t)((uintptr_t)g_objMapDesc));
-            *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT0;
+            o->flags &= ~(uint32_t)OBJ_FLAG_BIT0;
         }
 
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4) != 0) {
+        if (o->field5A4 != 0) {
             uint8_t *killer = (uint8_t *)LookupByUID(attacker);
             int16_t  army   = killer != (uint8_t *)0
                             ? (int16_t)*(const int8_t *)(killer + OBJ_OFF_ARMY)
                             : (int16_t)AM2_ARMY_NEUTRAL;
 
-            CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
-                            *(const int16_t *)(o + OBJ_OFF_Y),
+            CreateExplosion(o->pos.x,
+                            o->pos.y,
                             AM2_EXPL_TROOPER_GORE, army, 0,
                             g_spawnExtra6628d4,
                             0, 0, 0, 0);
@@ -5270,21 +5267,21 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
         /* Sarge's inventory goes on the ground around him, one item per step
          * of the table, and the loop has no bound past its five entries. */
-        if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0
+        if (o->sarge != 0
             && g_mpSession != 0
-            && ((const uint32_t *)(o + UNIT_OFF_INVENTORY))
+            && (&o->inventory[0])
                    [AM2_TROOPER_DROP_SLOT] != 0) {
 #define ring (g_dropRing)
             AM2_Point        where;
             int32_t          k = 1;
 
             do {
-                where.x = (int16_t)(ring[k - 1] + *(const int16_t *)(o + OBJ_OFF_X));
-                where.y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_Y) + ring[k]);
+                where.x = (int16_t)(ring[k - 1] + o->pos.x);
+                where.y = (int16_t)(o->pos.y + ring[k]);
                 TrooperDropItem(o, AM2_TROOPER_DROP_SLOT,
                                 where);
                 k += 2;
-            } while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
+            } while ((&o->inventory[0])
                          [AM2_TROOPER_DROP_SLOT] != 0);
         }
 
@@ -5292,7 +5289,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
     if (amount <= 0)
         return;
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != AM2_SOLDIER_KIND_3)
+    if (o->soldierKind != AM2_SOLDIER_KIND_3)
         return;
 
     limit = AM2_GORE_ANGLE;
@@ -5305,10 +5302,10 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
     /* The angle test is the original's abs() around a comparison -- a no-op
      * on 0/1, reproduced for the code it makes. */
     if (d > 0
-        && abs(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), d) <= limit)
+        && abs(AngleDelta(o->facing, d) <= limit)
         && (orig_game_rand() & 0xFF) < odds)
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
-                        *(const int16_t *)(o + OBJ_OFF_Y),
+        CreateExplosion(o->pos.x,
+                        o->pos.y,
                         AM2_EXPL_TROOPER_GORE, (int32_t)UidArmy(attacker),
                         attacker,
                         g_spawnExtra6628d4,
@@ -5781,7 +5778,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         DamageItem(obj, amount, extra, kind, attackerUid, 0);
         break;
     case 2:
-        DamageTrooper(obj, amount, extra, kind, attackerUid);
+        DamageTrooper((AM2_Object *)obj, amount, extra, kind, attackerUid);
         break;
     case 3:
         DamageVehicle(obj, amount, extra, kind, attackerUid);
@@ -6371,9 +6368,9 @@ void __cdecl ObjFrameStep(AM2_Object *o)
     case 4: if (LIVE) StepType1And4(o);      break;
     case 2:           StepType2(o);          break;
     case 3: if (LIVE) StepType3(o);          break;
-    case 5: if (LIVE) StepType5(obj);        break;
+    case 5: if (LIVE) StepType5((AM2_Object *)obj);        break;
     case 6: if (LIVE) StepType6(obj);        break;
-    case 7: if (LIVE) ObjMarkIfOverdue(obj); break;
+    case 7: if (LIVE) ObjMarkIfOverdue((AM2_Object *)obj); break;
     case 8: if (LIVE) StepType8(o);          break;
     }
 #undef LIVE
@@ -6797,7 +6794,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
     if ((*(int32_t *)(item + ITEM_OFF_AMMO) = ammo - 1) != 0)
         return;
 
-    RemoveInventoryItem(u, slot);
+    RemoveInventoryItem((AM2_Object *)u, slot);
 
     if (((AM2_Comm *)comm)->CommMustBroadcast(
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
@@ -6879,7 +6876,7 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, AM2_Point at)
             ((const AM2_Object *)item)->uid,
             *(const int32_t *)(item + ITEM_OFF_AMMO));
 
-    RemoveInventoryItem(u, slot);
+    RemoveInventoryItem((AM2_Object *)u, slot);
 
     if (!item)
         return;
@@ -6996,8 +6993,8 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
 
     switch (*(const int32_t *)o) {
-    case 2:  TrooperDied(obj, kind, by);       break;
-    case 3:  VehicleDied(obj, by);             break;
+    case 2:  TrooperDied((AM2_Object *)obj, kind, by);       break;
+    case 3:  VehicleDied((AM2_Object *)obj, by);             break;
     default:                                   break;
     }
 
@@ -10969,46 +10966,45 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
  * army gets OBJ_OFF_AI_MODE = 6, and the unconditional `= 1` a few stores
  * later overwrites it with no call or read in between. Kept as the original
  * has it; no A/B could show this, since both sides do the same thing. */
-void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
+void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
                            int32_t resurrect)
 {
-#define o ((uint8_t *)obj)
+#define o (obj)
     uint8_t  *row0;
     AM2_Point at;
     AM2_Point where;
     uint8_t   height;
     int32_t   i;
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+    o->flags &= ~(uint32_t)OBJ_FLAG_DESTROYED;
 
     at.x = (int16_t)x;
     at.y = (int16_t)y;
     where = at;
 
-    NearestClearVehiclePoint(o, *(const uint8_t *)(o + OBJ_OFF_FACING),
+    NearestClearVehiclePoint(o, o->facing,
                              where, &at);
-    *(AM2_Point *)(o + OBJ_OFF_POS) = at;
+    o->pos = at;
 
-    height = HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
-    *(o + OBJ_OFF_HEIGHT_SET) = height;
+    height = HeightAtPoint(o->pos);
+    o->heightSet = height;
     ObjTileChanged(o, (int32_t)(int8_t)height, 1);
 
-    row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    row0 = ((uint8_t *)o->rowSet.rows);
+    *(AM2_Point *)(row0 + ROW_OFF_X) = o->pos;
     ObjFlagSet0((AM2_MapRow *)row0);
     RowUpdate((AM2_MapRow *)row0, 0, g_mapDesc);
 
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        g_zeroPoint;
+    o->dest = g_zeroXY;
 
-    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
+    for (i = 1; i < o->rowSet.count; i++) {
+        uint8_t       *r = ((uint8_t *)o->rowSet.rows)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         /* The sprite is read through the object's rows at each use. */
-#define SPR0 (*(const uint8_t *const *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) \
+#define SPR0 (*(const uint8_t *const *)(((uint8_t *)o->rowSet.rows) \
                                        + ROW_OFF_SPRITE))
-        *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(AM2_Point *)(r + ROW_OFF_X) = o->pos;
         *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
         *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
 #undef SPR0
@@ -11017,41 +11013,41 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
     }
 
     ResetType2Fields(o);
-    memset(o + OBJ_OFF_FIELD_578, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
+    memset(&o->ctl, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
 
     /* Gated on `resurrect`, the fourth argument -- not on the position. The
      * original reads it at [esp+0x24] after two deferred cleanups, which is
      * arg3 and not the packed point that shares a slot with arg0. */
     if (resurrect != 0) {
-        uint8_t facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        uint8_t facing = o->facing;
 
-        *(o + OBJ_OFF_FIELD_530)   = facing;
-        *(o + OBJ_OFF_FACING_COPY) = facing;
-        *(o + OBJ_OFF_FIELD_578)   = facing;
-        *(o + OBJ_OFF_FACING_COPY2) = facing;
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_BIT0;
-        *(int32_t *)(o + OBJ_OFF_RANK) = 0;
-        *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
+        o->turretFacing   = facing;
+        o->facingCopy = facing;
+        o->ctl.heading   = facing;
+        o->ctl.aim = facing;
+        o->flags |= OBJ_FLAG_BIT0;
+        o->rank = 0;
+        o->repairFrame = 0;
 
         ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
 
         if (!ObjIsFriendly(o))
             ObjConceal(o, 0);
 
-        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+        if ((int32_t)o->owner
             != *(const int32_t *)&g_defaultOwner)
-            *(int32_t *)(o + OBJ_OFF_AI_MODE) = 6;   /* dead: see above */
+            o->aiMode = 6;   /* dead: see above */
 
         /* Re-stamped after the clear, and this is why the clear must come
          * first: 0x578 and 0x579 are inside it. */
-        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-        *(o + OBJ_OFF_FIELD_578)    = *(const uint8_t *)(o + OBJ_OFF_FACING);
-        *(o + OBJ_OFF_FACING_COPY2) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
-        *(int32_t *)(o + OBJ_OFF_FIELD_580) = 1;
-        *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
-        *(int32_t *)(o + OBJ_OFF_FIELD_58C) = 0;
-        *(int32_t *)(o + OBJ_OFF_FIELD_588) = 0;
-        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+        o->gate = 0;
+        o->ctl.heading    = o->facing;
+        o->ctl.aim = o->turretFacing;
+        o->ctl.state = 1;
+        o->sight.state = 0;
+        o->sight.seen = 0;
+        o->sight.hit = 0;
+        o->aiMode = 1;
     }
 
     SetKindFrames(o, 1);
@@ -11102,7 +11098,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
     height = HeightAtPoint(*(const AM2_Point *)(o + OBJ_OFF_POS));
     *(o + OBJ_OFF_HEIGHT_SET) = height;
-    ObjTileChanged(o, (int32_t)(int8_t)height, 1);
+    ObjTileChanged((AM2_Object *)o, (int32_t)(int8_t)height, 1);
 
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
@@ -12344,7 +12340,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
             ObjConceal(o, 1);
         }
 
-        if (ObjIsWatchedKind(o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
+        if (ObjIsWatchedKind((const AM2_Object *)o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
             ItemPostCreate((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
                            *(const AM2_Point *)(o + OBJ_OFF_POS));
 
@@ -12513,7 +12509,7 @@ have:
     if (set != AM2_DAMAGE_ITEM_SET)
         return;
 
-    if (ObjIsWatchedKind(obj)) {
+    if (ObjIsWatchedKind((const AM2_Object *)obj)) {
         uint8_t *owner = (uint8_t *)LookupOwnerObj(
             (uint32_t)*(const int8_t *)(o + OBJ_OFF_ARMY));
         uint32_t who = owner ? ((const AM2_Object *)owner)->uid
@@ -12613,10 +12609,10 @@ typedef int32_t (__cdecl *AM2_TimedDirFrame5Fn)(void *rows, int32_t dir);
  * ROW_OFF_Y_ADJUST is measured from, and when the flight dips below the
  * terrain the correction is added to THAT rather than to the height -- so the
  * missile keeps its trajectory and the sprite stops sinking. */
-void __cdecl StepType5(void *obj)
+void __cdecl StepType5(AM2_Object *obj)
 {
-#define o ((uint8_t *)obj)
-    uint8_t *def;
+#define o (obj)
+    const uint8_t *def;
     uint8_t *rows;
     int32_t  outcome = 6;
     int32_t  speed;
@@ -12625,7 +12621,7 @@ void __cdecl StepType5(void *obj)
 
     if (!o)
         return;
-    def = *(uint8_t *const *)(o + MISSILE_OFF_DEF);
+    def = o->field94;
     if (!def)
         return;
     if (!g_frameDeltaMs)
@@ -12635,43 +12631,43 @@ void __cdecl StepType5(void *obj)
 
     if (*(const int32_t *)(def + MISSILEDEF_OFF_FIELD_0C)) {
         /* Arced: gravity, and the height floors without stopping the fall. */
-        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) <= 0) {
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+        if (o->row0YAdjust <= 0) {
+            o->row0YAdjust = 0;
         } else {
             float f = g_frameDeltaSec
-                          * *(const float *)(o + MISSILE_OFF_VZ)
-                      + *(const float *)(o + MISSILE_OFF_FRAC_H);
+                          * o->velZ
+                      + o->subpixelZ;
             int32_t n = (int32_t)f;
 
-            *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
-            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0)
-                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
-            *(float *)(o + MISSILE_OFF_VZ) -=
+            o->subpixelZ = f - (float)n;
+            o->row0YAdjust += (int16_t)n;
+            if (o->row0YAdjust < 0)
+                o->row0YAdjust = 0;
+            o->velZ -=
                 g_gravity
                 * g_frameDeltaSec;
         }
-    } else if (*(const float *)(o + MISSILE_OFF_VZ)
+    } else if (o->velZ
                != g_floatZero) {
-        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > 0) {
+        if (o->row0YAdjust > 0) {
             float f = g_frameDeltaSec
-                          * *(const float *)(o + MISSILE_OFF_VZ)
-                      + *(const float *)(o + MISSILE_OFF_FRAC_H);
+                          * o->velZ
+                      + o->subpixelZ;
             int32_t n = (int32_t)f;
 
-            *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
+            o->subpixelZ = f - (float)n;
+            o->row0YAdjust += (int16_t)n;
             /* Driven through the floor: the clamp also stops the fall.
              * The image shares this block with the arm below (0x0043C1E8:
              * one `jge` past both stores), so the two must be identical. */
-            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0) {
-                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
-                *(float *)(o + MISSILE_OFF_VZ)       = 0.0f;
+            if (o->row0YAdjust < 0) {
+                o->row0YAdjust = 0;
+                o->velZ       = 0.0f;
             }
         } else {
             /* Flat and on the floor: it stops falling as well as sinking. */
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
-            *(float *)(o + MISSILE_OFF_VZ)       = 0.0f;
+            o->row0YAdjust = 0;
+            o->velZ       = 0.0f;
         }
     }
 
@@ -12680,16 +12676,16 @@ void __cdecl StepType5(void *obj)
 
     strike = 1;
     {
-        int32_t life = *(const int32_t *)(o + OBJ_OFF_FIELD_44)
+        int32_t life = o->field44
                        + *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
 
         /* Past twenty, the speed is scaled by how far through its life it is.
          * The divisor is the def's, so a longer-lived missile slows less. */
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0x14)
+        if (o->field44 > 0x14)
             speed = speed * life / *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
 
-        if (*(const int32_t *)(o + MISSILE_OFF_SCALED))
-            travel = (float)life * *(const float *)(o + MISSILE_OFF_SPEED_SCALE)
+        if (o->repairFrame)
+            travel = (float)life * o->speedScale
                      * g_frameDeltaSec;
         else
             travel = (float)life * g_frameDeltaSec;
@@ -12698,14 +12694,14 @@ void __cdecl StepType5(void *obj)
     if (*(const int32_t *)def == 3) {
         /* A trail lays a segment every AM2_MISSILE_TRAIL_MS; between segments
          * it flies without testing for a strike at all. */
-        uint32_t due = *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58);
+        uint32_t due = o->deadline58;
 
         if (g_gameClockMs - due
             < AM2_MISSILE_TRAIL_MS) {
             strike  = 0;
             outcome = 6;
         } else {
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+            o->deadline58 =
                 due + AM2_MISSILE_TRAIL_MS;
         }
     }
@@ -12717,22 +12713,22 @@ void __cdecl StepType5(void *obj)
 
         /* The fractions are accumulated in place and truncated from the
          * fields themselves. */
-        *(float *)(o + MISSILE_OFF_FRAC_X) +=
-            Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d;
-        *(float *)(o + MISSILE_OFF_FRAC_Y) +=
-            Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d;
-        nx = (int32_t)*(const float *)(o + MISSILE_OFF_FRAC_X);
-        ny = (int32_t)*(const float *)(o + MISSILE_OFF_FRAC_Y);
-        *(int16_t *)(o + OBJ_OFF_POS)     += (int16_t)nx;
-        *(int16_t *)(o + OBJ_OFF_POS + 2) += (int16_t)ny;
-        *(float *)(o + MISSILE_OFF_FRAC_X) -= (float)nx;
-        *(float *)(o + MISSILE_OFF_FRAC_Y) -= (float)ny;
+        o->subpixelX +=
+            Cos8(o->facing) * d;
+        o->subpixelY +=
+            Sin8(o->facing) * d;
+        nx = (int32_t)o->subpixelX;
+        ny = (int32_t)o->subpixelY;
+        o->pos.x     += (int16_t)nx;
+        o->pos.y += (int16_t)ny;
+        o->subpixelX -= (float)nx;
+        o->subpixelY -= (float)ny;
 
-        *(int32_t *)(o + MISSILE_OFF_FLOWN) += (int32_t)d;
+        o->flown += (int32_t)d;
 
         if (strike) {
-            outcome = ShotStrike(o, *(const AM2_Point *)(o + OBJ_OFF_POS),
-                                 *(const int16_t *)(o + MISSILE_OFF_HEIGHT));
+            outcome = ShotStrike(o, o->pos,
+                                 o->row0YAdjust);
             if (outcome != 6)
                 break;
         }
@@ -12740,8 +12736,8 @@ void __cdecl StepType5(void *obj)
     }
 
 after_flight:
-    def  = *(uint8_t *const *)(o + MISSILE_OFF_DEF);
-    rows = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
+    def  = o->field94;
+    rows = ((uint8_t *)o->rowSet.rows);
 
     switch (*(const int32_t *)def) {
     case 3:
@@ -12750,19 +12746,19 @@ after_flight:
          * ahead is more than 0x14 away and less than a second old, this one
          * jumps to a point 18 units off it on a random spread. */
         if (!TimedDirFrame(rows,
-                                   *(const uint8_t *)(o + OBJ_OFF_FACING)))
+                                   o->facing))
             outcome = 4;
-        if (*(const uint32_t *)(o + MISSILE_OFF_NEXT_UID)) {
+        if ((uint32_t)o->scriptState) {
             uint8_t *ahead = (uint8_t *)LookupByUID(
-                *(const uint32_t *)(o + MISSILE_OFF_NEXT_UID));
+                (uint32_t)o->scriptState);
 
             if (!ahead) {
-                *(uint32_t *)(o + MISSILE_OFF_NEXT_UID) = 0;
-            } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                o->scriptState = 0;
+            } else if (ApproxDist(&o->pos,
                                   (const AM2_Point *)(ahead + OBJ_OFF_POS))
                            > 0x14
                        && g_gameClockMs
-                              - *(const uint32_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS)
+                              - *(const uint32_t *)(((uint8_t *)o->rowSet.rows)
                                                     + 0x54) < 0x3E8) {
                 uint8_t spread;
 
@@ -12770,7 +12766,7 @@ after_flight:
                  * two off, a non-negative one adds two, and the random part is
                  * `orig_game_rand() % 6` either way. */
                 if (AngleDelta(*(const uint8_t *)(ahead + OBJ_OFF_FACING),
-                               *(const uint8_t *)(o + OBJ_OFF_FACING)) < 0)
+                               o->facing) < 0)
                     spread = (uint8_t)(*(const uint8_t *)(ahead
                                                           + OBJ_OFF_FACING)
                                        - (uint8_t)(orig_game_rand() % 6) - 2);
@@ -12789,10 +12785,10 @@ after_flight:
                         Sin8(spread) * AM2_MISSILE_TRAIL_SPACING
                         + (float)*(const int16_t *)(ahead + OBJ_OFF_POS + 2));
 
-                    *(int16_t *)(o + OBJ_OFF_POS)     = px;
-                    *(int16_t *)(o + OBJ_OFF_POS + 2) = py;
+                    o->pos.x     = px;
+                    o->pos.y = py;
                 }
-                *(o + OBJ_OFF_FACING) = *(const uint8_t *)(ahead
+                o->facing = *(const uint8_t *)(ahead
                                                            + OBJ_OFF_FACING);
             }
         }
@@ -12804,17 +12800,17 @@ after_flight:
          * clock rather than on a roll -- `clock % 5 < 3`. */
         uint32_t now = g_gameClockMs;
 
-        if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+        if (now - o->deadline58
             > AM2_MISSILE_SMOKE_MS) {
-            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = now;
+            o->deadline58 = now;
             /* One call per kind, as the image has them. */
             if ((now % 5) < 3)
-                CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                CreateExplosion(o->pos.x,
+                                o->pos.y,
                                 0x92, -1, 0, 0, 0, 0, 0, 0);
             else
-                CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                                *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                CreateExplosion(o->pos.x,
+                                o->pos.y,
                                 0x79, -1, 0, 0, 0, 0, 0, 0);
 
         }
@@ -12825,12 +12821,12 @@ after_flight:
     }
 
     /* The row rides MISSILE_OFF_GROUND, not the ground under it. */
-    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(AM2_Point *)(rows + ROW_OFF_X) = o->pos;
     *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
-        (int16_t)(*(const int16_t *)(o + MISSILE_OFF_HEIGHT)
-                  - *(const int16_t *)(o + MISSILE_OFF_GROUND));
+        (int16_t)(o->row0YAdjust
+                  - o->ground);
     RowUpdate((AM2_MapRow *)rows, 0, g_mapDesc);
-    ObjTileChanged(o, *(const int16_t *)(o + MISSILE_OFF_HEIGHT), 0);
+    ObjTileChanged(o, o->row0YAdjust, 0);
 
     /* Crossed from open ground onto blocked: clamp the flight DOWN to just
      * clear the new terrain (want = ground + overhead), and move the GROUND
@@ -12840,91 +12836,86 @@ after_flight:
      * this was written `<` (raise when lower), the opposite sense, which left
      * the port's missile one tile too high crossing a boundary so it detonated
      * a pixel off. */
-    if ((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE)
-        != *(const int32_t *)(o + OBJ_OFF_PREV_TILE)) {
+    if ((int32_t)o->tile
+        != (int32_t)o->prevTile) {
         const uint8_t *flags = g_tileFlags;
 
-        if ((flags[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)] & AM2_TILE_OPEN)
-            && !(flags[*(const uint16_t *)(o + OBJ_OFF_TILE)]
+        if ((flags[(int32_t)o->prevTile] & AM2_TILE_OPEN)
+            && !(flags[o->tile]
                  & AM2_TILE_OPEN)) {
             int16_t want = (int8_t)HeightAtPoint(
-                               *(const AM2_Point *)(o + OBJ_OFF_POS))
+                               o->pos)
                            + AM2_SIGHT_OVERHEAD;
 
-            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > (int16_t)want) {
-                *(int32_t *)(o + MISSILE_OFF_GROUND) +=
-                    want - *(const int16_t *)(o + MISSILE_OFF_HEIGHT);
-                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = (int16_t)want;
+            if (o->row0YAdjust > (int16_t)want) {
+                o->followers.count +=
+                    want - o->row0YAdjust;
+                o->row0YAdjust = (int16_t)want;
             }
         }
     }
 
     if (outcome >= 5) {
-        if (!*(const int32_t *)(*(uint8_t *const *)(o + MISSILE_OFF_DEF)
+        if (!*(const int32_t *)(o->field94
                                 + MISSILEDEF_OFF_FIELD_0C)
-            && *(const int32_t *)(o + MISSILE_OFF_FLOWN) > speed)
+            && o->flown > speed)
             goto expire;
         if (outcome != 5)
             return;
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x90, 4,
+        CreateExplosion(o->pos.x,
+                        o->pos.y, 0x90, 4,
                         0, 0, 0, 0, 0, 0);
         /* Its own copy of the function's tail (the flag store), not a jump
          * to the one at the end. */
-        *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
+        o->flags |= 2;
         return;
     }
 
 expire:
     /* The impact, by def kind. Generated from the byte table -- see above. */
-    switch (*(const int32_t *)(*(uint8_t *const *)(o + MISSILE_OFF_DEF))) {
+    switch (*(const int32_t *)(o->field94)) {
     case 1: case 7: case 8: case 9: case 10: case 21: case 29: case 30:
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x7B,
-                        (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
-                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
+        CreateExplosion(o->pos.x,
+                        o->pos.y, 0x7B,
+                        (int8_t)(uint8_t)o->owner,
+                        o->shooterUid,
                         0, 0, 0, 0,
-                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                        (uint8_t)(o->facing
                                   + 0x80));
         break;
     case 4: case 6:
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x94,
-                        (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
-                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
-                        *(const int32_t *)(*(uint8_t *const *)(
-                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+        CreateExplosion(o->pos.x,
+                        o->pos.y, 0x94,
+                        (int8_t)(uint8_t)o->owner,
+                        o->shooterUid,
+                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
                         0, 0, 0,
-                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                        (uint8_t)(o->facing
                                   + 0x80));
         break;
     case 2:
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2)
-                        - *(const int16_t *)(o + MISSILE_OFF_HEIGHT)
-                        + *(const int32_t *)(o + MISSILE_OFF_GROUND),
-                        0x8C, (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
-                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
-                        *(const int32_t *)(*(uint8_t *const *)(
-                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+        CreateExplosion(o->pos.x,
+                        o->pos.y
+                        - o->row0YAdjust
+                        + o->followers.count,
+                        0x8C, (int8_t)(uint8_t)o->owner,
+                        o->shooterUid,
+                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
                         0, 0, 0,
-                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                        (uint8_t)(o->facing
                                   + 0x80));
         break;
     case 5:
         /* The y is the full sum, not cut back to sixteen bits. */
-        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                        (*(const int16_t *)(o + OBJ_OFF_POS + 2)
-                                  - *(const int16_t *)(o
-                                                       + MISSILE_OFF_HEIGHT)
-                                  + *(const int32_t *)(o
-                                                       + MISSILE_OFF_GROUND)),
-                        0x81, (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
-                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
-                        *(const int32_t *)(*(uint8_t *const *)(
-                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+        CreateExplosion(o->pos.x,
+                        (o->pos.y
+                                  - o->row0YAdjust
+                                  + o->followers.count),
+                        0x81, (int8_t)(uint8_t)o->owner,
+                        o->shooterUid,
+                        *(const int32_t *)(o->field94 + MISSILEDEF_OFF_HEAL_PCT),
                         0, 0, 0,
-                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                        (uint8_t)(o->facing
                                   + 0x80));
         break;
     default:
@@ -12932,7 +12923,7 @@ expire:
         break;
     }
 
-    *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
+    o->flags |= 2;
 #undef o
 }
 
@@ -14102,7 +14093,7 @@ void __cdecl CreateWatchedItem(void *weapon, void *obj, AM2_Point at,
     ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), point);
 
     *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
-    ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+    ObjTileChanged((AM2_Object *)item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
 
     /* The original loads ecx with the comm object first and AllyFlag ignores
      * it -- army.h records that of both existing call sites, and this is a
@@ -14135,7 +14126,7 @@ void __cdecl CreateWatchedType(void *weapon, void *obj, AM2_Point at,
         return;
 
     *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
-    ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+    ObjTileChanged((AM2_Object *)item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
 
     (void)weapon;
 }

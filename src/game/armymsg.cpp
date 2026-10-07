@@ -1465,7 +1465,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
         if (request != AM2_DO_DROP)
             return;
 
-        RemoveInventoryItem(t,
+        RemoveInventoryItem((AM2_Object *)t,
                             *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
 
         if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))

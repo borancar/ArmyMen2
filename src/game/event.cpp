@@ -1145,7 +1145,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
             continue;
         }
 
-        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA((const AM2_Object *)obj)) {
             i++;
             continue;
         }
@@ -2132,7 +2132,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
             continue;
         }
 
-        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA((const AM2_Object *)obj)) {
             i++;
             continue;
         }
@@ -2593,7 +2593,7 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
-    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (void *)0);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
 }
@@ -2638,7 +2638,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
     lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
 
-    FireWeapon(weapon, unit, ObjHeight(unit), heading, spot, target);
+    FireWeapon(weapon, unit, ObjHeight((const AM2_Object *)unit), heading, spot, target);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = (int8_t)lent;
 }
@@ -2664,7 +2664,7 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
-    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (void *)0);
 }
 
 /* 0x00420300. The unit's own held weapon, at another object.
@@ -2697,7 +2697,7 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
                                (const AM2_Point *)(target + OBJ_OFF_POS));
 
-    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, target);
+    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, target);
 }
 
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.
@@ -3072,7 +3072,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
 
         if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             && ObjIsTypeIn238((const AM2_Object *)obj)
-            && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA(obj)))
+            && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA((const AM2_Object *)obj)))
             ObjAttachTo((AM2_Object *)obj, (AM2_Object *)target);
         i++;
     }

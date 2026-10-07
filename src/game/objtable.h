@@ -242,6 +242,12 @@ typedef struct AM2_Object {
             uint32_t chainUid;      /*   +0xA8 OBJ_OFF_CHAIN_UID, the head */
             uint32_t chainNextUid;  /*   +0xAC OBJ_OFF_CHAIN_NEXT_UID */
         };
+        struct {                    /*   a missile's (type 5): */
+            float    speedScale;    /*   +0xA4 MISSILE_OFF_SPEED_SCALE, multiplies the step */
+            int16_t  ground;        /*   +0xA8 MISSILE_OFF_GROUND */
+            uint8_t  _padaa[2];
+            int32_t  flown;         /*   +0xAC MISSILE_OFF_FLOWN, units travelled */
+        };
         struct {                    /*   types 2, 3 and 8: who follows it, */
             int32_t   capacity;     /*   OBJ_OFF_PTR_LIST, a pointer list */
             int32_t   count;        /*   SUBREC_OFF_COUNT */
