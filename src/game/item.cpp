@@ -3722,7 +3722,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
                     return 1;
             }
         } else if (ObjIsWatchedKind(obj)) {
-            if (from->owner != obj->owner
+            if (obj->owner != from->owner
                 || g_gameClockMs - obj->deadline58 > AM2_COLLIDE_OWN_DELAY)
                 return 1;
         }

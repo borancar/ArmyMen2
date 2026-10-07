@@ -776,7 +776,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 
             n = 0;
             while (1) {
-                if (!(width > x && n < AM2_RLE_RUN_MAX
+                if (!(x < width && n < AM2_RLE_RUN_MAX
                       && BitmapBitSet(pixels, x, row, height, stride)))
                     break;
                 x++;

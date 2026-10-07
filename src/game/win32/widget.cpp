@@ -8092,7 +8092,11 @@ AM2_HudPanel::AM2_HudPanel()
         w->x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
     w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
-    w->h = spr->bounds.bottom;
+    {
+        int32_t h = spr->bounds.bottom;
+
+        w->h = h;
+    }
     *(int32_t *)(self + HUDPANEL_OFF_STOP) = w->x;
     *(int32_t *)(self + HUDPANEL_OFF_OPEN) = 1;
     g_hudPanelX = w->x;
@@ -9663,12 +9667,16 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 #define COUNT   (**(const int32_t *const *)(CB + LIST_OFF_ROWS))
             if (HOT >= TOP + VISIBLE)
                 TOP = HOT - VISIBLE + 1;
-            *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
-                ThumbShift(TOP, COUNT - VISIBLE,
-                           *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN)
-                           - (*(const AM2_Sprite *const *)((uint8_t *)bar
-                                                           + ARROWBAR_OFF_SPRITE0))
-                                 ->bounds.bottom);
+            {
+                int32_t span = *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN);
+
+                *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
+                    ThumbShift(TOP, COUNT - VISIBLE,
+                               span
+                               - (*(const AM2_Sprite *const *)((uint8_t *)bar
+                                                               + ARROWBAR_OFF_SPRITE0))
+                                     ->bounds.bottom);
+            }
 #undef CB
 #undef HOT
 #undef TOP

@@ -215,6 +215,14 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **Constructor and operand-order sweeps, still 1532** (2026-10-07).
+    - All three probes can now find constructors (`??0Class` names).
+    - HudPanel 64 -> 19: the panel's height goes through a local.
+    - MpPanelScreen 260 -> 257: the bar's span goes through a local.
+    - `commute.py` swaps the operands of one comparison or commutative
+      operator at a time:
+      - ObjCollidesWith 17 -> 15.
+      - BoxAction, ListMaskAction and LoadShadowBmp, a byte or two each.
   - **Probe sweeps, still 1532** (2026-10-07).
     - Guarded `swap.py` over every unmatched function:
       - ScriptParseActionRecon 478 -> 458.

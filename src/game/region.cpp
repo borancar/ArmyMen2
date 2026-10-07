@@ -1867,7 +1867,7 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
            (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
 
     stride = box[2] - box[0] + 1;
-    for (y = c.top; y <= c.bottom; y++) {
+    for (y = c.top; c.bottom >= y; y++) {
         if (c.right < c.left)
             continue;
         memset(cells + (y - box[1]) * stride - box[0] + c.left,
@@ -2823,7 +2823,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
         k        = 8 - phase;
     }
 
-    for (y = world.top; world.bottom > y; y += 8) {
+    for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y) - oy) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
