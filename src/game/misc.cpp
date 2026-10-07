@@ -3054,10 +3054,10 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
                       &box, g_objMapDesc);
             while (obj != 0) {
                 if (ObjIsTypeIn238((const AM2_Object *)obj))
-                    DamageObject(obj, 1, 1,
+                    DamageObject((AM2_Object *)obj, 1, 1,
                                  *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
                 else if (*(const int32_t *)(r + SEQ_OFF_FIELD_0C) > 9)
-                    DamageObject(obj, 0x0F, 1,
+                    DamageObject((AM2_Object *)obj, 0x0F, 1,
                                  *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
                 obj = *(uint8_t **)(obj + 0x68u);
             }

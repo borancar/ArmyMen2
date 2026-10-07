@@ -4384,7 +4384,7 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
     o = (uint8_t *)ObjectsHitByPoint(&hit,
                                      g_objMapDesc);
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT))
-        DamageObject(o, g_aimDamage, 1,
+        DamageObject((AM2_Object *)o, g_aimDamage, 1,
                      uid, 0, 0);
 }
 
@@ -16616,23 +16616,22 @@ void __cdecl PointerInvokeClick(void)
     PlaySoundAt(0, 0, 0, 0, 0);
 }
 
-void __cdecl ObjFreeze(void *o)
+void __cdecl ObjFreeze(AM2_Object *o)
 {
-    uint8_t *obj = (uint8_t *)o;
+    AM2_Object *obj = o;
     int32_t  type;
 
     if (!obj)
         return;
 
-    type = *(const int32_t *)obj;
+    type = (int32_t)obj->type;
     if (type < 2)
         return;
     if (type > 3 && type != 8)
         return;
 
-    *(int32_t *)(obj + OBJ_OFF_AI_MODE) = AM2_AI_MODE_IGNORE;
-    *(int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
-        *(const int32_t *)&g_zeroPoint;
+    obj->aiMode      = AM2_AI_MODE_IGNORE;
+    obj->scriptPoint = g_zeroXY;
 }
 
 void __cdecl PointerInvokeFreezeArmy(void)

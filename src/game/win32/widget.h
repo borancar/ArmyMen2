@@ -2741,7 +2741,7 @@ void __cdecl SetPointerMode(int32_t mode);
 void __cdecl PointerInvokeClick(void);
 void __cdecl PointerInvokeFreezeArmy(void);
 void __cdecl PointerInvokeFreezeSelected(void);
-void __cdecl ObjFreeze(void *obj);
+void __cdecl ObjFreeze(struct AM2_Object *o);
 
 /* 0x00458A20. The ACTION slot of pointer mode 3: drop what our leader holds.
  * Both arguments are ignored -- the shape is the slot's, not its own. */

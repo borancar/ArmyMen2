@@ -3447,7 +3447,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
 
     o = (uint8_t *)ObjByUidAlias((head & 0x1FFFFFFFu)
                                  | ((uint32_t)army << 29));
-    ObjClearFootprint(o);
+    ObjClearFootprint((AM2_Object *)o);
 
     if (head & 0x80000000u) {
         /* Twelve bits an axis: a low byte each, then a byte holding both
@@ -3487,7 +3487,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
      * driven by its owner's packets, not by a route of ours. */
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         g_zeroPoint;
-    ObjSetFootprint(o);
+    ObjSetFootprint((AM2_Object *)o);
 
     if (*(const int32_t *)(g_commObject
                            + COMM_OFF_VERBOSE))

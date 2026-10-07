@@ -35,7 +35,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
 /* 0x00429220, one caller -- the deploy dispatcher's default arm. Put an
  * object at a point: move every row, take it off the map and put it back,
  * re-apply its height. */
-void __cdecl PlaceObj(void *obj, AM2_Point where);
+void __cdecl PlaceObj(struct AM2_Object *obj, AM2_Point where);
 
 /* 0x00433C20, three callers. The height handler for types 1 and 4: stamp the
  * height, recompute the row's depth key from it, and do the same down the
@@ -148,7 +148,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
  * of which eighteen entries make nothing. */
 /* 0x00448540, and now two callers: it was defined in item.cpp without ever
  * being declared here, because its only caller was in the same file. */
-void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot);
+void __cdecl TrooperPickupItem(struct AM2_Object *trooper, struct AM2_Object *item, int32_t slot);
 
 void __cdecl StepType5(struct AM2_Object *obj);
 
@@ -162,17 +162,17 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 void __cdecl DeployVehicle(struct AM2_Object *obj, int32_t x, int32_t y,
                            int32_t resurrect);
 
-void __cdecl DeployItem(void *obj, AM2_Point where, int32_t resurrect,
+void __cdecl DeployItem(struct AM2_Object *obj, AM2_Point where, int32_t resurrect,
                         int32_t suppress);
 
-void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
+void __cdecl DamageObject(struct AM2_Object *obj, int32_t amount, int32_t kind,
                           uint32_t attackerUid, uint8_t extra,
                           int32_t suppress);
 
 /* Original: 0x00428370, eight callers. Heal `obj` by `pct` percent of its
  * maximum health, clamped both ends, and raise the heal event. Items ignore
  * the percentage and go to full; nothing at or below zero health is healed. */
-void __cdecl HealObject(void *obj, int32_t pct, void *src);
+void __cdecl HealObject(struct AM2_Object *obj, int32_t pct, struct AM2_Object *src);
 
 /* Our leader, the way every pointer handler in this band gets it -- including
  * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
@@ -272,8 +272,8 @@ int32_t __cdecl ObjFieldB(const struct AM2_Object *obj);
 /* Reconstructed now, so the seam is gone and the eight call sites reach it
  * directly. The typedef went with it: its whole purpose was to give the
  * indirect call a shape. */
-int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
-                           int32_t heading, AM2_FireSpot spot, void *target);
+int32_t __cdecl FireWeapon(struct AM2_Object *weapon, struct AM2_Object *unit, int16_t height,
+                           int32_t heading, AM2_FireSpot spot, struct AM2_Object *target);
 
 /* 0x00428950 and 0x00428BB0. The item section of a savegame, both named by
  * their own counts -- "Saved %d items" and "Loaded %d items".
@@ -360,7 +360,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, AM2_Point at, void *chain,
 /* 0x0043C8D0, six call sites. Put a roach's footprint ON the map -- the exact
  * partner of the below, eighty-seven instructions each and four lines of diff.
  * Was ADDR_ROACH_STEP_TAIL_B, a role name from one call site. */
-void __cdecl ObjSetRoachFootprint(void *obj);
+void __cdecl ObjSetRoachFootprint(struct AM2_Object *obj);
 
 /* 0x0043CDD0, two callers -- LoadType8 and the spawner at 0x00420B33.
  * Allocate a roach, seed it from the ROACH_* constants aai/game.aai names,
@@ -422,7 +422,7 @@ void __cdecl RoachBite(AM2_Object *o);
 /* 0x00448280, eight callers. When a weapon leaves the map in a multiplayer
  * game the HOST puts another one back where it was, once. Four gates, the
  * second of which -- an ADDR_MP_SESSION -- no drive here can satisfy. */
-void __cdecl WeaponRespawn(void *obj);
+void __cdecl WeaponRespawn(struct AM2_Object *obj);
 
 /* 0x00417930, one caller -- a cheat's effect. Twenty-five armed enemies appear
  * at random points inside the visible view, each with an explosion where it
@@ -453,10 +453,10 @@ void __cdecl RoachAliveStepB(AM2_Object *o, AM2_RoachOut *step);
  * pair, of which the roach pair is the special case. Lay an object's mask over
  * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record
  * [kind * 32 + dir]. Gated on OBJ_FLAG_FOOTPRINT_ON each way round. */
-void __cdecl ObjSetFootprint(void *obj);
-void __cdecl ObjClearFootprint(void *obj);
+void __cdecl ObjSetFootprint(struct AM2_Object *obj);
+void __cdecl ObjClearFootprint(struct AM2_Object *obj);
 
-void __cdecl ObjClearRoachFootprint(void *obj);
+void __cdecl ObjClearRoachFootprint(struct AM2_Object *obj);
 
 /* RoachMaskWeight's point is a SCALAR, a packed x/y dword, where most of
  * this file passes AM2_Point. Not an oversight: VC6 allocates registers in
@@ -473,7 +473,7 @@ int32_t __cdecl ObjIsWatchedKind(const struct AM2_Object *obj);
  * is not allied with. Award the shooter experience: 1 for anything, the
  * target's rank + 1 if it is a live trooper, vehicle or roach, three times
  * that if the shot killed it, and 100 for a killed Sarge. */
-void __cdecl ShooterReact(void *shooter, void *target);
+void __cdecl ShooterReact(struct AM2_Object *shooter, struct AM2_Object *target);
 
 /* 0x00433980, nine callers. The type-1 creator: a composite key builds a
  * parent and its numbered children by recursion, a leaf key allocates one
@@ -590,14 +590,14 @@ int32_t __cdecl ObjHeight(const struct AM2_Object *obj);
 
 /* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
  * still original -- both arguments go straight through. */
-void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);
+void __cdecl ItemPreDestroyAlias(struct AM2_Object *obj, int32_t arg);
 
 /* 0x0041D3A0. One row's teardown: unregister it from the map's cell lists and
  * free the buffer it owns, both gated on the single flag at +0x34. */
 void __cdecl RowRelease(struct AM2_MapRow *row, struct AM2_MapDesc *desc);
 
 /* 0x00428DA0, 22 callers. Destroy an object by type, then broadcast. */
-void __cdecl DestroyByType(void *obj);
+void __cdecl DestroyByType(struct AM2_Object *obj);
 
 /* 0x00428C40. Free every item past its deadline; runs on leaving a level. */
 void __cdecl FreeOverdueItems(void);
@@ -883,7 +883,7 @@ void *__cdecl HeldWeaponObj(const void *obj);
 
 /* 0x0045A030, reached by address from the army walker. Hand a unit to the
  * AI: stop it firing if alive, and give Sarge stance 6. */
-void __cdecl ObjToAI(void *obj);
+void __cdecl ObjToAI(struct AM2_Object *obj);
 
 /* 0x0045B000, three callers. Set the soldier kind and put the first two rows
  * on the frames that go with it, skipping any row mid-animation. */
@@ -985,7 +985,7 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
  * A/B and no counter could reach it. The caller also pushes the firer's army
  * and position, which the body never reads. */
 void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
-                             uint32_t at);
+                             AM2_Point at);
 
 
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
@@ -1000,7 +1000,7 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit);
 
 /* 0x004578A0, one caller. Call a function for every selected object, dropping
  * stale and destroyed entries as it goes. */
-void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj));
+void __cdecl ForEachSelected(void (__cdecl *fn)(AM2_Object *obj));
 void __cdecl InitItemHeaderSize(void);
 
 /* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a

@@ -71,9 +71,9 @@ extern "C" const char *const am2_cheat_words[41] = {
 /* The callback `doctor doctor` hands ForEachArmyObject, at 0x00417A90.  It
  * heals each of the army's objects by 100 with the leader as the source --
  * which it looks up per object rather than once, as the image does. */
-static void __cdecl CheatHealOne(void *obj)
+static void __cdecl CheatHealOne(AM2_Object *obj)
 {
-    HealObject(obj, 0x64, LookupOwnerObj(g_defaultOwner));
+    HealObject(obj, 0x64, (AM2_Object *)LookupOwnerObj(g_defaultOwner));
 }
 
 /* The nineteen item cheats differ in exactly two values.  0x0041827C is not a
@@ -319,7 +319,7 @@ again:
         HudMessage("And you're the king!", kColour(((uintptr_t)&g_colourLagMid)));
         *(uint16_t *)(u + OBJ_OFF_HEALTH) = 1;
         g_invulnerable = 0;
-        DamageObject(u, 0x64, 2, *(const int32_t *)(u + OBJ_OFF_UID), 0, 0);
+        DamageObject((AM2_Object *)u, 0x64, 2, *(const int32_t *)(u + OBJ_OFF_UID), 0, 0);
         return;
     case 35:                                    /* night of the walking dead */
         HudMessage("Brains, Brains!", kColour(((uintptr_t)g_colourDarkBlue)));

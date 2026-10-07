@@ -1063,7 +1063,7 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
         return;
 
     obj = LookupByUID(uid);
-    HealObject(obj, value, 0);
+    HealObject((AM2_Object *)obj, value, 0);
 }
 
 /* 0x0041FEC0. Resurrect a named item, by its own log line.
@@ -1300,7 +1300,7 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
     if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) <= 0)
         return;
 
-    DamageObject(obj, a, b, 0, 0, 0);
+    DamageObject((AM2_Object *)obj, a, b, 0, 0, 0);
 }
 
 /* 0x0041F880 and 0x0041F970. Two more of the "On" shape.
@@ -1384,7 +1384,7 @@ void __cdecl EvtObjAction(uint32_t uid)
     if (obj == (void *)0)
         return;
 
-    DestroyByType(obj);
+    DestroyByType((AM2_Object *)obj);
 }
 
 /* --------------------------------------------------- name -> uid ---- */
@@ -1795,7 +1795,7 @@ void __cdecl EvtRuleC(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     if (!obj)
         return;
 
-    DeployItem(obj, *(const AM2_Point *)(obj + OBJ_OFF_POS), 0, 0);
+    DeployItem((AM2_Object *)obj, *(const AM2_Point *)(obj + OBJ_OFF_POS), 0, 0);
 }
 
 /* 0x00422270, 156 bytes -- put a unit back on the map where it fell.
@@ -1836,7 +1836,7 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 
     *(uint8_t *)(obj + OBJ_OFF_FACING) =
         *(const uint8_t *)(obj + OBJ_OFF_SPAWN_FACING);
-    DeployItem(obj, *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
+    DeployItem((AM2_Object *)obj, *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
 
     if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
         == *(const int32_t *)&g_defaultOwner)
@@ -2593,7 +2593,7 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
-    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (void *)0);
+    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)(void *)0);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
 }
@@ -2638,7 +2638,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
     lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
 
-    FireWeapon(weapon, unit, ObjHeight((const AM2_Object *)unit), heading, spot, target);
+    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjHeight((const AM2_Object *)unit), heading, spot, (AM2_Object *)target);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = (int8_t)lent;
 }
@@ -2664,7 +2664,7 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, AM2_Point at)
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &at);
 
-    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (void *)0);
+    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)(void *)0);
 }
 
 /* 0x00420300. The unit's own held weapon, at another object.
@@ -2697,7 +2697,7 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
                                (const AM2_Point *)(target + OBJ_OFF_POS));
 
-    FireWeapon(weapon, unit, ObjFieldB((const AM2_Object *)unit), heading, spot, target);
+    FireWeapon((AM2_Object *)weapon, (AM2_Object *)unit, ObjFieldB((const AM2_Object *)unit), heading, spot, (AM2_Object *)target);
 }
 
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.

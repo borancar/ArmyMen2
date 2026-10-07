@@ -1698,7 +1698,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         *(uint32_t *)(o + OBJ_OFF_FLAGS) =
             (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
              & ~(uint32_t)OBJ_FLAG_DESTROYED) | OBJ_FLAG_BIT0;
-        DestroyByType(o);
+        DestroyByType((AM2_Object *)o);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
     }
 
@@ -1918,7 +1918,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
         *(uint32_t *)(o + OBJ_OFF_FLAGS) =
             (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & ~(uint32_t)OBJ_FLAG_DESTROYED)
             | OBJ_FLAG_BIT0;
-        DestroyByType(o);
+        DestroyByType((AM2_Object *)o);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
     }
 
@@ -2115,7 +2115,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
     if (!o)
         return 0;
 
-    ObjClearFootprint(o);
+    ObjClearFootprint((AM2_Object *)o);
 
     rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC3);
     if (rec)
@@ -2135,7 +2135,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
                     (size_t)n * 4, 1, fp);
 
     *(int32_t *)(o + SAVED_OFF_TABLE_REC3) = rec;
-    ObjSetFootprint(o);
+    ObjSetFootprint((AM2_Object *)o);
     return 1;
 }
 

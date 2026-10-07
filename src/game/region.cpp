@@ -2347,10 +2347,10 @@ void __cdecl ItemTeardown(void *obj)
 
     switch (*(const int32_t *)o) {
     case AM2_OBJ_TYPE_ROACH:
-        ObjClearRoachFootprint(obj);
+        ObjClearRoachFootprint((AM2_Object *)obj);
         return;
     case AM2_OBJ_TYPE_VEHICLE:
-        ObjClearFootprint(obj);
+        ObjClearFootprint((AM2_Object *)obj);
         return;
     case AM2_OBJ_TYPE_ITEM:
         break;
@@ -2500,10 +2500,10 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
 
     switch (*(const int32_t *)o) {
     case AM2_OBJ_TYPE_ROACH:
-        ObjSetRoachFootprint(obj);
+        ObjSetRoachFootprint((AM2_Object *)obj);
         return;
     case AM2_OBJ_TYPE_VEHICLE:
-        ObjSetFootprint(obj);
+        ObjSetFootprint((AM2_Object *)obj);
         return;
     case AM2_OBJ_TYPE_ITEM:
         break;
@@ -2587,7 +2587,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
                      hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
                     if (hit == o)
                         continue;
-                    DamageObject(hit, damage, AM2_CRUSH_DAMAGE_KIND,
+                    DamageObject((AM2_Object *)hit, damage, AM2_CRUSH_DAMAGE_KIND,
                                  ((const AM2_Object *)o)->uid, 0, 0);
                 }
             }

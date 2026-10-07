@@ -801,7 +801,7 @@ void __cdecl RecvObjDestroyed(void *msg)
     if (*(const int16_t *)((uint8_t *)obj + OBJ_OFF_HEALTH) == 0)
         return;
 
-    DestroyByType(obj);
+    DestroyByType((AM2_Object *)obj);
 }
 
 void __cdecl RecvItemGone(void *msg)
@@ -873,7 +873,7 @@ void __cdecl RecvItemDeploy(void *msg)
     *(uint8_t *)((uint8_t *)obj + OBJ_OFF_FACING) =
         *(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING);
 
-    DeployItem(obj, *(const AM2_Point *)(m + MSG_DEPLOY_OFF_POS),
+    DeployItem((AM2_Object *)obj, *(const AM2_Point *)(m + MSG_DEPLOY_OFF_POS),
                (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_RESURRECT), 1);
 }
 
@@ -927,7 +927,7 @@ void __cdecl RecvDamage(void *msg)
                  (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
                  UidArmy(attacker), dir);
 
-    DamageObject(obj,
+    DamageObject((AM2_Object *)obj,
                  (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
                  (int32_t)*(const uint8_t *)(m + MSG_DAMAGE_OFF_KIND),
                  attacker, dir, 1);

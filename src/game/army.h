@@ -90,7 +90,8 @@ void *__cdecl LookupOwnerObj(uint32_t owner);
  * A uid that no longer resolves is REMOVED from the list, and the index is not
  * advanced when that happens, because the list has shifted under it. So this
  * is a sweep as well as a walk. */
-void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj));
+void __cdecl ForEachArmyObject(int32_t army,
+                               void(__cdecl *fn)(struct AM2_Object *obj));
 
 /* 0x00457B30, seven callers, every one of them creating a unit. Put the type's
  * health figure into the object's MAX health at +0x60, scaled by who owns it

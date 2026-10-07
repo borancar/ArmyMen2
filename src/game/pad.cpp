@@ -326,7 +326,7 @@ int32_t __cdecl ObjTileHook(void *obj)
                 if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
                     && g_gameClockMs
                        > *(const uint32_t *)(pad + PAD_OFF_DAMAGE_DUE))
-                    DamageObject(o,
+                    DamageObject((AM2_Object *)o,
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE),
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE_KIND),
                                  0, 0, 0);

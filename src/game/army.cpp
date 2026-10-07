@@ -98,7 +98,7 @@ void *__cdecl LookupOwnerObj(uint32_t owner)
     return 0;
 }
 
-void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
+void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(AM2_Object *obj))
 {
     void    *list = g_armyObjLists[army];
     int32_t  i    = 0;
@@ -107,7 +107,6 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
     while (i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT)) {
         AM2_Object     *obj = LookupByUID(
             (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
-        uint8_t        *raw = (uint8_t *)obj;
 
         if (!obj) {
             /* Gone: drop it and do NOT advance, since everything after it has
@@ -116,9 +115,9 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
             list = g_armyObjLists[army];
             continue;
         }
-        if (!(*(uint8_t *)(raw + OBJ_OFF_FLAGS) & OBJ_FLAG_SKIP)
+        if (!(obj->flagsLo & OBJ_FLAG_SKIP)
             && !(g_mpSession && ObjIsType2Inline(obj)
-                 && *(int32_t *)(raw + OBJ_OFF_SOLDIER_KIND) == 7))
+                 && obj->soldierKind == 7))
             fn(obj);
         i++;
         list = g_armyObjLists[army];
@@ -287,7 +286,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
                           *(const int8_t *)(v + OBJ_OFF_ARMY)))
         SendVehicleExit(v, occupant);
 
-    DeployItem(occupant, at, 0, 0);
+    DeployItem((AM2_Object *)occupant, at, 0, 0);
 
     if (*(const uint32_t *)(v + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
         if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) <= 0) {
@@ -349,12 +348,12 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
                                       AM2_VEHICLE_DEATH_DAMAGE,
                                       AM2_VEHICLE_DEATH_KIND,
                                       (const uint8_t *)rider + OBJ_OFF_POS, 0);
-                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                DamageObject((AM2_Object *)rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 1);
             } else {
                 am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
                         "damage owner is me\n");
-                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                DamageObject((AM2_Object *)rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 0);
             }
         }

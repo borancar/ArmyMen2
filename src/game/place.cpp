@@ -1074,7 +1074,7 @@ found:
             }
 
             /* Destroyed either way -- see the note. */
-            DestroyByType(inside);
+            DestroyByType((AM2_Object *)inside);
         }
         break;
     }
@@ -1086,7 +1086,7 @@ found:
     if (cost <= 0)
         return;
 
-    DestroyByType(o);
+    DestroyByType((AM2_Object *)o);
     *points += cost;
 }
 
