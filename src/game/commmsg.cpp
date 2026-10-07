@@ -1231,38 +1231,38 @@ void __cdecl RecvTrooperFire(void *msg)
  */
 void __cdecl RecvTrooperDropItem(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     AM2_Object *trooper;
     AM2_Object *item;
 
     if (kCommObj->verbose)
         am2_log("-->Trooper Drop Item Received: Trooper: %x, item: %x,"
                 " request: %d, slot: %d, quant: %d \n",
-                UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)),
-                UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)),
-                *(const int32_t *)(m + MSG_DROP_OFF_REQUEST),
-                *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                UidOnWire(m->hdr.uid),
+                UidOnWire(m->item),
+                m->request,
+                m->slot,
+                m->quant);
 
     trooper = (AM2_Object *)(uint8_t *)ObjByUidAlias(
-        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)));
+        UidOnWire(m->hdr.uid));
     if (!trooper)
         return;
 
     item = LookupByUID(
-        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)));
+        UidOnWire(m->item));
 
     if (!item) {
         /* The slot is re-read from the message at each use. */
         AM2_Object *held = WeaponByUid(
-            (int32_t)trooper->inventory[*(const int32_t *)(m + MSG_DROP_OFF_SLOT)]);
+            (int32_t)trooper->inventory[m->slot]);
 
         if (!held)
             return;
         if (!(held->flagsLo & OBJ_FLAG_REPLACED))
             return;
 
-        RemoveInventoryItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
+        RemoveInventoryItem(trooper, m->slot);
         if (kCommObj->verbose)
             am2_log("Weapon destroyed before dropping; but we handled it\n");
         return;
@@ -1273,7 +1273,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
 
     if (kCommObj->verbose)
         am2_log("Drop item received & performed; ammo %d\n",
-                *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                m->quant);
 
     if (kCommObj->CommMustBroadcast(
             (int16_t)trooper->owner)) {
@@ -1282,12 +1282,12 @@ void __cdecl RecvTrooperDropItem(void *msg)
         return;
     }
 
-    if (*(const int32_t *)(m + MSG_DROP_OFF_QUANT) > 0)
+    if (m->quant > 0)
         item->ammo =
-            *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
+            m->quant;
 
-    TrooperDropItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                    *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
+    TrooperDropItem(trooper, m->slot,
+                    m->at);
 }
 
 /* RecvTroopPair -- original 0x0044C960, one caller. Message kind 0x18.
@@ -1313,15 +1313,15 @@ void __cdecl RecvTrooperDropItem(void *msg)
  */
 void __cdecl RecvTroopPair(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_PairMsg *m = (const AM2_PairMsg *)msg;
     void          *a;
     void          *b;
 
-    a = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + MSG_PAIR_OFF_A)));
+    a = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (!a)
         return;
 
-    b = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_PAIR_OFF_B)));
+    b = LookupByUID(UidOnWire(m->b));
     if (!b)
         return;
 
@@ -1329,8 +1329,8 @@ void __cdecl RecvTroopPair(void *msg)
         return;
 
     orig_trooper_pair_apply((AM2_Object *)a, (AM2_Object *)b,
-                            *(const int32_t *)(m + MSG_PAIR_OFF_BYTE),
-                            *(const int32_t *)(m + MSG_PAIR_OFF_ARG));
+                            m->byteArg,
+                            m->arg);
 }
 
 /* RecvTrooperSetWeapon -- original 0x0044C3E0, one caller.
@@ -1368,14 +1368,14 @@ void __cdecl RecvTroopPair(void *msg)
  */
 void __cdecl RecvTrooperSetWeapon(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_SetWeaponMsg *m = (const AM2_SetWeaponMsg *)msg;
     uint32_t       trooperUid;
     uint32_t       weaponUid;
     AM2_Object       *trooper;
     AM2_Object          *weapon;
 
-    trooperUid = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_TROOPER));
-    weaponUid  = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_WEAPON));
+    trooperUid = UidOnWire(m->hdr.uid);
+    weaponUid  = UidOnWire(m->weapon);
 
     orig_log("Received TrooperSetWeapon message: linking trooper %08x to weapon %08x\n",
              trooperUid, weaponUid);
@@ -1395,7 +1395,7 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
     }
 
     /* The slot is re-read from the message at each use. */
-    trooper->inventory[*(const int32_t *)(m + MSG_SETWEAPON_OFF_SLOT)] =
+    trooper->inventory[m->slot] =
         weaponUid;
 
     SoldierKindForWeapon(
@@ -1403,7 +1403,7 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
         (uint32_t)weapon->typeRec->kind);
 
     trooper->inventorySel =
-        *(const int32_t *)(m + MSG_SETWEAPON_OFF_SLOT);
+        m->slot;
 }
 
 /* TroopMessageRecv -- original 0x0044C590, one caller.

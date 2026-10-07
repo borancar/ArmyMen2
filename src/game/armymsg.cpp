@@ -272,20 +272,20 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
 void __cdecl SendTrooperSetWeapon(const AM2_Object *trooper, uint32_t weaponUid,
                                   int32_t weapon)
 {
-    uint8_t         msg[AM2_MSG_TROOPER_WEAPON_LEN];
+    AM2_SetWeaponMsg         msg;
     const AM2_Comm  *comm = kComm;
 
     if (!comm->dplay)
         return;
 
-    *(uint16_t *)(msg + 0)    = AM2_MSG_TROOPER_WEAPON_LEN;
-    *(uint16_t *)(msg + 2)    = AM2_MSG_TROOPER_WEAPON;
-    *(uint32_t *)(msg + 4)    =
+    msg.hdr.len    = AM2_MSG_TROOPER_WEAPON_LEN;
+    msg.hdr.kind    = AM2_MSG_TROOPER_WEAPON;
+    msg.hdr.uid    =
         UidOnWire(trooper->uid);
-    *(uint32_t *)(msg + 8)    = UidOnWire(weaponUid);
-    *(int32_t  *)(msg + 0x18) = weapon;
+    msg.weapon    = UidOnWire(weaponUid);
+    msg.slot = weapon;
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
     orig_log("Send TrooperSetWeapon message, trooper: %08x, weapon:%08x\n",
              trooper->uid, weaponUid);
 }
@@ -360,7 +360,7 @@ void __cdecl SendObjDestroyed(const AM2_Object *obj)
 void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot,
                                  int32_t quantity, AM2_Point at)
 {
-    uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
+    AM2_ItemMsg  msg;
     AM2_Object *u = unit;
     AM2_Object *it = item;
 
@@ -374,27 +374,27 @@ void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot
     if (!it)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
-    *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
+    msg.hdr.len = AM2_MSG_DROP_ITEM_LEN;
+    msg.hdr.uid =
         UidOnWire(((const AM2_Object *)u)->uid);
-    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_DROP_ITEM;
-    *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
+    msg.hdr.kind = AM2_MSG_TROOPER_DROP_ITEM;
+    msg.item =
         UidOnWire(((const AM2_Object *)it)->uid);
-    *(AM2_Point *)(msg + MSG_DROP_OFF_AT)     = at;
-    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = slot;
-    *(int32_t *)(msg + MSG_DROP_OFF_QUANT)    = quantity;
-    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_DO_DROP;
+    msg.at     = at;
+    msg.slot     = slot;
+    msg.quant    = quantity;
+    msg.request  = AM2_DO_DROP;
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 
     if (kComm->verbose)
         orig_log("-->Trooper Drop Item Sent: Trooper: %x, item: %x,"
                 " request: %d, slot: %d, quant: %d \n",
-                UidOnWire(*(const uint32_t *)(msg + MSG_DROP_OFF_TROOPER)),
-                UidOnWire(*(const uint32_t *)(msg + MSG_DROP_OFF_ITEM)),
-                *(const int32_t *)(msg + MSG_DROP_OFF_REQUEST),
-                *(const int32_t *)(msg + MSG_DROP_OFF_SLOT),
-                *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+                UidOnWire(msg.hdr.uid),
+                UidOnWire(msg.item),
+                msg.request,
+                msg.slot,
+                msg.quant);
 }
 
 /* TrooperWantItemSend -- original 0x0044BFA0, two callers, and one of them is
@@ -425,7 +425,7 @@ void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot
 void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quantity)
 {
-    uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
+    AM2_ItemMsg  msg;
     AM2_Object *t = trooper;
     AM2_Object *it = (AM2_Object *)item;
 
@@ -438,19 +438,19 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
     if (!it)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
-    *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
+    msg.hdr.len = AM2_MSG_DROP_ITEM_LEN;
+    msg.hdr.uid =
         UidOnWire(((const AM2_Object *)t)->uid);
-    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_WANT_ITEM;
-    *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
+    msg.hdr.kind = AM2_MSG_TROOPER_WANT_ITEM;
+    msg.item =
         UidOnWire((it)->uid);
-    *(AM2_Point *)(msg + MSG_DROP_OFF_AT) =
+    msg.at =
         it->pos;
-    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST) = request;
-    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)    = slot;
-    *(int32_t *)(msg + MSG_DROP_OFF_QUANT)   = quantity;
+    msg.request = request;
+    msg.slot    = slot;
+    msg.quant   = quantity;
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 
     if (!kComm->verbose)
         return;
@@ -462,19 +462,19 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
     if (!request)
         orig_log("Send WANT_PICKUP item %x ammo %d\n",
                  (it)->uid,
-                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+                 msg.quant);
     else if (request == AM2_WANT_DROP)
         orig_log("Send WANT_DROP item %x ammo %d \n",
                  (it)->uid,
-                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+                 msg.quant);
     else if (request == AM2_DO_PICKUP)
         orig_log("Send DO_PICKUP item %x ammo %d\n",
                  (it)->uid,
-                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+                 msg.quant);
     else if (request == AM2_DO_DROP)
         orig_log("Send DO_DROP item %x ammo %d\n",
                  (it)->uid,
-                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+                 msg.quant);
 }
 
 /* TellOneSlot -- original 0x0044C480, one caller, which is TellEachSlot.
@@ -724,41 +724,41 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
 void __cdecl SendPairMessage(const AM2_Object *a, const AM2_Object *b, int32_t byteArg,
                              int32_t arg)
 {
-    uint8_t        msg[AM2_MSG_PAIR_LEN];
+    AM2_PairMsg        msg;
     const AM2_Object *pa = a;
     const AM2_Object *pb = (const AM2_Object *)b;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_PAIR_LEN;
-    *(uint32_t *)(msg + MSG_PAIR_OFF_A) =
+    msg.hdr.len = AM2_MSG_PAIR_LEN;
+    msg.hdr.uid =
         UidOnWire(pa->uid);
-    *(uint16_t *)(msg + 2) = AM2_MSG_PAIR;
-    *(uint32_t *)(msg + MSG_PAIR_OFF_B) =
+    msg.hdr.kind = AM2_MSG_PAIR;
+    msg.b =
         UidOnWire(pb->uid);
-    *(AM2_Point *)(msg + MSG_PAIR_OFF_POS) =
+    msg.pos =
         pb->pos;
-    *(int32_t *)(msg + MSG_PAIR_OFF_BYTE) = (int8_t)byteArg;
-    *(int32_t *)(msg + MSG_PAIR_OFF_ARG)  = arg;
+    msg.byteArg = (int8_t)byteArg;
+    msg.arg  = arg;
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 }
 
 void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
 {
-    uint8_t        msg[AM2_MSG_ITEM_DEPLOY_LEN];
+    AM2_DeployMsg        msg;
     const AM2_Object *it = (const AM2_Object *)item;
     const AM2_Comm *comm;
 
     if (!*(void *const *)&g_mpSession)
         return;
 
-    *(uint16_t *)(msg + 0)    = AM2_MSG_ITEM_DEPLOY_LEN;
-    *(uint16_t *)(msg + 2)    = AM2_MSG_ITEM_DEPLOY;
-    *(uint32_t *)(msg + 4)    = UidOnWire(it->uid);
-    *(AM2_Point *)(msg + 8)   = it->pos;
-    *(uint8_t  *)(msg + 0x0C) = it->facing;
-    *(uint8_t  *)(msg + 0x0D) = (uint8_t)arg;
+    msg.hdr.len    = AM2_MSG_ITEM_DEPLOY_LEN;
+    msg.hdr.kind    = AM2_MSG_ITEM_DEPLOY;
+    msg.hdr.uid    = UidOnWire(it->uid);
+    msg.pos   = it->pos;
+    msg.facing = it->facing;
+    msg.resurrect = (uint8_t)arg;
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 
     comm = kComm;
     if (comm->verbose)
@@ -851,26 +851,26 @@ void __cdecl RecvDeath(void *msg)
  * writes, so both readings are of one field. */
 void __cdecl RecvItemDeploy(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_DeployMsg *m = (const AM2_DeployMsg *)msg;
     const AM2_Comm *comm = kComm;
     AM2_Object          *obj;
 
     if (comm->verbose)
         orig_log("itemDeployMessageReceive: uid=%x, pos=(%d,%d), facing=%d\n",
-                 *(const uint32_t *)(m + MSG_DEPLOY_OFF_UID),
-                 (int32_t)*(const int16_t *)(m + MSG_DEPLOY_OFF_POS),
-                 (int32_t)*(const int16_t *)(m + MSG_DEPLOY_OFF_POS + 2),
-                 (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING));
+                 m->hdr.uid,
+                 (int32_t)m->pos.x,
+                 (int32_t)m->pos.y,
+                 (int32_t)m->facing);
 
-    obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_DEPLOY_OFF_UID)));
+    obj = LookupByUID(UidOnWire(m->hdr.uid));
     if (!obj)
         return;
 
     obj->facing =
-        *(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING);
+        m->facing;
 
-    DeployItem(obj, *(const AM2_Point *)(m + MSG_DEPLOY_OFF_POS),
-               (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_RESURRECT), 1);
+    DeployItem(obj, m->pos,
+               (int32_t)m->resurrect, 1);
 }
 
 /* 0x0042ADA0, the last of the six receivers and the one that settles a
@@ -899,20 +899,20 @@ void __cdecl RecvItemDeploy(void *msg)
  * which is what stops a hit being broadcast back. */
 void __cdecl RecvDamage(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_DamageMsg *m = (const AM2_DamageMsg *)msg;
     const AM2_Comm *comm;
     AM2_Object          *obj;
     uint32_t       attacker;
     AM2_Point      from;
     int32_t        dir;
 
-    attacker = UidOnWire(*(const uint32_t *)(m + MSG_DAMAGE_OFF_ATTACKER));
-    obj      = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_DAMAGE_OFF_UID)));
+    attacker = UidOnWire(m->attacker);
+    obj      = LookupByUID(UidOnWire(m->hdr.uid));
     if (!obj)
         return;
 
-    from.x = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS);
-    from.y = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS + 2);
+    from.x = m->pos.x;
+    from.y = m->pos.y;
     dir    = AngleBetween(&from,
                           &obj->pos);
 
@@ -920,12 +920,12 @@ void __cdecl RecvDamage(void *msg)
     if (comm->verbose)
         orig_log("Recieved Damage: item->uid %x, amount: %d, army %d, dir: %d\n",
                  (obj)->uid,
-                 (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
+                 (int32_t)m->amount,
                  UidArmy(attacker), dir);
 
     DamageObject(obj,
-                 (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
-                 (int32_t)*(const uint8_t *)(m + MSG_DAMAGE_OFF_KIND),
+                 (int32_t)m->amount,
+                 (int32_t)m->damageKind,
                  attacker, dir, 1);
 }
 
@@ -1061,65 +1061,65 @@ void __cdecl ItemPostCreate(int32_t army, AM2_Point where)
 void __cdecl SendItemCreate(AM2_Object *obj)
 {
     AM2_Object       *o = (AM2_Object *)obj;
-    uint8_t        msg[AM2_MSG_ITEM_CREATE_LEN];
+    AM2_CreateMsg        msg;
     int32_t        nameidx;
     const char    *name;
 
     if (!g_mpSession)
         return;
 
-    memset(msg, 0, sizeof msg);
-    *(uint16_t *)(msg + 0) = AM2_MSG_ITEM_CREATE_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_CREATE;
-    *(uint32_t *)(msg + MSG_CREATE_OFF_UID) =
+    memset(&msg, 0, sizeof msg);
+    msg.hdr.len = AM2_MSG_ITEM_CREATE_LEN;
+    msg.hdr.kind = AM2_MSG_ITEM_CREATE;
+    msg.hdr.uid =
         UidOnWire((o)->uid);
 
     nameidx = o->nameIdx;
     name = (nameidx >= 0) ? kScriptNames[nameidx].name : (const char *)0;
     if (name)
-        strcpy((char *)(msg + MSG_CREATE_OFF_NAME), name);
+        strcpy(msg.name, name);
     else
-        *(char *)(msg + MSG_CREATE_OFF_NAME) = '\0';
+        msg.name[0] = '\0';
 
-    *(AM2_Point *)(msg + MSG_CREATE_OFF_A) =
+    msg.pos =
         o->pos;
     /* The four box offsets a dword at a time, and the type last -- the
      * order that schedules into the image's. The type is read twice: a
      * word for the message, a dword for the switch. */
-    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[0] = (&o->box.left)[0];
-    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[2] = (&o->box.left)[2];
-    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[1] = (&o->box.left)[1];
-    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[3] = (&o->box.left)[3];
-    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = *(const uint16_t *)o;
-    *(uint32_t *)(msg + MSG_CREATE_OFF_C) =
+    ((int32_t *)&msg.box)[0] = (&o->box.left)[0];
+    ((int32_t *)&msg.box)[2] = (&o->box.left)[2];
+    ((int32_t *)&msg.box)[1] = (&o->box.left)[1];
+    ((int32_t *)&msg.box)[3] = (&o->box.left)[3];
+    msg.type = *(const uint16_t *)o;
+    msg.flags =
         o->flags;
     switch (*(const int32_t *)o) {
     case AM2_OBJ_TYPE_TROOPER:
         if (o->sarge)
-            *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+            msg.subtype =
                 AM2_TROOPER_SARGE_SUBTYPE;
         else
-            *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+            msg.subtype =
                 (uint16_t)WeaponClassOf(
                     o->inventory[0]);
         break;
 
     case AM2_OBJ_TYPE_VEHICLE:
-        *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+        msg.subtype =
             *(const uint16_t *)&o->vehicleKind;
-        *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
+        msg.ref =
             UidOnWire(o->weaponUid);
         break;
 
     case AM2_OBJ_TYPE_WEAPON:
-        *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+        msg.subtype =
             *((const uint16_t *)o->typeRec);
-        *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
+        msg.ref =
             o->targetUid;
         break;
 
     case AM2_OBJ_TYPE_ITEM:
-        *(int32_t *)(msg + MSG_CREATE_OFF_D) =
+        msg.ref =
             o->aai->key;
         break;
 
@@ -1129,11 +1129,11 @@ void __cdecl SendItemCreate(AM2_Object *obj)
 
     if (kComm->verbose)
         orig_log("<--Send Item Create: uid:%x, item type: %d, subtype: %d\n",
-                 UidOnWire(*(const uint32_t *)(msg + MSG_CREATE_OFF_UID)),
+                 UidOnWire(msg.hdr.uid),
                  *(const int32_t *)o,
-                 (int32_t)*(const int16_t *)(msg + MSG_CREATE_OFF_SUBTYPE));
+                 (int32_t)msg.subtype);
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 }
 
 /* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
@@ -1168,62 +1168,62 @@ void __cdecl SendItemCreate(AM2_Object *obj)
  * here; conflating them would pass a uid to ObjConceal. */
 void __cdecl RecvItemCreate(void *msg)
 {
-    const uint8_t *m    = (const uint8_t *)msg;
+    const AM2_CreateMsg *m    = (const AM2_CreateMsg *)msg;
     const char    *name = NULL;
-    uint32_t       uid  = UidOnWire(*(const uint32_t *)(m + MSG_CREATE_OFF_UID));
+    uint32_t       uid  = UidOnWire(m->hdr.uid);
     int32_t        army = (int32_t)UidArmy(uid);
     void          *made;
 
     orig_log("==> Receive Item Create [uid:%08x, item type: %d, subtype: %d\n", uid,
-             (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_TYPE),
-             (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE));
+             (int32_t)m->type,
+             (int32_t)m->subtype);
 
     /* An empty first byte means the message carries no name. */
-    if (*(const char *)(m + MSG_CREATE_OFF_NAME))
-        name = (const char *)(m + MSG_CREATE_OFF_NAME);
+    if (m->name[0])
+        name = m->name;
 
-    switch (*(const int16_t *)(m + MSG_CREATE_OFF_TYPE)) {
+    switch (m->type) {
     case 2:
         made = orig_create_trooper(
                    (char *)(uintptr_t)name,
-                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
-                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
+                   (int32_t)m->pos.x,
+                   (int32_t)m->pos.y,
                    AM2_THE_COMM->CommArmyOfSlot(
                                      army),
                    army,
-                   *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                   (int32_t)m->flags,
                    1, uid, 1,
-                   (int32_t)*(const uint8_t *)(m + MSG_CREATE_OFF_E));
-        if (*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE)
+                   (int32_t)m->extra);
+        if (m->subtype
             == AM2_TROOPER_SUBTYPE_LEADS)
             SetLeadsAndAct((AM2_Object *)made);
         return;
 
     case 3:
         made = CreateVehicle(
-                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE),
+                   (int32_t)m->subtype,
                    (char *)(uintptr_t)name,
-                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
-                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
+                   (int32_t)m->pos.x,
+                   (int32_t)m->pos.y,
                    AM2_THE_COMM->CommArmyOfSlot(
                                      army),
                    army,
-                   *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                   (int32_t)m->flags,
                    1, uid,
-                   (int32_t)*(const uint8_t *)(m + MSG_CREATE_OFF_E));
+                   (int32_t)m->extra);
         *(uint32_t *)((uint8_t *)made + 0x550) =
-            UidOnWire(*(const uint32_t *)(m + MSG_CREATE_OFF_D));
+            UidOnWire(m->ref);
         return;
 
     case 4:
         orig_create_weapon(
             name, army,
             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
-                            (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE),
+                            (int32_t)m->subtype,
                             0),
-            *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
-            *(const int32_t *)(m + MSG_CREATE_OFF_C),
-            *(const int32_t *)(m + MSG_CREATE_OFF_D),
+            m->pos,
+            (int32_t)m->flags,
+            (int32_t)m->ref,
             1, uid);
         return;
 
@@ -1232,15 +1232,15 @@ void __cdecl RecvItemCreate(void *msg)
          * place two levels down -- so this really does rewrite the RECEIVED
          * MESSAGE's own bytes, which is what the original does. */
         made = CreateItem((char *)(uintptr_t)name, army,
-                          *(const int32_t *)(m + MSG_CREATE_OFF_D),
-                          *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
-                          *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                          (int32_t)m->ref,
+                          m->pos,
+                          (int32_t)m->flags,
                           1, uid);
-        if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
+        if ((int32_t)m->ref
             != g_createWatchedKind)
             return;
         /* ARMY first, not the object -- see ItemPostCreate above. */
-        ItemPostCreate(army, *(const AM2_Point *)(m + MSG_CREATE_OFF_A));
+        ItemPostCreate(army, m->pos);
         if (!(*(AM2_Comm *const *)&g_commObject)->AllyFlag(g_defaultOwner, army))
             ObjConceal((AM2_Object *)made, 1);
         return;
@@ -1275,7 +1275,7 @@ void __cdecl RecvItemCreate(void *msg)
 void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
                              int32_t kind, const AM2_Point *where, int32_t unused)
 {
-    uint8_t        msg[AM2_MSG_DAMAGE_LEN];
+    AM2_DamageMsg        msg;
     const AM2_Object *o = (const AM2_Object *)obj;
     const AM2_Comm *comm;
 
@@ -1284,22 +1284,20 @@ void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
     if (!*(void *const *)&g_mpSession)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_DAMAGE_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_DAMAGE;
-    *(uint32_t *)(msg + MSG_DAMAGE_OFF_UID) =
+    msg.hdr.len = AM2_MSG_DAMAGE_LEN;
+    msg.hdr.kind = AM2_MSG_DAMAGE;
+    msg.hdr.uid =
         UidOnWire(o->uid);
 
-    *(int16_t *)(msg + MSG_DAMAGE_OFF_AMOUNT) = (int16_t)amount;
-    *(uint8_t *)(msg + MSG_DAMAGE_OFF_KIND)   = (uint8_t)kind;
+    msg.amount = (int16_t)amount;
+    msg.damageKind   = (uint8_t)kind;
 
-    *(int16_t *)(msg + MSG_DAMAGE_OFF_POS)     =
-        *(const int16_t *)where;
-    *(int16_t *)(msg + MSG_DAMAGE_OFF_POS + 2) =
-        *(const int16_t *)((const uint8_t *)where + 2);
+    msg.pos.x = where->x;
+    msg.pos.y = where->y;
 
-    *(uint32_t *)(msg + MSG_DAMAGE_OFF_ATTACKER) = UidOnWire(attacker);
+    msg.attacker = UidOnWire(attacker);
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 
     /* The amount logged is the message's word, not the argument. */
     comm = kComm;
@@ -1308,7 +1306,7 @@ void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
 
     orig_log("Send Damage: uid %x, amount: %d, health: %d, army %d\n",
              o->uid,
-             (int32_t)*(const int16_t *)(msg + MSG_DAMAGE_OFF_AMOUNT),
+             (int32_t)msg.amount,
              (int32_t)o->health,
              UidArmy(attacker));
 }
@@ -1409,19 +1407,19 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
  */
 void __cdecl RecvTrooperWantItem(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The request is read from the message at every use. */
-#define request (*(const int32_t *)(m + MSG_DROP_OFF_REQUEST))
+#define request (m->request)
     AM2_Object       *t;
     AM2_Object       *w;
 
     if (kComm->verbose)
         orig_log("-->Trooper Want Item Received: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d \n",
-                 UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)),
-                 UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)),
+                 UidOnWire(m->hdr.uid),
+                 UidOnWire(m->item),
                  request,
-                 *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                 *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                 m->slot,
+                 m->quant);
 
     if (kComm->isHost) {
         if (request == AM2_DO_PICKUP)
@@ -1434,7 +1432,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
     }
 
     t = (AM2_Object *)(uint8_t *)ObjByUidAlias(
-        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)));
+        UidOnWire(m->hdr.uid));
     if (!t)
         return;
 
@@ -1444,12 +1442,12 @@ void __cdecl RecvTrooperWantItem(void *msg)
         return;
 
     w = LookupByUID(
-        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)));
+        UidOnWire(m->item));
 
     if (!w) {
         /* The item is gone. One combination is still meaningful. */
         AM2_Object *held = WeaponByUid(
-            t->inventory[*(const int32_t *)(m + MSG_DROP_OFF_SLOT)]);
+            t->inventory[m->slot]);
 
         if (!held)
             return;
@@ -1459,7 +1457,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
             return;
 
         RemoveInventoryItem(t,
-                            *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
+                            m->slot);
 
         if (kComm->verbose)
             orig_log("Weapon destroyed before dropping; but we handled it\n");
@@ -1476,7 +1474,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
 
         if (kComm->verbose)
             orig_log("Tell pickup item received; ammo %d\n",
-                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                     m->quant);
 
         unused = 0;
         w->pickupAfter =
@@ -1484,9 +1482,9 @@ void __cdecl RecvTrooperWantItem(void *msg)
 
         if (CanPickUpWeapon(w, t, &slot, &unused)) {
             TrooperHostApprovedPickupItem(
-                t, w, slot, *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                t, w, slot, m->quant);
             SendPairMessage(t, w, slot,
-                            *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                            m->quant);
         }
 
         w->pickupAfter =
@@ -1498,7 +1496,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
     if (request == AM2_DO_DROP) {
         if (kComm->verbose)
             orig_log("Tell Drop item received; ammo %d\n",
-                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                     m->quant);
 
         /* NOT the same sense as the DO gate above: here a trooper we would
          * broadcast for is one we must NOT drop for. */
@@ -1506,8 +1504,8 @@ void __cdecl RecvTrooperWantItem(void *msg)
                               (int16_t)t->owner))
             return;
 
-        TrooperDropItem(t, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
-                        *(const AM2_Point *)(m + MSG_DROP_OFF_AT));
+        TrooperDropItem(t, m->slot,
+                        m->at);
         return;
     }
 
@@ -1520,19 +1518,19 @@ void __cdecl RecvTrooperWantItem(void *msg)
             return;
         }
 
-        if (*(const int32_t *)(m + MSG_DROP_OFF_QUANT) >= w->ammo)
+        if (m->quant >= w->ammo)
             give = w->ammo;
         else
-            give = *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
+            give = m->quant;
 
-        at = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
+        at = m->slot;
         if (at != -1
             && t->inventory[at]
             && !KindInSetB(w->typeRec->kind))
             w->ammo -= give;
 
         TrooperWantItemSend(t, w, AM2_DO_PICKUP,
-                            (int8_t)*(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                            (int8_t)m->slot,
                             give);
         orig_log("Request pickup item received & OKed; ammo %d\n", give);
         return;
@@ -1541,7 +1539,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
     if (request == AM2_WANT_DROP) {
         if (kComm->verbose)
             orig_log("Request drop item received; ammo %d\n",
-                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+                     m->quant);
     }
 #undef request
 }

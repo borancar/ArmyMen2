@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 #include "dist.h"        /* AM2_Point */
+#include "rect.h"        /* AM2_Rect */
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,11 +63,74 @@ void __cdecl TrooperWantItemSend(struct AM2_Object *trooper, struct AM2_Object *
 /* The header every message on this transport begins with. ArmyMessageSend
  * reads all three: the length decides how much is copied, and the uid is fed
  * to UidArmy for the debug line. */
-typedef struct {
+typedef struct AM2_ArmyMsgHdr {
     uint16_t len;    /* +0x00, bytes to copy, including this header */
     uint16_t kind;   /* +0x02 */
     uint32_t uid;    /* +0x04 */
 } AM2_ArmyMsgHdr;
+
+/* The item request, AM2_MSG_TROOPER_DROP_ITEM and _WANT_ITEM, 0x1C bytes. */
+typedef struct AM2_ItemMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_DROP_OFF_TROOPER */
+    uint32_t  item;             /* +0x08 MSG_DROP_OFF_ITEM, on the wire */
+    AM2_Point at;               /* +0x0C MSG_DROP_OFF_AT */
+    int32_t   request;          /* +0x10 MSG_DROP_OFF_REQUEST: AM2_WANT_PICKUP.. */
+    int32_t   quant;            /* +0x14 MSG_DROP_OFF_QUANT */
+    int32_t   slot;             /* +0x18 MSG_DROP_OFF_SLOT, sign-extended */
+} AM2_ItemMsg;
+
+/* AM2_MSG_PAIR, 0x1C bytes: two objects and b's position. */
+typedef struct AM2_PairMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_PAIR_OFF_A */
+    uint32_t  b;                /* +0x08 MSG_PAIR_OFF_B */
+    AM2_Point pos;              /* +0x0C MSG_PAIR_OFF_POS */
+    int32_t   hole;             /* +0x10 MSG_PAIR_OFF_HOLE, never written */
+    int32_t   arg;              /* +0x14 MSG_PAIR_OFF_ARG */
+    int32_t   byteArg;          /* +0x18 MSG_PAIR_OFF_BYTE, sign-extended from int8 */
+} AM2_PairMsg;
+
+/* AM2_MSG_TROOPER_WEAPON, 0x1C bytes. */
+typedef struct AM2_SetWeaponMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_SETWEAPON_OFF_TROOPER */
+    uint32_t  weapon;           /* +0x08 MSG_SETWEAPON_OFF_WEAPON */
+    uint8_t   pad0C[0x0C];      /* +0x0C */
+    int32_t   slot;             /* +0x18 MSG_SETWEAPON_OFF_SLOT, 0..5 */
+} AM2_SetWeaponMsg;
+
+/* AM2_MSG_ITEM_DEPLOY, 0x10 bytes. */
+typedef struct AM2_DeployMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_DEPLOY_OFF_UID */
+    AM2_Point pos;              /* +0x08 MSG_DEPLOY_OFF_POS */
+    uint8_t   facing;           /* +0x0C MSG_DEPLOY_OFF_FACING */
+    uint8_t   resurrect;        /* +0x0D MSG_DEPLOY_OFF_RESURRECT */
+    uint8_t   pad0E[2];         /* +0x0E */
+} AM2_DeployMsg;
+
+/* The damage message, 0x14 bytes. */
+typedef struct AM2_DamageMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_DAMAGE_OFF_UID, the victim */
+    uint32_t  attacker;         /* +0x08 MSG_DAMAGE_OFF_ATTACKER */
+    AM2_Point pos;              /* +0x0C MSG_DAMAGE_OFF_POS */
+    int16_t   amount;           /* +0x10 MSG_DAMAGE_OFF_AMOUNT */
+    uint8_t   damageKind;       /* +0x12 MSG_DAMAGE_OFF_KIND */
+    uint8_t   pad13;            /* +0x13 */
+} AM2_DamageMsg;
+
+/* AM2_MSG_ITEM_CREATE, 0x70 bytes. */
+typedef struct AM2_CreateMsg {
+    AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_CREATE_OFF_UID */
+    char      name[0x40];       /* +0x08 MSG_CREATE_OFF_NAME, empty for none */
+    int16_t   type;             /* +0x48 MSG_CREATE_OFF_TYPE, 1..4 */
+    AM2_Point pos;              /* +0x4A MSG_CREATE_OFF_A and _B */
+    uint16_t  pad4E;            /* +0x4E */
+    AM2_Rect  box;              /* +0x50 MSG_CREATE_OFF_BLOCK */
+    uint32_t  flags;            /* +0x60 MSG_CREATE_OFF_C */
+    int16_t   subtype;          /* +0x64 MSG_CREATE_OFF_SUBTYPE */
+    uint16_t  pad66;            /* +0x66 */
+    uint32_t  ref;              /* +0x68 MSG_CREATE_OFF_D: weapon uid, target uid or key */
+    uint8_t   extra;            /* +0x6C MSG_CREATE_OFF_E, never written */
+    uint8_t   pad6D[3];         /* +0x6D */
+} AM2_CreateMsg;
 
 /* 0x004105F0. Append one message to the outgoing packet, flushing first if it
  * will not fit and again afterwards if the packet has passed its threshold.
