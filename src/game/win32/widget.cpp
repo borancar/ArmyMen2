@@ -8608,7 +8608,8 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     AM2_Rect    part;
     int32_t     x;
     int32_t     y;
-    char        text[4];
+    /* Three bytes: "**" or two digits, and the terminator. */
+    char        text[3];
     int32_t     pen;
 
 /* A text block: the WHOLE widget rect against the clip, the string drawn at
@@ -8690,7 +8691,15 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     if (e->ammo < 0)
         return;
 
-    EDGE_SPRITE(e->ammoSprite)
+    /* EDGE_SPRITE, but x is stored before y here. */
+    x = w->rect.left;
+    y = pen;
+    *(AM2_Rect *)&box = RectMake(x, pen, w->rect.right,
+                                 e->ammoSprite->bounds.bottom + pen);
+    if (IntersectRect(&vis, &box, &clip)
+        && ClipRect(&e->ammoSprite->bounds, (const AM2_Rect *)&vis, &x, &y,
+                    &part))
+        DrawSpriteClipped(e->ammoSprite, x, y, &part, 0);
 
     /* The count is centered ONE PIXEL RIGHT of the widget middle
      * (`lea eax,[eax+ecx+1]`), three pixels down; the labels above use the

@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1539 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1540 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,11 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **HudEdgePaint matched** (2026-10-07), 1539 -> 1540.
+    - The ammo text buffer is three bytes, not four ("**" or two digits, and
+      the terminator). As four bytes, VC6 placed it above x and y rather than
+      below them.
+    - The ammo sprite stores x before y; the other two sprites store y first.
   - **CheckMapRules matched** (2026-10-07), 1538 -> 1539.
     - The complaint line is formatted into the caller's 0x40-byte rules-path
       buffer: MpComplain takes it as a parameter and has no local of its own.
