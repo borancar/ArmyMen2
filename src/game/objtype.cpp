@@ -663,43 +663,43 @@ void __cdecl BuildAaiBuiltins(void)
  * DefFindObjRec reads 1,689 on the same run, which is its OTHER callers --
  * ours reaches it by name.
  */
-void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
-                            AM2_Rect box)
+AM2_AaiRec *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
+                                  AM2_Rect box)
 {
-    uint8_t *rec = (uint8_t *)am2_malloc(AM2_AAI_RECORD_BYTES);
+    AM2_AaiRec *rec = (AM2_AaiRec *)am2_malloc(AM2_AAI_RECORD_BYTES);
     uint8_t *def;
 
     memset(rec, 0, AM2_AAI_RECORD_BYTES);
 
     if (type < 0)
-        *(int32_t *)(rec + AAIREC_OFF_TYPE)  = 0x2E;
+        rec->type  = 0x2E;
     else
-        *(int32_t *)(rec + AAIREC_OFF_TYPE)  = type;
-    *(int32_t *)(rec + AAIREC_OFF_KEY)       = key;
-    *(int32_t *)(rec + AAIREC_OFF_SLOT)      = -1;  /* AddAaiRecord fills it */
-    *(int32_t *)(rec + AAIREC_OFF_LIST_SLOT) = slot;
-    *(int32_t *)(rec + 0x14)                 = box.left;
-    *(int32_t *)(rec + 0x1C)                 = box.right;
-    *(int32_t *)(rec + 0x18)                 = box.top;
-    *(int32_t *)(rec + 0x20)                 = box.bottom;
+        rec->type  = type;
+    rec->key        = key;
+    rec->slot       = -1;  /* AddAaiRecord fills it */
+    rec->listSlot   = slot;
+    rec->box.left   = box.left;
+    rec->box.right  = box.right;
+    rec->box.top    = box.top;
+    rec->box.bottom = box.bottom;
 
     /* One return for every path; the negative type skips the definition
      * and the list. */
     if (type >= 0) {
         def = (uint8_t *)DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
         if (def) {
-            *(int32_t *)(rec + 0x24) = *(const int32_t *)(rec + AAIREC_OFF_TYPE);
-            *(int32_t *)(rec + 0x28) = *(const int32_t *)(def + 0x10);
-            *(int16_t *)(rec + 0x2C) = *(const int16_t *)(def + 0x14);
-            *(uint8_t *)(rec + 0x2E) = *(const uint8_t *)(def + 0x18);
-            *(uint8_t *)(rec + 0x2F) = *(const uint8_t *)(def + 0x1C);
-            *(int16_t *)(rec + 0x30) = *(const int16_t *)(def + 0x20);
-            *(int32_t *)(rec + 0x34) = *(const int32_t *)(def + 0x24);
+            rec->defType        = rec->type;
+            rec->orFlags        = *(const int32_t *)(def + 0x10);
+            rec->health         = *(const int16_t *)(def + 0x14);
+            rec->heightAdj      = *(const int8_t *)(def + 0x18);
+            rec->rank           = *(const int8_t *)(def + 0x1C);
+            rec->depth          = *(const int16_t *)(def + 0x20);
+            rec->depthSlopeBits = *(const int32_t *)(def + 0x24);
             /* Out of order, and deliberately: +0x38 takes +0x30, +0x3A takes
                +0x28. */
-            *(int16_t *)(rec + 0x38) = *(const int16_t *)(def + 0x30);
-            *(int16_t *)(rec + 0x3A) = *(const int16_t *)(def + 0x28);
-            *(uint8_t *)(rec + 0x3C) = *(const uint8_t *)(def + 0x34);
+            rec->crushDamage    = *(const int16_t *)(def + 0x30);
+            rec->armour         = *(const int16_t *)(def + 0x28);
+            rec->field3C        = *(const uint8_t *)(def + 0x34);
         }
 
         if (slot > 0) {
@@ -710,7 +710,7 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
 
             for (i = 0; i < list->count; i++)
                 list->records[i].depth =
-                    (int32_t)*(const uint16_t *)(rec + 0x30);
+                    (int32_t)(uint16_t)rec->depth;
         }
     }
     return rec;
@@ -750,7 +750,7 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
  * unexercised here, as it is in AddRecordList. 151 slots at nineteen per
  * grow puts both reallocs at about eight runs.
  */
-int32_t __cdecl AddAaiRecord(void *rec)
+int32_t __cdecl AddAaiRecord(AM2_AaiRec *rec)
 {
     uint32_t key;
     int32_t  lo, hi, grown;
@@ -765,7 +765,7 @@ int32_t __cdecl AddAaiRecord(void *rec)
 #define RECS  (g_aaiRecords)
 #define INDEX (*(uint32_t * *)&g_keyTable)
     hi  = COUNT;
-    key = *(const uint32_t *)((uint8_t *)rec + AAIREC_OFF_KEY);
+    key = rec->key;
     lo  = 0;
 
     while (hi > lo) {
@@ -781,14 +781,14 @@ int32_t __cdecl AddAaiRecord(void *rec)
 
     if (COUNT + 1 > CAP) {
         grown = COUNT + AM2_AAI_RECORD_GROW;
-        RECS = (void **)am2_realloc(RECS, (size_t)grown * 4);
+        RECS = (AM2_AaiRec **)am2_realloc(RECS, (size_t)grown * 4);
         memset(RECS + CAP, 0, AM2_AAI_RECORD_GROW * 4);
         INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
         memset(INDEX + CAP * 2, 0, AM2_AAI_RECORD_GROW * 8);
         CAP = grown;
     }
 
-    *(int32_t *)((uint8_t *)rec + AAIREC_OFF_SLOT) = COUNT;
+    rec->slot = COUNT;
     RECS[COUNT] = rec;
 
     if (lo < COUNT)
@@ -845,46 +845,46 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
                                int32_t a7, int32_t a8)
 {
 #define o (obj)
-    const uint8_t *rec;
+    const AM2_AaiRec *rec;
     int32_t        i;
 
     if (index < 0 || index >= g_keyTableN)
         return 0;
 
-    rec = (*(const uint8_t *const *const *)&g_aaiRecords)[index];
+    rec = g_aaiRecords[index];
     if (!rec)
         return 0;
 
     o->flags |=
-        (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
+        (uint32_t)(rec->orFlags | orFlags);
     o->owner = (uint8_t)army;
 
     ObjInitCommon(o, name, 1, at,
-                         (const AM2_Rect *)(const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
+                         &rec->box, a7, a8);
 
-    o->field94 = rec;
+    o->aai = rec;
 
     o->health =
         o->maxHealth =
-        *(const int16_t *)(rec + AAI_OFF_HEALTH);
+        rec->health;
     o->heightAdj =
-        *(const int8_t *)(rec + AAI_OFF_HEIGHT_ADJ);
+        rec->heightAdj;
     o->itemFlag =
-        *(const uint8_t *)(rec + AAI_OFF_RANK);
+        (uint8_t)rec->rank;
 
     o->deadline58 =
         *(const int32_t *)&g_gameClockMs;
 
     BuildRowsFromDef(&o->rowSet,
                      (g_recordLists)
-                         [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
+                         [rec->listSlot],
                      (int32_t)at.x,
                      (int32_t)at.y,
                      o->flags);
 
     for (i = 0; i < o->rowSet.count; i++)
         o->rowSet.rows[i].depthSlope =
-            *(const float *)(rec + AAI_OFF_ROW_FIELD28);
+            rec->depthSlope;
 
     ObjAfterMove(o, 0, 0);
     return 1;
@@ -945,10 +945,9 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
          * `(*(void ***)(uintptr_t)ADDR_RECORD_LISTS)[n]`. Indexing the global
          * itself is one dereference short -- the same mistake as the loop
          * below, made twice more in the same function. */
-        const uint8_t *aai = (const uint8_t *)
-            (g_aaiRecords)[slot];
+        const AM2_AaiRec *aai = g_aaiRecords[slot];
         const AM2_RecordList *l =
-            g_recordLists[*(const int32_t *)(aai + AAIREC_OFF_LIST_SLOT)];
+            g_recordLists[aai->listSlot];
 
         for (i = 0; i < l->count; i++) {
             /* TWO dereferences, and records[0] every time -- see the note

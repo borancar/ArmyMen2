@@ -1334,7 +1334,7 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
     if (third <= 0)
         third = o->formationSlot;
 
-    key = *(const uint32_t *)(o->field94 + 8);
+    key = o->aai->key;
     rec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
                                   & AM2_OBJREC_MASK_B),
                         (int32_t)((key >> AM2_OBJREC_SHIFT_A)
@@ -1362,7 +1362,7 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
         link->rowSet.rows->depthLayer =
             (int16_t)(ScaleBy32Blocks(height) - AM2_DEPTH_BASE);
 
-        key = *(const uint32_t *)(link->field94 + 8);
+        key = link->aai->key;
         lrec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
                                        & AM2_OBJREC_MASK_B),
                              (int32_t)((key >> AM2_OBJREC_SHIFT_A)
@@ -1850,8 +1850,7 @@ int32_t __cdecl ObjIsWatchedKind(const AM2_Object *obj)
     if (*(const int32_t *)o != AM2_OBJ_TYPE_ITEM)
         return 0;
 
-    return *(const int32_t *)
-               (o->field94 + 8)
+    return (int32_t)o->aai->key
            == g_createWatchedKind;
 }
 
@@ -3258,14 +3257,14 @@ static inline int32_t ShotCodeChecksArmour(int32_t code)
  * "stopped" and once 0, which is the only difference between them. */
 static inline int32_t ShotPiercesArmour(const AM2_Object *target, const AM2_Object *shot)
 {
-    const uint8_t *rec;
+    const AM2_AaiRec *rec;
     uint8_t        need;
 
     if (!ObjIsItem(target))
         return 1;
 
-    rec  = target->field94;
-    need = *(const uint8_t *)(rec + TYPEREC_OFF_FIELD_3C);
+    rec  = target->aai;
+    need = rec->field3C;
     if (need <= 0)
         return 1;
     if (shot->power < need)
@@ -3478,8 +3477,8 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
 {
     AM2_Object       *s = shot;
     /* The type record is re-read through the shot at each use. */
-#define REC (s->field94)
-    int32_t        code = *(const int32_t *)(REC + TYPEREC_OFF_CODE);
+#define REC (s->def)
+    int32_t        code = REC->kind;
     AM2_Object       *o;
     int32_t        scratch;
 
@@ -3504,12 +3503,11 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
         if (ObjIsType2(o))
             continue;
         if (ObjIsItem(o)
-            && *(const uint8_t *)(o->field94
-                                  + TYPEREC_OFF_FIELD_3C) > 0)
+            && o->aai->field3C > 0)
             continue;
 
         s->field44 =
-            20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
+            20 - REC->life;
     }
 
 /* The shot's TILE, re-read at each use. */
@@ -3525,7 +3523,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
             return AM2_SHOT_STRUCK_NOTHING;
         }
         s->field44 =
-            20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
+            20 - REC->life;
     }
     return AM2_SHOT_STRUCK_GROUND;
 #undef TILE
@@ -3574,9 +3572,9 @@ void __cdecl ApplyShotDamage(AM2_Object *target, AM2_Object *shot, AM2_Point unu
                              int16_t unusedB, int32_t doubled)
 {
     const AM2_Object *sh  = shot;
-    const uint8_t *rec = sh->field94;
-    int32_t amount = *(const int32_t *)(rec + TYPEREC_OFF_DAMAGE);
-    int32_t code   = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
+    const AM2_ItemType *rec = sh->def;
+    int32_t amount = rec->damage;
+    int32_t code   = rec->kind;
     int32_t kind;
     AM2_Object *owner;
 
@@ -4752,7 +4750,7 @@ void __cdecl MedkitHealOne(AM2_Object *obj)
     /* Right to left: the leader is found before the definition. */
     HealObject(obj,
                MissileDefFind(
-                                      AM2_ITEM_KIND_MEDKIT)->healPct,
+                                      AM2_ITEM_KIND_MEDKIT)->damage,
                OurLeaderUnit());
 }
 
@@ -6628,8 +6626,8 @@ void __cdecl StepType1And4(AM2_Object *o)
     }
 
     /* The record and the clock are re-read at each use. */
-#define REC (o->field94)
-    if (*(const int32_t *)REC == 0x2A
+#define REC (o->aai)
+    if (REC->type == 0x2A
         && o->health > 0) {
 
         if ((int32_t)o->owner
@@ -6659,7 +6657,7 @@ void __cdecl StepType1And4(AM2_Object *o)
         }
     }
 
-    if (*(const int32_t *)(REC + 8)
+    if ((int32_t)REC->key
             != g_watchedTypeId)
         return;
 
@@ -7473,7 +7471,7 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
         return 0;
 
     {
-        uint32_t v = *(const uint32_t *)(o->field94 + 8);
+        uint32_t v = o->aai->key;
 
         if (ApplyObjFrame(o,
                           (int32_t)((v >> AM2_OBJREC_SHIFT_B)
@@ -7498,7 +7496,7 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
 
         if (!(link->flags & OBJ_FLAG_NO_FRAME)) {
             uint32_t v =
-                *(const uint32_t *)(link->field94 + 8);
+                link->aai->key;
 
             if (ApplyObjFrame(link,
                               (int32_t)((v >> AM2_OBJREC_SHIFT_B)
@@ -12386,8 +12384,8 @@ void __cdecl DamageItem(AM2_Object *obj, int32_t amount, uint8_t extra, int32_t 
         return;
 
     /* The record is re-read from the object at each use. */
-#define rec (o->field94)
-    armour = *(const int16_t *)(rec + AAIREC_OFF_ARMOUR);
+#define rec (o->aai)
+    armour = rec->armour;
 
     if (kind == 1) {
         if (armour < 0)
@@ -12425,7 +12423,7 @@ have:
 
     /* ---- out of health ---- */
     {
-        uint32_t       key  = *(const uint32_t *)(rec + AAIREC_OFF_KEY);
+        uint32_t       key  = rec->key;
         const uint8_t *next;
         int32_t        index, frame;
 
@@ -12489,8 +12487,8 @@ have:
     }
 
     {
-        const uint8_t *r2 = o->field94;
-        int32_t idx = (int32_t)((*(const uint32_t *)(r2 + AAIREC_OFF_KEY)
+        const AM2_AaiRec *r2 = o->aai;
+        int32_t idx = (int32_t)((r2->key
                                  >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
         int32_t leaves, life;
 
@@ -12575,7 +12573,7 @@ void __cdecl StepType5(AM2_Object *obj)
 
     if (!o)
         return;
-    def = o->missileDef;
+    def = o->def;
     if (!def)
         return;
     if (!g_frameDeltaMs)
@@ -12690,7 +12688,7 @@ void __cdecl StepType5(AM2_Object *obj)
     }
 
 after_flight:
-    def  = o->missileDef;
+    def  = o->def;
     rows = o->rowSet.rows;
 
     switch (def->kind) {
@@ -12807,7 +12805,7 @@ after_flight:
     }
 
     if (outcome >= 5) {
-        if (!o->missileDef->field0C
+        if (!o->def->field0C
             && o->flown > speed)
             goto expire;
         if (outcome != 5)
@@ -12823,7 +12821,7 @@ after_flight:
 
 expire:
     /* The impact, by def kind. Generated from the byte table -- see above. */
-    switch (*(const int32_t *)(o->field94)) {
+    switch (o->def->kind) {
     case 1: case 7: case 8: case 9: case 10: case 21: case 29: case 30:
         CreateExplosion(o->pos.x,
                         o->pos.y, 0x7B,
@@ -12838,7 +12836,7 @@ expire:
                         o->pos.y, 0x94,
                         (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        o->missileDef->blastDamage,
+                        o->def->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -12850,7 +12848,7 @@ expire:
                         + o->followers.count,
                         0x8C, (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        o->missileDef->blastDamage,
+                        o->def->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -12863,7 +12861,7 @@ expire:
                                   + o->followers.count),
                         0x81, (int8_t)(uint8_t)o->owner,
                         o->shooterUid,
-                        o->missileDef->blastDamage,
+                        o->def->blastDamage,
                         0, 0, 0,
                         (uint8_t)(o->facing
                                   + 0x80));
@@ -13556,7 +13554,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
      * obvious tidy-up and changes the behaviour. */
     case 20:
         if (!(tgt && *(const int32_t *)tgt == 1
-              && *(const int32_t *)(tgt->field94 + 8)
+              && tgt->aai->key
                  == g_createWatchedKind)) {
             AM2_Object *o;
             fromP[0] = (int16_t)AM2_FTOL(
@@ -13570,7 +13568,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             if (o)
                 for (;;) {
                     if (*(const int32_t *)o == 1
-                        && *(const int32_t *)(o->field94 + 8)
+                        && o->aai->key
                            == g_createWatchedKind) {
                         target = o;
                         break;
@@ -14140,9 +14138,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
 
     *(int32_t *)o = 4;
 
-    kb = (int32_t)KeyFieldB(*(const uint32_t *)(
-             (const uint8_t *)(g_aaiRecords)[key]
-             + 8));
+    kb = (int32_t)KeyFieldB(g_aaiRecords[key]->key);
     o->typeRec = &g_missileDefs[kb];
 #define def (o->typeRec)
 

@@ -1321,14 +1321,14 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
     o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
     memset(o, 0, AM2_MISSILE_BYTES);
 
-    o->missileDef = w->typeRec;
+    o->def = w->typeRec;
     o->facing = (uint8_t)heading;
     o->repairFrame = repairFrame;
     o->speedScale = speedScale;
     o->rank = (int32_t)((const AM2_Object *)source)->uid;
     o->power = (uint8_t)scriptId;
 
-    def = *((const int32_t *)o->field94);
+    def = o->def->kind;
     switch (def) {
     case 2:
     case 5:
@@ -1377,7 +1377,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
 
 #define orows (o->rowSet.rows)
 
-    if (*((const int32_t *)o->field94) == 3) {
+    if (o->def->kind == 3) {
         orows->animCur = (AM2_AnimTable *)0;
         orows->depthLayer =
             (int16_t)(ScaleBy32Blocks(o->row0YAdjust) + AM2_MISSILE_ROW26_BIAS);
@@ -1458,7 +1458,7 @@ AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
     memcpy(o, h, (size_t)g_itemHeaderSize);
 
     orig_fread(&def, 4, 1, fp);
-    o->missileDef =
+    o->def =
         &g_missileDefs[def];
 
     orig_fread(&o->shooterUid, 4, 1, fp);
@@ -1466,7 +1466,7 @@ AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
     orig_fread(&o->speedScale, 4, 1, fp);
     orig_fread(&o->flown, 4, 1, fp);
 
-    switch (*((const int32_t *)o->field94)) {
+    switch (o->def->kind) {
     case 2:
     case 5:
         frame = AM2_MISSILE_FRAME_A;

@@ -1122,7 +1122,7 @@ void __cdecl SendItemCreate(AM2_Object *obj)
 
     case AM2_OBJ_TYPE_ITEM:
         *(int32_t *)(msg + MSG_CREATE_OFF_D) =
-            *(const int32_t *)(o->field94 + 8);
+            o->aai->key;
         break;
 
     default:

@@ -998,9 +998,7 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
                 || kUnitType(i)->vehicle)
                 continue;
             if (UnitKindMatches(
-                    *(const int32_t *)(
-                        o->field94
-                        + AAIREC_OFF_KEY),
+                    o->aai->key,
                     kUnitType(i)->kind, army))
                 goto found;
         }

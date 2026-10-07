@@ -778,8 +778,8 @@ void __cdecl FreeAaiTables(void)
             FreeIfNotNull(
                 (g_aaiRecords)[i]);
 
-        am2_free(*(void * *)&g_aaiRecords);
-        *(void * *)&g_aaiRecords       = (void *)0;
+        am2_free(g_aaiRecords);
+        g_aaiRecords       = (AM2_AaiRec **)0;
         g_keyTableN = 0;
         g_aaiRecordCap  = 0;
     }

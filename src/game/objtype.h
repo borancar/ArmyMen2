@@ -61,13 +61,13 @@ int32_t __cdecl FindRecordList(uint32_t owner);
 /* 0x004344A0. A 0x40-byte record, seeded from the object.aai record for its
  * (type, key) when the type is not negative. The box is BY VALUE: every
  * caller copies a rectangle into the argument area as one block. */
-void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
+struct AM2_AaiRec *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
                             AM2_Rect box);
 
 /* 0x004345A0. Register one of those under its key, writing the slot back into
  * the record. AddRecordList's twin on the table KeyLookup searches -- keyed on
  * +8 rather than +0, and growing by 19 rather than 17. */
-int32_t __cdecl AddAaiRecord(void *rec);
+int32_t __cdecl AddAaiRecord(struct AM2_AaiRec *rec);
 
 /* 0x00434700. Empty the AAI tables and put back the records that do not come
  * from object.aai: three singletons, a run of forty-four, and two more. */

@@ -1149,7 +1149,7 @@ int32_t __cdecl MeetsAllThree(AM2_Object *p)
 
     if (!(b->flagsLo & 4)
         && (int32_t)b->type == 1
-        && *((const int32_t *)b->field94) == 0x1F)
+        && b->aai->type == 0x1F)
         return 1;
     return 0;
 }

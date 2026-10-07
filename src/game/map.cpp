@@ -1915,7 +1915,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                         code = RandomRespawnKind(&numb);
                         aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
                         flags |= 0x10000;
-                        key = *(const int32_t *)((*(uint8_t ** *)&g_aaiRecords)[aai] + 8);
+                        key = (int32_t)g_aaiRecords[aai]->key;
                         goto haveRecord;
                     }
                     if (code == 0x64)
@@ -1943,7 +1943,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                  * weapon is placed at the point from BEFORE it ran. And the
                  * army is the literal 4, not the record's owner. */
                 settled = at;
-                flags |= *(const int32_t *)((*(uint8_t ** *)&g_aaiRecords)[aai] + 4);
+                flags |= g_aaiRecords[aai]->flags;
                 /* Through map.h's int32_t view: the MSVC definition above
                  * returns a word, and its own callers here would widen it. */
                 SettlePointInRegion(((int32_t (__cdecl *)(AM2_Point))(void *)TileOfPoint)(at),

@@ -452,7 +452,7 @@ void __cdecl LoadDefTables(void)
         dst->range       = src->range;
         dst->rangeMin    = src->rangeMin;
         dst->capacity    = src->capacity;
-        dst->healPct     = src->healPct;
+        dst->damage     = src->damage;
         dst->blastDamage = src->blastDamage;
         dst->automatic   = src->automatic;
         dst->field28     = src->field28;

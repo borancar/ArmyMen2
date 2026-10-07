@@ -129,8 +129,9 @@ typedef struct AM2_ItemType {
                                      * into the sight context (which calls it
                                      * damage, but compares a range against it) */
     int32_t  capacity;              /* +0x18 ITEMTYPE_OFF_CAPACITY */
-    int32_t  healPct;               /* +0x1C the parsed record's +0x20, which
-                                     * MedkitHeal reads as its heal percentage */
+    int32_t  damage;                /* +0x1C TYPEREC_OFF_DAMAGE, the base amount
+                                     * (parsed +0x20); the medkit's is the heal
+                                     * percentage MedkitHeal applies */
     int32_t  blastDamage;           /* +0x20 what a missile hands CreateExplosion */
     int32_t  automatic;             /* +0x24 MISSILEDEF_OFF_FIELD_24: non-zero
                                      * repeats while held */
@@ -138,6 +139,34 @@ typedef struct AM2_ItemType {
     int32_t  weight;                /* +0x2C MISSILEDEF_OFF_WEIGHT, respawn weight */
     int32_t  field30;               /* +0x30 MISSILEDEF_OFF_FIELD_30, RespawnKind's out */
 } AM2_ItemType;
+
+/* An AAI record (AM2_AAI_RECORD_BYTES), what MakeAaiRecord builds from a
+ * definition and an item's +0x94 points at. orig.h spells it with two
+ * prefixes, AAIREC_OFF_ and AAI_OFF_; TYPEREC_OFF_FIELD_3C is its +0x3C. */
+typedef struct AM2_AaiRec {
+    int32_t  type;                  /* +0x00 AAIREC_OFF_TYPE, 0x2E for a built-in */
+    int32_t  flags;                 /* +0x04 or'd into a placed object's flags */
+    uint32_t key;                   /* +0x08 AAIREC_OFF_KEY, a packed sprite key */
+    int32_t  slot;                  /* +0x0C AAIREC_OFF_SLOT, AddAaiRecord's */
+    int32_t  listSlot;              /* +0x10 AAIREC_OFF_LIST_SLOT, AAI_OFF_DEF_INDEX */
+    AM2_Rect box;                   /* +0x14 AAI_OFF_BOX */
+    int32_t  defType;               /* +0x24 the type again, once a def is found */
+    int32_t  orFlags;               /* +0x28 AAI_OFF_OR_FLAGS */
+    int16_t  health;                /* +0x2C AAI_OFF_HEALTH, to max and current */
+    int8_t   heightAdj;             /* +0x2E AAI_OFF_HEIGHT_ADJ */
+    int8_t   rank;                  /* +0x2F AAI_OFF_RANK */
+    int16_t  depth;                 /* +0x30 copied into the list's records */
+    uint8_t  _pad32[2];
+    union {                         /* +0x34 AAI_OFF_ROW_FIELD28: */
+        float   depthSlope;         /*   what the rows' depthSlope takes */
+        int32_t depthSlopeBits;     /*   and as MakeAaiRecord copies it */
+    };
+    int16_t  crushDamage;           /* +0x38 AAIREC_OFF_CRUSH_DAMAGE */
+    int16_t  armour;                /* +0x3A AAIREC_OFF_ARMOUR */
+    uint8_t  field3C;               /* +0x3C TYPEREC_OFF_FIELD_3C: a non-zero
+                                     * one makes an item shot-proof below it */
+    uint8_t  _pad3D[3];
+} AM2_AaiRec;
 
 /* One of ADDR_UNIT_TYPES' AM2_UNIT_TYPE_COUNT records: what the placement
  * screen offers -- a trooper, a vehicle or a building of `kind`, its name in
@@ -164,7 +193,7 @@ typedef struct AM2_MissileDefRec {
     int32_t  range;                 /* +0x14 -> +0x10 */
     int32_t  capacity;              /* +0x18 -> +0x18 */
     int32_t  automatic;             /* +0x1C -> +0x24 */
-    int32_t  healPct;               /* +0x20 -> +0x1C, MedkitHeal's */
+    int32_t  damage;                /* +0x20 -> +0x1C, MedkitHeal's percentage */
     int32_t  blastDamage;           /* +0x24 -> +0x20 */
     int32_t  field28;               /* +0x28 -> +0x28 */
     int32_t  weight;                /* +0x2C -> +0x2C */
@@ -340,8 +369,10 @@ typedef struct AM2_Object {
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
     union {                         /* +0x94 OBJ_OFF_FIELD_94, by object type: */
-        const uint8_t *field94;     /*   an item's type record */
-        const AM2_ItemType *missileDef; /* a missile's (type 5) def, its weapon's typeRec */
+        const uint8_t *field94;     /*   where the per-type save record starts */
+        const AM2_AaiRec *aai;      /*   an item's AAI record */
+        const AM2_ItemType *def;    /*   a shot's or a missile's def, its
+                                     *   weapon's typeRec */
         int32_t    aiDriven;        /*   types 2 and 3: non-zero, the AI drives it */
     };
     union {                         /* +0x98, by object type: */
@@ -609,6 +640,7 @@ static_assert(offsetof(AM2_SightOut, uid)         == 0x1C,  "sight uid");
 static_assert(offsetof(AM2_SightOut, weaponUid)   == 0x20,  "sight weaponUid");
 static_assert(offsetof(AM2_ItemType, range)       == 0x10,  "itemType range");
 static_assert(sizeof(AM2_ItemType)                == AM2_MISSILE_DEF_BYTES, "item type");
+static_assert(sizeof(AM2_AaiRec)                  == AM2_AAI_RECORD_BYTES, "aai rec");
 static_assert(sizeof(AM2_MissileDefRec)           == AM2_MISSILE_DEF_REC_SIZE, "missile def rec");
 static_assert(offsetof(AM2_SightCtx, dest)        == 0x0E,  "ctx dest");
 static_assert(offsetof(AM2_SightCtx, ready)       == 0x54,  "ctx ready");

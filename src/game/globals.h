@@ -39,7 +39,7 @@
 #define g_aaiKey980080           ((uint8_t *)(uintptr_t)ADDR_AAI_KEY_980080)  /* 0x0051615C */
 #define g_aaiKey980100           ((uint8_t *)(uintptr_t)ADDR_AAI_KEY_980100)  /* 0x00516168 */
 #define g_aaiRecordCap           (*(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP)  /* 0x00516144 */
-#define g_aaiRecords             (*(void ***)(uintptr_t)ADDR_AAI_RECORDS)  /* 0x0051614C */
+#define g_aaiRecords             (*(struct AM2_AaiRec ***)(uintptr_t)ADDR_AAI_RECORDS)  /* 0x0051614C */
 #define g_actionCrouch           ((int32_t *)(uintptr_t)ADDR_ACTION_CROUCH)  /* 0x00475090 */
 #define g_actionKey1             ((int32_t *)(uintptr_t)ADDR_ACTION_KEY1)  /* 0x004750CC */
 #define g_actionKey4             ((int32_t *)(uintptr_t)ADDR_ACTION_KEY4)  /* 0x004750D8 */

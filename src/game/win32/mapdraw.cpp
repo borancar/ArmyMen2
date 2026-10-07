@@ -1603,7 +1603,7 @@ int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
                             self->owner);
 
     /* Two four-way switches, and the key read again for the second test. */
-#define KEY (*(const uint32_t *)(self->field94 + 8))
+#define KEY (self->aai->key)
     if (ObjIsType4(obj)) {
         switch (self->typeRec->kind) {
         case AM2_RADAR_KIND_FIRST + 0: colour = 0; break;

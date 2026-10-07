@@ -104,9 +104,10 @@ def _aggregated(va):
 # object and tile masks settle on the 0x004F96C0 block alone; the typed
 # record lists and row sets settle it with none kept; the typed army
 # object lists settle on the 0x004FC8C8 block alone; the typed seq
-# records settle it with none kept.
+# records settle it with none kept; the typed AAI records bring back the
+# 0x00511BC8 block beside the 0x004F96C0 one.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ()
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0), (0x004F96C0, 0x004F96CC))
 
 
 def _kept(va):

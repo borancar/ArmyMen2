@@ -2498,9 +2498,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
     /* Zero means "the record's own kind", written back so nothing downstream
      * can tell which it got. */
     if (!damage)
-        damage = *(const int16_t *)
-                     (o->field94
-                      + AAIREC_OFF_CRUSH_DAMAGE);
+        damage = o->aai->crushDamage;
 
     if (o->heightSet
         > (int8_t)(g_tileAttrs)
@@ -2934,16 +2932,15 @@ int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
 {
     AM2_TileMask   mask;
 
-    const uint8_t *rec;
+    const AM2_AaiRec *rec;
     const AM2_RecordList *hdr;
     int32_t        x, y, n;
 
     if (slot >= g_keyTableN)
         return 1;
 
-    rec = ((const uint8_t *const *)
-              *(void *const *)&g_aaiRecords)[slot];
-    hdr = g_recordLists[*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)];
+    rec = g_aaiRecords[slot];
+    hdr = g_recordLists[rec->listSlot];
 
     if (hdr->mask.bits)
         ListMaskAction(at, hdr, &mask);
@@ -8033,7 +8030,7 @@ watched:
 
         /* A medic tent heals whoever stands in it, twice a second. */
         if ((int32_t)at->type == 1
-            && *(const int32_t *)at->field94 == 0x20
+            && at->aai->type == 0x20
             && g_gameClockMs > o->field5B0 + AM2_TROOPER_HEAL_MS) {
             HealObject(o, AM2_TROOPER_HEAL, at);
             o->field5B0 = g_gameClockMs;
@@ -10179,7 +10176,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             /* A repair pad under the vehicle heals it, at most every 500 ms. */
             if ((int32_t)p->type == 1
-                && *p->field94 == 0x21
+                && p->aai->type == 0x21
                 && p->health > 0
                 && g_gameClockMs
                        > o->field5A0 + 0x1F4u) {

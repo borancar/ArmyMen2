@@ -17742,7 +17742,7 @@ int32_t __cdecl PointerPickRepair(AM2_Object *o)
         return 0;
 
     if (o->type == AM2_OBJ_TYPE_ITEM
-        && *(const int32_t *)(o->field94 + AAIREC_OFF_TYPE) == AM2_AAI_TYPE_26)
+        && o->aai->type == AM2_AAI_TYPE_26)
         return 0;
 
     OverlayPrepare(AM2_MENU_ROW_REPAIR, 1);
