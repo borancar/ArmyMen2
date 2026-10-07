@@ -215,6 +215,23 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **DrawEffectLayer clamps in 16 bits; RowUpdate 166 -> 150** (2026-10-07),
+    no count change.
+    - DrawEffectLayer copies each displacement pair as one dword and clamps
+      its x and y in place as int16: the image's `xor cx, cx`, `add cx, bp`
+      and `movsx`. The frame is now 0x3144 as in the image. The score moved
+      from 165 to 230 because of the registers. What is left is the
+      per-army induction pointer: the image bases it on the aim point's y.
+    - RowUpdate reads the sprite's width and height into locals before the
+      rect is built, as the image loads both bounds up front. The image
+      then computes each right/bottom edge twice, once for the rect and
+      once for the cell. No spelling tried reproduces that: locals for the
+      corner, mixed reads, or a branchless top clamp.
+    - Also tried without gain:
+      - ObjRemap: clamp and shift order (65 is still the best).
+      - SelectFirePose: the mortar and airstrike arms written as a switch
+        (no change).
+      - DiedEffectB: three spellings of the angle test.
   - **ListUpdate matched; PausedFrameStep fixed and 238 -> 151**
     (2026-10-07), 1524 -> 1525.
     - ListUpdate repaints both row bands from a left and right it reads

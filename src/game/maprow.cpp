@@ -1092,6 +1092,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     AM2_Sprite *spr;
     int32_t     cl, ct, cr, cb;
     int32_t     cell, stride, used;
+    int32_t     w, h;
 
     if (!ObjFlagBit0(r)) {
         RowUnregisterAll(r, desc);
@@ -1120,10 +1121,12 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     r->flags &= ~(uint32_t)ROW_FLAG_REMOVED_DONE;
 
     spr = r->sprite;
+    w = spr->bounds.right;
+    h = spr->bounds.bottom;
     r->rect.left   = r->pos.x - spr->hotX;
     r->rect.top    = r->pos.y - spr->hotY - r->yAdjust;
-    r->rect.right  = r->rect.left + spr->bounds.right;
-    r->rect.bottom = r->rect.top + spr->bounds.bottom;
+    r->rect.right  = r->rect.left + w;
+    r->rect.bottom = r->rect.top + h;
 
     cl = r->rect.left   >> 8;
     ct = r->rect.top    >> 8;

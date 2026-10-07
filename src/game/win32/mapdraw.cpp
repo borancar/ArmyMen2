@@ -2476,23 +2476,27 @@ void __cdecl DrawEffectLayer(void)
 
             for (row = hit.top; row < hit.bottom; row++) {
                 for (col = hit.left; col < hit.right; col++) {
-                    int32_t  at = (row - box.top) * AM2_AIM_BLOCK
-                                  + (col - box.left);
-                    int32_t  sx = map[at * 2]     + box.left;
-                    int32_t  sy = map[at * 2 + 1] + box.top;
-                    int32_t  w  = g_bitmapAreaW;
+                    int32_t   at = (row - box.top) * AM2_AIM_BLOCK
+                                   + (col - box.left);
+                    /* The pair is copied as one dword and clamped in place,
+                     * in 16 bits: the image's `xor cx, cx` and `add cx, bp`. */
+                    AM2_Point d  = ((const AM2_Point *)map)[at];
 
-                    if (sx > w - 1)
-                        sx = w - 1;
-                    else if (sx < 0)
-                        sx = 0;
+                    if (d.x + box.left > g_bitmapAreaW - 1)
+                        d.x = (int16_t)(g_bitmapAreaW - 1);
+                    else if (d.x + box.left < 0)
+                        d.x = 0;
+                    else
+                        d.x += (int16_t)box.left;
 
-                    if (sy > (g_bitmapAreaH) - 1)
-                        sy = (g_bitmapAreaH) - 1;
-                    else if (sy < 0)
-                        sy = 0;
+                    if (d.y + box.top > g_bitmapAreaH - 1)
+                        d.y = (int16_t)(g_bitmapAreaH - 1);
+                    else if (d.y + box.top < 0)
+                        d.y = 0;
+                    else
+                        d.y += (int16_t)box.top;
 
-                    block[at] = g_frameBuf[sy * g_pitch + sx];
+                    block[at] = g_frameBuf[d.y * g_pitch + d.x];
                 }
             }
 
