@@ -1130,8 +1130,8 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
 
     cl = r->rect.left   >> 8;
     ct = r->rect.top    >> 8;
-    cr = r->rect.right  >> 8;
-    cb = r->rect.bottom >> 8;
+    cr = (r->rect.left + spr->bounds.right) >> 8;
+    cb = (r->rect.top + spr->bounds.bottom) >> 8;
 
 
     if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
@@ -1140,11 +1140,10 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     }
 
 
-    /* The left edge is branchless in the image (setle/dec/and, a conditional
-     * expression); the top edge is a plain test. */
+    /* Both near edges are branchless in the image (setle/dec/and, a
+     * conditional expression). */
     cl = cl <= 0 ? 0 : cl;
-    if (ct <= 0)
-        ct = 0;
+    ct = ct <= 0 ? 0 : ct;
     if (cr >= desc->cols - 1)
         cr = desc->cols - 1;
     if (cb >= desc->cols - 1)          /* COLS, not ROWS -- see above */
@@ -1158,18 +1157,17 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         int32_t x;
 
         for (x = cl; x <= cr; x++, cell++, used++) {
-            AM2_CellEntry *entry = &r->buffer[used];
-            int32_t       was   = entry->cell;
-
-            if (was == cell) {
+            /* Re-indexed at each use, the entry and its cell alike, and
+             * tested in ObjRemap's order: unlinked, or linked elsewhere. */
+#define entry (&r->buffer[used])
+            if (entry->cell < 0 || entry->cell != cell) {
+                if (entry->cell >= 0)
+                    ListUnlink(entry, &desc->cells[entry->cell]);
+                entry->cell = cell;
+                DepthLink(entry, &desc->cells[cell]);
+            } else
                 DepthResort(entry, &desc->cells[cell]);
-                continue;
-            }
-            if (was >= 0)
-                ListUnlink(entry, &desc->cells[was]);
-
-            entry->cell = cell;
-            DepthLink(entry, &desc->cells[cell]);
+#undef entry
         }
     }
 

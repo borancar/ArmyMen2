@@ -215,6 +215,13 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **RowUpdate 150 -> 117** (2026-10-07).
+    - The cell loop tests in ObjRemap's order: unlinked, or linked
+      elsewhere, else resort.
+    - cr and cb are rect.left / rect.top plus the sprite bounds re-read.
+    - Both near edges are branchless conditional expressions.
+    - Left: VC6 merges the first and the out-of-grid RowUnregisterAll
+      blocks, where the image keeps three separate calls.
   - **TrooperFire fixed, not matched** (2026-10-07; 9 -> 14 bytes, the
     first site's registers rotated). A trooper with a sight point but no
     target used to fire one weapon-range down its heading whenever it was
