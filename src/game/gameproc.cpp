@@ -539,13 +539,13 @@ int32_t __cdecl LoadDefaultCof(void)
     green = 0;
     orig_fread(&tag, 4, 1, fp);
     while (tag == AM2_SAVE_RECORD_MARK) {
-        uint8_t *obj = (uint8_t *)LoadOneItem(fp, 1);
+        AM2_Object *obj = (AM2_Object *)LoadOneItem(fp, 1);
 
         if (obj) {
-            int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+            int16_t max = obj->maxHealth;
 
-            if (max > 0 && *(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
-                *(int16_t *)(obj + OBJ_OFF_HEALTH) = max;
+            if (max > 0 && obj->health > 0) {
+                obj->health = max;
                 if (ObjIsType2Inline(obj))
                     green++;
             }
@@ -883,7 +883,7 @@ int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr)
  */
 int32_t __cdecl SaveType1(am2_FILE *fp, AM2_Object *obj)
 {
-    uint8_t *rec = (uint8_t *)obj + OBJ_OFF_FIELD_94;
+    uint8_t *rec = (uint8_t *)&obj->field94;
 
     orig_fwrite(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     WriteSaveTag(fp, *(const uint32_t *)(*(uint8_t *const *)rec + 8));
@@ -1442,36 +1442,36 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
  * The bounding rect handed to BuildRowSet is ADDR_ZERO_RECT, which no code in
  * the image writes; three call sites use it the same way.
  */
-void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
+void *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
 {
-    uint8_t       *o = (uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
-    const uint8_t *h = (const uint8_t *)hdr;
+    AM2_Object       *o = (AM2_Object *)am2_malloc(AM2_MISSILE_BYTES);
+    const AM2_Object *h = (const AM2_Object *)hdr;
     int32_t        def;
     int32_t        frame;
 
     memset(o, 0, AM2_MISSILE_BYTES);
 
-    *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
+    o->owner = h->owner;
 
-    ObjInitCommon((AM2_Object *)o, g_dirScratch,
+    ObjInitCommon(o, g_dirScratch,
                          AM2_OBJ_TYPE_MISSILE,
-                         *(const AM2_Point *)(h + OBJ_OFF_POS),
+                         h->pos,
                          g_missileBox,
-                         1, *(const int32_t *)(h + 4));
+                         1, (int32_t)h->uid);
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
 
     orig_fread(&def, 4, 1, fp);
-    *(const void **)(o + OBJ_OFF_FIELD_94) =
+    o->field94 =
         g_missileDefs
         + def * AM2_MISSILE_DEF_BYTES;
 
-    orig_fread(o + OBJ_OFF_RANK, 4, 1, fp);
-    orig_fread(o + OBJ_OFF_REPAIR_FRAME, 4, 1, fp);
-    orig_fread(o + OBJ_OFF_PTR_LIST, 4, 1, fp);
-    orig_fread(o + OBJ_OFF_CHAIN_NEXT_UID, 4, 1, fp);
+    orig_fread(&o->shooterUid, 4, 1, fp);
+    orig_fread(&o->repairFrame, 4, 1, fp);
+    orig_fread(&o->speedScale, 4, 1, fp);
+    orig_fread(&o->flown, 4, 1, fp);
 
-    switch (**(const int32_t *const *)(o + OBJ_OFF_FIELD_94)) {
+    switch (*((const int32_t *)o->field94)) {
     case 2:
     case 5:
         frame = AM2_MISSILE_FRAME_A;
@@ -1481,18 +1481,18 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
         break;
     }
 
-    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+    BuildRowSet(&o->rowSet, 1,
                 g_missileRowSpec,
-                *(const int16_t *)(h + OBJ_OFF_POS),
-                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                h->pos.x,
+                h->pos.y,
                 g_zeroRect);
 
     /* The row pointer is re-read at every use. */
-#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
+#define ROWS (((uint8_t *)o->rowSet.rows))
     *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
         g_missileAnims;
     *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint8_t *)(ROWS + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    *(uint8_t *)(ROWS + ROW_OFF_HEADING) = o->facing;
 
     SetAnimFrame((AM2_MapRow *)ROWS, (int16_t)frame, 1);
 #undef ROWS
@@ -1547,47 +1547,47 @@ struct AM2_Type8Obj {
     uint8_t     rest_[0x94 + AM2_TYPE8_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
+void *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type8Obj   obj;
     uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
-    const uint8_t *h   = (const uint8_t *)hdr;
-    uint8_t       *o;
+    const AM2_Object *h   = (const AM2_Object *)hdr;
+    AM2_Object       *o;
     float          part;
 
     orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
 
-    o = (uint8_t *)CreateRoach(
+    o = (AM2_Object *)(uint8_t *)CreateRoach(
             *(const int32_t *)(rec + 0x498),
             g_dirScratch,
-            *(const int16_t *)(h + OBJ_OFF_POS),
-            *(const int16_t *)(h + OBJ_OFF_POS + 2),
-            *(const int8_t *)(h + OBJ_OFF_ARMY),
-            *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
-            *(const int32_t *)(h + 4));
+            h->pos.x,
+            h->pos.y,
+            h->owner,
+            (int32_t)h->flags, 1,
+            (int32_t)h->uid);
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
+    CopyTypeRecord(&o->field94, rec, AM2_TYPE8_RECORD_SIZE);
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+    if (o->health > 0) {
         int32_t now;
 
-        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth((AM2_Object *)o, g_roachHealth);
+        part = (float)o->health
+               / o->maxHealth;
+        SetMaxHealth(o, g_roachHealth);
 
-        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+        now = o->maxHealth;
+        o->health = (int16_t)(int32_t)(now * part);
+        o->health =
+            (int16_t)Clamp(o->health, 1, now);
     }
 
     /* The list the record carried is a stale pointer from the file: the
      * object's copy is zeroed before anything can free it. */
-    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
-    ResetObjOnCof((AM2_Object *)o);
+    memset(&o->followers, 0, sizeof(AM2_PtrList));
+    ResetObjOnCof(o);
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
+    o->flags &= ~OBJ_FLAG_FOOTPRINT_ON;
 
     memset((void *)&obj.list, 0, sizeof obj.list);
     return o;
@@ -1643,12 +1643,12 @@ struct AM2_Type2Obj {
     uint8_t     rest_[0x94 + AM2_TYPE2_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
+void *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
     AM2_Type2Obj obj;
     uint8_t *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
-    uint8_t *h = (uint8_t *)hdr;
-    uint8_t *o;
+    AM2_Object *h = (AM2_Object *)hdr;
+    AM2_Object *o;
     int32_t  weaponCode;
     int32_t  uid;
     int32_t  i;
@@ -1658,16 +1658,16 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     orig_fread(&weaponCode, 4, 1, fp);
 
     if (renumber) {
-        o = (uint8_t *)CreateTrooper(
+        o = (AM2_Object *)(uint8_t *)CreateTrooper(
                 g_dirScratch,
-                *(const int16_t *)(h + OBJ_OFF_POS),
-                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                h->pos.x,
+                h->pos.y,
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
-                *(const int8_t *)(h + OBJ_OFF_ARMY),
-                *(const int32_t *)(h + OBJ_OFF_FLAGS), 1, 0, 0, 0);
+                h->owner,
+                (int32_t)h->flags, 1, 0, 0, 0);
 
-        UidRemapAdd(*(const uint32_t *)(h + 4), *(const uint32_t *)(o + 4));
-        *(uint32_t *)(h + 4) = *(const uint32_t *)(o + 4);
+        UidRemapAdd(h->uid, o->uid);
+        h->uid = o->uid;
 
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D0) = 0;
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_30)  = 0;
@@ -1675,53 +1675,53 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D8) = 0;
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4DC) = 0;
     } else {
-        o = (uint8_t *)CreateTrooper(
+        o = (AM2_Object *)(uint8_t *)CreateTrooper(
                 g_dirScratch,
-                *(const int16_t *)(h + OBJ_OFF_POS),
-                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                h->pos.x,
+                h->pos.y,
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
-                *(const int8_t *)(h + OBJ_OFF_ARMY),
-                *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
-                *(const uint32_t *)(h + 4), 0, 0);
+                h->owner,
+                (int32_t)h->flags, 1,
+                h->uid, 0, 0);
     }
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE2_RECORD_SIZE);
+    CopyTypeRecord(&o->field94, rec, AM2_TYPE2_RECORD_SIZE);
 
-    if (!(*(const uint32_t *)(h + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)) {
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
-            (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+    if (!(h->flags & OBJ_FLAG_BIT0)) {
+        o->flags =
+            (o->flags
              & ~(uint32_t)OBJ_FLAG_DESTROYED) | OBJ_FLAG_BIT0;
-        DestroyByType((AM2_Object *)o);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
+        DestroyByType(o);
+        o->health = 0;
     }
 
     if (renumber)
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_NEEDS_REMAP;
+        o->flags |= OBJ_FLAG_NEEDS_REMAP;
 
-    *(int16_t *)(o + OBJ_OFF_FIELD_574) = -1;
-    *(int32_t *)(o + OBJ_OFF_FIELD_568) = 0;
-    memset(o + TROOPER_OFF_CLEAR_A, 0, AM2_DEPLOY_CLEAR_DWORDS * 4);
+    o->field574 = -1;
+    o->inventorySel = 0;
+    memset(&o->sight, 0, AM2_DEPLOY_CLEAR_DWORDS * 4);
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+    if (o->health > 0) {
         int32_t now;
-        int32_t rank = *(const int32_t *)(o + OBJ_OFF_RANK);
+        int32_t rank = o->rank;
 
-        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth((AM2_Object *)o, g_rankRecords[rank].max_health);
+        part = (float)o->health
+               / o->maxHealth;
+        SetMaxHealth(o, g_rankRecords[rank].max_health);
 
-        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+        now = o->maxHealth;
+        o->health = (int16_t)(int32_t)(now * part);
+        o->health =
+            (int16_t)Clamp(o->health, 1, now);
     }
 
-    *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_KIND) =
+    o->tableRec2 =
         g_objTableRecords
         + *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT) * AM2_OBJ_TABLE_REC_SIZE;
 
-    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
+    memset(&o->followers, 0, sizeof(AM2_PtrList));
 
     if (*(const int32_t *)(rec + TYPE2_REC_OFF_COUNT) > 0) {
         for (i = 0; i < *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT); i++) {
@@ -1730,62 +1730,62 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
              * uid is read and thrown away. The original's own test, not a
              * shortcut. */
             if (!renumber)
-                ((AM2_Rec *)(o + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
+                ((AM2_Rec *)(&o->followers))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 
-    switch (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)) {
+    switch (o->soldierKind) {
     case AM2_SOLDIER_KIND_ACTION_C:
-        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
-        Type2ActionC((AM2_Object *)o, *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1);
+        o->soldierKind = 0;
+        Type2ActionC(o, o->field5A4 - 1);
         break;
 
     case AM2_SOLDIER_KIND_ACTION_A:
-        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
-        if (*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
+        o->soldierKind = 0;
+        if (o->maxHealth
             > AM2_TYPE2_KEEP_HEALTH_OVER) {
             /* Kept across the call in the stack object's own health fields,
              * which the original uses as its temporaries. */
-            uint8_t *keep = (uint8_t *)&obj;
+            AM2_Object *keep = (AM2_Object *)&obj;
 
-            *(int16_t *)(keep + OBJ_OFF_MAX_HEALTH) =
-                *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-            *(int16_t *)(keep + OBJ_OFF_HEALTH) =
-                *(const int16_t *)(o + OBJ_OFF_HEALTH);
-            Type2ActionA((AM2_Object *)o);
-            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-                *(const int16_t *)(keep + OBJ_OFF_MAX_HEALTH);
-            *(int16_t *)(o + OBJ_OFF_HEALTH) =
-                *(const int16_t *)(keep + OBJ_OFF_HEALTH);
+            keep->maxHealth =
+                o->maxHealth;
+            keep->health =
+                o->health;
+            Type2ActionA(o);
+            o->maxHealth =
+                keep->maxHealth;
+            o->health =
+                keep->health;
         } else {
-            Type2ActionA((AM2_Object *)o);
+            Type2ActionA(o);
         }
         break;
 
     case AM2_SOLDIER_KIND_ACTION_B:
-        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
-        Type2ActionB((AM2_Object *)o);
+        o->soldierKind = 0;
+        Type2ActionB(o);
         break;
 
     default:
-        SoldierKindForWeapon((AM2_Object *)o, (uint32_t)weaponCode);
+        SoldierKindForWeapon(o, (uint32_t)weaponCode);
         break;
     }
 
-    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
-        *(const int32_t *)(h + OBJ_OFF_DEADLINE_58);
-    *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+    o->deadline58 =
+        (int32_t)h->deadline58;
+    o->scriptState =
         *(const int32_t *)(rec + TYPE2_REC_OFF_SCRIPT);
-    *(int32_t *)(o + OBJ_OFF_POSE) = 1;
-    SetUnitPose((AM2_Object *)o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
+    o->pose = 1;
+    SetUnitPose(o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
 
     memset((void *)&obj.list, 0, sizeof obj.list);
 
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+    if (o->sarge)
         g_ourLeaderUid =
-            *(const uint32_t *)(o + 4);
+            o->uid;
 
-    ResetObjOnCof((AM2_Object *)o);
+    ResetObjOnCof(o);
     return o;
 }
 
@@ -1848,12 +1848,12 @@ struct AM2_Type3Obj {
     uint8_t     rest_[0x94 + AM2_TYPE3_RECORD_SIZE - 0x538 - sizeof(AM2_PtrList)];
 };
 
-void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
+void *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 {
     AM2_Type3Obj   obj;
     uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
-    const uint8_t *h = (const uint8_t *)hdr;
-    uint8_t       *o;
+    const AM2_Object *h = (const AM2_Object *)hdr;
+    AM2_Object       *o;
     const uint8_t *def;
     int32_t        i;
     uint32_t       uid;
@@ -1861,43 +1861,43 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
 
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
-    o = (uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
+    o = (AM2_Object *)(uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
                                  g_dirScratch,
-                                 *(const int16_t *)(h + OBJ_OFF_POS),
-                                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                                 h->pos.x,
+                                 h->pos.y,
                                  *(const int32_t *)(rec + TYPE3_REC_OFF_SLOT),
-                                 *(const int8_t *)(h + OBJ_OFF_ARMY),
-                                 *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
-                                 *(const int32_t *)(h + 4), 0);
+                                 h->owner,
+                                 (int32_t)h->flags, 1,
+                                 (int32_t)h->uid, 0);
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
 
-    ClearPtrList(o + OBJ_OFF_PTR_LIST);
-    ClearPtrList(o + VEHICLE_OFF_PTR_LIST);
+    ClearPtrList(&o->followers);
+    ClearPtrList(&o->riders);
 
-    CopyTypeRecord(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
+    CopyTypeRecord(&o->field94, rec, AM2_TYPE3_RECORD_SIZE);
 
-    *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_SLOT) =
+    o->tableRec3 =
         g_objTableRecords
         + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
            * AM2_OBJ_TABLE_REC_SIZE);
-    *(int32_t *)(o + OBJ_OFF_RANK) = AM2_TYPE3_LOAD_RANK;
+    o->rank = AM2_TYPE3_LOAD_RANK;
 
-    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
+    memset(&o->followers, 0, sizeof(AM2_PtrList));
 
     if (*(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT) > 0) {
         for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT); i++) {
             orig_fread(&uid, 4, 1, fp);
-            ((AM2_Rec *)(o + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
+            ((AM2_Rec *)(&o->followers))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 
-    memset(o + VEHICLE_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
+    memset(&o->riders, 0, sizeof(AM2_PtrList));
 
     if (*(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT) > 0) {
         for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT); i++) {
             orig_fread(&uid, 4, 1, fp);
-            ((AM2_Rec *)(o + VEHICLE_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
+            ((AM2_Rec *)(&o->riders))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 
@@ -1905,37 +1905,37 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     memset((void *)&obj.list, 0, sizeof obj.list);
     memset((void *)&obj.riders, 0, sizeof obj.riders);
 
-    ResetObjOnCof((AM2_Object *)o);
+    ResetObjOnCof(o);
 
-    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)
-        || *(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
-            (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & ~(uint32_t)OBJ_FLAG_DESTROYED)
+    if (!(o->flags & OBJ_FLAG_BIT0)
+        || o->health <= 0) {
+        o->flags =
+            (o->flags & ~(uint32_t)OBJ_FLAG_DESTROYED)
             | OBJ_FLAG_BIT0;
-        DestroyByType((AM2_Object *)o);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
+        DestroyByType(o);
+        o->health = 0;
     }
 
     def = (const uint8_t *)VehicleDefFind(
-              *(const int32_t *)(o + VEHICLE_OFF_KIND));
+              o->vehicleKind);
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0 && def) {
+    if (o->health > 0 && def) {
         int32_t now;
 
-        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth((AM2_Object *)o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+        part = (float)o->health
+               / o->maxHealth;
+        SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
 
-        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+        now = o->maxHealth;
+        o->health = (int16_t)(int32_t)(now * part);
+        o->health =
+            (int16_t)Clamp(o->health, 1, now);
     }
 
     /* The same clear LoadType8 makes, and for the same reason: the loaded
      * vehicle's footprint gets laid down again rather than being assumed
      * present from a flag the file supplied. */
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+    o->flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 
     return o;
 }
@@ -1974,7 +1974,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
  * that point -- the two freads have already happened, so the file position is
  * correct either way.
  */
-void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
+void *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
 {
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
@@ -1983,40 +1983,40 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
         uint8_t rec[AM2_TYPE1_RECORD_SIZE];
     } whole;
     uint32_t  tag;
-    uint8_t  *obj;
-    void     *ownRec;
+    AM2_Object  *obj;
+    const uint8_t     *ownRec;
     uint8_t   blockA[16];
     uint8_t   blockB[16];
 
     orig_fread(whole.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&tag, 4, 1, fp);
 
-    obj = (uint8_t *)CreateItem(
+    obj = (AM2_Object *)(uint8_t *)CreateItem(
         g_dirScratch, AM2_ARMY_NEUTRAL,
         (int32_t)tag,
-        *(const AM2_Point *)((const uint8_t *)hdr + OBJ_OFF_POS),
-        *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,
-        *(const uint32_t *)((const uint8_t *)hdr + 4));
+        hdr->pos,
+        (int32_t)hdr->flags, 1,
+        hdr->uid);
     if (!obj)
         return (void *)0;
 
-    ownRec = *(void **)(obj + OBJ_OFF_FIELD_94);
-    memcpy(blockA, obj + 0x20, sizeof blockA);
-    memcpy(blockB, obj + 0x30, sizeof blockB);
+    ownRec = obj->field94;
+    memcpy(blockA, &obj->box, sizeof blockA);
+    memcpy(blockB, &obj->hit, sizeof blockB);
 
     memcpy(obj, hdr, (size_t)kItemHeaderSize);
-    memcpy(obj + OBJ_OFF_FIELD_94, whole.rec, AM2_TYPE1_RECORD_SIZE);
-    *(void **)(obj + OBJ_OFF_FIELD_94) = ownRec;
+    memcpy(&obj->field94, whole.rec, AM2_TYPE1_RECORD_SIZE);
+    obj->field94 = ownRec;
 
-    memcpy(obj + 0x20, blockA, sizeof blockA);
-    memcpy(obj + 0x30, blockB, sizeof blockB);
+    memcpy(&obj->box, blockA, sizeof blockA);
+    memcpy(&obj->hit, blockB, sizeof blockB);
 
-    if (*(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME) > 0)
-        ChangeObjectFrame((AM2_Object *)obj, *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME),
+    if (obj->repairFrame > 0)
+        ChangeObjectFrame(obj, obj->repairFrame,
                           0);
-    if (*(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) > 0)
-        ChangeObjectFrame((AM2_Object *)obj,
-                          *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT), 1);
+    if (obj->formationSlot > 0)
+        ChangeObjectFrame(obj,
+                          obj->formationSlot, 1);
 
     return obj;
 }
@@ -2024,7 +2024,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
 
 int32_t __cdecl SaveType6(am2_FILE *fp, AM2_Object *obj)
 {
-    orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
+    orig_fwrite((uint8_t *)&obj->field94,
                 AM2_TYPE6_RECORD_SIZE, 1, fp);
     return 1;
 }
@@ -2034,7 +2034,7 @@ int32_t __cdecl SaveType8(am2_FILE *fp, AM2_Object *obj)
     if (!obj)
         return 0;
 
-    orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
+    orig_fwrite((uint8_t *)&obj->field94,
                 AM2_TYPE8_RECORD_SIZE, 1, fp);
     return 1;
 }
@@ -2151,7 +2151,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, AM2_Object *obj)
  */
 int32_t __cdecl SaveType4(am2_FILE *fp, AM2_Object *obj)
 {
-    const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
+    const uint8_t *rec = (const uint8_t *)&obj->field94;
 
     if (!SaveType1(fp, obj))
         return 0;
@@ -2164,7 +2164,7 @@ int32_t __cdecl SaveType4(am2_FILE *fp, AM2_Object *obj)
 
 int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
 {
-    const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
+    const uint8_t *rec = (const uint8_t *)&obj->field94;
 
     WriteSaveTag(fp, **(const uint32_t *const *)rec);
     WriteSaveTag(fp, *(const uint32_t *)(rec + 0x04));
@@ -2202,7 +2202,7 @@ int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
  * a null dereference. That is the original's, and SaveOneItem's careful
  * per-step checking has no counterpart on this side of the format.
  */
-void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
+void *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
 {
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
@@ -2210,22 +2210,22 @@ void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
         uint8_t head[OBJ_OFF_FIELD_94];
         uint8_t rec[AM2_TYPE6_RECORD_SIZE];
     } obj;
-    const uint8_t *h = (const uint8_t *)hdr;
-    uint8_t       *made;
+    const AM2_Object *h = (const AM2_Object *)hdr;
+    AM2_Object       *made;
 
     orig_fread(obj.rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
 
-    made = (uint8_t *)orig_spawn_at(
-               *(const int16_t *)(h + OBJ_OFF_POS),
-               *(const int16_t *)(h + OBJ_OFF_POS + 2),
+    made = (AM2_Object *)(uint8_t *)orig_spawn_at(
+               h->pos.x,
+               h->pos.y,
                *(const int32_t *)(obj.rec + TYPE6_REC_OFF_KIND),
-               *(const int8_t *)(h + OBJ_OFF_ARMY),
+               h->owner,
                *(const uint32_t *)(obj.rec + TYPE6_REC_OFF_UID),
                *(const int32_t *)(obj.rec + TYPE6_REC_OFF_EXTRA),
-               0, 1, *(const int32_t *)(h + 4), 0);
+               0, 1, (int32_t)h->uid, 0);
 
     memcpy(made, h, (size_t)kItemHeaderSize);
-    CopyTypeRecord(made + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE6_RECORD_SIZE);
+    CopyTypeRecord(&made->field94, obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
 
@@ -2244,18 +2244,18 @@ void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
  * including the fields the creator was just given. A failed creation answers
  * 0 and copies nothing.
  */
-void *__cdecl LoadType7(am2_FILE *fp, const void *hdr)
+void *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
 {
-    const uint8_t *h = (const uint8_t *)hdr;
+    const AM2_Object *h = (const AM2_Object *)hdr;
     uint8_t       *made;
 
     (void)fp;
 
-    made = (uint8_t *)MakeKind7(*(const AM2_Point *)(h + OBJ_OFF_POS), 1,
-                                      *(const int8_t *)(h + OBJ_OFF_ARMY),
-                                      *(const uint8_t *)(h + OBJ_OFF_FACING),
+    made = (uint8_t *)MakeKind7(h->pos, 1,
+                                      h->owner,
+                                      h->facing,
                                       1,
-                                      *(const int32_t *)(h + 4));
+                                      (int32_t)h->uid);
     if (!made)
         return (void *)0;
 
@@ -2362,17 +2362,17 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
      * its flags through it -- the original's, and reproduced. */
     switch (*(const int32_t *)hdr) {
     case 1:
-        made = (uint8_t *)LoadType1(fp, hdr);
+        made = (uint8_t *)LoadType1(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 2:
-        made = (uint8_t *)LoadType2(fp, (void *)hdr, arg);
+        made = (uint8_t *)LoadType2(fp, (AM2_Object *)(void *)hdr, arg);
         if (!made)
             return NULL;
         break;
     case 3:
-        made = (uint8_t *)LoadType3(fp, hdr);
+        made = (uint8_t *)LoadType3(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
@@ -2382,27 +2382,27 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
      * read whatever was on the stack for it. The call site settles it: it
      * pushes three and cleans 0xC. */
     case 4:
-        made = (uint8_t *)LoadType4(fp, (void *)hdr, arg);
+        made = (uint8_t *)LoadType4(fp, (AM2_Object *)(void *)hdr, arg);
         if (!made)
             return NULL;
         break;
     case 5:
-        made = (uint8_t *)LoadType5(fp, hdr);
+        made = (uint8_t *)LoadType5(fp, (AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 6:
-        made = (uint8_t *)LoadType6(fp, hdr);
+        made = (uint8_t *)LoadType6(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 7:
-        made = (uint8_t *)LoadType7(fp, hdr);
+        made = (uint8_t *)LoadType7(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
     case 8:
-        made = (uint8_t *)LoadType8(fp, hdr);
+        made = (uint8_t *)LoadType8(fp, (const AM2_Object *)hdr);
         if (!made)
             return NULL;
         break;
@@ -3091,9 +3091,9 @@ void gameproc_install(void)
  * THE RENUMBER FLAG IS READ TWICE. Once to choose the create, and again at
  * the end to set bit 0x4000000 in OBJ_OFF_FLAGS -- so a renumbered weapon is
  * marked as such, and the flag is not simply the create path's leftover. */
-void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
+void *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
 {
-    uint8_t  *h = (uint8_t *)hdr;
+    AM2_Object  *h = (AM2_Object *)hdr;
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
     struct {
@@ -3105,8 +3105,8 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
     uint32_t  cooldown;
     uint32_t  unused;
     int32_t   aai;
-    uint8_t  *w;
-    void     *ownRec;
+    AM2_Object  *w;
+    const uint8_t     *ownRec;
 
     orig_fread(obj.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&spriteKey, 4, 1, fp);
@@ -3118,33 +3118,33 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
                                 (int32_t)KeyFieldB(spriteKey), 0);
 
     if (renumber) {
-        w = (uint8_t *)CreateWeapon(
+        w = (AM2_Object *)(uint8_t *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
-                *(const AM2_Point *)(h + OBJ_OFF_POS),
-                *(const int32_t *)(h + OBJ_OFF_FLAGS),
+                h->pos,
+                (int32_t)h->flags,
                 (int32_t)extra, 1, 0);
-        UidRemapAdd(*(const uint32_t *)(h + OBJ_OFF_UID),
-                    *(const uint32_t *)(w + OBJ_OFF_UID));
-        *(uint32_t *)(h + OBJ_OFF_UID) = *(const uint32_t *)(w + OBJ_OFF_UID);
+        UidRemapAdd(h->uid,
+                    w->uid);
+        h->uid = w->uid;
     } else {
-        w = (uint8_t *)CreateWeapon(
+        w = (AM2_Object *)(uint8_t *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
-                *(const AM2_Point *)(h + OBJ_OFF_POS),
-                *(const int32_t *)(h + OBJ_OFF_FLAGS),
+                h->pos,
+                (int32_t)h->flags,
                 (int32_t)extra, 1,
-                *(const uint32_t *)(h + OBJ_OFF_UID));
+                h->uid);
     }
 
-    ownRec = *(void **)(w + OBJ_OFF_FIELD_94);
+    ownRec = w->field94;
     memcpy(w, h, (size_t)g_itemHeaderSize);
-    memcpy(w + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE1_RECORD_SIZE);
-    *(void **)(w + OBJ_OFF_FIELD_94) = ownRec;
+    memcpy(&w->field94, obj.rec, AM2_TYPE1_RECORD_SIZE);
+    w->field94 = ownRec;
 
-    *(uint32_t *)(w + 0xC4u) = cooldown;
-    *(uint32_t *)(w + 0xC8u) = 0;
+    w->followUid = cooldown;
+    w->pickupAfter = 0;
 
     if (renumber)
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= 0x4000000u;
+        w->flags |= 0x4000000u;
 
     (void)unused;
     return w;
