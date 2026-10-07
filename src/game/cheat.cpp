@@ -85,7 +85,7 @@ static void __cdecl CheatHealOne(AM2_Object *obj)
 #define CHEAT_GIVE_ITEM(kind, ammo)                                          \
     CreateWeapon(g_dirScratch, 0,               \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
-                 *(const AM2_Point *)(u + OBJ_OFF_POS), 0, (ammo), 0, 0)
+                 u->pos, 0, (ammo), 0, 0)
 
 typedef int32_t (__cdecl *am2_rand_fn)(void);
 #define orig_rand  ((am2_rand_fn)(uintptr_t)ADDR_GAME_RAND)
@@ -100,18 +100,18 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * write happens before or after the swap.  Written out in each arm, as the
  * image has them; the no-old-weapon exit is one block both arms reach. */
 #define CHEAT_NEW_WEAPON(kind)                                               \
-    ((uint8_t *)CreateWeapon(g_dirScratch, 0,   \
+    ((AM2_Object *)(uint8_t *)CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
                  g_zeroXY, 4, -1, 0, 0))
 
 /* 0x00417B80. */
 void __cdecl CheatLine(const char *line)
 {
-    uint8_t *u;
+    AM2_Object *u;
     int32_t  n;
     AM2_Point where;
-    uint8_t *old;
-    uint8_t *fresh;
+    AM2_Object *old;
+    AM2_Object *fresh;
 
     if (line == 0)
         return;
@@ -133,7 +133,7 @@ void __cdecl CheatLine(const char *line)
     if (g_cheatEnabled == 0)
         return;
 
-    u = (uint8_t *)LookupOwnerObj(g_defaultOwner);
+    u = (AM2_Object *)(uint8_t *)LookupOwnerObj(g_defaultOwner);
     if (u == 0)
         return;
 
@@ -164,8 +164,8 @@ again:
             return;
 
         CreateExplosion(where.x, where.y, 0x85, 0, 0, 0, 0, 0, 0, 0);
-        *(uint32_t *)(u + OBJ_OFF_POS) = *(const uint32_t *)&where;
-        ObjTileChanged((AM2_Object *)u, 0, 0);
+        u->pos = where;
+        ObjTileChanged(u, 0, 0);
         return;
     case 4:                                     /* spidey senses tingling */
         HudMessage("I see everything!", kColour(((uintptr_t)&g_whiteInk)));
@@ -199,19 +199,19 @@ again:
         HudMessage("Flame On!", kColour(((uintptr_t)&g_hudColour)));
         g_flameOn = 1;
         (*(int32_t *)&g_flameNextMs) = 0;
-        old = (uint8_t *)WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
+        old = WeaponByUid(u->field54C);
         fresh = CHEAT_NEW_WEAPON(3);
         if (old) {
             if (fresh == 0)
                 return;
-            *(int32_t *)(old + OBJ_OFF_FLAGS) |= 2;
-            fresh[OBJ_OFF_ARMY] = u[OBJ_OFF_ARMY];
-            *(int32_t *)(u + OBJ_OFF_WEAPON_UID) = *(const int32_t *)(fresh + OBJ_OFF_UID);
-            SoldierKindForWeapon((AM2_Object *)u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
-            SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
-            SetFieldInAll(u + OBJ_OFF_SUBRECORD,
+            old->flags |= 2;
+            fresh->owner = u->owner;
+            u->field54C = (int32_t)fresh->uid;
+            SoldierKindForWeapon(u, *fresh->typeRec);
+            SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
+            SetFieldInAll(&u->rowSet,
                           g_flameRecord);
-            RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
+            RowUpdate((AM2_MapRow *)(u->rowSet.rows), 1,
                       g_mapDesc);
             return;
         }
@@ -222,27 +222,26 @@ again:
         HudMessage("Flame Off!", kColour(((uintptr_t)&g_hudColour)));
         g_flameOn = 0;
         (*(int32_t *)&g_flameNextMs) = 0;
-        SetFieldInAll(u + OBJ_OFF_SUBRECORD,
-                      *(void **)(u + OBJ_OFF_TABLE_REC_KIND));
-        RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
+        SetFieldInAll(&u->rowSet, (void *)u->tableRec2);
+        RowUpdate((AM2_MapRow *)(u->rowSet.rows), 1,
                   g_mapDesc);
-        old = (uint8_t *)WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
+        old = WeaponByUid(u->field54C);
         fresh = CHEAT_NEW_WEAPON(9);
         if (old) {
             if (fresh == 0)
                 return;
-            *(int32_t *)(old + OBJ_OFF_FLAGS) |= 2;
-            fresh[OBJ_OFF_ARMY] = u[OBJ_OFF_ARMY];
-            *(int32_t *)(u + OBJ_OFF_WEAPON_UID) = *(const int32_t *)(fresh + OBJ_OFF_UID);
-            SoldierKindForWeapon((AM2_Object *)u, **(int32_t **)(fresh + OBJ_OFF_FIELD_C0));
-            SendTrooperSetWeapon(u, *(const int32_t *)(fresh + OBJ_OFF_UID), 0);
+            old->flags |= 2;
+            fresh->owner = u->owner;
+            u->field54C = (int32_t)fresh->uid;
+            SoldierKindForWeapon(u, *fresh->typeRec);
+            SendTrooperSetWeapon(u, (int32_t)fresh->uid, 0);
             return;
         }
     no_old:
         /* WHICH OBJECT GETS THE FLAG DEPENDS ON WHETHER THERE WAS AN OLD
          * ONE.  With no old weapon the image flags the NEW one and stops. */
         if (fresh)
-            *(int32_t *)(fresh + OBJ_OFF_FLAGS) |= 2;
+            fresh->flags |= 2;
         return;
 
     /* The nineteen item cheats.  Reply, colour, kind, ammo -- nothing else
@@ -296,7 +295,7 @@ again:
     case 31:                                    /* techno */
         HudMessage("Rocks.", kColour(((uintptr_t)&g_colourStale)));
         PlayDynamicSound("portal1_8bit.wav", 1, 0, 0, 0, 0x10, 2,
-                         *(const uint32_t *)(u + OBJ_OFF_UID));
+                         u->uid);
         return;
 
     case 32:                                    /* god of gamblers */
@@ -310,16 +309,16 @@ again:
 
     case 33:                                    /* ninja arts */
         HudMessage("Stealth mode on!", kColour(((uintptr_t)g_colourDarkBlue)));
-        SetFieldInAll(u + OBJ_OFF_SUBRECORD,
+        SetFieldInAll(&u->rowSet,
                       g_rowLutDoubles);
-        RowUpdate((AM2_MapRow *)(*(void **)(u + OBJ_OFF_ROWS)), 1,
+        RowUpdate((AM2_MapRow *)(u->rowSet.rows), 1,
                   g_mapDesc);
         return;
     case 34:                                    /* suicide kings */
         HudMessage("And you're the king!", kColour(((uintptr_t)&g_colourLagMid)));
-        *(uint16_t *)(u + OBJ_OFF_HEALTH) = 1;
+        u->health = 1;
         g_invulnerable = 0;
-        DamageObject((AM2_Object *)u, 0x64, 2, *(const int32_t *)(u + OBJ_OFF_UID), 0, 0);
+        DamageObject(u, 0x64, 2, (int32_t)u->uid, 0, 0);
         return;
     case 35:                                    /* night of the walking dead */
         HudMessage("Brains, Brains!", kColour(((uintptr_t)g_colourDarkBlue)));

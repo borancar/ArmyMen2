@@ -271,7 +271,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
 uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
 {
     AM2_Rect  box;
-    uint8_t  *o;
+    AM2_Object  *o;
 
     /* `where` is a packed point, read a half at a time from its own slot. */
     box.left   = where.x - AM2_AIR_ENEMY_RADIUS;
@@ -279,18 +279,18 @@ uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
     box.top    = where.y - AM2_AIR_ENEMY_RADIUS;
     box.bottom = where.y + AM2_AIR_ENEMY_RADIUS;
 
-    o = (uint8_t *)ObjectsInRect(&box, g_objMapDesc,
+    o = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
                                  MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
      * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a
      * different structure entirely. Two right names, one collision. */
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        const AM2_Object *obj = (const AM2_Object *)o;
+    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+        const AM2_Object *obj = o;
 
         /* Once per candidate, not once before the loop. */
         if ((int32_t)obj->owner != (int32_t)UidArmy(from)
-            && *(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)
+            && o->health > 0)
             return obj->uid;
     }
     return 0;
@@ -437,22 +437,22 @@ void __cdecl SetFogOfWar(int32_t fogOn)
     g_fogOfWar = 1;
 
     for (obj = FirstItem(); obj; obj = NextItem()) {
-        uint8_t *o = (uint8_t *)obj;
+        AM2_Object *o = (AM2_Object *)(uint8_t *)obj;
         uint32_t flags;
         int32_t  i;
 
-        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        if (o->flags & OBJ_FLAG_DESTROYED)
             continue;
         if (!ObjIsTypeIn238((const AM2_Object *)obj))
             continue;
 
-        flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+        flags = o->flags;
         if (!(flags & OBJ_FLAG_CONCEALED))
             continue;
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
+        o->flags = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
 
-        for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-            uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+        for (i = 0; i < o->rowSet.count; i++) {
+            uint8_t *row = ((uint8_t *)o->rowSet.rows)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
             *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
@@ -838,21 +838,21 @@ void __cdecl ResolveFormationPoint(AM2_Object *follower, AM2_Object *leader,
 
 void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
-    uint8_t *o;
+    AM2_Object *o;
 
-    for (o = (uint8_t *)FirstItem(); o; o = (uint8_t *)NextItem()) {
+    for (o = (AM2_Object *)(uint8_t *)FirstItem(); o; o = (AM2_Object *)(uint8_t *)NextItem()) {
         /* Types 2, 3 and 8 only; not one that is already revealed; and
          * ApproxDist -- a diamond, not a circle -- within the radius. */
-        if (!ObjIsTypeIn238((const AM2_Object *)o))
+        if (!ObjIsTypeIn238(o))
             continue;
-        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_REVEALED)
+        if (o->flags & OBJ_FLAG_REVEALED)
             continue;
-        if (ApproxDist(&where, (const AM2_Point *)(o + OBJ_OFF_POS))
+        if (ApproxDist(&where, &o->pos)
                 > radius)
             continue;
 
-        RevealObj((AM2_Object *)o);
-        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) =
+        RevealObj(o);
+        o->revealedUntil =
             (int32_t)g_gameClockMs + delayMs;
     }
 }
@@ -1072,17 +1072,17 @@ void __cdecl AirSupportPop(void)
 int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
                            const char *name)
 {
-    const uint8_t *w = (const uint8_t *)who;
-    const uint8_t *o = (const uint8_t *)owner;
-    const uint8_t *base;
+    const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
+    const AM2_Object *o = (const AM2_Object *)(const uint8_t *)owner;
+    const AM2_Object *base;
     int32_t        answer = AM2_NOT_AT_FLAG_BASE;
 
-    if (AM2_THE_COMM->CommArmyOfSlot(*(const int8_t *)(o + OBJ_OFF_ARMY)) == army) {
-        base = (const uint8_t *)LookupByUID(
+    if (AM2_THE_COMM->CommArmyOfSlot(o->owner) == army) {
+        base = LookupByUID(
                    (uint32_t)kScriptNames[ScriptFindName(name)].value);
         if (base
-            && ApproxDist((const AM2_Point *)(base + OBJ_OFF_POS),
-                          (const AM2_Point *)(w + OBJ_OFF_POS))
+            && ApproxDist(&base->pos,
+                          &w->pos)
                < AM2_FLAG_BASE_RANGE)
             answer = 0;
     }
@@ -1202,21 +1202,21 @@ int32_t __cdecl ObjBlockWeight(AM2_Object *from, AM2_Object *obj, AM2_Point unus
  */
 int32_t __cdecl ThingCode(const void *who, const void *owner)
 {
-    const uint8_t *w = (const uint8_t *)who;
-    const uint8_t *o = (const uint8_t *)owner;
+    const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
+    const AM2_Object *o = (const AM2_Object *)(const uint8_t *)owner;
     int32_t        result = 0;
 
     /* Cases in the image's layout order; the answer for an unlisted code is
      * the zero preset before the switch. */
-    switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
+    switch (*w->typeRec) {
     case 2:               result = 8; break;
     case 3: case 4: case 5:  result = 0x10; break;
     case 6: case 7:       result = 0x20; break;
     case 21:              result = 0x21; break;
     case 29:              result = 0x40; break;
     case 22: {
-        int32_t max    = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        int32_t health = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+        int32_t max    = o->maxHealth;
+        int32_t health = o->health;
 
         result = health < max / 2 ? 0x20 : 8;
 
@@ -1271,25 +1271,25 @@ void __cdecl ToggleFogOfWar(void)
     *fog = (*fog == 0);
 
     for (o = FirstItem(); o; o = NextItem()) {
-        uint8_t *p = (uint8_t *)o;
+        AM2_Object *p = (AM2_Object *)(uint8_t *)o;
 
-        if (*(const uint8_t *)(p + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        if (p->flagsLo & OBJ_FLAG_DESTROYED)
             continue;
-        if (!ObjIsTypeIn238((const AM2_Object *)p))
+        if (!ObjIsTypeIn238(p))
             continue;
-        if (ObjIsFriendly((const AM2_Object *)p))
+        if (ObjIsFriendly(p))
             continue;
 
         if (*fog) {
-            RevealObj((AM2_Object *)p);
+            RevealObj(p);
         } else {
-            uint32_t until = *(const uint32_t *)(p + OBJ_OFF_REVEALED_UNTIL);
+            uint32_t until = p->revealedUntil;
 
             /* `<= 0` on an unsigned, i.e. == 0: the original's `jbe` after
              * `test`, where `== 0` compiles `je`. */
             if (until <= 0u
                 || g_gameClockMs < until)
-                ObjConceal((AM2_Object *)p, 0);
+                ObjConceal(p, 0);
         }
     }
 }
@@ -1810,30 +1810,30 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
     flags |= AM2_AIR_DROP_FLAG;
 
     for (i = 0; i < AM2_AIR_DROP_COUNT; i++) {
-        void *trooper;
-        void *weapon;
+        AM2_Object *trooper;
+        AM2_Object *weapon;
 
-        trooper = CreateTrooper(g_dirScratch,
+        trooper = (AM2_Object *)CreateTrooper(g_dirScratch,
                                 at.x + OFF[i * 2],
                                 at.y + OFF[i * 2 + 1],
                                 AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
-        weapon = CreateWeapon(g_dirScratch, army,
+        weapon = (AM2_Object *)CreateWeapon(g_dirScratch, army,
                               KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
                               g_zeroXY,
                               4, -1, 0, 0);
         if (!weapon)
             continue;
 
-        *(uint32_t *)((uint8_t *)trooper + OBJ_OFF_WEAPON_UID) =
-            *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID);
+        trooper->inventory[0] =
+            weapon->uid;
         *((uint8_t *)trooper + OBJ_OFF_FACING) = FACE[i];
 
-        SoldierKindForWeapon((AM2_Object *)trooper,
-            **(const uint32_t **)((const uint8_t *)weapon + OBJ_OFF_FIELD_C0));
+        SoldierKindForWeapon(trooper,
+            *((const uint32_t *)weapon->typeRec));
         SendTrooperSetWeapon(trooper,
-            *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID), 0);
+            weapon->uid, 0);
     }
 #undef FACE
 #undef OFF
