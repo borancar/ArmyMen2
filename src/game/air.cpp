@@ -1419,7 +1419,6 @@ void __cdecl AirPassesDraw(void)
     int32_t x;
     int32_t y;
     int32_t frame;
-    int32_t half;
 
     /* The pass time is re-read, and halved with a shift, at every use. */
 #define MS (g_airPassMs)
@@ -1427,18 +1426,17 @@ void __cdecl AirPassesDraw(void)
         return;
 
     for (i = 0; i < g_airPassCount; i++) {
+        x = g_airPassWhere[i * 2]
+            - g_viewX;
         y = g_airPassWhere[i * 2 + 1]
             - g_viewY
             - AM2_AIR_PASS_LIFT;
-        x = g_airPassWhere[i * 2]
-            - g_viewX;
-        half = MS >> 1;
 
-        if (g_airPassTimer[i] < half) {
-            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / half;
+        if (g_airPassTimer[i] < (MS >> 1)) {
+            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / (MS >> 1);
             y -= AM2_AIR_PASS_LIFT;
         } else {
-            frame = ((g_airPassTimer[i] - half) * AM2_AIR_PASS_FRAMES) / half;
+            frame = ((g_airPassTimer[i] - (MS >> 1)) * AM2_AIR_PASS_FRAMES) / (MS >> 1);
         }
 
         DrawSprite((g_airSprites3)[frame],

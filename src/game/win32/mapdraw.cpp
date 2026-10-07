@@ -1850,7 +1850,6 @@ void __cdecl ViewUpdate(void)
     int32_t w     = g_blitRect->right - g_blitRect->left;
     int32_t h     = g_blitRect->bottom - g_blitRect->top;
     int32_t halfW = w >> 1;
-    int32_t halfH;
     /* The map bounds are read from their globals at each clamp. */
 #define BOUND_L (g_mapBoundsLeft)
 #define BOUND_T (g_mapBoundsTop)
@@ -1863,9 +1862,8 @@ void __cdecl ViewUpdate(void)
 
     g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
                                     BOUND_R - halfW - 1);
-    halfH = h >> 1;
-    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, halfH + BOUND_T,
-                                    BOUND_B - halfH - 1);
+    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + BOUND_T,
+                                    BOUND_B - (h >> 1) - 1);
 
     obj = g_objCtxObj;
     if (obj) {
@@ -1914,13 +1912,13 @@ void __cdecl ViewUpdate(void)
 
 clamp_eye:
     vpt.x = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
-    vpt.y = (int16_t)Clamp(vpt.y, halfH + BOUND_T, BOUND_B - halfH - 1);
+    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + BOUND_T, BOUND_B - (h >> 1) - 1);
 
     {
         int32_t *world  = g_secondRect;
 #define origin (&g_viewX)
         int32_t  vl = vpt.x - halfW;
-        int32_t  vt = vpt.y - halfH;
+        int32_t  vt = vpt.y - (h >> 1);
 
         world[0] = vl;
         world[1] = vt;

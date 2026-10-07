@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1537 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1538 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,12 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **AirPassesDraw matched** (2026-10-07), 1537 -> 1538.
+    - Half the pass time is recomputed at each use: no `half` local.
+    - x is computed before y.
+    - ViewUpdate 76 -> 68, likewise without a `halfH` local.
+    - unhoist.py now also handles locals that are declared first and
+      assigned exactly once later.
   - **The reverse-hoist probe** (`unhoist.py`, session tmp directory),
     still 1537 (2026-10-07).
     - It replaces a local initialised from a plain expression with that
