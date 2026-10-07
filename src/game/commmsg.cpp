@@ -1530,7 +1530,7 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, AM2_Object *vehicle)
     if (!vehicle)
         return;
 
-    for (i = 0; i < v->posePending; i++) {
+    for (i = 0; i < v->riders.count; i++) {
         if ((v->riders.uids)[i]
                 == uid) {
             ((AM2_Rec *)&v->riders)->ListRemoveAt(i);
@@ -3462,9 +3462,9 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
 
             o->gate = 1;
             o->ctl.state = (int32_t)(action & 7u);
-            o->sight.state = (int32_t)((uint32_t)action >> 7);
-            o->sight.hit = (int32_t)(((uint32_t)action >> 6) & 1u);
-            o->sight.seen = (int32_t)(((uint32_t)action >> 5) & 1u);
+            o->ctl.field0C = (int32_t)((uint32_t)action >> 7);
+            o->ctl.stop = (int32_t)(((uint32_t)action >> 6) & 1u);
+            o->ctl.approach = (int32_t)(((uint32_t)action >> 5) & 1u);
         }
     }
 
@@ -3497,9 +3497,9 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
                 (uint32_t)o->ctl.heading,
                 (uint32_t)o->ctl.aim,
                 o->ctl.state,
-                o->sight.state,
-                o->sight.hit,
-                o->sight.seen);
+                o->ctl.field0C,
+                o->ctl.stop,
+                o->ctl.approach);
 
     return at;
 }

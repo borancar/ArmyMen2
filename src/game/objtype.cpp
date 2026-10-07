@@ -1411,7 +1411,7 @@ int32_t __cdecl ObjIsSelectable(AM2_Object *o)
         return 0;
 
     if (ObjIsType3((const AM2_Object *)obj)
-            && obj->posePending <= 0)
+            && obj->riders.count <= 0)
         return 0;
 
     return 1;

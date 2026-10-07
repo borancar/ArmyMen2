@@ -176,7 +176,7 @@ void *__cdecl ListFirstObj(const AM2_Object *obj)
 
     if (!obj)
         return 0;
-    if (o->posePending < 1)
+    if (o->riders.count < 1)
         return 0;
     return LookupByUID(*o->riders.uids);
 }

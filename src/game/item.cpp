@@ -2052,7 +2052,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     ROWS->depthLayer = AM2_ROW_FIELD26_INIT;
     *(uint32_t *)ROWS |= ROW_FLAG_BIT8;
 
-    o->seats = 1;
+    o->roachCtl.state = 1;
     o->roachCtl.heading   = 0;
 
     SetAnimFrame(ROWS, g_roachStartFrame, 0);
@@ -7986,7 +7986,7 @@ void __cdecl EnterVehicle(AM2_Object *unit, AM2_Object *vehicle)
     uint32_t  uid = ((const AM2_Object *)unit)->uid;
     int32_t   n;
 
-    if (v->posePending
+    if (v->riders.count
             >= v->seats)
         return;
 
@@ -7995,7 +7995,7 @@ void __cdecl EnterVehicle(AM2_Object *unit, AM2_Object *vehicle)
 
     /* The count is read after the SARGE test, not before. */
     if (u->sarge
-        && (n = v->posePending) > 1) {
+        && (n = v->riders.count) > 1) {
         /* Re-read between the two stores, as the original does. */
         (v->riders.uids)[n - 1] =
             (v->riders.uids)[0];
@@ -11002,9 +11002,9 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
         o->ctl.heading    = o->facing;
         o->ctl.aim = o->turretFacing;
         o->ctl.state = 1;
-        o->sight.state = 0;
-        o->sight.seen = 0;
-        o->sight.hit = 0;
+        o->ctl.field0C = 0;
+        o->ctl.approach = 0;
+        o->ctl.stop = 0;
         o->aiMode = 1;
     }
 
@@ -11082,7 +11082,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
         o->sight.bearing   = o->facing;
         SetUnitPose((AM2_Object *)o, 1);
 
-        o->searchBase    = 0;
+        o->riding    = 0;
         o->field5A4 = 0;
         ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
         o->pose = 0;
@@ -12084,7 +12084,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                                AM2_VEHICLE_WEAPON_FLAGS, -1, remote, 0);
 
         if (w != (void *)0)
-            o->inventory[1] =
+            o->weaponUid =
                 (int32_t)w->uid;
     }
 

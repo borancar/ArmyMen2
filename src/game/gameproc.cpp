@@ -2118,7 +2118,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, AM2_Object *obj)
         orig_fwrite(o->followers.uids,
                     (size_t)n * 4, 1, fp);
 
-    n = o->posePending;
+    n = o->riders.count;
     if (n > 0)
         orig_fwrite(o->riders.uids,
                     (size_t)n * 4, 1, fp);
