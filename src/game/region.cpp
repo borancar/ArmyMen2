@@ -8111,14 +8111,16 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         const uint8_t *at = out + SIGHTCOUT_OFF_X;
 
         if (*(const int16_t *)at != 0
-            && ObjCodeUnmapped(w)
-            && PointsDiffer(*(const uint32_t *)(o + OBJ_OFF_POS),
-                            *(const uint32_t *)at))
+            && ObjCodeUnmapped(w))
         {
-            /* Turned to face it: a call of its own, which the original
-             * writes out in full and the compiler cross-jumps into the
-             * other arm's tail. */
-            TrooperFaceTo(o, (const AM2_Point *)at);
+            /* Turned to face it only when it is somewhere else: a point
+             * we are standing on still gets fired at, unturned. The
+             * image's PointsDiffer `je` lands on the jitter below, not on
+             * the no-point arm -- this was once one condition, which sent
+             * that case one weapon-range down the heading instead. */
+            if (PointsDiffer(*(const uint32_t *)(o + OBJ_OFF_POS),
+                             *(const uint32_t *)at))
+                TrooperFaceTo(o, (const AM2_Point *)at);
             heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
             fired = FireWeaponB(w, o, ObjHeight(o), heading,
                                 *(const AM2_FireSpot *)at, 0);

@@ -215,6 +215,12 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **TrooperFire fixed, not matched** (2026-10-07; 9 -> 14 bytes, the
+    first site's registers rotated). A trooper with a sight point but no
+    target used to fire one weapon-range down its heading whenever it was
+    standing on that point. The original only skips the turn and still fires
+    at the point: its PointsDiffer `je` lands on the jitter, not on the
+    no-point arm. Found by `$T/callguard.py`.
   - **Step3Drive 372 -> 309** (2026-10-07). The wheeled (kind 1) engine
     sounds are an `else if` after the tracked kinds. That lets VC6 merge all
     eight PlaySoundAt arms into the one call the image has. Found by
