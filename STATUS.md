@@ -215,6 +215,17 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **RunScriptAction 129 -> 30** (2026-10-07), no count change.
+    - The setbriefvo arm (0x28) sits between setbriefing (0x27) and
+      setstratmap (0x29), which is where the image lays out its strcpy to
+      g_levelSoundName.
+    - Arm 0x2E assigns `army` in both branches: CommSlotForArmy(act->army)
+      in a session, and act->army otherwise. Defaulting `army` and then
+      overwriting it put the session flag in ecx where the image tests it
+      in eax.
+    - What is left is which frame slot each variable read takes. The order
+      of the eleven function-scope declarations has no effect on that: 400
+      permutations all scored 30.
   - **Frame size as evidence, again: ListMaskAction 227 -> 211** (2026-10-07),
     no count change. Twelve differing functions have a frame size that
     differs from the image's:

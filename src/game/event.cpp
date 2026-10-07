@@ -3801,10 +3801,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         SetObjScriptState(act->target, act->subject, act->n0);
         return;
 
-    case 0x28:                                  /* setbriefvo */
-        strcpy(&g_levelSoundName, act->text);
-        return;
-
     case 0x24: {                                /* setobjbitmap */
         /* THE VARIABLE IS READ AND THROWN AWAY. Both branches call with
          * act->n0; the only difference is that a positive xvar gets a
@@ -3831,6 +3827,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     /* Three level strings, three destinations, one shape. */
     case 0x27:                                  /* setbriefing */
         strcpy(&g_levelStrC, act->text);
+        return;
+
+    case 0x28:                                  /* setbriefvo */
+        strcpy(&g_levelSoundName, act->text);
         return;
 
     case 0x29:                                  /* setstratmap */
@@ -3865,10 +3865,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x2E: {
         /* Both paths call the same function; multiplayer maps the army
          * through its comm SLOT and single-player passes the army itself. */
-        int32_t army = act->army;
+        int32_t army;
 
         if (g_mpSession != 0)
-            army = ((AM2_Comm *)kCommObject)->CommSlotForArmy(army);
+            army = ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army);
+        else
+            army = act->army;
         EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                         army);
         return;
