@@ -94,7 +94,11 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
      * this in" tests below work. */
     orig_fread(&count, 4, 1, fp);
     table->count = count;
-    table->entries = (AM2_AnimEntry *)am2_malloc((size_t)(table->count * 16));
+    {
+        int32_t n = table->count;
+
+        table->entries = (AM2_AnimEntry *)am2_malloc((size_t)(n * 16));
+    }
     memset(table->entries, 0, (size_t)(table->count * 16));
 
     for (i = 0; i < table->count; i++) {
@@ -104,7 +108,8 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
         e->id = w;
         orig_fread(&w, 2, 1, fp);
         e->next = w;
-        e->next = e->next == 0 ? -2 : e->next;
+        if (e->next == 0)
+            e->next = -2;
 
         /* The kind. Only 0 and 1 appear in any shipped file: 1 carries an
          * animation, anything else borrows one. */

@@ -2434,7 +2434,11 @@ eos:
         /* A bearing is a byte: the value is stored, then cut to one. */
         if (TOK.kind == AM2_TOKEN_INTEGER) {
             act->n0 = TOKVAL;
-            act->n0 = (uint8_t)act->n0;
+            {
+                int32_t n0 = act->n0;
+
+                act->n0 = (uint8_t)n0;
+            }
             if (++(*at) >= ctx->count) {
                 am2_log("Unexpected end of script.\n");
                 return 0;

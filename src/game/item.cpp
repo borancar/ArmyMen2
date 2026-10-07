@@ -10957,8 +10957,8 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
             float       dz = scale * o->velZ;
             int32_t     iz = (int32_t)dz;
 
-            o->row0YAdjust = (int16_t)(o->row0YAdjust + (int16_t)iz);
             o->subpixelZ   = (float)(dz + o->subpixelZ - iz);
+            o->row0YAdjust = (int16_t)(o->row0YAdjust + (int16_t)iz);
 
             if (o->row0YAdjust < 0) {
                 o->row0YAdjust = 0;
@@ -11271,8 +11271,8 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
         return;
 
     ct = top    >> AM2_CELL_SHIFT;
-    cl = left   >> AM2_CELL_SHIFT;
     cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
+    cl = left   >> AM2_CELL_SHIFT;
     cb = ((o->box.bottom - o->box.top) + top)  >> AM2_CELL_SHIFT;
 
     /* Off the grid in any direction is an unregister, not a clamp. The
@@ -12689,8 +12689,8 @@ void __cdecl StepType5(void *obj)
                       + *(const float *)(o + MISSILE_OFF_FRAC_H);
             int32_t n = (int32_t)f;
 
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
             *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
             if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0)
                 *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
             *(float *)(o + MISSILE_OFF_VZ) -=
@@ -12705,8 +12705,8 @@ void __cdecl StepType5(void *obj)
                       + *(const float *)(o + MISSILE_OFF_FRAC_H);
             int32_t n = (int32_t)f;
 
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
             *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
             /* Driven through the floor: the clamp also stops the fall.
              * The image shares this block with the arm below (0x0043C1E8:
              * one `jge` past both stores), so the two must be identical. */

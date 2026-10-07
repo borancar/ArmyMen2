@@ -1185,8 +1185,8 @@ void __cdecl ScrollMapCache(void)
 
     g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
     g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
-    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
     g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
+    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
         PaintMapTiles(g_camera);
@@ -1216,8 +1216,8 @@ void __cdecl ScrollMapCache(void)
          * than the view -- built only to be handed to the stubbed log. */
         tiles.left   = sx;
         tiles.top    = sy;
-        tiles.right  = g_camera->right - adx - g_camera->left + sx;
         tiles.bottom = g_camera->bottom - ady - g_camera->top + sy;
+        tiles.right  = g_camera->right - adx - g_camera->left + sx;
 
         src.left   = sx << TILE_SHIFT;
         src.top    = sy << TILE_SHIFT;
@@ -1237,8 +1237,8 @@ void __cdecl ScrollMapCache(void)
     if (dx != 0) {
         if (dx > 0) {
             tall.left  = g_camera->right - dx;
-            wide.right = tall.left;
             tall.right = tall.left + dx;
+            wide.right = tall.left;
         } else {
             tall.left  = g_camera->left;
             tall.right = g_camera->left - dx;
@@ -1252,8 +1252,8 @@ void __cdecl ScrollMapCache(void)
     if (dy == 0)
         return;
     if (dy > 0) {
-        wide.bottom = g_camera->bottom;
         wide.top    = g_camera->bottom - dy;
+        wide.bottom = g_camera->bottom;
     } else {
         wide.bottom = g_camera->top - dy;
         wide.top    = g_camera->top;
@@ -1929,8 +1929,8 @@ clamp_eye:
 
         origin[1] = vt - g_blitRect->top;
         origin[0] = vl - g_blitRect->left;
-        origin[3] = g_screenH + origin[1];
         origin[2] = g_screenW + origin[0];
+        origin[3] = g_screenH + origin[1];
 
         VIEW_EYE->y = (int16_t)vpt.y;
         VIEW_EYE->x = (int16_t)vpt.x;

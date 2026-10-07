@@ -1571,8 +1571,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             orig_map_fread(hdr, 0xC, 1, f);
             consumed += 0xC;
             (g_mapTilesW)      = hdr[0];
-            (g_mapTilesH)      = hdr[1];
             (g_mapExtentX)     = (g_mapTilesW) << 4;
+            (g_mapTilesH)      = hdr[1];
             (*(int32_t *)&g_mapRowShift)    = Log2Mask(hdr[0]) & 0xFF;
             (g_mapExtentY)     = (g_mapTilesH) << 4;
             (g_mapExtentShift) = Log2Mask((g_mapExtentX)) & 0xFF;
@@ -1786,8 +1786,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                         r[0x12] = (uint8_t)elev;
                         owner   = (uint8_t)ownr;
                     }
-                    r[0x13] = owner;
                     r[0x10] = (uint8_t)trig;
+                    r[0x13] = owner;
                     r[0x11] = 0;
                     r[0x15] = (uint8_t)numb;
 

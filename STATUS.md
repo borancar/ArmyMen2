@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1531 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1532 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,30 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **LoadAnimTable matched; two search tools** (2026-10-07), 1531 -> 1532.
+    - LoadAnimTable stores -2 only when `next` is zero. The ternary
+      stored in both arms. It also takes the count into a local for the
+      allocation (17 -> 0).
+    - `hoist2.py` (session tmp directory) generalises `hoist.py`. It moves
+      any memory read in a statement, not just a call argument, into a
+      local and scores the result.
+    - `swap.py` swaps adjacent independent statements and scores them.
+      Calls and statements that read each other's target are skipped.
+    - Gains kept, all semantics-preserving:
+      - Type2PlayerInput 61 -> 11 (the facing through a local).
+      - ScrollMapCache 156 -> 98 (Clamp and rectangle field order).
+      - StepType5 22 -> 8 (fraction stored before height, both sites).
+      - ScriptParseActionRecon 501 -> 478.
+      - LoadMap 70 -> 65.
+      - ObjRemap 65 -> 56.
+      - ObjMoveAlongFacing 35 -> 30.
+      - HudSquadUpdate 84 -> 79.
+      - ViewUpdate 79 -> 76.
+      - HudPostUpdate and DepthResort, one each.
+    - The probes edit the source blindly. Each kept change was checked for
+      semantics: one of hoist2's nested hoists shadowed another and only
+      scored better by computing the wrong value. Its names are unique
+      now.
   - **A value read into a local before the call** (2026-10-07), 1529 ->
     1531.
     - VC6 picks a different scratch register for a value read straight

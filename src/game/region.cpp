@@ -9758,11 +9758,18 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
         w[4]    = (uint8_t)bearing;
 
         /* Close in, or already facing far enough away, keep the old facing. */
+        /* The facing goes through a local for the test, as the image's
+         * register choices for the rest of the function show; the store
+         * below reads it again. */
+        {
+        int32_t facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
         if (reach < 6
             || (reach < 0x18
-                && AngleDelta(bearing, *(const uint8_t *)(o + OBJ_OFF_FACING))
+                && AngleDelta(bearing, facing)
                      < 0x40))
             w[4] = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        }
 
         *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
     }

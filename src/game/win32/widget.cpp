@@ -4869,9 +4869,13 @@ void __cdecl HudPostUpdate(void)
         int32_t sel = *(const int32_t *)((const uint8_t *)leader
                                          + UNIT_OFF_INVENTORY_SEL);
 
-        weapon = WeaponByUid(*(const uint32_t *)((const uint8_t *)leader
+        {
+            uint32_t uid = *(const uint32_t *)((const uint8_t *)leader
                                                  + UNIT_OFF_INVENTORY
-                                                 + (uint32_t)sel * 4));
+                                                 + (uint32_t)sel * 4);
+
+            weapon = WeaponByUid(uid);
+        }
         if (weapon) {
             /* obj -> type record -> kind, then the kind's own record. Three
              * loads, not two: OBJ_OFF_FIELD_C0 is a POINTER to the type. */
@@ -6310,7 +6314,11 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
             /* NO WEAPON STILL FILLS THE SLOT, with icon 1 -- where the
              * passenger loop below SKIPS such a unit outright. */
-            weapon = (const uint8_t *)WeaponByUid(obj->inventory[0]);
+            {
+                uint32_t uid = obj->inventory[0];
+
+                weapon = (const uint8_t *)WeaponByUid(uid);
+            }
             if (weapon)
                 sq->recs[slot].index = HudSquadWeaponIcon(weapon);
             else
