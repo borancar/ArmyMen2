@@ -215,6 +215,11 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **MpPanelScreen fixed, 175 -> 171** (2026-10-07). FillListFromRules
+    is called even when the name table is empty: the image's `je` jumps
+    straight to the call. It used to sit inside the test. The native build
+    clears the path buffer first, so that case reads an empty name rather
+    than stack garbage.
   - **ArmyMessageSend matched** (2026-10-07), 1546 -> 1547. Same lever:
     the packet append goes through an inline PacketAppend wrapper, which
     puts the saved length in edx as the image has it.

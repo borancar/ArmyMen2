@@ -9375,6 +9375,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * gives it a slot of its own, where a block-scoped one shares. */
     char       path[0x40];
     AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
+#if !defined(_MSC_VER) || defined(__GNUC__)
+    path[0] = '\0';
+#endif
     ReadMpMapList();
 
     /* The four player-colour swatches.  The loop's bound is the address of
@@ -9758,8 +9761,12 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                    (const char *)(rec + NAMEREC_OFF_NAME));
             am2_sprintf(path, "%s.txt",
                         (const char *)(rec + NAMEREC_OFF_NAME2));
-            FillListFromRules(path, w);
         }
+        /* OUTSIDE the test, as the image has it (`je` straight to this
+         * call): with no scripts listed, the rules are read from whatever
+         * the path buffer holds. The native build starts it empty so that
+         * is a harmless empty name rather than stack garbage. */
+        FillListFromRules(path, w);
 
         *slot = new AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
                                 (int32_t)(uintptr_t)OnMpGameType,
