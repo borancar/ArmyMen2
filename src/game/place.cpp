@@ -824,7 +824,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 ItemPostCreate(slot, where);
                 if (!AllyFlag(g_defaultOwner,
                               (uint32_t)slot))
-                    ObjConceal(made, 1);
+                    ObjConceal((AM2_Object *)made, 1);
             }
             return;
         }

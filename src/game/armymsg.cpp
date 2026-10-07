@@ -1247,7 +1247,7 @@ void __cdecl RecvItemCreate(void *msg)
         /* ARMY first, not the object -- see ItemPostCreate above. */
         ItemPostCreate(army, *(const AM2_Point *)(m + MSG_CREATE_OFF_A));
         if (!(*(AM2_Comm *const *)&g_commObject)->AllyFlag(g_defaultOwner, army))
-            ObjConceal(made, 1);
+            ObjConceal((AM2_Object *)made, 1);
         return;
 
     default:

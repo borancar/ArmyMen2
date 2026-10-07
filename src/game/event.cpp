@@ -1890,7 +1890,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     *(int32_t *)(unit + OBJ_OFF_AI_MODE_PREV) =
         *(const int32_t *)(unit + OBJ_OFF_AI_MODE);
     *(int32_t *)(unit + OBJ_OFF_AI_MODE)    = AM2_AI_MODE_ATTACK;
-    ObjConceal(unit, 0);
+    ObjConceal((AM2_Object *)unit, 0);
 }
 
 /* --------------------------------------------- immediate trigger ---- */

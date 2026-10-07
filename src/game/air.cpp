@@ -360,31 +360,31 @@ void __cdecl RevealObj(AM2_Object *o)
  *
  * VERIFIED BY READING. Thirteen callers and the fog cheat is the reachable
  * one, which needs a typed cheat code this project does not drive. */
-void __cdecl ObjConceal(void *obj, int32_t force)
+void __cdecl ObjConceal(AM2_Object *obj, int32_t force)
 {
     int32_t  i;
 
     if (!obj)
         return;
 
-    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)
+    if (obj->flags & OBJ_FLAG_CONCEALED)
         return;
 
     /* A BIT4 object keeps REVEALED unless it is a type-2 whose +0x530 is not
      * 5: the image's failed ObjIsType2 jumps past the clear (0x00429671). */
-    if (!(*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4))
-        *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_REVEALED;
+    if (!(obj->flags & OBJ_FLAG_BIT4))
+        obj->flags &= ~(uint32_t)OBJ_FLAG_REVEALED;
     else if (ObjIsType2((const AM2_Object *)obj)
-             && *(const int32_t *)((uint8_t *)obj + OBJ_OFF_FIELD_530) != 5)
-        *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_REVEALED;
+             && obj->field530 != 5)
+        obj->flags &= ~(uint32_t)OBJ_FLAG_REVEALED;
 
     if (g_fogOfWar && !force)
         return;
 
-    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_CONCEALED;
+    obj->flags |= OBJ_FLAG_CONCEALED;
 
-    for (i = 0; i < *(const int32_t *)((uint8_t *)obj + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
+    for (i = 0; i < obj->rowSet.count; i++) {
+        uint8_t *row = ((uint8_t *)obj->rowSet.rows)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row |= (uint32_t)ROW_FLAG_REMOVED;
@@ -559,10 +559,10 @@ AM2_Point __cdecl ObjAnchorPoint(const AM2_Object *o)
  * nothing here touches it -- the same shape as 0x00404ED0, which orig.h
  * already records. Kept in the signature because the call site pushes it.
  */
-void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
+void __cdecl FormationPointFar(AM2_Object *follower, AM2_Object *leader, AM2_Point *out,
                                int32_t slot)
 {
-    const uint8_t *l = (const uint8_t *)leader;
+    const AM2_Object *l = leader;
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
@@ -570,17 +570,17 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 
     (void)follower;
 
-    out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
-    out->x = *(const int16_t *)(l + OBJ_OFF_POS);
+    out->y = l->pos.y;
+    out->x = l->pos.x;
 
     switch (*(const int32_t *)l) {
     case 3:
-        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        leaderFacing = l->facing;
         shift        = 1;
         break;
     case 2:
     case 8:
-        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        leaderFacing = l->facing;
         shift        = 0;
         break;
     default:
@@ -641,10 +641,10 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
  * a distance under 200 needs 32 bits, and the coordinate added to it 17, well
  * inside 53 -- and a C cast to an integer truncates toward zero exactly as
  * _ftol does. Both were checked rather than assumed. */
-void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
+void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point *out,
                             int32_t slot)
 {
-#define l ((const uint8_t *)leader)
+#define l (leader)
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
@@ -658,17 +658,17 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         return;
     }
 
-    out->x = *(const int16_t *)(l + OBJ_OFF_POS);
-    out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
+    out->x = l->pos.x;
+    out->y = l->pos.y;
 
     switch (*(const int32_t *)l) {
     case 3:
-        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        leaderFacing = l->facing;
         shift        = 1;
         break;
     case 2:
     case 8:
-        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        leaderFacing = l->facing;
         shift        = 0;
         break;
     default:
@@ -732,22 +732,22 @@ typedef int32_t (__cdecl *AM2_AirRandFn)(void);
  * with three uninitialised bytes above it, which they mask off; and the rand
  * is the image's own LCG, which it must be.
  */
-void __cdecl RandomPointToward(const void *target, const void *obj,
+void __cdecl RandomPointToward(const AM2_Object *target, const AM2_Object *obj,
                                int32_t dist, AM2_Point *out)
 {
-    const uint8_t *o = (const uint8_t *)obj;
-    const uint8_t *t = (const uint8_t *)target;
+    const AM2_Object *o = obj;
+    const AM2_Object *t = target;
     uint8_t        heading;
     float          d;
 
-    heading = (uint8_t)(AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                                     (const AM2_Point *)(t + OBJ_OFF_POS))
+    heading = (uint8_t)(AngleBetween(&o->pos,
+                                     &t->pos)
                         + (orig_air_rand() & 0x3F) - 0x20);
     d = (float)dist;
 
     /* Single precision throughout, as RandomPointAhead. */
-    out->x = (int16_t)(Cos8(heading) * d + *(const int16_t *)(o + OBJ_OFF_X));
-    out->y = (int16_t)(Sin8(heading) * d + *(const int16_t *)(o + OBJ_OFF_Y));
+    out->x = (int16_t)(Cos8(heading) * d + o->pos.x);
+    out->y = (int16_t)(Sin8(heading) * d + o->pos.y);
 }
 
 /* RandomPointAhead -- original 0x00404ED0, two callers, and a sibling of the
@@ -773,20 +773,20 @@ void __cdecl RandomPointToward(const void *target, const void *obj,
  * The rand is the image's own LCG and must be: libc's would give a different
  * sequence and every wandering unit would go somewhere else.
  */
-void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
+void __cdecl RandomPointAhead(void *, const AM2_Object *obj, int32_t dist,
                               AM2_Point *out)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
     uint8_t        facing;
     float          d;
 
     facing = (uint8_t)((orig_air_rand() & 0x3F)
-                       + *(const uint8_t *)(o + OBJ_OFF_FACING) - 0x20);
+                       + o->facing - 0x20);
     d = (float)dist;
 
     /* Single precision throughout: the image adds the position with fiadd. */
-    out->x = (int16_t)(Cos8(facing) * d + *(const int16_t *)(o + OBJ_OFF_X));
-    out->y = (int16_t)(Sin8(facing) * d + *(const int16_t *)(o + OBJ_OFF_Y));
+    out->x = (int16_t)(Cos8(facing) * d + o->pos.x);
+    out->y = (int16_t)(Sin8(facing) * d + o->pos.y);
 }
 
 /* 0x00404580, three callers. Place a follower in formation on its leader,
@@ -807,30 +807,30 @@ void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
  * reconstructed -- so this function's counter moves and FormationPoint's does
  * not move from here. Its other caller, 0x0043E0EF, is still the original's
  * and can. */
-void __cdecl ResolveFormationPoint(void *follower, void *leader,
+void __cdecl ResolveFormationPoint(AM2_Object *follower, AM2_Object *leader,
                                    AM2_Point *out)
 {
-    uint8_t *f = (uint8_t *)follower;
+    AM2_Object *f = follower;
 
     if (!follower || !leader)
         return;
 
     if (ObjIsType2((const AM2_Object *)leader)) {
         uint32_t riding =
-            *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING);
+            leader->riding;
 
         if (riding) {
             AM2_Object *veh = LookupByUID(riding);
 
             if (veh) {
-                *(uint32_t *)(f + OBJ_OFF_FOLLOW_UID) = veh->uid;
+                f->followUid = veh->uid;
                 leader = veh;
             }
         }
     }
 
     FormationPoint(follower, leader, out,
-                         *(const int32_t *)(f + OBJ_OFF_FORMATION_SLOT));
+                         f->formationSlot);
 }
 
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
@@ -1138,11 +1138,11 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
  * it would otherwise have been; the sibling commit got exactly that guess
  * wrong in the other direction.
  */
-int32_t __cdecl ObjBlockWeight(void *from, void *obj, AM2_Point unused,
+int32_t __cdecl ObjBlockWeight(AM2_Object *from, AM2_Object *obj, AM2_Point unused,
                                AM2_Point at)
 {
-    const uint8_t *o = (const uint8_t *)obj;
-    const uint8_t *f = (const uint8_t *)from;
+    const AM2_Object *o = obj;
+    const AM2_Object *f = from;
 
     (void)unused;
 
@@ -1150,23 +1150,23 @@ int32_t __cdecl ObjBlockWeight(void *from, void *obj, AM2_Point unused,
         return 0;
 
     if (f
-        && abs((int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-               - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
+        && abs((int32_t)o->heightSet
+               - (int32_t)f->heightSet)
            > AM2_BLOCK_HEIGHT_STEP)
         return 0;
 
     if (ObjIsItem((const AM2_Object *)o))
-        return *(const int8_t *)(o + OBJ_OFF_RANK);
+        return o->itemFlag;
 
     /* The distance test only for a 3 or an 8, and only with a mover; every
      * other way out is the full weight, from one shared tail. */
     if (f && (ObjIsType3((const AM2_Object *)o)
               || ObjIsType8((const AM2_Object *)o))) {
-        int32_t d = ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                               (const AM2_Point *)(o + OBJ_OFF_POS));
+        int32_t d = ApproxDist(&f->pos,
+                               &o->pos);
 
         if (ApproxDist(&at,
-                       (const AM2_Point *)(o + OBJ_OFF_POS)) >= d)
+                       &o->pos) >= d)
             return 0;
     }
 
@@ -1289,7 +1289,7 @@ void __cdecl ToggleFogOfWar(void)
              * `test`, where `== 0` compiles `je`. */
             if (until <= 0u
                 || g_gameClockMs < until)
-                ObjConceal(p, 0);
+                ObjConceal((AM2_Object *)p, 0);
         }
     }
 }
@@ -1487,13 +1487,13 @@ void __cdecl AirPassesDraw(void)
  * Both early exits sit before the original's `push esi`, which is why they pop
  * one register fewer -- the conditional-push shape, the same one that gives
  * StepType6 two returns at different depths. */
-void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, void *obj,
+void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, AM2_Object *obj,
                                 AM2_Point *out)
 {
     int32_t  *isVehicle = g_slotIsVehicle;
     AM2_Point *slotPos  = g_slotPositions;
     uint8_t  *headings  = g_slotHeadings;
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
     uint8_t   heading;
     int32_t   parent;
     int16_t   dist;
@@ -1506,7 +1506,7 @@ void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, void *obj,
 
     if (slot == 0) {
         *out = leaderPos;
-        heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+        heading = AngleBetween(&o->pos,
                                &leaderPos);
     } else if (slot < 9) {
         const uint8_t *rec = g_slotRecs
@@ -1600,10 +1600,10 @@ static inline int32_t AbsAngle(uint32_t from, uint32_t to)
     return abs(AngleDelta(from, to));
 }
 
-void __cdecl AddSightBlocker(void *viewer, void *blocker)
+void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
 {
-    const uint8_t *v = (const uint8_t *)viewer;
-    const uint8_t *b = (const uint8_t *)blocker;
+    const AM2_Object *v = viewer;
+    const AM2_Object *b = blocker;
     const AM2_RankRec *rank;
     uint8_t        heading;
     int32_t        hv;
@@ -1622,40 +1622,40 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     uint8_t        a0;
     uint8_t        a1;
 
-    heading = *(const uint8_t *)(v + OBJ_OFF_FACING);
+    heading = v->facing;
     if (ObjIsType3((const AM2_Object *)v)
-        && *(const int32_t *)(v + OBJ_OFF_ROW_COUNT) > 1)
-        heading = *(const uint8_t *)(v + OBJ_OFF_FIELD_530);
+        && v->rowSet.count > 1)
+        heading = v->turretFacing;
 
     hb = ObjHeight((const AM2_Object *)b);
     hv = ObjHeight((const AM2_Object *)v);
     if (hb + AM2_SIGHT_OVERHEAD < hv)
         return;
 
-    if (*(const void *const *)(b + OBJ_OFF_HIT_MASK) == (const void *)0) {
-        int32_t bx = *(const int16_t *)(b + OBJ_OFF_X);
-        int32_t by = *(const int16_t *)(b + OBJ_OFF_Y);
+    if (b->rowSet.hitMask == (const void *)0) {
+        int32_t bx = b->pos.x;
+        int32_t by = b->pos.y;
 
-        l  = *(const int32_t *)(b + OBJ_OFF_BOX_LEFT)   + bx;
-        r  = *(const int32_t *)(b + OBJ_OFF_BOX_RIGHT)  + bx;
-        t  = *(const int32_t *)(b + OBJ_OFF_BOX_TOP)    + by;
-        bo = *(const int32_t *)(b + OBJ_OFF_BOX_BOTTOM) + by;
+        l  = b->looseBox.left   + bx;
+        r  = b->looseBox.right  + bx;
+        t  = b->looseBox.top    + by;
+        bo = b->looseBox.bottom + by;
     } else {
         /* Through the rect, as objtype.cpp reaches the same four fields:
          * only OBJ_OFF_HIT_RECT has a macro and the other three are its
          * members, which is the composed-offset case checkoffsetuse lists. */
-        const AM2_Rect *hit = (const AM2_Rect *)(b + OBJ_OFF_HIT_RECT);
+        const AM2_Rect *hit = &b->hit;
 
         l = hit->left; r = hit->right; t = hit->top; bo = hit->bottom;
     }
 
-    vx = *(const int16_t *)(v + OBJ_OFF_X);
+    vx = v->pos.x;
 
     /* The outcode, one test at a time. */
     code = 0;
     if (l < vx)
         code = 1;
-    vy = *(const int16_t *)(v + OBJ_OFF_Y);
+    vy = v->pos.y;
     if (t < vy)
         code |= 2;
     if (r < vx)
@@ -1687,8 +1687,8 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         int32_t dx1, dy1, d1;
 
         a0 = AngleOfDelta3(dx0, dy0, d0);
-        dx1 = (int16_t)(farPt.x - *(const int16_t *)(v + OBJ_OFF_X));
-        dy1 = (int16_t)(farPt.y - *(const int16_t *)(v + OBJ_OFF_Y));
+        dx1 = (int16_t)(farPt.x - v->pos.x);
+        dy1 = (int16_t)(farPt.y - v->pos.y);
         d1 = ApproxDistXY(dx1, dy1);
         a1 = AngleOfDelta3(dx1, dy1, d1);
         /* The original pads the silhouette distance by one tile once (the
@@ -1702,7 +1702,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         dist += AM2_SIGHT_DIST_PAD;
     }
 
-    rank = &g_rankRecords[*(const int32_t *)(v + OBJ_OFF_RANK)];
+    rank = &g_rankRecords[v->rank];
 
     if ((int32_t)(int16_t)dist
         > rank->sight_range)
@@ -1732,7 +1732,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         uint32_t idx = (uint32_t)(a0 & 0xFF) >> 2;
 
 #define REC   (g_sightBlockByDir[idx])
-#define range (g_rankRecords[*(const int32_t *)(v + OBJ_OFF_RANK)].sight_range)
+#define range (g_rankRecords[v->rank].sight_range)
 
         if (REC.stamp != gen) {
             REC.stamp = gen;

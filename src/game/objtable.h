@@ -228,7 +228,7 @@ typedef struct AM2_Object {
     uint8_t        _pad66[2];       /* +0x66 */
     struct AM2_Object *queryNext;   /* +0x68  OBJ_OFF_QUERY_NEXT, the query result's thread */
     AM2_RowSet     rowSet;          /* +0x6C OBJ_OFF_SUBRECORD */
-    uint8_t        _pad7c[0x10];    /* +0x7C */
+    AM2_Rect       looseBox;        /* +0x7C OBJ_OFF_BOX_LEFT.., added to pos when there is no hit mask */
     uint8_t        cellCount;       /* +0x8C OBJ_OFF_CELL_COUNT */
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
@@ -450,6 +450,7 @@ static_assert(offsetof(AM2_Object, lastUse)       == 0xC4,  "lastUse");
 static_assert(offsetof(AM2_Object, dest)          == 0xC0,  "dest");
 static_assert(offsetof(AM2_Object, prevTile)      == 0x1C,  "prevTile");
 static_assert(offsetof(AM2_Object, queryNext)     == 0x68,  "queryNext");
+static_assert(offsetof(AM2_Object, looseBox)      == 0x7C,  "looseBox");
 static_assert(offsetof(AM2_Object, heldWeaponUid) == 0x564, "heldWeaponUid");
 static_assert(offsetof(AM2_Object, revealedUntil) == 0x5C,  "revealedUntil");
 static_assert(offsetof(AM2_Object, pickupAfter)   == 0xC8,  "pickupAfter");

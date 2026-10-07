@@ -1810,7 +1810,7 @@ int32_t __cdecl BlockWeightAt(AM2_Object *from, AM2_Point at, AM2_Point ref)
             g_objMapDesc);
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, o, at,
+        total += ObjBlockWeight(from, (AM2_Object *)o, at,
                                 ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
@@ -11924,7 +11924,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         AM2_ROW_FIELD26_INIT;
 
     if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly((const AM2_Object *)o))
-        ObjConceal(o, 0);
+        ObjConceal((AM2_Object *)o, 0);
 
     SetUnitPose((AM2_Object *)o, 1);
     return o;
@@ -12137,7 +12137,7 @@ no_weapon:
     }
 
     if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly((const AM2_Object *)o))
-        ObjConceal(o, 0);
+        ObjConceal((AM2_Object *)o, 0);
 
     SetKindFrames((AM2_Object *)o, 1);
     RowUpdate((AM2_MapRow *)ROWS, 1, g_mapDesc);
@@ -12315,7 +12315,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
 
         if (orFlags & OBJ_FLAG_CONCEALED) {
             *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_CONCEALED;
-            ObjConceal(o, 1);
+            ObjConceal((AM2_Object *)o, 1);
         }
 
         if (ObjIsWatchedKind((const AM2_Object *)o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
@@ -14077,7 +14077,7 @@ void __cdecl CreateWatchedItem(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
      * third. Two stack arguments, owner then army. */
     if (!AM2_THE_COMM->AllyFlag(*(const int32_t *)&g_defaultOwner,
                                 o->owner))
-        ObjConceal(item, 1);
+        ObjConceal((AM2_Object *)item, 1);
 
     (void)weapon;
 }

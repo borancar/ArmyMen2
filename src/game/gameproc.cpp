@@ -1164,7 +1164,7 @@ int32_t __cdecl PlaceScenario(void)
                     if (*(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
                         AM2_Point p;
 
-                        FormationPoint(obj, lead, &p, formed);
+                        FormationPoint((AM2_Object *)obj, (AM2_Object *)lead, &p, formed);
                         /* The point is copied as one dword. */
                         *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
                         *(uint8_t *)(obj + OBJ_OFF_FACING) =

@@ -97,15 +97,15 @@ void __cdecl AiStep(struct AM2_Object *o, struct AM2_SteerOut *out);
 /* 0x00428E40, six call sites in five functions. Where would this object be
  * after one frame at that heading and speed? It writes the point and moves
  * nothing. `outPt` is an AM2_Point. */
-int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
+int32_t __cdecl MoveStepPoint(struct AM2_Object *obj, uint8_t heading, uint8_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
-                              void *outPt);
+                              AM2_Point *outPt);
 
 /* 0x0040DA70, three callers. MoveStepPoint with the speed taken from the
  * object's current animation rather than passed in. `outPt` is an AM2_Point
  * and is filled with the object's own position on every exit. */
-int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
-                              void *outPt, int32_t fast);
+int32_t __cdecl AnimStepPoint(struct AM2_Object *obj, uint8_t heading, int32_t pose,
+                              AM2_Point *outPt, int32_t fast);
 
 int32_t __cdecl PlanPathTo(struct AM2_Object *o, AM2_Point *at, int32_t arg);
 
@@ -287,12 +287,12 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out);
 /* 0x00438F80, two callers. Offset the object's box by its position and hand it
  * to BoxAction, when the first row's sprite has a software image. `out` is the
  * same record, and was declared `int32_t arg` here until BoxAction was read. */
-int32_t __cdecl ObjBoxAction(void *obj, void *out);
+int32_t __cdecl ObjBoxAction(struct AM2_Object *obj, void *out);
 
 /* 0x004389D0, the same job from the object's per-pixel OBJ_OFF_HIT_MASK rather
  * than from its box. This is the arm that runs; ObjBoxAction is the fallback
  * for an object with no mask, which nothing on a drivable map is. */
-int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
+int32_t __cdecl ObjHitMaskAction(struct AM2_Object *obj, void *out);
 
 /* 0x00437E70. A* over the region graph: an open list sorted by g+h, a
  * generation stamp in place of a visited set, the answer written backwards
@@ -345,13 +345,13 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
  * for an ITEM, subtract its height from every masked cell's weight and move
  * the tile cover where a weight crosses 15. Clears OBJ_FLAG_FOOTPRINT_ON, so
  * it is idempotent. COLD: no drive this project has destroys an item. */
-void __cdecl ItemTeardown(void *obj);
+void __cdecl ItemTeardown(struct AM2_Object *obj);
 
 /* 0x00439000, four callers. ItemTeardown's mirror: lay the object's footprint
  * down instead of taking it up, and -- when the third argument or the record
  * supplies a crush damage -- hurt everything already standing on it. The
  * second argument is never read. */
-void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage);
+void __cdecl ObjAfterMove(struct AM2_Object *obj, int32_t unused, int32_t damage);
 
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an

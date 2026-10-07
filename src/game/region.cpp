@@ -981,12 +981,12 @@ next:
  * intermediate `speed * frameSeconds` IS stored to a float by the original --
  * `fst dword` -- so that one is a float here too rather than a double.
  */
-int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
+int32_t __cdecl MoveStepPoint(AM2_Object *obj, uint8_t heading, uint8_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
-                              void *outPt)
+                              AM2_Point *outPt)
 {
-    uint8_t         *o    = (uint8_t *)obj;
-    AM2_Point       *out  = (AM2_Point *)outPt;
+    AM2_Object         *o    = obj;
+    AM2_Point       *out  = outPt;
     uint8_t         *rows;
     AM2_Anim        *anim;
     uint8_t          head;
@@ -998,8 +998,8 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
         return 0;
 
     rows = (uint8_t *)0;
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
-        rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    if (o->rowSet.count > 0)
+        rows = ((uint8_t *)o->rowSet.rows);
 
     anim = *(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING);
     if (!anim)
@@ -1007,7 +1007,7 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
 
     /* The shift reads the animation again through the row. */
     head = heading;
-    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING) && rows)
+    if ((o->flagsLo & OBJ_FLAG_SNAP_HEADING) && rows)
         head = (uint8_t)((uint8_t)RoundTo8(head, anim->directionBits)
                          << (8 - (*(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING))->directionBits));
 
@@ -1015,7 +1015,7 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
         head = (uint8_t)(head + 0x80);
     head = (uint8_t)(head + turn);
 
-    *(uint32_t *)out = *(const uint32_t *)(o + OBJ_OFF_POS);
+    *out = o->pos;
     if (speed) {
         /* The float step is compared against DOUBLE constants. */
         step = (float)speed * g_frameDeltaSec;
@@ -1027,12 +1027,12 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
         /* Both offsets are worked out before either is stored. */
         {
             int32_t dx = (int32_t)((double)Cos8(head) * (double)step
-                                   + (double)*(const float *)(o + OBJ_OFF_SUBPIXEL_X));
+                                   + (double)o->subpixelX);
             int32_t dy = (int32_t)((double)Sin8(head) * (double)step
-                                   + (double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Y));
+                                   + (double)o->subpixelY);
 
-            out->x = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS) + dx);
-            out->y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2) + dy);
+            out->x = (int16_t)(o->pos.x + dx);
+            out->y = (int16_t)(o->pos.y + dy);
         }
     }
     return 1;
@@ -1070,21 +1070,21 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
  * at the object's position, and a row with no animation table answers 0 with
  * the same point. The difference matters to the caller and not to the point.
  */
-int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
-                              void *outPt, int32_t fast)
+int32_t __cdecl AnimStepPoint(AM2_Object *obj, uint8_t heading, int32_t pose,
+                              AM2_Point *outPt, int32_t fast)
 {
-    uint8_t   *o    = (uint8_t *)obj;
-    AM2_Point *out  = (AM2_Point *)outPt;
+    AM2_Object   *o    = obj;
+    AM2_Point *out  = outPt;
     int32_t    animId =
         (g_weaponPoseFrames)[pose];
-    uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    uint8_t   *rows = ((uint8_t *)o->rowSet.rows);
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              speed;
     uint8_t              bias;
 
-    out->x = *(const int16_t *)(o + OBJ_OFF_POS);
-    out->y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+    out->x = o->pos.x;
+    out->y = o->pos.y;
 
     if (!animId)
         return 1;
@@ -1887,28 +1887,28 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
  * is the FLAT half and that structure names LPDIRECTDRAWSURFACE. The same
  * reason item.cpp reads the sprite list as void **.
  */
-int32_t __cdecl ObjBoxAction(void *obj, void *out)
+int32_t __cdecl ObjBoxAction(AM2_Object *obj, void *out)
 {
-    const uint8_t *o = (const uint8_t *)obj;
+    const AM2_Object *o = obj;
     const uint8_t *spr;
     int32_t        x;
     int32_t        y;
     AM2_Rect       area;
 
     spr = *(const uint8_t *const *)
-              (*(const uint8_t *const *)(o + OBJ_OFF_ROWS) + ROW_OFF_SPRITE);
+              (((const uint8_t *)o->rowSet.rows) + ROW_OFF_SPRITE);
     if (!spr)
         return 0;
     if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
         return 0;
     if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
-        x = *(const int16_t *)(o + OBJ_OFF_X);
-        y = *(const int16_t *)(o + OBJ_OFF_Y);
+        x = o->pos.x;
+        y = o->pos.y;
 
-        area.left   = *(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x;
-        area.right  = *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x;
-        area.top    = *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y;
-        area.bottom = *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y;
+        area.left   = o->looseBox.left   + x;
+        area.right  = o->looseBox.right  + x;
+        area.top    = o->looseBox.top    + y;
+        area.bottom = o->looseBox.bottom + y;
         return BoxAction(area, out);
     }
     return 1;
@@ -2047,7 +2047,7 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
  * regressed. It also means this function cannot be behind a difference in any
  * configuration -- worth knowing when `mission`'s frame gate fails, which it
  * does on this machine for reasons of its own. */
-int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
+int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, void *out)
 {
     /* No locals for the record's parts: the box is the record itself, the
      * cells follow it, the hit rect is re-read from the object and the grid
@@ -2329,9 +2329,9 @@ static inline void ShiftTileCoverUp(uint16_t cell)
  * in the window observed. So a clean A/B says only that nothing else
  * regressed, exactly as region.cpp says of ObjBoxAction. Verified by reading.
  */
-void __cdecl ItemTeardown(void *obj)
+void __cdecl ItemTeardown(AM2_Object *obj)
 {
-    uint8_t       *o = (uint8_t *)obj;
+    AM2_Object       *o = obj;
     uint8_t        mask[AM2_TILEMASK_BYTES];
     const int32_t *rect = (const int32_t *)(mask + TILEMASK_OFF_RECT);
     const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
@@ -2340,9 +2340,9 @@ void __cdecl ItemTeardown(void *obj)
     int32_t        row;
     int32_t        x;
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+    if (o->flags & OBJ_FLAG_DESTROYED)
         return;
-    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
+    if (!(o->flags & OBJ_FLAG_FOOTPRINT_ON))
         return;
 
     switch (*(const int32_t *)o) {
@@ -2358,9 +2358,9 @@ void __cdecl ItemTeardown(void *obj)
         return;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+    if (o->rowSet.count < 1)
         return;
-    if (!*(const void *const *)(*(const uint8_t *const *)(o + OBJ_OFF_ROWS)
+    if (!*(const void *const *)(((const uint8_t *)o->rowSet.rows)
                                 + ROW_OFF_SPRITE))
         return;
     if (!ObjIsItem((const AM2_Object *)obj))
@@ -2373,15 +2373,15 @@ void __cdecl ItemTeardown(void *obj)
      * non-zero above. `mov dl,[esi+0x65]` feeds only the compare;
      * `movsx eax,[esi+0x98]` is stored to a local and reloaded at the
      * subtraction. */
-    height = *(const int8_t *)(o + OBJ_OFF_RANK);
-    if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+    height = o->itemFlag;
+    if (o->heightSet
         > (int8_t)(g_tileAttrs)
-              [*(const uint16_t *)(o + OBJ_OFF_TILE)])
+              [o->tile])
         return;
     if (!height)
         return;
 
-    if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
+    if (o->rowSet.hitMask)
         ObjHitMaskAction(obj, mask);
     else
         ObjBoxAction(obj, mask);
@@ -2416,7 +2416,7 @@ void __cdecl ItemTeardown(void *obj)
         }
     }
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+    o->flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 }
 
 /* The row shift read as the whole dword it is stored in, where ObjAfterMove
@@ -2471,9 +2471,9 @@ extern "C" const int32_t am2_rl_map_row_shift32;  /* 0x00514DE4 */
  * ShiftTileCover on the two crossings of AM2_BLOCK_FULL -- is ItemTeardown's,
  * and its comment is the one to read.
  */
-void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
+void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
 {
-    uint8_t       *o = (uint8_t *)obj;
+    AM2_Object       *o = obj;
     (void)unused;
     uint8_t        mask[AM2_TILEMASK_BYTES];
     /* The rectangle is read out of the mask at each use: no local. */
@@ -2490,7 +2490,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     uint32_t       flags;
 
     /* The flags are read once for the three tests. */
-    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    flags = o->flags;
     if (!(flags & OBJ_FLAG_BIT0))
         return;
     if (flags & OBJ_FLAG_DESTROYED)
@@ -2511,31 +2511,31 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
         return;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+    if (o->rowSet.count < 1)
         return;
-    if (!*(const void *const *)(*(const uint8_t *const *)(o + OBJ_OFF_ROWS)
+    if (!*(const void *const *)(((const uint8_t *)o->rowSet.rows)
                                 + ROW_OFF_SPRITE))
         return;
     if (!ObjIsItem((const AM2_Object *)obj))
         return;
 
-    height = *(const int8_t *)(o + OBJ_OFF_RANK);
+    height = o->itemFlag;
 
     /* Zero means "the record's own kind", written back so nothing downstream
      * can tell which it got. */
     if (!damage)
         damage = *(const int16_t *)
-                     (*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
+                     (o->field94
                       + AAIREC_OFF_CRUSH_DAMAGE);
 
-    if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+    if (o->heightSet
         > (int8_t)(g_tileAttrs)
-              [*(const uint16_t *)(o + OBJ_OFF_TILE)])
+              [o->tile])
         return;
     if (!height)
         return;
 
-    if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
+    if (o->rowSet.hitMask)
         ObjHitMaskAction(obj, mask);
     else
         ObjBoxAction(obj, mask);
@@ -2575,26 +2575,25 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
             if (damage) {
                 int32_t   ox, oy;     /* TileToXY writes both */
                 AM2_Point at;
-                uint8_t  *hit;
+                AM2_Object *hit;
 
                 TileToXY(cell, &ox, &oy);
                 at.x = (int16_t)ox;
                 at.y = (int16_t)oy;
 
-                for (hit = (uint8_t *)ObjectsAtPoint(&at,
-                         g_objMapDesc);
+                for (hit = (AM2_Object *)ObjectsAtPoint(&at, g_objMapDesc);
                      hit;
-                     hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
+                     hit = hit->queryNext) {
                     if (hit == o)
                         continue;
-                    DamageObject((AM2_Object *)hit, damage, AM2_CRUSH_DAMAGE_KIND,
+                    DamageObject(hit, damage, AM2_CRUSH_DAMAGE_KIND,
                                  ((const AM2_Object *)o)->uid, 0, 0);
                 }
             }
         }
     }
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+    o->flags |= OBJ_FLAG_FOOTPRINT_ON;
 #undef rect
 #undef cells
 }

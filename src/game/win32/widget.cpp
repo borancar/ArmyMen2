@@ -16831,7 +16831,7 @@ void __cdecl PointerActionMode4(void *target, AM2_Point at)
             continue;
         }
 
-        FormationSlotPoint(i, at, o, &slot);
+        FormationSlotPoint(i, at, (AM2_Object *)o, &slot);
         ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
 
         /* Written before the test that may replace it -- see above. */
@@ -17026,7 +17026,7 @@ void __cdecl PointerActionMode6(void *target, AM2_Point at)
             /* The original hands FormationSlotPoint the address of its own
              * first argument slot -- the target is a packed point, and the
              * slot is overwritten with this unit's place in the formation. */
-            FormationSlotPoint(i, at, o, (AM2_Point *)&target);
+            FormationSlotPoint(i, at, (AM2_Object *)o, (AM2_Point *)&target);
 
             ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
             *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 1;

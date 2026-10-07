@@ -116,7 +116,7 @@ void __cdecl FreeSpriteList(void);
 
 /* Original: 0x004042A0, one caller -- FormationPoint, for slot 12 and above,
  * where the twelve-entry slot table runs out. Rings of sixteen. */
-void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
+void __cdecl FormationPointFar(struct AM2_Object *follower, struct AM2_Object *leader, AM2_Point *out,
                                int32_t slot);
 
 /* Original: 0x00404400, two callers. Write the formation position for `slot`
@@ -124,16 +124,16 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 /* Original: 0x00456EA0, three callers. Where a formation slot sits, and it
  * caches its own answer into the per-slot tables -- see air.cpp for why that
  * makes the vehicle rule propagate down the tree. */
-void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, void *obj,
+void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, struct AM2_Object *obj,
                                 AM2_Point *out);
 
-void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
+void __cdecl FormationPoint(struct AM2_Object *follower, struct AM2_Object *leader, AM2_Point *out,
                             int32_t slot);
 
 /* Original: 0x00404580, three callers, and the name is ours. Place `follower`
  * in formation on `leader`, redirecting to the vehicle when the leader is a
  * type 2 that is riding one, then calling FormationPoint. */
-void __cdecl ResolveFormationPoint(void *follower, void *leader,
+void __cdecl ResolveFormationPoint(struct AM2_Object *follower, struct AM2_Object *leader,
                                    AM2_Point *out);
 
 /* Original: 0x004035F0. Zero the two per-frame counters, both of which are
@@ -160,7 +160,7 @@ void __cdecl SetFogOfWar(int32_t fogOn);
 
 /* 0x00429650. RevealObj's inverse -- sets OBJ_FLAG_CONCEALED and unlinks the
  * rows. Declines unless ADDR_FOG_OF_WAR is zero (fog ON) or `force` is set. */
-void __cdecl ObjConceal(void *obj, int32_t force);
+void __cdecl ObjConceal(struct AM2_Object *obj, int32_t force);
 
 /* 0x0041A1B0, two callers -- both cheat arms. Invert the fog flag and bring
  * every enemy object into line with it. See air.cpp for the double write. */
@@ -178,7 +178,7 @@ int32_t __cdecl ThingCode(const void *who, const void *owner);
 /* 0x00448E60. How much `obj` obstructs, as seen from `from` and measured
  * against `at`. 0, an item's own byte, or AM2_BLOCK_FULL. The third argument
  * is not read; it is in the signature because the callers pass it. */
-int32_t __cdecl ObjBlockWeight(void *from, void *obj, AM2_Point unused,
+int32_t __cdecl ObjBlockWeight(struct AM2_Object *from, struct AM2_Object *obj, AM2_Point unused,
                                AM2_Point at);
 void __cdecl GrowSpriteList(void);
 
@@ -247,7 +247,7 @@ void air_install(void);
 
 /* 0x00404ED0, two callers. Pick a point `dist` away from an object on a
  * heading within +/-32 of the way it is facing. The first argument is unused. */
-void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
+void __cdecl RandomPointAhead(void *, const struct AM2_Object *obj, int32_t dist,
                               AM2_Point *out);
 
 /* 0x00404E50. RandomPointAhead with the heading taken from another object's
@@ -257,7 +257,7 @@ void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
  * latency, capped at three seconds. It names itself in its log lines. */
 int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
 
-void __cdecl RandomPointToward(const void *target, const void *obj,
+void __cdecl RandomPointToward(const struct AM2_Object *target, const struct AM2_Object *obj,
                                int32_t dist, AM2_Point *out);
 
 /* 0x004036F0, one caller. What one object does to another's VIEW: take the
@@ -265,7 +265,7 @@ void __cdecl RandomPointToward(const void *target, const void *obj,
  * subtends, record how far the view is obstructed in three height bands. The
  * output is ADDR_SIGHT_BLOCK_BY_DIR, not a return value -- the original's
  * epilogue sets no eax at all. */
-void __cdecl AddSightBlocker(void *viewer, void *blocker);
+void __cdecl AddSightBlocker(struct AM2_Object *viewer, struct AM2_Object *blocker);
 
 /* 0x00409540, one caller. What an air pass does when its timer expires:
  * drop three paratroopers in a V, each with a weapon and its own facing. */

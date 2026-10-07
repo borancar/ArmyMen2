@@ -1895,7 +1895,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 /* No null test of its own: ObjIsWatchedKind answers 0 for one. */
                 if (ObjIsWatchedKind((const AM2_Object *)obj)
                     && (int32_t)g_defaultOwner != army)
-                    ObjConceal(obj, 1);
+                    ObjConceal((AM2_Object *)obj, 1);
                 /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL
                  * below, exactly as the original does (0x0042D1C3 jmps to the
                  * ApplyHeightItem at 0x0042D30B that the weapon arm reaches by
