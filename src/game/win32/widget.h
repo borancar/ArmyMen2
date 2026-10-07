@@ -521,16 +521,18 @@ struct AM2_Blinker : AM2_Panel {
             AM2_Sprite *sprite0;    /* 0x0060  MULTISPR_OFF_SPRITE0, the first bitmap's */
             AM2_Sprite *sprites[2]; /* 0x0064  MULTISPR_OFF_SPRITES */
             int32_t     index;      /* 0x006C  MULTISPR_OFF_INDEX */
+            int32_t     yBias;      /* 0x0070  MULTISPR_OFF_Y_BIAS, added to the centred y */
+            int32_t     yInset;     /* 0x0074  MULTISPR_OFF_Y_INSET, off the height first */
         };
         struct {                    /*   and as a blinking toggle: */
             AM2_Sprite *spriteOff;  /* 0x0060  TOGGLE_OFF_SPRITE_OFF */
             AM2_Sprite *spriteOn;   /* 0x0064  TOGGLE_OFF_SPRITE_ON */
             int32_t     active;     /* 0x0068  BLINK_OFF_ACTIVE, non-zero while flashing */
             int32_t     state;      /* 0x006C  TOGGLE_OFF_STATE, non-zero picks ON */
+            uint32_t    period;     /* 0x0070  BLINK_OFF_PERIOD, ms between flips */
+            int32_t     remaining;  /* 0x0074  BLINK_OFF_REMAINING, flips before it stops */
         };
     };
-    uint32_t    period;             /* 0x0070  BLINK_OFF_PERIOD, ms between flips */
-    int32_t     remaining;          /* 0x0074  BLINK_OFF_REMAINING, flips before it stops */
     uint32_t    elapsed;            /* 0x0078  BLINK_OFF_ELAPSED, ms since the last flip */
     uint32_t    last;               /* 0x007C  BLINK_OFF_LAST, GetTickCount then */
     AM2_Blinker(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
@@ -743,7 +745,8 @@ struct AM2_BattleNameScreen : AM2_ScreenBase {
 };
 struct AM2_CommPanelScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_COMM_PANEL_SIZE - sizeof(AM2_ScreenBase)];
+    AM2_ListBox *list;              /* 0x0064  COMMPANEL_OFF_LIST, the connections box */
+    struct AM2_Rec *rows;           /* 0x0068  COMMPANEL_OFF_ROWS, what it lists */
     AM2_CommPanelScreen(const char *bmp);
     ~AM2_CommPanelScreen();
 };
@@ -802,7 +805,7 @@ struct AM2_EnterNameScreen : AM2_ScreenBase {
 };
 struct AM2_LoadGameScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    int32_t     field64;            /* 0x0064 */
+    struct AM2_Rec *list;           /* 0x0064  the .sav names */
     char        name[AM2_LOAD_GAME_SIZE - 0x68]; /* 0x0068  LOAD_GAME_OFF_NAME */
     AM2_LoadGameScreen(const char *bmp, int32_t flag);
     ~AM2_LoadGameScreen();
@@ -810,7 +813,7 @@ struct AM2_LoadGameScreen : AM2_ScreenBase {
 struct AM2_MoviesScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
     AM2_Sprite *sprites[12][2];     /* 0x0064 MOVIES_OFF_SPRITES: off, on */
-    AM2_Widget *buttons[4];         /* 0x00C4 MOVIES_OFF_BUTTONS */
+    AM2_Button *buttons[4];         /* 0x00C4 MOVIES_OFF_BUTTONS */
     AM2_MoviesScreen(const char *bmp);
     ~AM2_MoviesScreen();
 };
@@ -863,13 +866,13 @@ struct AM2_ReplayDialogScreen : AM2_ScreenBase {
 };
 struct AM2_SelectMapScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_MP_SELECT_MAP_SIZE - sizeof(AM2_ScreenBase)];
+    struct AM2_Rec *list;           /* 0x0064  the map names */
     AM2_SelectMapScreen(const char *bmp);
     ~AM2_SelectMapScreen();
 };
 struct AM2_SelectPlayerScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_[AM2_SELECT_PLAYER_SIZE - sizeof(AM2_ScreenBase)];
+    struct AM2_Rec *list;           /* 0x0064  the player names */
     AM2_SelectPlayerScreen(const char *bmp);
     ~AM2_SelectPlayerScreen();
 };

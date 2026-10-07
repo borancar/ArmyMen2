@@ -2243,7 +2243,7 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
     /* The list's fields and the bar's are read afresh at every use. */
 #define TOP     (list->topRow)
 #define VISIBLE (list->visible)
-#define COUNT   (*(const int32_t *const)list->rows)
+#define COUNT   (*(const int32_t *)list->rows)
 #define THUMB   (bar->sprite0)
     if (!list)
         return;
@@ -8793,34 +8793,32 @@ void __cdecl OnAppActivated(void)
 AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_Widget *w = this;
+    AM2_CommPanelScreen *w = this;
 
     AM2_Widget *panel;
-    AM2_Widget *list;
+    AM2_ListBox *list;
     AM2_ArrowBar *bar;
     AM2_CTOR_VTABLE(w, VTABLE_COMM_PANEL);
     SetGameDir(g_dirScratch);
 
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = new AM2_Rec(1);
-    CommEnumConnections(g_commObject, *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS));
+    w->rows = new AM2_Rec(1);
+    CommEnumConnections(g_commObject, w->rows);
 
     panel = new AM2_Panel("02_001_00_commpanel.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x40, 0x62, 0x200, 0x11C));
     ::WidgetAddChild(w, panel);
     w->focusedChild = panel;          /* missing until the bytes said so */
     panel->flag44 = 1;
 
-    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x11F, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS), (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
-    *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x11F, 0xAA), w->rows, (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
+    w->list = list;
     ::WidgetAddChild(panel, list);
-    WidgetVFocus(*(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST), 0);
+    WidgetVFocus(w->list, 0);
 
     bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x15E, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
-    *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w
-                                                 + COMMPANEL_OFF_LIST)
-                     + LIST_OFF_ARROWBAR) = bar;
+    w->list->arrowBar = bar;
     bar->list =
-        *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
+        w->list;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_SELECT0, (const char *)(uintptr_t)AM2_BMP_SELECT1,
                    (const char *)(uintptr_t)AM2_BMP_SELECT2, 1,
@@ -9017,8 +9015,7 @@ void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     }
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    *(int32_t *)(g_paintObject
-                 + BATTLEJOIN_OFF_CHOSEN) = row;
+    ((AM2_DlgBattleJoinScreen *)g_paintObject)->chosen = row;
 }
 
 void __cdecl BattleJoinPoll(AM2_Widget *w)
@@ -11314,7 +11311,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
     AM2_Widget *w = this;
 
     AM2_ListBox       *self = (AM2_ListBox *)w;
-    const uint8_t *src  = (const uint8_t *const)self->rows;
+    const uint8_t *src  = (const uint8_t *)self->rows;
     RECT           vis;
     int32_t        row;
     RECT           r;
@@ -11333,7 +11330,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
     r.left = w->rect.left;
     ClearRegion(&vis, g_backgroundColour);
 
-    src = (const uint8_t *const)self->rows;
+    src = (const uint8_t *)self->rows;
 
     for (row = *(const int32_t *)((uint8_t *)self + TEXTLIST_OFF_FIRST);
          row < *(const int32_t *)(src + TEXTLIST_SRC_COUNT);
@@ -11359,13 +11356,13 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 
         DrawTextClipped(r.left + AM2_TEXT_LIST_PAD, y,
                         (const char *)(*(const uint8_t *const *)
-                                           ((const uint8_t *const)self->rows
+                                           ((const uint8_t *)self->rows
                                             + TEXTLIST_SRC_RECORDS)
                                        + row * TEXTLIST_REC_SIZE),
                         AM2_TEXT_LIST_FONT, vis, colour);
         UnlockSurface();
 
-        src = (const uint8_t *const)self->rows;
+        src = (const uint8_t *)self->rows;
     }
 }
 
@@ -11539,7 +11536,7 @@ void __cdecl CloseScreen(void)
 AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_Widget *w = this;
+    AM2_SelectMapScreen *w = this;
 
     AM2_Widget *panel;
     AM2_ListBox *list;
@@ -11548,7 +11545,7 @@ AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_MAP);
     ReadCampaignLevels();
 
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
+    w->list = new AM2_Rec(1);
 
 for (i = 0; i < LevelCount(); i++) {
         AM2_Level *rec = FindLevelRecord(i + 1);
@@ -11557,7 +11554,7 @@ for (i = 0; i < LevelCount(); i++) {
             int32_t *id = (int32_t *)am2_malloc(sizeof *id);
 
             *id = i + 1;
-            ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(
+            w->list->ListAdd(
                     rec->name, id);
         }
     }
@@ -11567,7 +11564,7 @@ for (i = 0; i < LevelCount(); i++) {
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectMapRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x95, 0xAA), w->list, (int32_t)(uintptr_t)SelectMapRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
@@ -11671,9 +11668,9 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     ::WidgetAddChild(panel, btn);
     panel->focusedChild = btn;
     this->buttons[0] = btn;
-    this->buttons[1] = (AM2_Widget *)0;
-    this->buttons[2] = (AM2_Widget *)0;
-    this->buttons[3] = (AM2_Widget *)0;
+    this->buttons[1] = (AM2_Button *)0;
+    this->buttons[2] = (AM2_Button *)0;
+    this->buttons[3] = (AM2_Button *)0;
 
     if (g_movieCount > 0) {
         btn = new AM2_Button(g_dirScratch,
@@ -11787,7 +11784,7 @@ AM2_MoviesScreen::~AM2_MoviesScreen()
 void __cdecl OnMovieNextPage(AM2_Widget *w)
 {
     AM2_Widget  *panel;
-    AM2_Widget  *screen;
+    AM2_MoviesScreen *screen;
     int32_t      i;
 
     if (!w)
@@ -11795,7 +11792,7 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
     panel = w->parent;
     if (!panel)
         return;
-    screen = panel->parent;
+    screen = (AM2_MoviesScreen *)panel->parent;
     if (!screen)
         return;
 
@@ -11804,18 +11801,17 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
         g_moviePage = 0;
 
     /* The slot, the page and the sprite pair are each re-read per store. */
-#define SLOT(i) (*(uint8_t **)((uint8_t *)screen + MOVIES_OFF_BUTTONS + (uint32_t)(i) * 4))
-#define PAIR(n) ((AM2_Sprite *const *)((const uint8_t *)screen + MOVIES_OFF_SPRITES \
-                                        + (uint32_t)(n) * 8))
+#define SLOT(i) (screen->buttons[i])
+#define PAIR(n) (screen->sprites[n])
     for (i = 0; i < AM2_MOVIE_PAGE_SIZE; i++) {
         int32_t idx = i + g_moviePage * AM2_MOVIE_PAGE_SIZE;
 
         if (!SLOT(i))
             continue;
-        *(int32_t *)(SLOT(i) + MOVIE_BUTTON_OFF_INDEX)        = idx;
-        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_NORMAL)  = PAIR(idx)[1];
-        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_FOCUS)   = PAIR(idx)[0];
-        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_PRESSED) = PAIR(idx)[0];
+        SLOT(i)->row           = idx;
+        SLOT(i)->spriteNormal  = PAIR(idx)[1];
+        SLOT(i)->spriteFocus   = PAIR(idx)[0];
+        SLOT(i)->spritePressed = PAIR(idx)[0];
     }
 #undef SLOT
 #undef PAIR
@@ -11830,7 +11826,7 @@ void __cdecl OnMoviePlay(AM2_Widget *w)
     int32_t idx;
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    idx = *(const int32_t *)((const uint8_t *)w + MOVIE_BUTTON_OFF_INDEX);
+    idx = ((const AM2_ButtonBase *)w)->row;
     strcpy(&g_movieToPlay, names[idx]);
     RequestState(3);
     g_stateArg = 1;
@@ -13108,7 +13104,7 @@ void __cdecl OnSelectPlayer(AM2_Widget *w)
 AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_Widget *w = this;
+    AM2_SelectPlayerScreen *w = this;
 
     AM2_Widget *panel;
     AM2_ListBox *list;
@@ -13121,7 +13117,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     SetGameDir("save");
     g_currentPlayer[0] = '\0';
 
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
+    w->list = new AM2_Rec(1);
 
     strcpy(pattern, "*");
     handle = orig_findfirst(pattern, found);
@@ -13131,7 +13127,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
 
             if ((found[AM2_FIND_OFF_ATTRIB] & AM2_FIND_ATTR_DIR)
                     && name[0] != '.')
-                ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(name,
+                w->list->ListAdd(name,
                         (void *)0);
         } while (orig_findnext(handle, found) == 0);
         orig_findclose(handle);
@@ -13142,17 +13138,16 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x29, 0x43, 0x96, 0xAB), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectPlayerRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x29, 0x43, 0x96, 0xAB), w->list, (int32_t)(uintptr_t)SelectPlayerRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
     /* Opening the screen selects the first player. */
     {
-        const int32_t *r = *(const int32_t **)((uint8_t *)w
-                                               + COMMPANEL_OFF_LIST);
+        const AM2_Rec *r = w->list;
 
-        if (r[0] > 0)
-            strcpy(g_currentPlayer, *(const char *const *)(r + 1));
+        if (r->count > 0)
+            strcpy(g_currentPlayer, (const char *)r->rows);
     }
 
     bar = (AM2_ArrowBar *)new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
@@ -13275,7 +13270,7 @@ void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
         return;
     if (!(g_paintObject))
         return;
-    strcpy((char *)(g_paintObject) + LOAD_GAME_OFF_NAME,
+    strcpy(((AM2_LoadGameScreen *)g_paintObject)->name,
            rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
     PlaySoundAt(2, 0, 0, 0, 0);
 }
@@ -13291,7 +13286,7 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w)
     (void)w;
     if (!(g_paintObject))
         return;
-    name = (const char *)(g_paintObject) + LOAD_GAME_OFF_NAME;
+    name = ((AM2_LoadGameScreen *)g_paintObject)->name;
     if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
@@ -13358,7 +13353,7 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     (void)w;
     if (!(g_paintObject))
         return;
-    name = (const char *)(g_paintObject) + LOAD_GAME_OFF_NAME;
+    name = ((AM2_LoadGameScreen *)g_paintObject)->name;
     if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
@@ -13386,7 +13381,7 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
 AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     : AM2_ScreenBase(bmp, flag)
 {
-    AM2_Widget *w = this;
+    AM2_LoadGameScreen *w = this;
 
     AM2_Widget *parent;
     AM2_ListBox *list;
@@ -13398,9 +13393,9 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     int32_t     dx;
     int32_t     dy;
     AM2_CTOR_VTABLE(w, VTABLE_LOAD_GAME);
-    *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
+    w->name[0] = '\0';
 
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
+    w->list = new AM2_Rec(1);
 
     orig_sprintf(path, "save\\%s",
                  g_currentPlayer);
@@ -13410,7 +13405,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     handle = orig_findfirst(pattern, found);
     if (handle != -1) {
         do {
-            ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(
+            w->list->ListAdd(
                     (const char *)(found + AM2_FIND_OFF_NAME), (void *)0);
         } while (orig_findnext(handle, found) == 0);
         orig_findclose(handle);
@@ -13433,7 +13428,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
         parent = panel;
     }
 
-    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x2A, dy + 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)LoadGameRow, 0, 1);
+    list = (AM2_ListBox *)new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x2A, dy + 0x44, 0x95, 0xAA), w->list, (int32_t)(uintptr_t)LoadGameRow, 0, 1);
     ::WidgetAddChild(parent, list);
     if (g_gameState == 2)
         w->focusedChild = list;
@@ -13441,12 +13436,11 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
 
     /* Opening the screen selects the first save, name and all. */
     {
-        const int32_t *r = *(const int32_t **)((uint8_t *)w
-                                               + COMMPANEL_OFF_LIST);
+        const AM2_Rec *r = w->list;
 
-        if (r[0] > 0)
-            strcpy((char *)w + LOAD_GAME_OFF_NAME,
-                   *(const char *const *)(r + 1));
+        if (r->count > 0)
+            strcpy(w->name,
+                   (const char *)r->rows);
     }
     list->flag44 = 1;
 
@@ -15855,8 +15849,7 @@ void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
 
     ::WidgetScreenRect(w);
 
-    spr = *(AM2_Sprite *const *)((uint8_t *)self + MULTISPR_OFF_SPRITES
-                                 + self->index * 4);
+    spr = self->sprites[self->index];
     if (!spr)
         return;
 
@@ -15864,9 +15857,9 @@ void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
     x = dest.left = ((w->rect.right - spr->bounds.right - w->rect.left) >> 1)
                     + w->rect.left;
     dest.right = spr->bounds.right + x;
-    y = dest.top = ((w->rect.bottom - *(const int32_t *)((uint8_t *)self + MULTISPR_OFF_Y_INSET)
+    y = dest.top = ((w->rect.bottom - self->yInset
                      - w->rect.top) >> 1)
-                   + *(const int32_t *)((uint8_t *)self + MULTISPR_OFF_Y_BIAS) + w->rect.top;
+                   + self->yBias + w->rect.top;
     dest.bottom = spr->bounds.bottom + y;
 
     if (!IntersectRect(&vis, &dest, &clip))
