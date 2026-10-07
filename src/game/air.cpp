@@ -265,7 +265,7 @@ found:
  * win32/mapdraw.h because it clips with IntersectRect, and including that
  * header here would drag windows.h into a flat module. The same reason
  * script.cpp forward-declares PreloadSprite. */
-void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc,
                             int32_t (__cdecl *keep)(AM2_Object *obj));
 
 uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
@@ -279,7 +279,7 @@ uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
     box.top    = where.y - AM2_AIR_ENEMY_RADIUS;
     box.bottom = where.y + AM2_AIR_ENEMY_RADIUS;
 
-    o = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
+    o = ObjectsInRect(&box, g_objMapDesc,
                                  MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's

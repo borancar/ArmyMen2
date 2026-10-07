@@ -2555,7 +2555,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
                 at.x = (int16_t)ox;
                 at.y = (int16_t)oy;
 
-                for (hit = (AM2_Object *)ObjectsAtPoint(&at, g_objMapDesc);
+                for (hit = ObjectsAtPoint(&at, g_objMapDesc);
                      hit;
                      hit = hit->queryNext) {
                     if (hit == o)
@@ -4740,7 +4740,7 @@ tail:
  * block closes at line 129 and this declaration is at 164, so it has C++
  * linkage. Getting that backwards is a link error rather than a silent one,
  * which is the only reason it is safe to repeat a declaration at all. */
-void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc,
                             int32_t (__cdecl *keep)(AM2_Object *obj));
 
 /* 0x0045CAA0 called with ONE argument and no format string -- a third role for
@@ -4873,10 +4873,10 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     box.bottom = (int32_t)o->pos.y + reach;
 
     if (flags)
-        it = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
+        it = ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsHittable);
     else
-        it = (AM2_Object *)ObjectsInRect(&box, g_objMapDesc,
+        it = ObjectsInRect(&box, g_objMapDesc,
                                       ObjIsLiveTarget);
     if (!it)
         goto finish;
@@ -7729,7 +7729,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
                              &g_weaponPoseFrames[out->state]) <= 0) {
         o->fieldD6     = 0;
         o->stuckCount  = 0;
-        at = (AM2_Object *)ObjectsAtPoint((const AM2_Point *)pos, g_objMapDesc);
+        at = ObjectsAtPoint((const AM2_Point *)pos, g_objMapDesc);
         goto settle_facing;
     }
 
@@ -7772,7 +7772,7 @@ have_facing:
     pose = ObjNextKind538(o, out->state);
     i    = 0;
     AnimStepPoint(o, facing, pose, &stepPoint, 0);
-    at = (AM2_Object *)ObjectsAtPoint(&stepPoint, g_objMapDesc);
+    at = ObjectsAtPoint(&stepPoint, g_objMapDesc);
     /* Walkable: take this heading and step, with no sweep at all -- the
      * `i == 0` arm of the dispatch below (0x0044B14B jumps straight to it),
      * so none of the stop arms runs on a clear step. */
@@ -7826,7 +7826,7 @@ sweep:
 
             while (facing = (uint8_t)(facing + (uint8_t)*step),
                    AnimStepPoint(o, facing, pose, &stepPoint, 0),
-                   (at = (AM2_Object *)ObjectsAtPoint(&stepPoint, g_objMapDesc)),
+                   (at = ObjectsAtPoint(&stepPoint, g_objMapDesc)),
                    BlockWeightRoute(o, stepPoint, at, &inside)
                        >= AM2_STEP_ROUTE_OK) {
                 {
@@ -10135,7 +10135,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     /* Everything under the point the vehicle is MOVING TO, not where it is:
      * ObjectsAtPoint is handed the step point MoveStepPoint just wrote. */
     {
-        AM2_Object *p = (AM2_Object *)ObjectsAtPoint(&step,
+        AM2_Object *p = ObjectsAtPoint(&step,
                          g_objMapDesc);
 
         while (p != 0) {

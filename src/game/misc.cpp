@@ -2981,7 +2981,7 @@ int32_t __cdecl SeqStepKind6(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
  * It is on CLAUDE.md's "unexercised" list, which means it does not RUN here --
  * not that it is unwritten. I read the two as the same thing for a moment and
  * built a seam to the image; checkseams refused it. */
-void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc);
 
 /* SeqStepKind7 -- original 0x00461700, the fifth of the seven steppers. A
  * FLAME: every 300 ms it puffs a kind-6 sequence and burns everything inside
@@ -3039,23 +3039,23 @@ int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 
         if (!skip) {
             AM2_Rect box;
-            uint8_t *obj;
+            AM2_Object *obj;
 
             box.left   = row->pos.x - 0x28;
             box.right  = row->pos.x + 0x28;
             box.top    = row->pos.y - 0x40;
             box.bottom = row->pos.y + 0x10;
 
-            obj = (uint8_t *)AllObjectsInRect(
+            obj = AllObjectsInRect(
                       &box, g_objMapDesc);
             while (obj != 0) {
-                if (ObjIsTypeIn238((const AM2_Object *)obj))
-                    DamageObject((AM2_Object *)obj, 1, 1,
+                if (ObjIsTypeIn238(obj))
+                    DamageObject(obj, 1, 1,
                                  r->owner, 0, 0);
                 else if (r->field0C > 9)
-                    DamageObject((AM2_Object *)obj, 0x0F, 1,
+                    DamageObject(obj, 0x0F, 1,
                                  r->owner, 0, 0);
-                obj = *(uint8_t **)(obj + 0x68u);
+                obj = obj->queryNext;
             }
         }
 

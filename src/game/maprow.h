@@ -121,8 +121,8 @@ void __cdecl RowUpdate(AM2_MapRow *row, int32_t force, AM2_MapDesc *desc);
 
 /* Original: 0x0041D270 and 0x0041D210. The map descriptor's grid, freed and
  * rebuilt. Both are called on both descriptors when a map loads. */
-void __cdecl MapDescFree(void *desc);
-void __cdecl MapDescInit(void *desc, int32_t w, int32_t h);
+void __cdecl MapDescFree(AM2_MapDesc *desc);
+void __cdecl MapDescInit(AM2_MapDesc *desc, int32_t w, int32_t h);
 
 /* Original: 0x0040A050. Clear a map object and give it a sprite, a position
  * and the default palette. See maprow.cpp for why it is filed here. */

@@ -4379,7 +4379,7 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
 #undef AIM
 #undef PT
 
-    o = (AM2_Object *)ObjectsHitByPoint(&hit,
+    o = ObjectsHitByPoint(&hit,
                                      g_objMapDesc);
     for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext))
         DamageObject(o, g_aimDamage, 1,
@@ -4906,7 +4906,7 @@ void __cdecl HudPostUpdate(void)
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                   + *(const int16_t *)&g_viewY);
-    obj = (AM2_Object *)ObjectsHitByPoint(&at, g_objMapDesc);
+    obj = ObjectsHitByPoint(&at, g_objMapDesc);
     for (; obj; obj = obj->queryNext) {
         if (ours) {
             pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;

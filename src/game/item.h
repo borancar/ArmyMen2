@@ -543,12 +543,12 @@ uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint);
 
 /* 0x0042A1B0. The mouse pick: every object in a cell whose own hit rectangle
  * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
-void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc);
+struct AM2_Object *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc);
 
 /* 0x0042A550, fifteen callers. Its sibling, asking a LOOSER question of the
  * same cell: the hit rectangle, then one of three further tests chosen by the
  * object's flags and whether it has a bitmask at all. */
-void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc);
+struct AM2_Object *__cdecl ObjectsAtPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc);
 
 /* 0x004294C0, fifteen callers. Recompute an object's tile from its position
  * and, if anything moved, put it back on the map. */
@@ -966,7 +966,7 @@ void __cdecl SetObjContext(struct AM2_Object *obj);
 
 /* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied
  * predicate, which runs BETWEEN the rectangle test and the mask test. */
-void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
+struct AM2_Object *__cdecl WalkCellAtPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc,
                               int32_t (__cdecl *keep)(struct AM2_Object *obj));
 
 /* 0x004499A0, one caller. Is the object's first row on a frame from which its

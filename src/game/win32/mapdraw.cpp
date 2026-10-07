@@ -870,9 +870,10 @@ done:
  * value from theirs, so this is one place where the two builds cannot be
  * expected to agree if it is ever reached. Nothing observed reaches it: it
  * needs 500 visible objects and a region wider than it is tall. */
-void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
+void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
+                            int32_t deep)
 {
-    const uint8_t *d    = (const uint8_t *)desc;
+    const AM2_MapDesc *d    = desc;
     int32_t        cols = 0;
     int32_t        last;
     int32_t        l, t, r, b, l0, t0;
@@ -890,12 +891,12 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
 
     if (b < 0)
         return;
-    if (t > *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1)
+    if (t > d->rows - 1)
         return;
     if (r < 0)
         return;
 
-    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    cols = d->cols;
     last = cols - 1;
     if (l > last)
         return;
@@ -908,8 +909,8 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
         b = last;
 
     cell = (const uint8_t *const *)
-           (*(const uint8_t *const *)(d + MAPDESC_OFF_CELLS))
-           + ((t0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + l0);
+           (((const uint8_t *)d->cells))
+           + ((t0 << d->shift) + l0);
     stride = cols - r + l0 - 1;
 
     for (row = t0; row <= b; row++) {
@@ -2721,10 +2722,10 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
  * The predicate is cdecl and takes the object alone; it runs last, after the
  * intersection, so it never sees an object that does not touch the rectangle.
  */
-void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc,
                             int32_t (__cdecl *keep)(AM2_Object *obj))
 {
-    const uint8_t *d    = (const uint8_t *)desc;
+    const AM2_MapDesc *d    = desc;
     AM2_Object    *head = (AM2_Object *)0;
     int32_t        cols;
     int32_t        x0, y0, x1, y1;
@@ -2737,30 +2738,29 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
         || r->left >= g_mapExtentX
         || r->bottom < 0
         || r->top >= g_mapExtentY)
-        return (void *)0;
+        return (AM2_Object *)0;
 
     x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
-    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    cols = d->cols;
     if (cols - 1 < (r->right >> AM2_CELL_SHIFT))
         x1 = cols - 1;
     else
         x1 = r->right >> AM2_CELL_SHIFT;
     y0 = (r->top >> AM2_CELL_SHIFT) < 0 ? 0 : r->top >> AM2_CELL_SHIFT;
-    y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < (r->bottom >> AM2_CELL_SHIFT)
-         ? *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 : r->bottom >> AM2_CELL_SHIFT;
+    y1 = d->rows - 1 < (r->bottom >> AM2_CELL_SHIFT)
+         ? d->rows - 1 : r->bottom >> AM2_CELL_SHIFT;
 
     /* What to add to the cell index at the end of a row to land on x0 of the
      * next one. The row's own walk has already advanced it x1 - x0 + 1 times. */
     wrap = cols - x1 + x0 - 1;
-    cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
+    cell = (y0 << d->shift) + x0;
 
     for (y = y0; y <= y1; cell += wrap, y++) {
         for (x = x0; x <= x1; cell++, x++) {
-            uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
-                                 (d + MAPDESC_OFF_CELLS)))[cell];
+            AM2_CellEntry *node = d->cells[cell];
 
-            for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-                AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+            for (; node; node = node->next) {
+                AM2_Object *o = node->object;
                 int32_t  t;
 
                 if (o->flagsLo & OBJ_FLAG_DESTROYED)
@@ -2830,9 +2830,9 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
  * rather than folded away: "the original checks and the check is vacuous" is
  * a different fact from "the original does not check".
  */
-void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
+struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc)
 {
-    const uint8_t *d    = (const uint8_t *)desc;
+    const AM2_MapDesc *d    = desc;
     AM2_Object    *head = (AM2_Object *)0;
     int32_t        cols;
     int32_t        x0, y0, x1, y1;
@@ -2845,28 +2845,27 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
         || r->right >= g_mapExtentX
         || r->top < 0
         || r->bottom >= g_mapExtentY)
-        return (void *)0;
+        return (AM2_Object *)0;
 
     x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
-    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    cols = d->cols;
     if (cols - 1 < (r->right >> AM2_CELL_SHIFT))
         x1 = cols - 1;
     else
         x1 = r->right >> AM2_CELL_SHIFT;
     y0 = (r->top >> AM2_CELL_SHIFT) < 0 ? 0 : r->top >> AM2_CELL_SHIFT;
-    y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < (r->bottom >> AM2_CELL_SHIFT)
-         ? *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 : r->bottom >> AM2_CELL_SHIFT;
+    y1 = d->rows - 1 < (r->bottom >> AM2_CELL_SHIFT)
+         ? d->rows - 1 : r->bottom >> AM2_CELL_SHIFT;
 
     wrap = cols - x1 + x0 - 1;
-    cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
+    cell = (y0 << d->shift) + x0;
 
     for (y = y0; y <= y1; cell += wrap, y++) {
         for (x = x0; x <= x1; cell++, x++) {
-            uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
-                                 (d + MAPDESC_OFF_CELLS)))[cell];
+            AM2_CellEntry *node = d->cells[cell];
 
-            for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-                AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+            for (; node; node = node->next) {
+                AM2_Object *o = node->object;
 
                 if (o->flagsLo & OBJ_FLAG_DESTROYED)
                     continue;

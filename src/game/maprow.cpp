@@ -868,23 +868,23 @@ found:
  * every object registers in the wrong cell and the frame says so. Measured,
  * because a clean A/B over code that turns out to be undiscriminated is worth
  * nothing and this file has just had two of those. */
-void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
+void __cdecl MapDescInit(AM2_MapDesc *desc, int32_t w, int32_t h)
 {
-    uint8_t *d = (uint8_t *)desc;
+    AM2_MapDesc *d = desc;
     int32_t  bytes;
-    void    *cells;
+    AM2_CellEntry **cells;
 
     MapDescFree(d);
 
-    *(int32_t *)(d + MAPDESC_OFF_COLS) = w >> AM2_CELL_SHIFT;
-    *(int32_t *)(d + MAPDESC_OFF_ROWS) = h >> AM2_CELL_SHIFT;
-    *(int32_t *)(d + MAPDESC_OFF_SHIFT) =
-        Log2Mask(*(const int32_t *)(d + MAPDESC_OFF_COLS));
+    d->cols = w >> AM2_CELL_SHIFT;
+    d->rows = h >> AM2_CELL_SHIFT;
+    d->shift =
+        Log2Mask(d->cols);
 
-    bytes = (*(const int32_t *)(d + MAPDESC_OFF_COLS)
-             << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) << 2;
-    cells = am2_malloc((size_t)bytes);
-    *(void **)(d + MAPDESC_OFF_CELLS) = cells;
+    bytes = (d->cols
+             << d->shift) << 2;
+    cells = (AM2_CellEntry **)am2_malloc((size_t)bytes);
+    d->cells = cells;
     memset(cells, 0, (size_t)bytes);
 }
 
@@ -893,19 +893,19 @@ void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
  * The three shape fields are cleared AFTER the free and the pointer is
  * cleared between them, which is the original's order and observable by
  * nothing. */
-void __cdecl MapDescFree(void *desc)
+void __cdecl MapDescFree(AM2_MapDesc *desc)
 {
-    uint8_t *d     = (uint8_t *)desc;
-    void    *cells = *(void **)(d + MAPDESC_OFF_CELLS);
+    AM2_MapDesc *d     = desc;
+    AM2_CellEntry **cells = d->cells;
 
     if (cells) {
         am2_free(cells);
-        *(void **)(d + MAPDESC_OFF_CELLS) = (void *)0;
+        d->cells = (AM2_CellEntry **)0;
     }
 
-    *(int32_t *)(d + MAPDESC_OFF_COLS)  = 0;
-    *(int32_t *)(d + MAPDESC_OFF_ROWS)  = 0;
-    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = 0;
+    d->cols  = 0;
+    d->rows  = 0;
+    d->shift = 0;
 }
 
 /* 0x0041D2B0, six callers. Give a row its entry buffer and put it on the map.

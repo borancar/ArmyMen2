@@ -67,7 +67,8 @@ void __cdecl ScrollDecay(void);
 /* 0x0041E440. Walk the map's cell grid over a world rectangle, hand every
  * object to the depth sort, draw the sorted list -- and split the rectangle
  * and recurse when the sort runs out of room. */
-void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
+void __cdecl DrawMapObjects(const AM2_Rect *world, const struct AM2_MapDesc *desc,
+                            int32_t deep);
 
 /* 0x0041E160. Insert one object into the sorted depth list. 0 means the list
  * is FULL, which is what makes the walker subdivide; an object outside the
@@ -161,13 +162,13 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
  * through OBJ_OFF_QUERY_NEXT with a caller-supplied predicate -- the family
  * item.cpp holds, with a block of cells to walk rather than one, and a
  * de-duplication rule on the object's home cell. See the definition. */
-void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc,
                             int32_t (__cdecl *keep)(struct AM2_Object *obj));
 
 /* 0x0042A3D0, three callers. ObjectsInRect with no predicate, a stricter entry
  * clip -- the whole rectangle must be on the map -- and one arm fewer in the
  * home-cell rule. See the definition. */
-void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc);
 
 /* 0x0041DD90, three callers, all row code. Cut a rectangle into the dirty
  * list so nothing in it overlaps: clip to the view, subtract every entry it

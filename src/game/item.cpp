@@ -540,8 +540,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
 #if !defined(AM2_RELINK)
     int32_t i;
 
-    if (*(void *const *)((const uint8_t *)g_objMapDesc
-                         + MAPDESC_OFF_CELLS)) {
+    if (g_objMapDesc->cells) {
         for (i = 0; i < g_objCount; i++)
             ItemPreDestroy(g_objTable[i].obj,
                            (int32_t)((uintptr_t)g_objMapDesc));
@@ -1226,25 +1225,23 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
  * as the strongest corroboration available -- the two share their bounds,
  * their chaining and their newest-first order, and differ only in the test.
  */
-void *__cdecl ObjectsAtPoint(const AM2_Point *pt, const void *desc)
+struct AM2_Object *__cdecl ObjectsAtPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc)
 {
-    const uint8_t *d    = (const uint8_t *)desc;
+    const AM2_MapDesc *d    = desc;
     int32_t        cx   = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t        cy   = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     AM2_Object       *head = (AM2_Object *)0;
-    uint8_t       *node;
+    AM2_CellEntry       *node;
 
-#define COLS (*(const int32_t *)(d + MAPDESC_OFF_COLS))
+#define COLS (d->cols)
     if (cx < 0 || cx > COLS - 1 || cy < 0 || cy > COLS - 1)
-        return (void *)0;
+        return (AM2_Object *)0;
 #undef COLS
 
-    node = ((uint8_t *const *)(*(const uint8_t *const *)
-                (d + MAPDESC_OFF_CELLS)))
-           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+    node = d->cells[(cy << d->shift) + cx];
 
-    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-        AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+    for (; node; node = node->next) {
+        AM2_Object *o = node->object;
 
         if (o->flagsLo & OBJ_FLAG_DESTROYED)
             continue;
@@ -1719,25 +1716,23 @@ void __cdecl ObjTileChanged(AM2_Object *obj, int32_t height, int32_t force)
  * whatever the function is for; what changed is the fix. Clicking on a unit
  * would not have closed it, because no caller here reads the cursor.
  * Verified by reading. */
-void *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const void *desc)
+struct AM2_Object *__cdecl ObjectsHitByPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc)
 {
-    const uint8_t *d = (const uint8_t *)desc;
+    const AM2_MapDesc *d = desc;
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     AM2_Object *head    = (AM2_Object *)0;
-    uint8_t *node;
+    AM2_CellEntry *node;
 
     /* The grid size is read after the first test, as the original does. */
-    if (cx < 0 || cx > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1
-        || cy < 0 || cy > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1)
-        return (void *)0;
+    if (cx < 0 || cx > d->cols - 1
+        || cy < 0 || cy > d->cols - 1)
+        return (AM2_Object *)0;
 
-    node = ((uint8_t *const *)(*(const uint8_t *const *)
-                (d + MAPDESC_OFF_CELLS)))
-           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+    node = d->cells[(cy << d->shift) + cx];
 
-    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-        AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+    for (; node; node = node->next) {
+        AM2_Object *o = node->object;
 
         if (o->flagsLo & OBJ_FLAG_DESTROYED)
             continue;
@@ -1804,7 +1799,7 @@ int32_t __cdecl BlockWeightAt(AM2_Object *from, AM2_Point at, AM2_Point ref)
     int32_t  total = 0;
     uint32_t tile;
 
-    o = (AM2_Object *)ObjectsAtPoint(
+    o = ObjectsAtPoint(
             (const AM2_Point *)&at,
             g_objMapDesc);
 
@@ -2199,11 +2194,11 @@ void __cdecl ObjClearFootprint(AM2_Object *obj)
  * rather than by including that header for the reason item.cpp already
  * declares PlaySoundAt above: this file is on the flat side of the split and
  * mapdraw.h reaches win32.h. Neither of its parameters names a Win32 type. */
-void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc);
 
 /* Its predicate-taking sibling, same file and same reason for being declared
  * here rather than included. */
-void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *r, const struct AM2_MapDesc *desc,
                             int32_t (__cdecl *keep)(AM2_Object *obj));
 
 /* CreateWeapon's typedef moved to item.h: place.cpp wants it too, and its
@@ -2711,7 +2706,7 @@ void __cdecl RoachBite(AM2_Object *o)
     box.bottom = at.y + BOX.bottom;
     back = o->facing + 0x80;
 
-    for (hit = (AM2_Object *)AllObjectsInRect(&box, g_objMapDesc);
+    for (hit = AllObjectsInRect(&box, g_objMapDesc);
          hit; hit = hit->queryNext) {
         if (!ObjsAreAllied(o, hit, 0))
             DamageObject(hit,
@@ -3488,7 +3483,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
     AM2_Object       *o;
     int32_t        scratch;
 
-    o = (AM2_Object *)ObjectsAtPoint(&at, g_objMapDesc);
+    o = ObjectsAtPoint(&at, g_objMapDesc);
 
     for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
         /* OBJ_OFF_RANK on a SHOT is the shooter's uid -- see orig.h. */
@@ -3883,7 +3878,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, AM2_Point at)
         here.y = PTS[i].y + at.y;
 
         /* NOTE: the BASE point, not `here`. */
-        chain = (AM2_Object *)ObjectsAtPoint(&at,
+        chain = ObjectsAtPoint(&at,
                                       g_objMapDesc);
 
         total += (kind == AM2_MASK_CHAIN_KIND)
@@ -3926,7 +3921,7 @@ uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint)
     /* TileAttrAt's body, inline as the image has it. */
     int8_t  best = *(const int8_t *)(g_tileAttrs
                                      + ((uint32_t)TileOfPoint(packedPoint) & 0xFFFFu));
-    AM2_Object *o   = (AM2_Object *)ObjectsAtPoint(
+    AM2_Object *o   = ObjectsAtPoint(
                        &packedPoint, g_objMapDesc);
 
     for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
@@ -9295,7 +9290,7 @@ void __cdecl SelectionClick(void)
             /* The drag has been let go. */
             g_viewRectOn = 0;
 
-            e = (AM2_Object *)ObjectsInRect(
+            e = ObjectsInRect(
                     (const AM2_Rect *)g_viewRect_,
                     g_objMapDesc,
                     ObjIsSelectable);
@@ -9362,7 +9357,7 @@ void __cdecl SelectionClick(void)
     if (!g_mouseChanged1)
         return;
 
-    e = (AM2_Object *)(uint8_t *)WalkCellAtPoint(
+    e = WalkCellAtPoint(
             (const AM2_Point *)&world, g_objMapDesc,
             ObjIsSelectable);
     if (!e)
@@ -10364,26 +10359,24 @@ void __cdecl SetObjContext(AM2_Object *obj)
  * that order. Same as the sibling, and worth stating because a caller taking
  * "the first hit" gets the last one added.
  */
-void *__cdecl WalkCellAtPoint(const AM2_Point *pt, const void *desc,
+struct AM2_Object *__cdecl WalkCellAtPoint(const AM2_Point *pt, const struct AM2_MapDesc *desc,
                               int32_t (__cdecl *keep)(AM2_Object *obj))
 {
-    const uint8_t *d = (const uint8_t *)desc;
+    const AM2_MapDesc *d = desc;
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     AM2_Object *head    = (AM2_Object *)0;
-    uint8_t *node;
+    AM2_CellEntry *node;
 
     /* The grid size is read after the first test, as the original does. */
-    if (cx < 0 || cx > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1
-        || cy < 0 || cy > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1)
-        return (void *)0;
+    if (cx < 0 || cx > d->cols - 1
+        || cy < 0 || cy > d->cols - 1)
+        return (AM2_Object *)0;
 
-    node = ((uint8_t *const *)(*(const uint8_t *const *)
-                (d + MAPDESC_OFF_CELLS)))
-           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+    node = d->cells[(cy << d->shift) + cx];
 
-    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
-        AM2_Object *o = (AM2_Object *)*(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+    for (; node; node = node->next) {
+        AM2_Object *o = node->object;
 
         if (o->flagsLo & OBJ_FLAG_DESTROYED)
             continue;
@@ -11691,7 +11684,7 @@ void __cdecl StepType6(AM2_Object *obj)
     if (o->rowSet.rows->cell >= 4
         && o->rank > 0) {
 
-        victim = (AM2_Object *)(uint8_t *)AllObjectsInRect(
+        victim = AllObjectsInRect(
                      (const AM2_Rect *)((uint8_t *)o + BLAST_OFF_RECT),
                      g_objMapDesc);
 
@@ -13578,7 +13571,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             fromP[1] = (int16_t)AM2_FTOL(
                 Sin8(u->facing) * AM2_FW_STEP
                 + fromP[1]);
-            o = (AM2_Object *)ObjectsAtPoint(&from,
+            o = ObjectsAtPoint(&from,
                     g_objMapDesc);
             if (o)
                 for (;;) {
@@ -13627,7 +13620,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             Sin8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + u->pos.y);
 
-        o = (AM2_Object *)ObjectsHitByPoint((const AM2_Point *)&from,
+        o = ObjectsHitByPoint((const AM2_Point *)&from,
                 g_objMapDesc);
 
         attacker = u->uid;
