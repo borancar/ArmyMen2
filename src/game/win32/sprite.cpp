@@ -675,9 +675,8 @@ typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
  * needs width bytes per row, so a sprite wider than about 32,000 pixels total
  * would smash the frame. The original's, and kept.
  *
- * THE DIB HEADER IS READ AS RAW OFFSETS, the way LoadDibFlipped reads its
- * own, so nothing here names a Win32 structure. Two of the fields are not
- * used for what a bitmap reader would expect:
+ * Two of the DIB header's fields are not used for what a bitmap reader
+ * would expect:
  *
  *   THE STRIDE IS biSizeImage / biHeight, computed rather than derived from
  *   the width -- so a .sha whose biSizeImage is wrong reads garbage rather
@@ -705,14 +704,24 @@ typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
 int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 {
     BITMAPFILEHEADER fileHdr;
-    BITMAPINFOHEADER infoHdr;
-    uint8_t   palette[0x400];
+    /* The info header and its colour table are ONE object: the image orders
+     * its frame by it (the file header below it, not above). The hot spot is
+     * the low word of biXPelsPerMeter and biYPelsPerMeter, read as words. */
+    struct {
+        union {
+            BITMAPINFOHEADER hdr;
+            struct {
+                uint8_t head[0x18];
+                int16_t hotX, attachX, hotY, attachY;
+            } hot;
+        };
+        uint8_t palette[0x400];
+    } info;
     uint8_t   stream[0x7D00];
     am2_FILE *fp;
     int32_t   base;
     uint8_t  *pixels;
     uint8_t  *out;
-    uint8_t  *rowTable;
     int32_t   width, height, stride;
     uint32_t  bytes;
     int32_t   row, x, len;
@@ -728,18 +737,20 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 
     base = (int32_t)orig_ftell(fp);
     orig_fread(&fileHdr, AM2_BMPFILE_HDR_BYTES, 1, fp);
-    orig_fread(&infoHdr, AM2_BMPINFO_HDR_BYTES, 1, fp);
+    orig_fread(&info.hdr, AM2_BMPINFO_HDR_BYTES, 1, fp);
 
-    if (infoHdr.biBitCount != 1) {
+    if (info.hdr.biBitCount != 1) {
         orig_fclose(fp);
         orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_NOT_1BIT)), path);
         return 0;
     }
 
-    orig_fread(palette, (size_t)infoHdr.biHeight * 4, 1, fp);
+    /* biClrUsed entries: the count was once biHeight, which overran the
+     * 0x400-byte table for any shadow taller than 256 rows. */
+    orig_fread(info.palette, (size_t)info.hdr.biClrUsed * 4, 1, fp);
     orig_fseek(fp, (int32_t)fileHdr.bfOffBits + base, 0);
 
-    bytes = infoHdr.biSizeImage;
+    bytes = info.hdr.biSizeImage;
     if (bytes <= 0) {
         orig_fclose(fp);
         orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_BAD_SIZE)), path);
@@ -750,40 +761,38 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     orig_fread(pixels, (size_t)bytes, 1, fp);
     orig_fclose(fp);
 
-    height = infoHdr.biHeight;
+    height = info.hdr.biHeight;
     stride = (int32_t)(bytes / (uint32_t)height);
-    width  = infoHdr.biWidth;
+    width  = info.hdr.biWidth;
 
     *(int16_t *)(stream + 0) = (int16_t)width;
     *(int16_t *)(stream + 2) = (int16_t)height;
 
-    rowTable = stream + 4;
-    out      = stream + 4 + (uint32_t)height * 2;
+    out = stream + 4 + (uint32_t)height * 2;
 
-    for (row = 0; row < height; row++, rowTable += 2) {
-        *(int16_t *)rowTable = (int16_t)(out - stream);
-
+    /* The loops read the header's width and height, not the locals; those
+     * are for the bounds at the end. */
+    for (row = 0; row < info.hdr.biHeight; row++) {
         x = 0;
+        ((int16_t *)(stream + 4))[row] = (int16_t)(out - stream);
         do {
             uint8_t n = 0;
 
-            while (x < width && n < AM2_RLE_RUN_MAX
-                   && !BitmapBitSet(pixels, x, row, height, stride)) {
+            while (x < info.hdr.biWidth && n < AM2_RLE_RUN_MAX
+                   && !BitmapBitSet(pixels, x, row, info.hdr.biHeight, stride)) {
                 x++;
                 n++;
             }
             *out++ = n;
 
             n = 0;
-            while (1) {
-                if (!(x < width && n < AM2_RLE_RUN_MAX
-                      && BitmapBitSet(pixels, x, row, height, stride)))
-                    break;
+            while (x < info.hdr.biWidth && n < AM2_RLE_RUN_MAX
+                   && BitmapBitSet(pixels, x, row, info.hdr.biHeight, stride)) {
                 x++;
                 n++;
             }
             *out++ = n;
-        } while (x < width - 1);
+        } while (x < info.hdr.biWidth - 1);
     }
 
     am2_free(pixels);
@@ -794,8 +803,8 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     spr->palette = g_defaultPalette;
 
     if (!spr->image.surface) {
-        int16_t hx = (int16_t)infoHdr.biXPelsPerMeter;
-        int16_t hy = (int16_t)infoHdr.biYPelsPerMeter;
+        int16_t hx = info.hot.hotX;
+        int16_t hy = info.hot.hotY;
 
         spr->bounds.top    = 0;
         spr->bounds.left   = 0;

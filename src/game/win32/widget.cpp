@@ -9371,6 +9371,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     uint8_t   *p = (uint8_t *)w;
     AM2_Rect   r;
     int32_t    i;
+    /* The game box's rules path. Function scope: the image's 0x1a4 frame
+     * gives it a slot of its own, where a block-scoped one shares. */
+    char       path[0x40];
     AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
     ReadMpMapList();
 
@@ -9730,7 +9733,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_GAME_BOX);
         void        *rows;
-        char         path[0x40];
         int32_t      sel = 0;
 
         rows = new AM2_Rec(0);

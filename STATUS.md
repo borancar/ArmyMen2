@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1540 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1541 of
   1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
@@ -215,6 +215,18 @@ main result so far (details in `src/vc6/README.md`):
     helper, a comma in the call, dword- or mixed-typed point arguments.
     FormationPoint/Far differ only in which frame slot two compiler
     temporaries take, and no spelling tried moves that either.
+  - **LoadShadowBmp matched** (2026-10-07), 1540 -> 1541.
+    - Fixed a real bug: the palette read is biClrUsed * 4 bytes, not
+      biHeight * 4. The old count overran the 0x400-byte table for any shadow
+      taller than 256 rows.
+    - The info header and colour table are one local object. As two, VC6
+      put the file header above the info header.
+    - The hot spot is read as words, through a union view of the header.
+    - The loops read the header's width and height. The row table is indexed
+      (VC6 strength-reduces it inside the loop guard). x = 0 comes before the
+      row-table store.
+    - MpPanelScreen 230 -> 175: the game box's 0x40 path is function-scope,
+      which makes the frame 0x1a4 as in the image.
   - **HudEdgePaint matched** (2026-10-07), 1539 -> 1540.
     - The ammo text buffer is three bytes, not four ("**" or two digits, and
       the terminator). As four bytes, VC6 placed it above x and y rather than
