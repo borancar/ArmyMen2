@@ -491,11 +491,11 @@ struct AM2_Edit : AM2_Widget {
     uint8_t     pad67;
     const char *charset;            /* 0x0068  EDIT_OFF_CHARSET */
     int32_t     caret;              /* 0x006C  EDIT_OFF_CARET */
-    int32_t     dot;                /* 0x0070  EDIT_OFF_DOT */
+    AM2_Widget *dot;                /* 0x0070  EDIT_OFF_DOT, a blinker restarted per key */
     void      (__cdecl *onEnter)(AM2_Widget *);   /* 0x0074  EDIT_OFF_ON_ENTER */
-    int32_t     arg78;              /* 0x0078  EDIT_OFF_ARG78 */
-    int32_t     arg7C;              /* 0x007C  EDIT_OFF_ARG7C */
-    AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
+    void      (__cdecl *onChange)(AM2_Widget *); /* 0x0078  EDIT_OFF_ARG78, after each key */
+    AM2_Widget *owner;              /* 0x007C  EDIT_OFF_ARG7C, the spin it belongs to */
+    AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), void (__cdecl *onChange)(AM2_Widget *), AM2_Widget *owner);
     explicit AM2_Edit(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Edit();
 };
@@ -2428,7 +2428,7 @@ static inline AM2_Widget * __attribute__((thiscall)) ButtonConstruct(AM2_Widget 
  * `~!@#$%^& in it -- and a caller that wants a narrower field overwrites
  * EDIT_OFF_CHARSET afterwards, which is exactly what ENTER BATTLE NAME does
  * with the letters-and-digits set at 0x00485308. */
-static inline AM2_Widget * __attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
+static inline AM2_Widget * __attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), void (__cdecl *a)(AM2_Widget *), AM2_Widget *b)
 { AM2_Rect box = { left, top, width, height };
   return ::new (w) AM2_Edit(buf, maxChars, box, font, inkFocus, ink, paper, onEnter, a, b); }
 

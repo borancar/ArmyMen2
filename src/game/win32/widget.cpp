@@ -859,7 +859,7 @@ typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
 static inline void EditReleaseFocus(AM2_Widget *w)
 {
     if (g_focusedEdit == w) {
-        g_focusedEdit = (AM2_Widget *)0;
+        g_focusedEdit = (AM2_Edit *)0;
         (*(am2_char_fn *)&g_charHandler) = (am2_char_fn)0;
     }
 }
@@ -882,10 +882,8 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 
 typedef void (__cdecl *AM2_ButtonFn)(AM2_Widget *w);
 
-static inline void ButtonFire(AM2_Widget *w, int32_t off)
+static inline void ButtonFire(AM2_Widget *w, AM2_ButtonFn fn)
 {
-    AM2_ButtonFn fn = *(AM2_ButtonFn *)((uint8_t *)w + off);
-
     if (fn)
         fn(w);
 }
@@ -1293,7 +1291,7 @@ void __attribute__((thiscall)) am2_dtor_AM2_ScrollBar(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
-AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Edit(void *mem, char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Edit(void *mem, char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), void (__cdecl *a)(AM2_Widget *), AM2_Widget *b)
 { return ::new (mem) AM2_Edit(buf, maxChars, box, font, inkFocus, ink, paper, onEnter, a, b); }
 void __attribute__((thiscall)) am2_dtor_AM2_Edit(AM2_Widget *w)
 { ((AM2_Edit *)w)->AM2_Edit::~AM2_Edit(); }
@@ -2344,14 +2342,12 @@ typedef int32_t (__cdecl *AM2_RemoveFn)(const char *);
  * because the callback is free to move the focus. */
 static inline void EditNotifyAndRepaint(void)
 {
-    AM2_Edit *edit = (AM2_Edit *)g_focusedEdit;
-    void      (__cdecl *onChange)(AM2_Widget *) =
-        *(void (__cdecl *const *)(AM2_Widget *))((uint8_t *)edit
-                                                 + EDIT_OFF_ARG78);
+    AM2_Edit *edit = g_focusedEdit;
+    void      (__cdecl *onChange)(AM2_Widget *) = edit->onChange;
 
     if (onChange)
         onChange(edit);
-    edit = (AM2_Edit *)g_focusedEdit;
+    edit = g_focusedEdit;
     WidgetVPaint(edit, edit->rect);
 }
 
@@ -2747,11 +2743,11 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *);
  * the edit at 0x7C -- which is read off the three bodies and not from the
  * constructor.
  */
-static inline void SpinApply(AM2_Widget *spin, AM2_Widget *edit, int32_t value)
+static inline void SpinApply(AM2_Widget *spin, AM2_Edit *edit, int32_t value)
 {
     void (__cdecl *fn)(AM2_Widget *);
 
-    orig_sprintf(*(char *const *)((uint8_t *)edit + EDIT_OFF_TEXT), "%i", value);
+    orig_sprintf(edit->text, "%i", value);
 
     fn = *(void (__cdecl **)(AM2_Widget *))((uint8_t *)spin + SPIN_OFF_HANDLER);
     if (fn)
@@ -10189,7 +10185,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 
     {
         AM2_Widget *box =
-            (AM2_Widget *const)panel->typeBox;
+            panel->typeBox;
 
         WidgetVPaint(box, box->rect);
     }
@@ -11344,7 +11340,7 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
     /* The focused field is read from its global at every use -- VC6 shares
      * the loads between calls and reloads after each, as the image does --
      * which also covers the blinker moving the focus. */
-#define FOCUS ((uint8_t *)g_focusedEdit)
+#define FOCUS (g_focusedEdit)
     (void)lo;
     (void)hi;
     if (!g_focusedEdit) {
@@ -11354,38 +11350,38 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 
     /* A field with a blinker beside it restarts it on every keystroke, and
      * plays wave 0 while it does. */
-    if (*(AM2_Widget **)(FOCUS + EDIT_OFF_DOT)) {
-        BlinkerStart(*(AM2_Widget **)(FOCUS + EDIT_OFF_DOT), 0x46, 1);
+    if (FOCUS->dot) {
+        BlinkerStart(FOCUS->dot, 0x46, 1);
         PlaySoundAt(0, 0, 0, 0, 0);
     }
 
-    len = (int32_t)strlen(*(const char *const *)(FOCUS + EDIT_OFF_TEXT));
+    len = (int32_t)strlen(FOCUS->text);
 
     if (ch >= 0x20 && ch < 0x80 && ch != '^'
-        && orig_strchr(*(const char *const *)(FOCUS + EDIT_OFF_CHARSET), (int)ch)) {
+        && orig_strchr(FOCUS->charset, (int)ch)) {
         /* The refusal beep is written three times; VC6 folds the copies
          * into one block, the image's -- this layout is what puts it where
          * the image has it. */
-        width = TextExtent(*(const char *const *)(FOCUS + EDIT_OFF_TEXT),
-                           *(const int32_t *)(FOCUS + EDIT_OFF_FONT), 0);
+        width = TextExtent(FOCUS->text,
+                           FOCUS->font, 0);
         if (width + EDIT_TEXT_MARGIN > g_focusedEdit->w) {
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
-        if (len >= *(const int32_t *)(FOCUS + EDIT_OFF_MAX) - 1) {
+        if (len >= FOCUS->maxChars - 1) {
         full:
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
-        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len]     = (char)ch;
-        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len + 1] = '\0';
+        FOCUS->text[len]     = (char)ch;
+        FOCUS->text[len + 1] = '\0';
         EditNotifyAndRepaint();
         return;
     }
 
     if (ch == 8) {
         if (len > 0) {
-            (*(char **)(FOCUS + EDIT_OFF_TEXT))[len - 1] = '\0';
+            FOCUS->text[len - 1] = '\0';
             EditNotifyAndRepaint();
             return;
         }
@@ -11394,7 +11390,7 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 
     if (ch == 0x0D) {
         void (__cdecl *onEnter)(AM2_Widget *) =
-            *(void (__cdecl *const *)(AM2_Widget *))(FOCUS + EDIT_OFF_ON_ENTER);
+            FOCUS->onEnter;
 
         if (onEnter)
             onEnter(g_focusedEdit);
@@ -14614,7 +14610,7 @@ AM2_ButtonBase::AM2_ButtonBase()
     AM2_CTOR_VTABLE(w, VTABLE_BUTTON_BASE);
     self->repeats = 0;
     self->deadline = 0;
-    *(int32_t *)((uint8_t *)self + BUTTON_BASE_OFF_C) = 0;
+    self->onRight = 0;
 }
 
 void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
@@ -14648,14 +14644,14 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
             if ((&g_mouseChanged)[0]) {
                 if ((&g_mouseButton)[0])
                     BUTTON_FINISH();
-                ButtonFire(w, BUTTON_OFF_ON_LEFT);
+                ButtonFire(w, w->activate);
                 w->hovered = 0;
                 BUTTON_FINISH();
             }
             if ((&g_mouseChanged)[1]) {
                 if ((&g_mouseButton)[1])
                     BUTTON_FINISH();
-                ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+                ButtonFire(w, self->onRight);
                 w->hovered = 0;
                 BUTTON_FINISH();
             }
@@ -14673,24 +14669,24 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
             if (orig_get_tick_count() <= BUTTON_DEADLINE(w))
                 goto update;
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
-            ButtonFire(w, BUTTON_OFF_ON_LEFT);
+            ButtonFire(w, w->activate);
             BUTTON_FINISH();
         }
         if ((&g_mouseChanged)[0]) {
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
-            ButtonFire(w, BUTTON_OFF_ON_LEFT);
+            ButtonFire(w, w->activate);
             BUTTON_FINISH();
         }
         if ((&g_mouseButton)[1]) {
             if ((&g_mouseChanged)[1]) {
                 BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
-                ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+                ButtonFire(w, self->onRight);
                 BUTTON_FINISH();
             }
             if (orig_get_tick_count() <= BUTTON_DEADLINE(w))
                 goto update;
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
-            ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+            ButtonFire(w, self->onRight);
             BUTTON_FINISH();
         }
 #undef BUTTON_FINISH
@@ -15053,7 +15049,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdateCancel()
  * EDIT_OFF_CHARSET afterwards. That is exactly what ENTER BATTLE NAME does
  * with the letters-and-digits set at 0x00485308, so the two sets are a
  * default and an override rather than two unrelated tables. */
-AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, uint8_t inkFocus_, uint8_t ink_, uint8_t paper_, void (__cdecl *onEnter_)(AM2_Widget *), int32_t a, int32_t b)
+AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, uint8_t inkFocus_, uint8_t ink_, uint8_t paper_, void (__cdecl *onEnter_)(AM2_Widget *), void (__cdecl *onChange_)(AM2_Widget *), AM2_Widget *owner_)
 {
     AM2_Widget *w = this;
 
@@ -15063,11 +15059,11 @@ AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, ui
     inkFocus = inkFocus_;
     ink      = ink_;
     paper    = paper_;
-    arg78    = a;
+    onChange = onChange_;
 
     AM2_CTOR_VTABLE(w, VTABLE_EDIT);
     onEnter = onEnter_;
-    arg7C   = b;
+    owner   = owner_;
     caret   = 0;
     charset = g_editCharsetDefault;
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
@@ -15097,7 +15093,7 @@ void __attribute__((thiscall)) AM2_Widget::EditTakeFocus(int32_t announce)
 {
     AM2_Widget *w = this;
 
-    g_focusedEdit = w;
+    g_focusedEdit = (AM2_Edit *)w;
     (*(am2_char_fn *)&g_charHandler) = EditCharHandler;
     ::WidgetTakeFocus(w, announce);
 }
@@ -15940,7 +15936,7 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
     l       = (AM2_ListBox *)list;
     top     = l->topRow;
     visible = l->visible;
-    count   = *(const int32_t *const)l->rows;
+    count   = l->rows->count;
 
     thumb = b->sprite0;
     b->shift =
@@ -16191,7 +16187,7 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
     kid = new AM2_Edit((char *)((uint8_t *)self + MPSPIN_OFF_TEXT), 5,
                        *RectSet(AM2_TEMP(AM2_Rect), w->x, w->y + 5, inner, box.bottom - 0x0A),
                        1, c0, c1, c2, (void (__cdecl *)(AM2_Widget *))0,
-                       (int32_t)(uintptr_t)SpinCommit, (int32_t)(uintptr_t)w);
+                       SpinCommit, w);
     self->edit = kid;
     ::WidgetAddChild(parent, kid);
 }
