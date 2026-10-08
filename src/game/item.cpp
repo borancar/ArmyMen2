@@ -10829,7 +10829,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
         int32_t     speed;
 
         if ((uint8_t)o->flags & OBJ_FLAG_SNAP_HEADING && row0 != (AM2_MapRow *)0) {
-            angle = (uint8_t)RoundTo8((int32_t)angle, anim->directionBits);
+            angle = (uint8_t)RoundTo8((int32_t)o->facing, anim->directionBits);
             /* Re-read the animation off the row, as the original does. */
             angle = (uint8_t)((uint32_t)angle
                               << (8u - row0->animPlaying->directionBits));
