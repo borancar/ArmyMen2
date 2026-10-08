@@ -629,7 +629,7 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
 void __cdecl FreeMapSurfaces(void)
 {
     ReleaseSprite(g_mapSprite);
-    *(AM2_Sprite * *)&g_mapSprite = NULL;
+    *&g_mapSprite = NULL;
 
     if (g_mapCache) {
         IDirectDrawSurface_Release(g_mapCache);

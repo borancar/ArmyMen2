@@ -749,7 +749,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         /* The caller's NAME, as the trooper arm passes it -- not the
          * directory scratch the weapon calls take. The image pushes the
          * seventh argument here (0x0043AE12). */
-        made = (AM2_Object *)CreateVehicle(
+        made = CreateVehicle(
                    KIND, (char *)name,
                    where.x,
                    where.y,
@@ -800,7 +800,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         if (KIND >= AM2_PILLBOX_KIND_FIRST && KIND <= AM2_PILLBOX_KIND_LAST)
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
-        made = (AM2_Object *)CreateItem((char *)name, slot, key,
+        made = CreateItem((char *)name, slot, key,
                                      where, flag,
                                      0, 0);
 
@@ -1094,7 +1094,7 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
-#define SET_CURSOR(x) (g_menuSpritesEnd = (AM2_Sprite *)(x))
+#define SET_CURSOR(x) (g_menuSpritesEnd = (x))
 
 /* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
  * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump

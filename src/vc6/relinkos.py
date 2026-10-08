@@ -111,9 +111,10 @@ def _aggregated(va):
 # the typed comm-message receivers settle it with none kept; the typed
 # outgoing message globals want the 0x004FC8C8 block; the typed start
 # message and spiral table want the 0x00511BC8 block instead; the typed
-# paint object wants both the 0x00511BC8 and the 0x004FC8C8 blocks.
+# paint object wants both the 0x00511BC8 and the 0x004FC8C8 blocks; with
+# the useless casts gone it is the 0x00511BC8 block alone.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00511BC8, 0x00511DA0), (0x004FC8C8, 0x004FC994))
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
 
 
 def _kept(va):

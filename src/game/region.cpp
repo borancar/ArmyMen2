@@ -3428,7 +3428,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
          * rather than the whole local -- the original's `mov word`. */
         pt.x = 0;
         NearestAllowedTile(ob, kLinks(fromRegion)[link].into,
-                           (AM2_Point *)&pt);
+                           &pt);
     }
 
 after_region:
@@ -6949,7 +6949,7 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
         && ctx.destDist < AM2_AI_REACHED_DIST) {
         int32_t     army = o->field5A4 - 1;
         uint32_t    from = 0;
-        AM2_Object *rec  = (AM2_Object *)LookupOwnerObj((uint32_t)army);
+        AM2_Object *rec  = LookupOwnerObj((uint32_t)army);
 
         if (rec)
             from = rec->uid;
@@ -10260,7 +10260,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
     if (ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)
         || ((&g_mouseButton)[AM2_MOUSE_MIDDLE] == 0
             && (&g_mouseChanged)[AM2_MOUSE_MIDDLE] != 0)) {
-        AM2_Object *unit = (AM2_Object *)LookupOwnerObj(
+        AM2_Object *unit = LookupOwnerObj(
             *(const int32_t *)&g_defaultOwner);
 
         if (unit != 0) {

@@ -1632,10 +1632,10 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
             GrowSpriteList();
 
         spr = (AM2_Sprite *)am2_malloc(0x40);
-        (*(AM2_Sprite ** *)&g_spriteList)[g_spriteListN] = spr;
+        (g_spriteList)[g_spriteListN] = spr;
         /* Re-read from the list rather than reusing the pointer, as the
          * original does -- twice, once for each of the next two uses. */
-        spr = (*(AM2_Sprite ** *)&g_spriteList)[g_spriteListN];
+        spr = (g_spriteList)[g_spriteListN];
         memset(spr, 0, 0x40);
 
         /* Each field has its own local, read in pairs and then stored. */
@@ -1789,7 +1789,7 @@ static inline AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
 {
     int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->directionBits) & 0xFF;
 
-    return (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing].sprite];
+    return (g_spriteList)[a->cells[(int32_t)a->frames * facing].sprite];
 }
 
 AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
@@ -1874,7 +1874,7 @@ void __cdecl BuildRoachMask(void)
     /* No early return for zero directions: the loop's own test is the only
      * one, as the image has it. */
     for (facing = 0; facing < a->directions; facing++) {
-        AM2_Sprite *spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing]
+        AM2_Sprite *spr = (g_spriteList)[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
         AM2_Point   found[AM2_MASK_POINTS];
         int32_t     count = 0;
@@ -1960,7 +1960,7 @@ void __cdecl BuildVehicleMask(int32_t kind)
         if (g_traceVeh)
             am2_log("vehicle mask direction: %d\n", dir);
 
-        spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * dir].sprite];
+        spr = (g_spriteList)[a->cells[(int32_t)a->frames * dir].sprite];
 
         count = 0;
         /* Block centres, as BuildRoachMask. */

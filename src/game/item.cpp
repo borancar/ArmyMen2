@@ -3663,7 +3663,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
         if (ObjIsTypeIn238(obj)) {
             if (!ObjIsType3(obj) || from->owner != obj->owner) {
                 if (!ObjsAreAllied(from, obj, 0)
-                    || (((AM2_Object *)LookupOwnerObj(g_defaultOwner))->riding
+                    || ((LookupOwnerObj(g_defaultOwner))->riding
                             == from->uid
                         && !from->field10C))
                     return 1;
@@ -4513,7 +4513,7 @@ void __cdecl FlameTick(void)
 
     g_flameNextMs = now + AM2_FLAME_PERIOD_MS;
 
-    leader = (AM2_Object *)LookupOwnerObj(
+    leader = LookupOwnerObj(
         g_defaultOwner);
 
     /* Dereferenced before the test below -- see the note above. */
@@ -5799,7 +5799,7 @@ void __cdecl DamageObject(AM2_Object *obj, int32_t amount, int32_t kind,
         return;
 
     {
-        AM2_Object *leader = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
+        AM2_Object *leader = LookupOwnerObj(g_defaultOwner);
 
         if (!(leader->flagsLo & OBJ_FLAG_DESTROYED))
             SelectUnit(leader);
@@ -6533,7 +6533,7 @@ void __cdecl Type2ActionC(AM2_Object *obj, int32_t prev)
         if (o->owner ==
                 (int32_t)g_defaultOwner
             && g_selectedCount == 0) {
-            AM2_Object *mine = (AM2_Object *)LookupOwnerObj(
+            AM2_Object *mine = LookupOwnerObj(
                 g_defaultOwner);
 
             if (!(mine->flagsLo
@@ -9175,7 +9175,7 @@ void __cdecl RemapInventoryUids(void)
     AM2_Object *obj;
 
 #define REMAP ((const uint32_t (*)[2])*(const uint32_t (**)[2])((uintptr_t)&g_uidRemap))
-    for (obj = (AM2_Object *)FirstItem(); obj; obj = (AM2_Object *)NextItem()) {
+    for (obj = FirstItem(); obj; obj = NextItem()) {
         int32_t slot;
 
         if (!(obj->flags & OBJ_FLAG_NEEDS_REMAP))
@@ -10512,7 +10512,7 @@ int32_t __cdecl WeaponFrameReady(AM2_Object *obj, AM2_Object *weapon)
 void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
                              AM2_Point at)
 {
-    AM2_Object *o = (AM2_Object *)ObjByUidAlias(uid);
+    AM2_Object *o = ObjByUidAlias(uid);
     int32_t  slot;
 
     (void)army;
@@ -11262,7 +11262,7 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
 
     (void)unusedPoint;
 
-    local = (AM2_Object *)LookupOwnerObj(
+    local = LookupOwnerObj(
                 g_defaultOwner);
     mode   = 1;
     aiMode = 8;
@@ -12213,7 +12213,7 @@ struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2
             pt.y += rec->dy;
 
             if (!parent) {
-                parent = (AM2_Object *)CreateItem(name, army, rec->child, pt,
+                parent = CreateItem(name, army, rec->child, pt,
                                                orFlags, remote, uid);
                 if (parent && (rec->c & 1))
                     parent->flags |= OBJ_FLAG_NO_FRAME;
@@ -12227,7 +12227,7 @@ struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2
                 else
                     child[0] = '\0';
 
-                made = (AM2_Object *)CreateItem(child, army, rec->child, pt,
+                made = CreateItem(child, army, rec->child, pt,
                                              orFlags, remote, 0);
                 if (made) {
                     made->followers.capacity =
@@ -12451,7 +12451,7 @@ have:
         return;
 
     if (ObjIsWatchedKind((const AM2_Object *)obj)) {
-        AM2_Object *owner = (AM2_Object *)LookupOwnerObj(
+        AM2_Object *owner = LookupOwnerObj(
             (uint32_t)o->owner);
         uint32_t who = owner ? (owner)->uid
                              : ((const AM2_Object *)o)->uid;
@@ -13594,10 +13594,10 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
                     u->pos.x,
                     u->pos.y);
 
-        ((AM2_Point *)&from)->x = (int16_t)AM2_FTOL(
+        (&from)->x = (int16_t)AM2_FTOL(
             Cos8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + u->pos.x);
-        ((AM2_Point *)&from)->y = (int16_t)AM2_FTOL(
+        (&from)->y = (int16_t)AM2_FTOL(
             Sin8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + u->pos.y);
 

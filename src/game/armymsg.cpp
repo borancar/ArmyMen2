@@ -1428,7 +1428,7 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
             return;
     }
 
-    t = (AM2_Object *)ObjByUidAlias(
+    t = ObjByUidAlias(
         UidOnWire(m->hdr.uid));
     if (!t)
         return;

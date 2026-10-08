@@ -3171,7 +3171,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 
         for (seq = (int32_t)flow->heHas + 1;
              seq <= (int32_t)mine->sequence - 1; seq++) {
-            AM2_MsgNode *node = (AM2_MsgNode *)MsgListSetFlag(
+            AM2_MsgNode *node = MsgListSetFlag(
                 g_msgListSendq, seq, 0, mask);
 
             if (!node)

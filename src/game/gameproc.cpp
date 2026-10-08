@@ -539,7 +539,7 @@ int32_t __cdecl LoadDefaultCof(void)
     green = 0;
     orig_fread(&tag, 4, 1, fp);
     while (tag == AM2_SAVE_RECORD_MARK) {
-        AM2_Object *obj = (AM2_Object *)LoadOneItem(fp, 1);
+        AM2_Object *obj = LoadOneItem(fp, 1);
 
         if (obj) {
             int16_t max = obj->maxHealth;
@@ -1118,7 +1118,7 @@ int32_t __cdecl PlaceScenario(void)
         int32_t  i      = 0;
         int32_t  formed = 0;
 
-        lead = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
+        lead = LookupOwnerObj(g_defaultOwner);
 
         if (!lead)
             goto done;
@@ -1887,7 +1887,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
-    o = (AM2_Object *)CreateVehicle(obj.vehicleKind,
+    o = CreateVehicle(obj.vehicleKind,
                                  g_dirScratch,
                                  h->pos.x,
                                  h->pos.y,
@@ -2017,7 +2017,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
     orig_fread(whole.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&tag, 4, 1, fp);
 
-    obj = (AM2_Object *)CreateItem(
+    obj = CreateItem(
         g_dirScratch, AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         hdr->pos,

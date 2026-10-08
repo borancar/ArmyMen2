@@ -838,7 +838,7 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
     AM2_Object *o;
 
-    for (o = (AM2_Object *)FirstItem(); o; o = (AM2_Object *)NextItem()) {
+    for (o = FirstItem(); o; o = NextItem()) {
         /* Types 2, 3 and 8 only; not one that is already revealed; and
          * ApproxDist -- a diamond, not a circle -- within the radius. */
         if (!ObjIsTypeIn238(o))
@@ -934,13 +934,13 @@ void __cdecl FreeSpriteList(void)
 {
     int32_t i;
 
-    if ((*(AM2_Sprite ** *)&g_spriteList)) {
+    if (g_spriteList) {
         /* The count is re-read every iteration, not held. */
         for (i = 0; i < g_spriteListN; i++)
-            ReleaseSprite((*(AM2_Sprite ** *)&g_spriteList)[i]);
+            ReleaseSprite(g_spriteList[i]);
 
-        am2_free((*(AM2_Sprite ** *)&g_spriteList));
-        (*(AM2_Sprite ** *)&g_spriteList)    = (AM2_Sprite **)0;
+        am2_free(g_spriteList);
+        g_spriteList    = (AM2_Sprite **)0;
         g_spriteListN   = 0;
         g_spriteListCap = 0;
     } else {
@@ -955,7 +955,7 @@ void __cdecl GrowSpriteList(void)
     /* A hundred more, and the COUNT is not consulted -- this is "make room",
      * not "grow if full". The realloc is not checked. */
     g_spriteListCap += AM2_SPRITE_LIST_GROW;
-    (*(AM2_Sprite ** *)&g_spriteList) = (AM2_Sprite **)am2_realloc((*(AM2_Sprite ** *)&g_spriteList),
+    g_spriteList = (AM2_Sprite **)am2_realloc(g_spriteList,
                                               (size_t)g_spriteListCap * 4u);
 }
 

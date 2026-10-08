@@ -73,7 +73,7 @@ extern "C" const char *const am2_cheat_words[41] = {
  * which it looks up per object rather than once, as the image does. */
 static void __cdecl CheatHealOne(AM2_Object *obj)
 {
-    HealObject(obj, 0x64, (AM2_Object *)LookupOwnerObj(g_defaultOwner));
+    HealObject(obj, 0x64, LookupOwnerObj(g_defaultOwner));
 }
 
 /* The nineteen item cheats differ in exactly two values.  0x0041827C is not a
@@ -133,7 +133,7 @@ void __cdecl CheatLine(const char *line)
     if (g_cheatEnabled == 0)
         return;
 
-    u = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
+    u = LookupOwnerObj(g_defaultOwner);
     if (u == 0)
         return;
 
