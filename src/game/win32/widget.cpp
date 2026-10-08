@@ -5569,7 +5569,7 @@ AM2_HudSarge::AM2_HudSarge()
 
     for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
         self->sprites[i] =
-            (AM2_Sprite *)PreloadArmySprite(AM2_HUD_SARGE_SPRITE_SET, i, 0, 0);
+            PreloadArmySprite(AM2_HUD_SARGE_SPRITE_SET, i, 0, 0);
 
     for (i = 0; i < AM2_HUD_SARGE_SLOT_COUNT; i++)
         self->slots[i].index = -1;
@@ -6819,7 +6819,7 @@ AM2_HudCmd::AM2_HudCmd()
                               / AM2_HUD_CMD_SPR_STRIDE); i++) {
         AM2_CmdRec *rec = &g_hudCmdSpec[i];
 
-        rec->sprite = (AM2_Sprite *)PreloadArmySprite(
+        rec->sprite = PreloadArmySprite(
             rec->set,
             rec->index,
             rec->frame, 0);
@@ -7154,7 +7154,7 @@ AM2_HudTop::AM2_HudTop()
         buttonX = 0x10;
     }
 
-    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 1, frame, 0);
+    spr = PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 1, frame, 0);
     sprite0 = spr;
     if (!spr)
         return;
@@ -7185,12 +7185,12 @@ AM2_HudTop::AM2_HudTop()
     typed[0] = 0;
     count = 0;
 
-    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 1, 1);
+    spr = PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 1, 1);
     spriteDown = spr;
     if (!spr)
         return;
 
-    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 2, 1);
+    spr = PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 2, 1);
     spriteHot = spr;
     if (!spr)
         return;
@@ -7790,9 +7790,9 @@ AM2_CountButton::AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int3
     AM2_CTOR_VTABLE(w, VTABLE_COUNT_BUTTON);
 
     self->spr =
-        (AM2_Sprite *)PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, army, 0);
+        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, army, 0);
     self->sprOff =
-        (AM2_Sprite *)PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, AM2_COUNT_FRAME_OFF, 0);
+        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, AM2_COUNT_FRAME_OFF, 0);
 
     w->sprite = self->spr;
     self->lit = 0;
@@ -8033,9 +8033,9 @@ AM2_HudPanel::AM2_HudPanel()
 
     /* The net-game flag is re-read at each use, as the original does. */
     if (g_netGame == 0)
-        spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 0, 1);
+        spr = PreloadArmySprite(0x0B, 0, 0, 1);
     else
-        spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 1, 1);
+        spr = PreloadArmySprite(0x0B, 0, 1, 1);
     self->sprite0 = spr;
     if (!spr)
         return;
@@ -8324,7 +8324,7 @@ AM2_HudEdge::AM2_HudEdge()
     AM2_Sprite *spr;
     AM2_CTOR_VTABLE(w, VTABLE_HUD_EDGE_STRIP);
 
-    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0, 0, 1);
+    spr = PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0, 0, 1);
     self->sprite0 = spr;
     if (!spr)
         return;
@@ -8336,9 +8336,9 @@ AM2_HudEdge::AM2_HudEdge()
     w->h = spr->bounds.bottom;
 
     self->sprite =
-        (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0B, 0, 1);
+        PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0B, 0, 1);
     self->ammoSprite =
-        (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0A, 0, 1);
+        PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0A, 0, 1);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeDelete(int32_t flags)

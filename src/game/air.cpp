@@ -1809,13 +1809,13 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
         AM2_Object *trooper;
         AM2_Object *weapon;
 
-        trooper = (AM2_Object *)CreateTrooper(g_dirScratch,
+        trooper = CreateTrooper(g_dirScratch,
                                 at.x + OFF[i * 2],
                                 at.y + OFF[i * 2 + 1],
                                 AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
-        weapon = (AM2_Object *)CreateWeapon(g_dirScratch, army,
+        weapon = CreateWeapon(g_dirScratch, army,
                               KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
                               g_zeroXY,
                               4, -1, 0, 0);

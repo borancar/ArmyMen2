@@ -153,7 +153,7 @@ void __cdecl FreeAirSpritesAlias(void);
 /* Original: 0x00408E00. Reload the air-support sprites and put the queue back
  * to empty -- the level-load reset for the whole subsystem. */
 void __cdecl ResetAirSupport(void);
-void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
+struct AM2_Sprite *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
                                 int32_t flags);
 
 /* Original: 0x00445990. A sprite id to its SLOT in the sprite table, or -1.

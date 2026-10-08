@@ -2140,11 +2140,11 @@ int32_t __cdecl ArmySpriteBase(void)
  * and the fallback all need a player who is not army 0 -- which means a
  * multiplayer session, and no drive here has one. Said plainly rather than
  * left to read as seventy calls of coverage. */
-void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
+AM2_Sprite *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
                                 int32_t flags)
 {
     int32_t base = ArmySpriteBase();
-    void   *spr;
+    AM2_Sprite *spr;
 
     spr = PreloadSprite(set, index + base, frame, flags, 1);
     if (spr || base <= 0)

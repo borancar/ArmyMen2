@@ -100,7 +100,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * write happens before or after the swap.  Written out in each arm, as the
  * image has them; the no-old-weapon exit is one block both arms reach. */
 #define CHEAT_NEW_WEAPON(kind)                                               \
-    ((AM2_Object *)CreateWeapon(g_dirScratch, 0,   \
+    (CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
                  g_zeroXY, 4, -1, 0, 0))
 

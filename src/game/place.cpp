@@ -713,14 +713,14 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
     *points -= rec->cost;
 
     if (rec->trooper) {
-        made = (AM2_Object *)CreateTrooper(
+        made = CreateTrooper(
                    (char *)name, where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
         ObjSetFieldA(made, (uint32_t)group);
 
-        weapon = (AM2_Object *)CreateWeapon(
+        weapon = CreateWeapon(
                      g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)KIND, 0),
                      g_zeroXY,
@@ -831,7 +831,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 wkind = (KIND == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
                                     : AM2_PILLBOX_WEAPON_MG;
 
-            occupant = (AM2_Object *)CreateTrooper(
+            occupant = CreateTrooper(
                            g_dirScratch,
                            where.x,
                            where.y,
@@ -839,7 +839,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                            0, 0, 0, 1, facing);
             ObjSetFieldA(occupant, (uint32_t)group);
 
-            weapon = (AM2_Object *)CreateWeapon(
+            weapon = CreateWeapon(
                          g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),

@@ -1996,7 +1996,7 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * load that flag is set, and LoadType8 clears OBJ_FLAG_FOOTPRINT_ON on the
  * way out instead so a later pass puts it down -- the two halves of one
  * decision, in two functions. */
-void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
+AM2_Object *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7, int32_t uid)
 {
     AM2_Object  *o    = (AM2_Object *)am2_malloc(AM2_ROACH_BYTES);
@@ -3943,24 +3943,24 @@ uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint)
  *
  * Uid 0 is refused before the lookup and the test is UNSIGNED, so a uid with
  * the top bit set still reaches LookupByUID. */
-void *__cdecl UnitByUid(uint32_t uid)
+AM2_Object *__cdecl UnitByUid(uint32_t uid)
 {
-    const int32_t *o;
+    AM2_Object *o;
 
     if (uid <= 0)   /* uid is unsigned; `<= 0` is `== 0`, and the original's
                      * `test; jbe` is how MSVC 6 spelled the unsigned guard */
-        return (void *)0;
+        return (AM2_Object *)0;
 
-    o = (const int32_t *)LookupByUID(uid);
+    o = LookupByUID(uid);
     if (!o)
-        return (void *)0;
+        return (AM2_Object *)0;
 
-    if (*o < 2)
-        return (void *)0;
-    if (*o <= 3 || *o == 8)
-        return (void *)o;
+    if ((int32_t)o->type < 2)
+        return (AM2_Object *)0;
+    if ((int32_t)o->type <= 3 || (int32_t)o->type == 8)
+        return o;
 
-    return (void *)0;
+    return (AM2_Object *)0;
 }
 
 int32_t __cdecl ObjHeight(const AM2_Object *obj)
@@ -4440,13 +4440,13 @@ void __cdecl PortalSpawn(void)
 
         orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
 
-        trooper = (AM2_Object *)orig_create_trooper(
+        trooper = orig_create_trooper(
                       (char *)"a",
                       x, y, 1, 1, 0, 0, 0, 1, 0);
         if (!trooper)
             continue;
 
-        weapon = (AM2_Object *)orig_create_weapon(
+        weapon = orig_create_weapon(
                      g_dirScratch, 1,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[orig_game_rand() % 4],
@@ -6916,7 +6916,7 @@ void __cdecl Type2ActionA(AM2_Object *obj)
     if (old)
         old->flags |= OBJ_FLAG_REPLACED;
 
-    made = (AM2_Object *)CreateWeapon(g_dirScratch,
+    made = CreateWeapon(g_dirScratch,
                             (int32_t)o->owner,
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),
@@ -7576,7 +7576,7 @@ void __cdecl RankPromote(AM2_Object *obj)
     if (old)
         old->flags |= OBJ_FLAG_REPLACED;
 
-    made = (AM2_Object *)CreateWeapon(
+    made = CreateWeapon(
         g_dirScratch,
         o->owner,
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
@@ -11786,7 +11786,7 @@ void __cdecl StepType6(AM2_Object *obj)
  * A NAME IS TAKEN ONLY IF NONE WAS GIVEN -- a null pointer or an empty string
  * both reach TakeSoldierName, which is the "is this string set" idiom this
  * project has met before. */
-void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
+AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                             int32_t army, int32_t flags, int32_t remote,
                             uint32_t uid, int32_t settle, uint8_t facing)
 {
@@ -11798,7 +11798,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
 
     if (g_mpSession && !remote
         && !AM2_THE_COMM->CommMustBroadcast(army))
-        return (void *)0;
+        return (AM2_Object *)0;
 
     o = (AM2_Object *)am2_malloc(AM2_TROOPER_BYTES);
     memset(o, 0, AM2_TROOPER_BYTES);
@@ -12067,7 +12067,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
     if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)army)) {
-        AM2_Object *w = (AM2_Object *)CreateWeapon(g_dirScratch, army,
+        AM2_Object *w = CreateWeapon(g_dirScratch, army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                                (uint32_t)weaponKind, 0),
                                g_zeroXY,
@@ -14096,7 +14096,7 @@ void __cdecl CreateWatchedType(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
  * The malloc's argument is cleaned by InitObjFromAai's `add esp, 0x24`, which
  * is why that cleanup counts nine dwords against eight pushes -- the shared
  * cleanup shape, once more. */
-void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
+AM2_Object *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                            AM2_Point at, int32_t flags, int32_t quantity,
                            int32_t remote, int32_t uid)
 {
@@ -14112,7 +14112,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     if (g_mpSession != 0 && remote == 0
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
-        return (void *)0;
+        return (AM2_Object *)0;
 
     o = (AM2_Object *)am2_malloc(AM2_WEAPON_BYTES);
     memset(o, 0, 0x35u * 4u);
@@ -14121,7 +14121,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
         if (g_commObject->verbose)
             am2_log("CreateWeapon\n");
         am2_free(o);
-        return (void *)0;
+        return (AM2_Object *)0;
     }
 
     *(int32_t *)o = 4;

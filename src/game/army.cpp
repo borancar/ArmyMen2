@@ -170,7 +170,7 @@ void __cdecl SetLeadsAndAct(AM2_Object *obj)
     Type238Action((AM2_Object *)obj, AM2_LEADS_ACTION_ARG);
 }
 
-void *__cdecl ListFirstObj(const AM2_Object *obj)
+AM2_Object *__cdecl ListFirstObj(const AM2_Object *obj)
 {
     const AM2_Object *o = obj;
 

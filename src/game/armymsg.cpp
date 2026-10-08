@@ -1184,7 +1184,7 @@ void __cdecl RecvItemCreate(const AM2_ArmyMsgHdr *msg)
 
     switch (m->type) {
     case 2:
-        made = (AM2_Object *)orig_create_trooper(
+        made = orig_create_trooper(
                    (char *)(uintptr_t)name,
                    (int32_t)m->pos.x,
                    (int32_t)m->pos.y,

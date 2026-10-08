@@ -134,7 +134,7 @@ void __cdecl SetLeadsAndAct(struct AM2_Object *obj);
  * Null for a null argument or an empty list, and the empty case answers 0
  * rather than falling through -- the count at +0x53C is tested against 1
  * before the pointer at +0x540 is touched. */
-void *__cdecl ListFirstObj(const struct AM2_Object *obj);
+struct AM2_Object *__cdecl ListFirstObj(const struct AM2_Object *obj);
 uint32_t __cdecl ListFirstField548(const struct AM2_Object *obj);
 
 /* 0x0045AE30, one caller, and it names itself twice: "ExitAllFromVehicle: I

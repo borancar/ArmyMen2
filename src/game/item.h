@@ -384,7 +384,7 @@ void __cdecl ObjSetRoachFootprint(struct AM2_Object *obj);
  * NOTE the second argument is an ARMY -- AM2_ARMY_NEUTRAL where callers pass
  * 4 -- not the object type, which is what CommMustBroadcast's parameter
  * establishes and what a literal 4 in a type-4 constructor invites. */
-void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
+struct AM2_Object *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                            AM2_Point at, int32_t flags, int32_t quantity,
                            int32_t remote, int32_t uid);
 
@@ -405,11 +405,11 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
 /* 0x00447620, and formerly deferred. Make a type-2 TROOPER. Answers null when
  * a network session refuses a local creation for an army this machine must not
  * broadcast for; `settle` routes the point through NearestClearPoint. */
-void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
+struct AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                             int32_t army, int32_t flags, int32_t remote,
                             uint32_t uid, int32_t settle, uint8_t facing);
 
-void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
+struct AM2_Object *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,
                           int32_t uid);
 
@@ -574,7 +574,7 @@ void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
                         uint8_t facing, int32_t e, int32_t f);
 
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
-void *__cdecl UnitByUid(uint32_t uid);
+struct AM2_Object *__cdecl UnitByUid(uint32_t uid);
 
 /* 0x004355D0, one caller. A second deadline on the mission clock, at +0x58:
  * once the clock is PAST it, bit 1 of the object's flags goes on. Unsigned
