@@ -275,9 +275,10 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
             return 0;
 
         target->u.name = name;
+        AM2_ScriptName *tab = kScriptNames;
+        uint32_t uid = (uint32_t)(uintptr_t)tab[name].value;
 
-        AM2_Object *obj = LookupByUID(
-            (uint32_t)(uintptr_t)kScriptNames[name].value);
+        AM2_Object *obj = LookupByUID(uid);
 
         if (!obj || !ObjIsItem(obj)) {
             am2_log("Token %s is not a valid object.\n",
