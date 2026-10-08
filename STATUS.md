@@ -66,9 +66,12 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1555 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1556 of
   1645 byte-identical (2026-10-08), piecewise 399.** RemapSpriteRuns,
-  ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION: where one local is a plain copy
+  ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
+  StepType5 to a struct local: a point built in an AM2_Point and stored a
+  field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit
+  move): where one local is a plain copy
   of another (`cols = width`, `x = at.x`), a use that names the other one
   changes which value stays live, and that decides the register tie. The
   run loop closes on `width`, not `cols`; three hit-box edges add `at.x`
