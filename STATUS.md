@@ -72,7 +72,10 @@ main result so far (details in `src/vc6/README.md`):
   from holding a call result in a typed local and from spelling a stored
   value differently from the one compared next, which stops VC6 threading the
   compare. A greedy mutation climber (operand swaps, relational flips, hoisted
-  call results) over 30 of the remaining 93 moved none of them. The CheatLine /
+  call results) over 30 of the remaining 93 moved none of them.
+  EvtCondition's two-byte miss (base/index order in one address) was taken to
+  the IL: c2 compiles operand-swapped IL to identical code, so that order is
+  decided inside the code generator and no source spelling reaches it. The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
   externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
