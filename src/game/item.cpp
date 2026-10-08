@@ -3654,6 +3654,10 @@ void __cdecl ApplyShotDamage(AM2_Object *target, AM2_Object *shot, AM2_Point unu
  */
 int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
 {
+    /* The leader is held in a local: read inline, VC6 swaps `from` and `obj`
+     * between esi and edi. */
+    AM2_Object *leader;
+
     /* Every "no" falls to the one return at the end, as the image has it. */
     if (abs(from->heightSet - obj->heightSet) <= AM2_BLOCK_HEIGHT_STEP) {
         if ((obj->flags & OBJ_FLAG_BIT24)
@@ -3663,13 +3667,13 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
         if (ObjIsTypeIn238(obj)) {
             if (!ObjIsType3(obj) || from->owner != obj->owner) {
                 if (!ObjsAreAllied(from, obj, 0)
-                    || ((LookupOwnerObj(g_defaultOwner))->riding
+                    || ((leader = LookupOwnerObj(g_defaultOwner))->riding
                             == from->uid
                         && !from->field10C))
                     return 1;
             }
         } else if (ObjIsWatchedKind(obj)) {
-            if (obj->owner != from->owner
+            if (from->owner != obj->owner
                 || g_gameClockMs - obj->deadline58 > AM2_COLLIDE_OWN_DELAY)
                 return 1;
         }
