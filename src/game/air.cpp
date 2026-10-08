@@ -1600,7 +1600,6 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
 {
     const AM2_Object *v = viewer;
     const AM2_Object *b = blocker;
-    const AM2_RankRec *rank;
     uint8_t        heading;
     int32_t        hv;
     int32_t        hb;
@@ -1677,8 +1676,8 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
     }
 
     {
-        int32_t dx0 = (int16_t)(close.x - vx);
-        int32_t dy0 = (int16_t)(close.y - vy);
+        int16_t dx0 = (int16_t)(close.x - vx);
+        int16_t dy0 = (int16_t)(close.y - vy);
         int32_t d0  = ApproxDistXY(dx0, dy0);
         int32_t dx1, dy1, d1;
 
@@ -1698,13 +1697,11 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
         dist += AM2_SIGHT_DIST_PAD;
     }
 
-    rank = &g_rankRecords[v->rank];
-
     if ((int32_t)(int16_t)dist
-        > rank->sight_range)
+        > g_rankRecords[v->rank].sight_range)
         return;
 
-    arc = *(const uint8_t *)&rank->field_04;
+    arc = *(const uint8_t *)&g_rankRecords[v->rank].field_04;
 
     if (AbsAngle(heading, a0) < arc) {
         if (AbsAngle(heading, a1) > arc)
