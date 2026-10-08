@@ -1194,7 +1194,7 @@ int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b)
     if (trace < 0)
         trace = getenv("AM2_TRACE_DEPTH") != 0;
     if (trace && a && b && AM2_TRACE_ON()) {
-        const AM2_MapRow *pa = (const AM2_MapRow *)a, *pb = (const AM2_MapRow *)(const uint8_t *)b;
+        const AM2_MapRow *pa = (const AM2_MapRow *)a, *pb = (const AM2_MapRow *)b;
         fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
                 pa->depthLayer, (double)pa->depthSlope,

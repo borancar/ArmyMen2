@@ -100,7 +100,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * write happens before or after the swap.  Written out in each arm, as the
  * image has them; the no-old-weapon exit is one block both arms reach. */
 #define CHEAT_NEW_WEAPON(kind)                                               \
-    ((AM2_Object *)(uint8_t *)CreateWeapon(g_dirScratch, 0,   \
+    ((AM2_Object *)CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
                  g_zeroXY, 4, -1, 0, 0))
 
@@ -133,7 +133,7 @@ void __cdecl CheatLine(const char *line)
     if (g_cheatEnabled == 0)
         return;
 
-    u = (AM2_Object *)(uint8_t *)LookupOwnerObj(g_defaultOwner);
+    u = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
     if (u == 0)
         return;
 

@@ -1048,7 +1048,7 @@ int32_t __cdecl PlaceScenario(void)
              * bootcamp came back with 1,609 of 1,610 object lines identical
              * and Sarge's UID reading 1 instead of 0x3E8. The state dump is
              * the only artifact that could see it. */
-            unit = (AM2_Object *)(uint8_t *)CreateTrooper(
+            unit = (AM2_Object *)CreateTrooper(
                        row->name,
                        row->pos.x,
                        row->pos.y,
@@ -1118,7 +1118,7 @@ int32_t __cdecl PlaceScenario(void)
         int32_t  i      = 0;
         int32_t  formed = 0;
 
-        lead = (AM2_Object *)(uint8_t *)LookupOwnerObj(g_defaultOwner);
+        lead = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
 
         if (!lead)
             goto done;
@@ -1317,7 +1317,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
     if (!weapon)
         return (void *)0;
 
-    o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
+    o = (AM2_Object *)am2_malloc(AM2_MISSILE_BYTES);
     memset(o, 0, AM2_MISSILE_BYTES);
 
     o->def = w->typeRec;
@@ -1557,7 +1557,7 @@ AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
 
     orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
 
-    o = (AM2_Object *)(uint8_t *)CreateRoach(
+    o = (AM2_Object *)CreateRoach(
             obj.kind,
             g_dirScratch,
             h->pos.x,
@@ -1677,7 +1677,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     orig_fread(&weaponCode, 4, 1, fp);
 
     if (renumber) {
-        o = (AM2_Object *)(uint8_t *)CreateTrooper(
+        o = (AM2_Object *)CreateTrooper(
                 g_dirScratch,
                 h->pos.x,
                 h->pos.y,
@@ -1694,7 +1694,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
         obj.uid56C        = 0;
         obj.riding        = 0;
     } else {
-        o = (AM2_Object *)(uint8_t *)CreateTrooper(
+        o = (AM2_Object *)CreateTrooper(
                 g_dirScratch,
                 h->pos.x,
                 h->pos.y,
@@ -1887,7 +1887,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
 
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
-    o = (AM2_Object *)(uint8_t *)CreateVehicle(obj.vehicleKind,
+    o = (AM2_Object *)CreateVehicle(obj.vehicleKind,
                                  g_dirScratch,
                                  h->pos.x,
                                  h->pos.y,
@@ -2017,7 +2017,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
     orig_fread(whole.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&tag, 4, 1, fp);
 
-    obj = (AM2_Object *)(uint8_t *)CreateItem(
+    obj = (AM2_Object *)CreateItem(
         g_dirScratch, AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         hdr->pos,
@@ -2245,7 +2245,7 @@ AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
 
     orig_fread(&obj.rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
 
-    made = (AM2_Object *)(uint8_t *)orig_spawn_at(
+    made = (AM2_Object *)orig_spawn_at(
                h->pos.x,
                h->pos.y,
                obj.rec.kind,
@@ -3143,7 +3143,7 @@ AM2_Object *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
                                 (int32_t)KeyFieldB(spriteKey), 0);
 
     if (renumber) {
-        w = (AM2_Object *)(uint8_t *)CreateWeapon(
+        w = (AM2_Object *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
                 h->pos,
                 (int32_t)h->flags,
@@ -3152,7 +3152,7 @@ AM2_Object *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
                     w->uid);
         h->uid = w->uid;
     } else {
-        w = (AM2_Object *)(uint8_t *)CreateWeapon(
+        w = (AM2_Object *)CreateWeapon(
                 g_dirScratch, AM2_ARMY_NEUTRAL, aai,
                 h->pos,
                 (int32_t)h->flags,

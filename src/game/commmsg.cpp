@@ -1145,7 +1145,7 @@ void __cdecl RecvTrooperFire(const AM2_ArmyMsgHdr *msg)
     AM2_Object *unit;
     AM2_Object *weapon;
 
-    unit = (AM2_Object *)(uint8_t *)ObjByUidAlias(troopUid);
+    unit = (AM2_Object *)ObjByUidAlias(troopUid);
     if (!unit)
         return;
 
@@ -1243,7 +1243,7 @@ void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
                 m->slot,
                 m->quant);
 
-    trooper = (AM2_Object *)(uint8_t *)ObjByUidAlias(
+    trooper = (AM2_Object *)ObjByUidAlias(
         UidOnWire(m->hdr.uid));
     if (!trooper)
         return;
@@ -1379,7 +1379,7 @@ void __cdecl RecvTrooperSetWeapon(const AM2_ArmyMsgHdr *msg)
     orig_log("Received TrooperSetWeapon message: linking trooper %08x to weapon %08x\n",
              trooperUid, weaponUid);
 
-    trooper = (AM2_Object *)(uint8_t *)ObjByUidAlias(trooperUid);
+    trooper = (AM2_Object *)ObjByUidAlias(trooperUid);
     if (!trooper) {
         orig_log("Received TrooperSetWeapon message: trooper %08x not found\n",
                  trooperUid);
@@ -2306,7 +2306,7 @@ const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army)
     head |= (uint32_t)*p++ << 8;
     head |= (uint32_t)*p++;
 
-    obj = (AM2_Object *)(uint8_t *)ObjByUidAlias((head & AM2_TROOPSUB_UID_MASK)
+    obj = (AM2_Object *)ObjByUidAlias((head & AM2_TROOPSUB_UID_MASK)
                                    | ((uint32_t)army
                                       << AM2_TROOPSUB_ARMY_SHIFT));
 
@@ -3404,7 +3404,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
     head |= (uint32_t)*at++ << 8;
     head |= (uint32_t)*at++;
 
-    o = (AM2_Object *)(uint8_t *)ObjByUidAlias((head & 0x1FFFFFFFu)
+    o = (AM2_Object *)ObjByUidAlias((head & 0x1FFFFFFFu)
                                  | ((uint32_t)army << 29));
     ObjClearFootprint(o);
 
@@ -3527,7 +3527,7 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
             return;
     }
 
-    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(m->hdr.uid));
+    vehicle = (AM2_Object *)ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 
@@ -3630,7 +3630,7 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
                 m->slot,
                 m->quant);
 
-    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(m->hdr.uid));
+    vehicle = (AM2_Object *)ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 

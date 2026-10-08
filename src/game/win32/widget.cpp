@@ -4374,7 +4374,7 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
 
     o = ObjectsHitByPoint(&hit,
                                      g_objMapDesc);
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext))
+    for (; o; o = o->queryNext)
         DamageObject(o, g_aimDamage, 1,
                      uid, 0, 0);
 }
@@ -4699,7 +4699,7 @@ void __cdecl PlacementScreenClick(AM2_Point at)
         if (!g_mouseChanged)
             return;
 
-        RefundPlacedUnit((AM2_Object *)(uint8_t *)obj,
+        RefundPlacedUnit((AM2_Object *)obj,
                          (int32_t)g_defaultOwner,
                          &g_ourPoints);
 
@@ -5464,7 +5464,7 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 #define phase ((int32_t)((g_gameClockMs \
                           >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES))
 
-    for (obj = (AM2_Object *)(uint8_t *)FirstItem(); obj; obj = (AM2_Object *)(uint8_t *)NextItem()) {
+    for (obj = (AM2_Object *)FirstItem(); obj; obj = (AM2_Object *)NextItem()) {
         const AM2_Object *o = obj;
         uint32_t          flags;
         int32_t           x;
@@ -5751,7 +5751,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
 
     ::WidgetUpdate(w);
 
-    obj = (AM2_Object *)(uint8_t *)LookupOwnerObj(g_defaultOwner);
+    obj = (AM2_Object *)LookupOwnerObj(g_defaultOwner);
     if (!obj)
         return;
 
@@ -6300,7 +6300,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         } else if (ObjIsType3(obj)) {
             int32_t k;
 
-            sq->recs[slot].index = HudSquadVehicleIcon((const AM2_Object *)(const uint8_t *)obj);
+            sq->recs[slot].index = HudSquadVehicleIcon((const AM2_Object *)obj);
             sq->recs[slot].detailArg = (int32_t)obj->uid;
             SQUAD_BAR(sq->recs[slot].barW, obj);
             sq->recs[slot].icons = 0;

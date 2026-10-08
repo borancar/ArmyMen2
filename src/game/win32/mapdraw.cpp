@@ -2046,7 +2046,7 @@ void __cdecl DrawSelection(void)
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    leader = (const AM2_Object *)(const uint8_t *)LookupOwnerObj(
+    leader = (const AM2_Object *)LookupOwnerObj(
                  g_defaultOwner);
 
     if (leader

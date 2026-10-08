@@ -1875,7 +1875,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 
     army = obj->owner;
 
-    unit = (AM2_Object *)(uint8_t *)CreateTrooper(
+    unit = (AM2_Object *)CreateTrooper(
                g_dirScratch,
                obj->pos.x,
                obj->pos.y,
@@ -2574,7 +2574,7 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
 
     if (!weapon)
         return;
-    unit = (AM2_Object *)(uint8_t *)UnitByUid(unitUid);
+    unit = (AM2_Object *)UnitByUid(unitUid);
     if (!unit)
         return;
 
@@ -2616,7 +2616,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
 
     if (!weapon)
         return;
-    unit = (AM2_Object *)(uint8_t *)UnitByUid(unitUid);
+    unit = (AM2_Object *)UnitByUid(unitUid);
     if (!unit)
         return;
     target = LookupByUID(targetUid);
@@ -3589,7 +3589,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (at.x == 0)
             return;
 
-        unit = (AM2_Object *)(uint8_t *)CreateTrooper(act->text, at.x,
+        unit = (AM2_Object *)CreateTrooper(act->text, at.x,
                                         at.y,
                                         kCommObject->CommArmyOfSlot(
                                                        act->army),
@@ -3600,7 +3600,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* Then the same weapon-attach the cheat console does, which is
          * worth saying because it is four calls in a fixed order and
          * getting one wrong leaves a trooper holding nothing. */
-        weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
+        weapon = (AM2_Object *)CreateWeapon(
                      g_dirScratch, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
                      g_zeroXY,

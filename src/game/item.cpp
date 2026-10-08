@@ -1411,7 +1411,7 @@ void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
     if (++*count > AM2_KIND7_MAX)
         return (void *)0;
 
-    o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_ITEM_HEADER_BYTES);
+    o = (AM2_Object *)am2_malloc(AM2_ITEM_HEADER_BYTES);
     memset(o, 0, AM2_ITEM_HEADER_BYTES);
 
     o->owner = (int8_t)army;
@@ -1622,7 +1622,7 @@ void __cdecl VehicleDied(AM2_Object *obj, uint32_t by)
     o->gate        = 1;
 
     if (o->rowSet.count > 1)
-        ObjFlagClear0((AM2_MapRow *)(((uint8_t *)o->rowSet.rows) + AM2_OBJ_ROW_STRIDE));
+        ObjFlagClear0(&o->rowSet.rows[1]);
 
     ObjClearFootprint(o);
 
@@ -1798,7 +1798,7 @@ int32_t __cdecl BlockWeightAt(AM2_Object *from, AM2_Point at, AM2_Point ref)
             (const AM2_Point *)&at,
             g_objMapDesc);
 
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (; o; o = o->queryNext) {
         total += ObjBlockWeight(from, o, at,
                                 ref);
         if (total >= AM2_BLOCK_FULL)
@@ -1910,7 +1910,7 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
 
     ++g_roachMarkStamp;
 
-    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)o->rowSet.rows);
 
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
@@ -2122,7 +2122,7 @@ static inline void ObjFootprint(void *obj, int32_t set)
 
     ++g_objMarkStamp;
 
-    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)o->rowSet.rows);
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
     baseY = (o->pos.y >> AM2_MASK_CELL_SHIFT)
@@ -2755,7 +2755,7 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
 
     ++g_roachMarkStamp;
 
-    rows = ((const AM2_MapRow *)(const uint8_t *)o->rowSet.rows);
+    rows = ((const AM2_MapRow *)o->rowSet.rows);
 
     baseX = (o->pos.x >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
@@ -2909,7 +2909,7 @@ int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *
 
     (void)unused;
 
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (; o; o = o->queryNext) {
         total += ObjBlockWeight(from, o, at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
@@ -3479,7 +3479,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
 
     o = ObjectsAtPoint(&at, g_objMapDesc);
 
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (; o; o = o->queryNext) {
         /* OBJ_OFF_RANK on a SHOT is the shooter's uid -- see orig.h. */
         if ((o)->uid
             == s->shooterUid)
@@ -3777,7 +3777,7 @@ int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *ch
     int32_t  total = 0;
     uint32_t tile;
 
-    for (o = (AM2_Object *)(uint8_t *)chain; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (o = (AM2_Object *)chain; o; o = o->queryNext) {
         int32_t w = TroopBlockWeight(f, o, ref);
 
         total += w;
@@ -3917,7 +3917,7 @@ uint8_t __cdecl HeightAtPoint(AM2_Point packedPoint)
     AM2_Object *o   = ObjectsAtPoint(
                        &packedPoint, g_objMapDesc);
 
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (; o; o = o->queryNext) {
         int8_t h;
 
         if (!ObjIsItem(o))
@@ -4440,13 +4440,13 @@ void __cdecl PortalSpawn(void)
 
         orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
 
-        trooper = (AM2_Object *)(uint8_t *)orig_create_trooper(
+        trooper = (AM2_Object *)orig_create_trooper(
                       (char *)"a",
                       x, y, 1, 1, 0, 0, 0, 1, 0);
         if (!trooper)
             continue;
 
-        weapon = (AM2_Object *)(uint8_t *)orig_create_weapon(
+        weapon = (AM2_Object *)orig_create_weapon(
                      g_dirScratch, 1,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[orig_game_rand() % 4],
@@ -4513,7 +4513,7 @@ void __cdecl FlameTick(void)
 
     g_flameNextMs = now + AM2_FLAME_PERIOD_MS;
 
-    leader = (AM2_Object *)(uint8_t *)LookupOwnerObj(
+    leader = (AM2_Object *)LookupOwnerObj(
         g_defaultOwner);
 
     /* Dereferenced before the test below -- see the note above. */
@@ -5387,7 +5387,7 @@ void __cdecl DamageVehicle(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
     o->gate        = 1;
 
     if (o->rowSet.count > 1)
-        ObjFlagClear0((AM2_MapRow *)(((uint8_t *)o->rowSet.rows) + AM2_OBJ_ROW_STRIDE));
+        ObjFlagClear0(&o->rowSet.rows[1]);
 
     ObjClearFootprint((AM2_Object *)obj);
 
@@ -7333,11 +7333,11 @@ void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
             AM2_Object *w = WeaponByUid(o->inventory[o->inventorySel]);
 
             if (w) {
-                SetAnimFrame((AM2_MapRow *)((uint8_t *)o->rowSet.rows),
+                SetAnimFrame(o->rowSet.rows,
                              (int16_t)(g_weaponPoseFrames)[WeaponPoseIndex(obj, (AM2_Object *)w)],
                              1);
             } else {
-                SetAnimFrame((AM2_MapRow *)((uint8_t *)o->rowSet.rows), 1, 1);
+                SetAnimFrame(o->rowSet.rows, 1, 1);
             }
         } else {
             AM2_MapRow *r = o->rowSet.rows;
@@ -7576,7 +7576,7 @@ void __cdecl RankPromote(AM2_Object *obj)
     if (old)
         old->flags |= OBJ_FLAG_REPLACED;
 
-    made = (AM2_Object *)(uint8_t *)CreateWeapon(
+    made = (AM2_Object *)CreateWeapon(
         g_dirScratch,
         o->owner,
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
@@ -9175,7 +9175,7 @@ void __cdecl RemapInventoryUids(void)
     AM2_Object *obj;
 
 #define REMAP ((const uint32_t (*)[2])*(const uint32_t (**)[2])((uintptr_t)&g_uidRemap))
-    for (obj = (AM2_Object *)(uint8_t *)FirstItem(); obj; obj = (AM2_Object *)(uint8_t *)NextItem()) {
+    for (obj = (AM2_Object *)FirstItem(); obj; obj = (AM2_Object *)NextItem()) {
         int32_t slot;
 
         if (!(obj->flags & OBJ_FLAG_NEEDS_REMAP))
@@ -9289,7 +9289,7 @@ void __cdecl SelectionClick(void)
             if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
                 DeselectAll();
 
-            for (; e; e = ((AM2_Object *)(uint8_t *)e->queryNext)) {
+            for (; e; e = e->queryNext) {
                 int32_t n = g_selectedCount;
                 int32_t i;
                 int32_t seen = 0;
@@ -10535,7 +10535,7 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
     SetFieldInAll(&o->rowSet,
                   (void *)o->tableRec2);
 
-    RowUpdate((AM2_MapRow *)(o->rowSet.rows), 1,
+    RowUpdate(o->rowSet.rows, 1,
               g_mapDesc);
 }
 
@@ -11262,7 +11262,7 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
 
     (void)unusedPoint;
 
-    local = (AM2_Object *)(uint8_t *)LookupOwnerObj(
+    local = (AM2_Object *)LookupOwnerObj(
                 g_defaultOwner);
     mode   = 1;
     aiMode = 8;
@@ -11609,7 +11609,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     if (delay > 0)
         SubrecHideRows(&o->rowSet);
 
-    SetAnimFrame((AM2_MapRow *)((uint8_t *)o->rowSet.rows), (int16_t)kind, 1);
+    SetAnimFrame(o->rowSet.rows, (int16_t)kind, 1);
     return o;
 }
 
@@ -11653,7 +11653,7 @@ void __cdecl StepType6(AM2_Object *obj)
             > g_gameClockMs)
             return;
         o->blastDue = 0;
-        ObjFlagSet0((AM2_MapRow *)(o->rowSet.rows));
+        ObjFlagSet0(o->rowSet.rows);
     }
 
     if (o->blastSound != 0) {
@@ -11671,7 +11671,7 @@ void __cdecl StepType6(AM2_Object *obj)
                      g_objMapDesc);
 
         for (; victim != 0;
-             victim = ((AM2_Object *)(uint8_t *)victim->queryNext)) {
+             victim = victim->queryNext) {
             int32_t dmg = o->blastDamage;
 
             if (ObjIsType2(victim)
@@ -11800,7 +11800,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         && !AM2_THE_COMM->CommMustBroadcast(army))
         return (void *)0;
 
-    o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_TROOPER_BYTES);
+    o = (AM2_Object *)am2_malloc(AM2_TROOPER_BYTES);
     memset(o, 0, AM2_TROOPER_BYTES);
 
     at.x = (int16_t)x;
@@ -11966,7 +11966,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
         return (AM2_Object *)0;
     }
 
-    o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_VEHICLE_BYTES);
+    o = (AM2_Object *)am2_malloc(AM2_VEHICLE_BYTES);
     memset(o, 0, AM2_VEHICLE_BYTES);
 
     at.x = (int16_t)x;
@@ -12213,7 +12213,7 @@ struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2
             pt.y += rec->dy;
 
             if (!parent) {
-                parent = (AM2_Object *)(uint8_t *)CreateItem(name, army, rec->child, pt,
+                parent = (AM2_Object *)CreateItem(name, army, rec->child, pt,
                                                orFlags, remote, uid);
                 if (parent && (rec->c & 1))
                     parent->flags |= OBJ_FLAG_NO_FRAME;
@@ -12227,7 +12227,7 @@ struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2
                 else
                     child[0] = '\0';
 
-                made = (AM2_Object *)(uint8_t *)CreateItem(child, army, rec->child, pt,
+                made = (AM2_Object *)CreateItem(child, army, rec->child, pt,
                                              orFlags, remote, 0);
                 if (made) {
                     made->followers.capacity =
@@ -12262,7 +12262,7 @@ struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2
     o    = (AM2_Object *)0;
     slot = EnsureSpriteAaiRecord(set, index, frame);
     if (slot >= 0) {
-        o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_ITEM_BYTES);
+        o = (AM2_Object *)am2_malloc(AM2_ITEM_BYTES);
         memset(o, 0, AM2_ITEM_BYTES);
 
         if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
@@ -14114,7 +14114,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                               (int16_t)army))
         return (void *)0;
 
-    o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_WEAPON_BYTES);
+    o = (AM2_Object *)am2_malloc(AM2_WEAPON_BYTES);
     memset(o, 0, 0x35u * 4u);
 
     if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid)) {

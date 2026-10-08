@@ -1362,7 +1362,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
 
         ApplyObjHeight((AM2_Object *)obj,
                        (int32_t)o->heightSet);
-        RowUpdate((AM2_MapRow *)(o->rowSet.rows), 0,
+        RowUpdate(o->rowSet.rows, 0,
                   g_mapDesc);
     }
 

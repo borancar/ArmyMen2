@@ -616,7 +616,7 @@ int32_t __cdecl IsPlacedUnit(AM2_Object *obj, int32_t army)
      * register at the end. Nested positively, the kinds laid out 3, 2, 1,
      * and the type table walked by index (a signed `jl`). */
 #define TYPE(i, member) (g_unitTypes[i].member)
-    AM2_Object *o = (AM2_Object *)(uint8_t *)obj;
+    AM2_Object *o = (AM2_Object *)obj;
     int32_t  found = 0;
     int32_t  slot;
     int32_t  i;
@@ -713,14 +713,14 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
     *points -= rec->cost;
 
     if (rec->trooper) {
-        made = (AM2_Object *)(uint8_t *)CreateTrooper(
+        made = (AM2_Object *)CreateTrooper(
                    (char *)name, where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
         ObjSetFieldA(made, (uint32_t)group);
 
-        weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
+        weapon = (AM2_Object *)CreateWeapon(
                      g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)KIND, 0),
                      g_zeroXY,
@@ -749,7 +749,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         /* The caller's NAME, as the trooper arm passes it -- not the
          * directory scratch the weapon calls take. The image pushes the
          * seventh argument here (0x0043AE12). */
-        made = (AM2_Object *)(uint8_t *)CreateVehicle(
+        made = (AM2_Object *)CreateVehicle(
                    KIND, (char *)name,
                    where.x,
                    where.y,
@@ -800,7 +800,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         if (KIND >= AM2_PILLBOX_KIND_FIRST && KIND <= AM2_PILLBOX_KIND_LAST)
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
-        made = (AM2_Object *)(uint8_t *)CreateItem((char *)name, slot, key,
+        made = (AM2_Object *)CreateItem((char *)name, slot, key,
                                      where, flag,
                                      0, 0);
 
@@ -831,7 +831,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                 wkind = (KIND == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
                                     : AM2_PILLBOX_WEAPON_MG;
 
-            occupant = (AM2_Object *)(uint8_t *)CreateTrooper(
+            occupant = (AM2_Object *)CreateTrooper(
                            g_dirScratch,
                            where.x,
                            where.y,
@@ -839,7 +839,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                            0, 0, 0, 1, facing);
             ObjSetFieldA(occupant, (uint32_t)group);
 
-            weapon = (AM2_Object *)(uint8_t *)CreateWeapon(
+            weapon = (AM2_Object *)CreateWeapon(
                          g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),

@@ -283,7 +283,7 @@ uint32_t __cdecl FindEnemyNear(AM2_Point where, uint32_t from)
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
      * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a
      * different structure entirely. Two right names, one collision. */
-    for (; o; o = ((AM2_Object *)(uint8_t *)o->queryNext)) {
+    for (; o; o = o->queryNext) {
         const AM2_Object *obj = o;
 
         /* Once per candidate, not once before the loop. */
@@ -435,7 +435,7 @@ void __cdecl SetFogOfWar(int32_t fogOn)
     g_fogOfWar = 1;
 
     for (obj = FirstItem(); obj; obj = NextItem()) {
-        AM2_Object *o = (AM2_Object *)(uint8_t *)obj;
+        AM2_Object *o = (AM2_Object *)obj;
         uint32_t flags;
         int32_t  i;
 
@@ -838,7 +838,7 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
     AM2_Object *o;
 
-    for (o = (AM2_Object *)(uint8_t *)FirstItem(); o; o = (AM2_Object *)(uint8_t *)NextItem()) {
+    for (o = (AM2_Object *)FirstItem(); o; o = (AM2_Object *)NextItem()) {
         /* Types 2, 3 and 8 only; not one that is already revealed; and
          * ApproxDist -- a diamond, not a circle -- within the radius. */
         if (!ObjIsTypeIn238(o))
@@ -1070,8 +1070,8 @@ void __cdecl AirSupportPop(void)
 int32_t __cdecl AtFlagBase(const AM2_Object *who, const AM2_Object *owner, int32_t army,
                            const char *name)
 {
-    const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
-    const AM2_Object *o = (const AM2_Object *)(const uint8_t *)owner;
+    const AM2_Object *w = (const AM2_Object *)who;
+    const AM2_Object *o = (const AM2_Object *)owner;
     const AM2_Object *base;
     int32_t        answer = AM2_NOT_AT_FLAG_BASE;
 
@@ -1200,8 +1200,8 @@ int32_t __cdecl ObjBlockWeight(AM2_Object *from, AM2_Object *obj, AM2_Point unus
  */
 int32_t __cdecl ThingCode(const AM2_Object *who, const AM2_Object *owner)
 {
-    const AM2_Object *w = (const AM2_Object *)(const uint8_t *)who;
-    const AM2_Object *o = (const AM2_Object *)(const uint8_t *)owner;
+    const AM2_Object *w = (const AM2_Object *)who;
+    const AM2_Object *o = (const AM2_Object *)owner;
     int32_t        result = 0;
 
     /* Cases in the image's layout order; the answer for an unlisted code is
@@ -1269,7 +1269,7 @@ void __cdecl ToggleFogOfWar(void)
     *fog = (*fog == 0);
 
     for (o = FirstItem(); o; o = NextItem()) {
-        AM2_Object *p = (AM2_Object *)(uint8_t *)o;
+        AM2_Object *p = (AM2_Object *)o;
 
         if (p->flagsLo & OBJ_FLAG_DESTROYED)
             continue;
