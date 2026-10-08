@@ -71,7 +71,20 @@ main result so far (details in `src/vc6/README.md`):
   ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
   StepType5 to a struct local: a point built in an AM2_Point and stored a
   field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit
-  move): where one local is a plain copy
+  move), and GenerateObjScriptFromTokens to hoisting (a pointer to the
+  repeated table entry, then the uid read into its own local). A by-size
+  sweep (2026-10-09) took every remaining function under ~600 bytes through
+  the searches and by hand: OptionsDefaults, SaveListOnPick, PointActionC,
+  SpriteRebuildAlt, StepRowAnim, BoxAction, the two footprint pairs,
+  ParseScenarioPart, Step3RouteAndBoard, PointerActionMode5, SelectWeapon,
+  BlockWeightTroops, AddToItemList and SelectionClick are each held by two
+  variables in swapped registers, a scratch-register rotation offset by one,
+  a scheduling swap, or (SelectWeapon) VC6 keeping the EARLIER copy of a
+  cross-jumped switch tail where the image kept the later one. For those,
+  every source rewrite tried compiles to identical code or worse. Note the
+  instruction scorer and the relink's byte distance can disagree: an arm
+  reorder that cut SelectWeapon from 39 to 28 instructions grew its bytes
+  124 -> 230 by moving the jump table.: where one local is a plain copy
   of another (`cols = width`, `x = at.x`), a use that names the other one
   changes which value stays live, and that decides the register tie. The
   run loop closes on `width`, not `cols`; three hit-box edges add `at.x`
