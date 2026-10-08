@@ -7561,7 +7561,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     }
 
     if (!*(AM2_Widget * *)&g_mouseGrab && g_mouseChanged)
-        *(AM2_Widget * *)&g_mouseGrab = button;
+        *(AM2_Widget * *)&g_mouseGrab = (AM2_Widget *)&hud->buttonSprite;
     if (*(AM2_Widget * *)&g_mouseGrab != button)
         return;
 
