@@ -1067,7 +1067,7 @@ int32_t __cdecl ObjInitCommon(AM2_Object *obj, char *name, int32_t type,
     AddToItemList((AM2_Object *)obj, uid);
 
     if (!name || !*name) {
-        o->nameIdx = -1;
+        obj->nameIdx = -1;
     } else {
         n = 1;
         orig_strlwr(name);
@@ -1078,7 +1078,7 @@ int32_t __cdecl ObjInitCommon(AM2_Object *obj, char *name, int32_t type,
 
             while (index >= 0) {
                 if (kScriptNames[index].value == 0) {
-                    o->nameIdx = index;
+                    obj->nameIdx = index;
                     kScriptNames[index].value =
                         (int32_t)o->uid;
                     goto named;
@@ -1111,10 +1111,10 @@ named:
         keep->top    = b->top;
         keep->bottom = b->bottom;
 
-        hit->left   = b->left + x;
-        hit->top    = b->top + y;
+        hit->left   = b->left + at.x;
+        hit->top    = b->top + at.y;
         hit->right  = b->right + x;
-        hit->bottom = b->bottom + y;
+        hit->bottom = b->bottom + at.y;
 #undef hit
 #undef keep
     }
