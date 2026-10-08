@@ -31,32 +31,32 @@ int32_t __cdecl UidObjKind(uint32_t uid);
 /* 0x0044CC90 and 0x0044C960, two arms of the trooper dispatcher: kind 0x16 is
  * a batch of variable-length sub-records, kind 0x18 a (trooper, weapon) pair
  * whose sender armymsg.cpp already has. */
-void __cdecl RecvTroopBatch(void *msg, int32_t army);
+void __cdecl RecvTroopBatch(const struct AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0044BC10, one caller: TellOneSlot. Append one trooper's state to a batch
  * message -- a DELTA record, emitted only when position, facing or pose has
  * changed enough, with one presence bit each in the top three bits of its
  * first dword. Five bytes at least and NINE at most, which is what makes the
  * caller's ten-byte reservation a bound rather than a guess. */
-void __cdecl AppendTroopState(void *msg, AM2_Object *obj);
-void __cdecl RecvTroopPair(void *msg);
+void __cdecl AppendTroopState(struct AM2_ArmyBatch *msg, AM2_Object *obj);
+void __cdecl RecvTroopPair(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0044C3E0, kind 0x22 -- the twin of armymsg.cpp's SendTrooperSetWeapon, so
  * that message is ours at both ends. */
-void __cdecl RecvTrooperSetWeapon(void *msg);
+void __cdecl RecvTrooperSetWeapon(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0044C590, one caller. The trooper half of the army-message dispatcher:
  * thirteen arms over kinds 0x16..0x22, seven of which are the unknown log. */
-void __cdecl TroopMessageRecv(void *msg, int32_t army);
+void __cdecl TroopMessageRecv(const struct AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0045E590, one caller. The vehicle half of the army-message dispatcher:
  * eleven arms over kinds 0x1B..0x25, four of which are the unknown log. */
-void __cdecl VehicleMsgRecv(void *msg, int32_t army);
+void __cdecl VehicleMsgRecv(const struct AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0045EAA0 and 0x0045ADD0, the receive side of a unit leaving a vehicle --
  * the twin of armymsg.cpp's SendVehicleExit, so message kind 0x25 is now ours
  * at both ends. */
-void __cdecl RecvVehicleExit(void *msg);
+void __cdecl RecvVehicleExit(const struct AM2_ArmyMsgHdr *msg);
 void __cdecl VehicleTakeOutOccupant(uint32_t uid, struct AM2_Object *vehicle);
 
 /* 0x00401210. Drain one message list into another, head first. Here rather
@@ -141,18 +141,18 @@ int32_t __cdecl FlowRecvMessage(void *nodev);
 
 /* 0x0045E590. The vehicle message dispatcher: eleven table slots over seven
  * handlers, with kinds 0x20..0x23 sharing the unknown-message arm. */
-void __cdecl VehicleMsgRecv(void *msg, int32_t army);
+void __cdecl VehicleMsgRecv(const struct AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0045EB10. Kind 0x1B, a BATCH: walk the records from +8 to the message's
  * own length word, handing each to the applier. */
-void __cdecl RecvVehicle1B(void *msg, int32_t army);
+void __cdecl RecvVehicle1B(const struct AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0045E810. Kind 0x1E, which resolves two objects and then does nothing --
  * its only effect was a debug print the retail build stubbed to `ret`. */
-void __cdecl RecvVehicle1E(void *msg);
+void __cdecl RecvVehicle1E(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0045EA30. Kind 0x24, the receive half of SendVehicleEnter. */
-void __cdecl RecvVehicle24(void *msg);
+void __cdecl RecvVehicle24(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0045DF10. Decode one vehicle delta record and RETURN the cursor past it,
  * which is what lets RecvVehicle1B find the next one. */
@@ -160,14 +160,14 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army);
 
 /* 0x0045E630. Kind 0x1D: the host grants or refuses a vehicle's request to
  * pick an item up, and tells the asker. Three of its four arms are a log. */
-void __cdecl RecvVehicle1D(void *msg);
+void __cdecl RecvVehicle1D(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0045E860. Kind 0x1F, the drop notification -- and it writes NOTHING:
  * every arm is a guard or a log, for work done elsewhere. */
-void __cdecl RecvVehicle1F(void *msg);
+void __cdecl RecvVehicle1F(const struct AM2_ArmyMsgHdr *msg);
 
 /* 0x0045E980. Kind 0x1C: unpack a remote vehicle's shot and RAISE the fire
  * flag SendVehicleFire cleared on the way out. */
-void __cdecl RecvVehicle1C(void *msg);
+void __cdecl RecvVehicle1C(const struct AM2_ArmyMsgHdr *msg);
 
 #endif

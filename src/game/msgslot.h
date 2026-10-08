@@ -520,7 +520,7 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid);
  * otherwise. Both arms then request menu 0x22 and raise the state-pending flag
  * DIRECTLY, without going through RequestState -- which is the same pair
  * CLAUDE.md records as the route to the level teardown. */
-void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq);
+void __cdecl ReceiveArmyMsg(const struct AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq);
 
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.

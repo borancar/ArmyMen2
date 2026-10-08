@@ -964,7 +964,7 @@ typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
  * The nibble byte is `((x8 ^ y4) & 0xF) ^ y4`, which takes its low nibble from
  * x's high bits and its high nibble from y's -- the merge idiom, and exactly
  * what TroopSubParse unpacks. */
-void __cdecl AppendTroopState(void *msg, AM2_Object *o)
+void __cdecl AppendTroopState(AM2_ArmyBatch *msg, AM2_Object *o)
 {
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out;
@@ -1096,7 +1096,7 @@ void __cdecl AppendTroopState(void *msg, AM2_Object *o)
  * address, so a length below 8 makes the loop not run rather than run
  * backwards. Reproduced as the unsigned compare it is.
  */
-void __cdecl RecvTroopBatch(void *msg, int32_t army)
+void __cdecl RecvTroopBatch(const AM2_ArmyMsgHdr *msg, int32_t army)
 {
     const uint8_t *m   = (const uint8_t *)msg;
     const uint8_t *at  = m + sizeof(AM2_ArmyMsgHdr);   /* before end, as */
@@ -1137,7 +1137,7 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army)
  * It reuses its own ARGUMENT SLOT to hold the trooper's wire uid, which is
  * why the log's first value is the uid and not the message pointer.
  */
-void __cdecl RecvTrooperFire(void *msg)
+void __cdecl RecvTrooperFire(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_TrooperFireMsg *m = (const AM2_TrooperFireMsg *)msg;
     uint32_t troopUid  = UidOnWire(m->hdr.uid);
@@ -1229,7 +1229,7 @@ void __cdecl RecvTrooperFire(void *msg)
  * and makes the item vanish rather than placing it. The two functions agree
  * about the meaning of zero without either of them saying so.
  */
-void __cdecl RecvTrooperDropItem(void *msg)
+void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     AM2_Object *trooper;
@@ -1311,7 +1311,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
  *
  * UidOnWire on both, and it is the identity -- see armymsg.cpp.
  */
-void __cdecl RecvTroopPair(void *msg)
+void __cdecl RecvTroopPair(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_PairMsg *m = (const AM2_PairMsg *)msg;
     void          *a;
@@ -1366,7 +1366,7 @@ void __cdecl RecvTroopPair(void *msg)
  * and complaining itself if it is not. What is stored is the WIRE UID, not
  * the object.
  */
-void __cdecl RecvTrooperSetWeapon(void *msg)
+void __cdecl RecvTrooperSetWeapon(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_SetWeaponMsg *m = (const AM2_SetWeaponMsg *)msg;
     uint32_t       trooperUid;
@@ -1441,9 +1441,9 @@ typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
  * Declared here rather than by including that header, the same way
  * SendPlayerMsg is above: commmsg.cpp is flat and this signature names no
  * Win32 type. */
-void __cdecl RecvTrooperWantItem(void *msg);
+void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg);
 
-void __cdecl TroopMessageRecv(void *msg, int32_t army)
+void __cdecl TroopMessageRecv(const AM2_ArmyMsgHdr *msg, int32_t army)
 {
     uint32_t kind = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
@@ -1537,7 +1537,7 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, AM2_Object *vehicle)
  * call here is reproduced because the original makes it, not because anything
  * is converted.
  */
-void __cdecl RecvVehicleExit(void *msg)
+void __cdecl RecvVehicleExit(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     void          *vehicle;
@@ -1590,7 +1590,7 @@ typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
 typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
 
-void __cdecl VehicleMsgRecv(void *msg, int32_t army)
+void __cdecl VehicleMsgRecv(const AM2_ArmyMsgHdr *msg, int32_t army)
 {
     uint32_t kind = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
@@ -1628,12 +1628,12 @@ static inline void RecordGameOver(int32_t winner)
     g_statePending = 1;
 }
 
-void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
+void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq)
 {
-    uint8_t  *m    = (uint8_t *)msg;
+    const AM2_ArmyMsgHdr *m = msg;
     AM2_Comm  *comm = kCommObj;
     /* The uid is read from the message at every use. */
-#define uid (*(const uint32_t *)(m + AM2_ARMYMSG_UID))
+#define uid (m->uid)
     int32_t   army;
     int32_t   kind;
 
@@ -1674,12 +1674,12 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
     }
 
     /* An if-chain on the 16-bit type, not a switch, every arm returning. */
-    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 4) {
+    if (m->kind == 4) {
         am2_log("Received GAME_LOST_MESSAGE\n");
         RecordGameOver(army);
         return;
     }
-    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 5) {
+    if (m->kind == 5) {
         am2_log("Received GAME_WON_MESSAGE\n");
         /* With winning disabled, a win is recorded exactly as a loss. Our
          * own win is recorded as winner 1. */
@@ -1694,15 +1694,15 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         }
         return;
     }
-    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 0x20) {
+    if (m->kind == 0x20) {
         EventMessageReceive((const AM2_EventMsg *)m);
         return;
     }
     am2_log("Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; "
             "msgsize: %d\n",
-            kind, *(const uint16_t *)(m + AM2_ARMYMSG_TYPE),
+            kind, m->kind,
             UidOnWire(uid),
-            *(const uint16_t *)(m + AM2_ARMYMSG_SIZE));
+            m->len);
 #undef uid
 }
 
@@ -1760,7 +1760,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
                 return;
             }
 
-            ReceiveArmyMsg(p, slot, (int32_t)pkt->seq);
+            ReceiveArmyMsg((const AM2_ArmyMsgHdr *)p, slot, (int32_t)pkt->seq);
 
             /* Re-read, after the handler has had the bytes, and as an int. */
             step = *(const uint16_t *)p;
@@ -2063,7 +2063,7 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
     t->sight.field00 = 0;
     t->sight.hit = 0;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (kCommObj->verbose)
         am2_log("Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), "
@@ -3277,7 +3277,7 @@ pool:
  * The applier is reached by ADDRESS because it is still the image's. */
 uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army);
 
-void __cdecl RecvVehicle1B(void *msg, int32_t army)
+void __cdecl RecvVehicle1B(const AM2_ArmyMsgHdr *msg, int32_t army)
 {
     uint8_t       *m   = (uint8_t *)msg;
     uint8_t       *at  = m + 8;                     /* before end, as the */
@@ -3301,7 +3301,7 @@ void __cdecl RecvVehicle1B(void *msg, int32_t army)
  * pointer as a format string. The lookups ARE reproduced -- they are what the
  * original executes, and ObjByUidAlias is not free of side effects for us to
  * assume away. */
-void __cdecl RecvVehicle1E(void *msg)
+void __cdecl RecvVehicle1E(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     void          *vehicle;
@@ -3337,7 +3337,7 @@ void __cdecl RecvVehicle1E(void *msg)
  * The vehicle resolves through ObjByUidAlias and the passenger does NOT
  * resolve at all here: BoardVehicle takes the uid and does its own lookup,
  * which is why only one of the two is turned into a pointer. */
-void __cdecl RecvVehicle24(void *msg)
+void __cdecl RecvVehicle24(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     AM2_Comm       *comm = g_commObject;
@@ -3501,7 +3501,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
  * Every Log here carries its format string, so all of them are reproduced;
  * that is the distinction Step3Drive's header draws against the two-argument
  * call to the same address. */
-void __cdecl RecvVehicle1D(void *msg)
+void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object and the request are read afresh at every use. */
@@ -3617,7 +3617,7 @@ void __cdecl RecvVehicle1D(void *msg)
  * which one the flag belongs to.
  *
  * All four Log calls carry format strings and are reproduced. */
-void __cdecl RecvVehicle1F(void *msg)
+void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object is read at every use. */
@@ -3696,7 +3696,7 @@ void __cdecl RecvVehicle1F(void *msg)
  *
  * No null check on the message's own fields, only on the resolved vehicle --
  * the original's, reproduced. */
-void __cdecl RecvVehicle1C(void *msg)
+void __cdecl RecvVehicle1C(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleFireMsg *m = (const AM2_VehicleFireMsg *)msg;
     uint32_t       vehUid    = UidOnWire(m->hdr.uid);

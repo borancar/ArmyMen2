@@ -18,6 +18,7 @@
 /* AM2_ScriptCond and am2_FILE. script.h is on the flat side of the split and
  * names no Win32 type, so including it here costs nothing in portability. */
 #include "script.h"
+#include "armymsg.h"   /* AM2_ArmyMsgHdr */
 #include "../inject/orig.h"
 
 #ifdef __cplusplus
@@ -92,11 +93,9 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame);
  * The three padding bytes after `type` are never written. The original leaves
  * them as whatever the stack held, and so does this -- the struct is a local
  * and only the named fields are assigned. */
-typedef struct {
-    uint16_t len;          /* +0x00, always 0x28 */
-    uint16_t kind;         /* +0x02, AM2_ARMY_MSG_EVENT */
-    uint32_t uid;          /* +0x04, the transport's own uid slot;
-                            * EventMessageSend always writes 0 */
+typedef struct AM2_EventMsg {
+    AM2_ArmyMsgHdr hdr;    /* +0x00 len 0x28, kind AM2_ARMY_MSG_EVENT, and a
+                            * uid EventMessageSend always writes 0 */
     uint8_t  type;         /* +0x08, the event type, narrowed to a byte */
     int32_t  num1;         /* +0x0C */
     uint32_t uid1;         /* +0x10, through UidOnWire */

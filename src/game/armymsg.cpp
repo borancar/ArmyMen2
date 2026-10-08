@@ -166,7 +166,7 @@ static inline void PacketAppend(void *dst, const void *src, size_t n)
  * is the original's, not a transcription slip -- the harness recognises the
  * case and skips it. Reproduced so the two sides log alike.
  */
-void __cdecl ArmyMessageSend(const void *msg)
+void __cdecl ArmyMessageSend(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ArmyMsgHdr *hdr = (const AM2_ArmyMsgHdr *)msg;
     uint16_t              len;
@@ -285,7 +285,7 @@ void __cdecl SendTrooperSetWeapon(const AM2_Object *trooper, uint32_t weaponUid,
     msg.weapon    = UidOnWire(weaponUid);
     msg.slot = weapon;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
     orig_log("Send TrooperSetWeapon message, trooper: %08x, weapon:%08x\n",
              trooper->uid, weaponUid);
 }
@@ -309,17 +309,17 @@ void __cdecl SendTrooperSetWeapon(const AM2_Object *trooper, uint32_t weaponUid,
  * path; a missing drive. Verified by reading. */
 void __cdecl SendObjDestroyed(const AM2_Object *obj)
 {
-    uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
+    AM2_ArmyMsgHdr msg;
 
     if (!g_mpSession)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_OBJ_DESTROYED;
-    *(uint32_t *)(msg + 4) =
+    msg.len = AM2_MSG_OBJ_DESTROYED_LEN;
+    msg.kind = AM2_MSG_OBJ_DESTROYED;
+    msg.uid =
         UidOnWire(obj->uid);
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 }
 
 /* AppendTroopState is ours now; the seam and its typedef went with it. What
@@ -385,7 +385,7 @@ void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot
     msg.quant    = quantity;
     msg.request  = AM2_DO_DROP;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (kComm->verbose)
         orig_log("-->Trooper Drop Item Sent: Trooper: %x, item: %x,"
@@ -450,7 +450,7 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
     msg.slot    = slot;
     msg.quant   = quantity;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (!kComm->verbose)
         return;
@@ -527,8 +527,8 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
  * and later messages of a long list carry the first trooper's uid. */
 void __cdecl TellOneSlot(int32_t slot)
 {
-    uint8_t         msg[AM2_TROOP_BATCH_MAX];
-    AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
+    AM2_ArmyBatch   msg;
+    AM2_ArmyMsgHdr *h = &msg.hdr;
     const AM2_PtrList *list;
     int32_t         i = 0;
 
@@ -549,11 +549,11 @@ void __cdecl TellOneSlot(int32_t slot)
                 && ObjIsType2(obj)) {
                 if (h->uid == 0)
                     h->uid = obj->uid;
-                AppendTroopState(msg, obj);
+                AppendTroopState(&msg, obj);
             }
             if (h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {
-                ArmyMessageSend(msg);
+                ArmyMessageSend(&msg.hdr);
                 h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);
             }
         }
@@ -563,7 +563,7 @@ void __cdecl TellOneSlot(int32_t slot)
     } while (i < list->count);
 
     if (h->len != sizeof(AM2_ArmyMsgHdr))
-        ArmyMessageSend(msg);
+        ArmyMessageSend(&msg.hdr);
 }
 
 /* 0x0042A9A0. Tell the other players an item is gone.
@@ -593,7 +593,7 @@ void __cdecl TellOneSlot(int32_t slot)
  * and nothing in a Boot Camp mission is. Verified by reading. */
 void __cdecl ItemGoneMessageSend(const AM2_Object *obj)
 {
-    uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
+    AM2_ArmyMsgHdr msg;
 
     /* The type and uid are read from the object again at each use. */
     if (!g_mpSession)
@@ -602,27 +602,27 @@ void __cdecl ItemGoneMessageSend(const AM2_Object *obj)
     if (*(const int32_t *)obj <= 0 || *(const int32_t *)obj > 4)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_GONE;
-    *(uint32_t *)(msg + 4) = UidOnWire(obj->uid);
+    msg.len = AM2_MSG_OBJ_DESTROYED_LEN;
+    msg.kind = AM2_MSG_ITEM_GONE;
+    msg.uid = UidOnWire(obj->uid);
 
     if (kComm->verbose)
         orig_log("itemGoneMessageSend uid %x item_type %d\n",
                  obj->uid,
                  *(const int32_t *)obj);
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
 }
 
 typedef int32_t (__cdecl *AM2_RecvFn)(void *msg);
 
 /* The three receivers, defined below beside the senders they pair with. */
-void __cdecl RecvObjDestroyed(void *msg);
-void __cdecl RecvItemGone(void *msg);
-void __cdecl RecvDeath(void *msg);
-void __cdecl RecvItemDeploy(void *msg);
-void __cdecl RecvDamage(void *msg);
-void __cdecl RecvItemCreate(void *msg);
+void __cdecl RecvObjDestroyed(const AM2_ArmyMsgHdr *msg);
+void __cdecl RecvItemGone(const AM2_ArmyMsgHdr *msg);
+void __cdecl RecvDeath(const AM2_ArmyMsgHdr *msg);
+void __cdecl RecvItemDeploy(const AM2_ArmyMsgHdr *msg);
+void __cdecl RecvDamage(const AM2_ArmyMsgHdr *msg);
+void __cdecl RecvItemCreate(const AM2_ArmyMsgHdr *msg);
 
 /* 0x0042ACE0, one caller. Routes an incoming army message to its receiver and
  * answers whether it took it -- 1 for the six codes it knows, 0 otherwise, so
@@ -660,7 +660,7 @@ void __cdecl RecvItemCreate(void *msg);
  * read out of the image rather than inferred: the 22-byte index table at
  * 0x0042AD7C and the seven-entry jump table above it agree that exactly six
  * codes are handled and which arm each takes. */
-int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
+int32_t __cdecl ArmyMsgFilter(const AM2_ArmyMsgHdr *msg, int32_t army)
 {
     uint32_t code = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
@@ -739,7 +739,7 @@ void __cdecl SendPairMessage(const AM2_Object *a, const AM2_Object *b, int32_t b
     msg.byteArg = (int8_t)byteArg;
     msg.arg  = arg;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 }
 
 void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
@@ -758,7 +758,7 @@ void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
     msg.facing = it->facing;
     msg.resurrect = (uint8_t)arg;
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     comm = kComm;
     if (comm->verbose)
@@ -785,7 +785,7 @@ void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
  * COMM_OFF_VERBOSE; Death logs UNCONDITIONALLY. ObjDestroyed does not log at
  * all. Reproduced as found -- three sibling functions in one band disagreeing
  * about their own tracing is exactly the sort of thing a rewrite unifies. */
-void __cdecl RecvObjDestroyed(void *msg)
+void __cdecl RecvObjDestroyed(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ArmyMsgHdr *m = (const AM2_ArmyMsgHdr *)msg;
     AM2_Object          *obj = LookupByUID(UidOnWire(m->uid));
@@ -800,7 +800,7 @@ void __cdecl RecvObjDestroyed(void *msg)
     DestroyByType(obj);
 }
 
-void __cdecl RecvItemGone(void *msg)
+void __cdecl RecvItemGone(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ArmyMsgHdr *m = (const AM2_ArmyMsgHdr *)msg;
     AM2_Object          *obj = LookupByUID(UidOnWire(m->uid));
@@ -817,7 +817,7 @@ void __cdecl RecvItemGone(void *msg)
                  (obj)->uid);
 }
 
-void __cdecl RecvDeath(void *msg)
+void __cdecl RecvDeath(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_DeathMsg *m  = (const AM2_DeathMsg *)msg;
     uint32_t       by = UidOnWire(m->by);
@@ -849,7 +849,7 @@ void __cdecl RecvDeath(void *msg)
  * The position is read twice and two different ways: as two int16 halves for
  * the log, and as the packed dword for DeployItem. That is what the sender
  * writes, so both readings are of one field. */
-void __cdecl RecvItemDeploy(void *msg)
+void __cdecl RecvItemDeploy(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_DeployMsg *m = (const AM2_DeployMsg *)msg;
     const AM2_Comm *comm = kComm;
@@ -897,7 +897,7 @@ void __cdecl RecvItemDeploy(void *msg)
  * The last argument to DamageObject is a literal 1, so damage arriving over
  * the wire suppresses whatever the local path would otherwise do with it --
  * which is what stops a hit being broadcast back. */
-void __cdecl RecvDamage(void *msg)
+void __cdecl RecvDamage(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_DamageMsg *m = (const AM2_DamageMsg *)msg;
     const AM2_Comm *comm;
@@ -1133,7 +1133,7 @@ void __cdecl SendItemCreate(AM2_Object *obj)
                  *(const int32_t *)o,
                  (int32_t)msg.subtype);
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 }
 
 /* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
@@ -1166,7 +1166,7 @@ void __cdecl SendItemCreate(AM2_Object *obj)
  * `ebx` is the uid up to the item arm's creator call and the CREATED OBJECT
  * after it -- the original reuses the register. Written as two named locals
  * here; conflating them would pass a uid to ObjConceal. */
-void __cdecl RecvItemCreate(void *msg)
+void __cdecl RecvItemCreate(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_CreateMsg *m    = (const AM2_CreateMsg *)msg;
     const char    *name = NULL;
@@ -1297,7 +1297,7 @@ void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
 
     msg.attacker = UidOnWire(attacker);
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     /* The amount logged is the message's word, not the argument. */
     comm = kComm;
@@ -1348,7 +1348,7 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
     msg.hdr.kind = AM2_MSG_VEHICLE_EXIT;  /* after uid, the original's order */
     msg.occupant = UidOnWire(((const AM2_Object *)occupant)->uid);
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (kComm->verbose)
         orig_log("-->Vehicle Exit Sent: Vehicle: %x, item: %x\n",
@@ -1402,7 +1402,7 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
  * WANT_DROP DOES NOTHING BUT LOG, which is worth saying plainly: the arm
  * exists, it is reached, and the drop itself must happen somewhere else.
  */
-void __cdecl RecvTrooperWantItem(void *msg)
+void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The request is read from the message at every use. */
@@ -1653,7 +1653,7 @@ void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
     msg.hdr.uid  = UidOnWire(veh->uid);
     msg.hdr.kind = AM2_MSG_VEHICLE_ENTER;
     msg.occupant = UidOnWire(unt->uid);
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Sent: Vehicle: %x, item: %x\n",
@@ -1705,7 +1705,7 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
     msg.seed     = veh->fireFlag;
 
     veh->ctl.hit = 0;
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"Vehicle Fire Send, vehicle: %x,  gunface:%d, pos (%d,%d,%d),  globTarg %d \n",
@@ -1749,7 +1749,7 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
  * which the function has already copied into ebx, and 0x0045DEFD subtracts
  * that -- so the buffer's length gains what THIS call wrote and not where the
  * cursor happened to end. */
-void __cdecl VehicleUpdateAppend(void *msg, AM2_Object *obj)
+void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
 {
 #define comm (g_commObject)
 #define o (obj)
@@ -1984,8 +1984,8 @@ void __cdecl VehicleUpdateAppend(void *msg, AM2_Object *obj)
  * and a different one. */
 void __cdecl SendVehicleUpdates(int32_t slot)
 {
-    uint8_t         msg[AM2_TROOP_BATCH_MAX];
-    AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
+    AM2_ArmyBatch   msg;
+    AM2_ArmyMsgHdr *h = &msg.hdr;
     const AM2_PtrList *list;
     int32_t         i = 0;
 
@@ -2006,11 +2006,11 @@ void __cdecl SendVehicleUpdates(int32_t slot)
                 && ObjIsType3(obj)) {
                 if (h->uid == 0)
                     h->uid = obj->uid;
-                VehicleUpdateAppend(msg, obj);
+                VehicleUpdateAppend(&msg, obj);
             }
             if (h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {
-                ArmyMessageSend(msg);
+                ArmyMessageSend(&msg.hdr);
                 h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);
             }
         }
@@ -2020,7 +2020,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
     } while (i < list->count);
 
     if (h->len != sizeof(AM2_ArmyMsgHdr))
-        ArmyMessageSend(msg);
+        ArmyMessageSend(&msg.hdr);
 }
 
 /* SendAllVehicleUpdates -- original 0x0045E550, one caller: CommSyncCheck.
@@ -2112,7 +2112,7 @@ void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t 
     msg.request  = request;
     msg.slot     = (int32_t)slot;
     msg.quant    = quant;
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
 
     if (comm->verbose == 0)
         return;

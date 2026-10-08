@@ -5636,7 +5636,7 @@ static void __cdecl SendDeathMessage(AM2_Object *obj, uint32_t attackerUid,
     msg.kind                = (uint8_t)kind;
     msg.by = UidOnWire(attackerUid);
 
-    ArmyMessageSend(&msg);
+    ArmyMessageSend(&msg.hdr);
     am2_log("Send Death Message: uid %x, army %d\n",
             ((const AM2_Object *)obj)->uid, UidArmy(attackerUid));
 }

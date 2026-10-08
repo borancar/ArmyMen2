@@ -69,6 +69,13 @@ typedef struct AM2_ArmyMsgHdr {
     uint32_t uid;    /* +0x04 */
 } AM2_ArmyMsgHdr;
 
+/* A batch, AM2_MSG_TROOP_BATCH or _VEHICLE_BATCH: the header, then one
+ * packed state record per unit, AM2_TROOP_BATCH_MAX bytes at most. */
+typedef struct AM2_ArmyBatch {
+    AM2_ArmyMsgHdr hdr;             /* +0x00 len grows as records go in */
+    uint8_t   body[0x12C - 8];      /* +0x08 the records, a byte stream */
+} AM2_ArmyBatch;
+
 /* The item request, AM2_MSG_TROOPER_DROP_ITEM and _WANT_ITEM, 0x1C bytes. */
 typedef struct AM2_ItemMsg {
     AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_DROP_OFF_TROOPER */
@@ -175,7 +182,7 @@ typedef struct AM2_CreateMsg {
  * will not fit and again afterwards if the packet has passed its threshold.
  * Does nothing at all unless DirectPlay is up, the session is joined and there
  * are at least two players. */
-void __cdecl ArmyMessageSend(const void *msg);
+void __cdecl ArmyMessageSend(const AM2_ArmyMsgHdr *msg);
 
 /* 0x00410820. Tell the other players the game has paused or resumed, with the
  * reason mask. Does nothing unless the session is joined. Eight callers. */
@@ -197,7 +204,7 @@ void __cdecl ItemGoneMessageSend(const struct AM2_Object *obj);
 /* 0x0042ACE0. Routes an army message to its receiver; 1 if it took it. Six
  * codes, and the middle of the range is NOT among them -- 0x13..0x22 get 0.
  * `army` is pushed by the caller and never read. */
-int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army);
+int32_t __cdecl ArmyMsgFilter(const AM2_ArmyMsgHdr *msg, int32_t army);
 
 /* 0x0042AA50. Tell the other players an item was deployed. Sixteen bytes; the
  * two trailing bytes are the item's facing and the caller's argument, in that
@@ -242,7 +249,7 @@ void __cdecl SendVehicleUpdates(int32_t slot);
 /* 0x0045DAA0. Append one vehicle's DELTA update to a message buffer whose
  * first word is its length. The sibling of AppendTroopState, sharing its
  * design and not its code. */
-void __cdecl VehicleUpdateAppend(void *msg, struct AM2_Object *obj);
+void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, struct AM2_Object *obj);
 
 /* 0x0045E550. Ask each of the four comm slots to send its vehicle batch. */
 void __cdecl SendAllVehicleUpdates(void);
