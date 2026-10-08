@@ -452,10 +452,10 @@
 #define g_mpScriptName           (*(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME)  /* 0x00511C08 */
 #define g_mpSession              (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)  /* 0x00511DA0 */
 #define g_mpTeamSprites          (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES)  /* 0x006645A0 */
-#define g_msgChat                ((uint8_t *)(uintptr_t)ADDR_MSG_CHAT)  /* 0x004FA910 */
+#define g_msgChat                ((struct AM2_ChatMsg *)(uintptr_t)ADDR_MSG_CHAT)  /* 0x004FA910 */
 #define g_msgColor               ((uint8_t *)(uintptr_t)ADDR_MSG_COLOR)  /* 0x004FC898 */
 #define g_msgEndSetup            ((void *)(uintptr_t)ADDR_MSG_END_SETUP)  /* 0x004FC3A8 */
-#define g_msgGamePause           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_PAUSE)  /* 0x004FAA50 */
+#define g_msgGamePause           ((struct AM2_PauseMsg *)(uintptr_t)ADDR_MSG_GAME_PAUSE)  /* 0x004FAA50 */
 #define g_msgGameReady           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_READY)  /* 0x004FAA28 */
 #define g_msgGameStart           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_START)  /* 0x004FC5F0 */
 #define g_msgKind01              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND01)  /* 0x004FBF80 */

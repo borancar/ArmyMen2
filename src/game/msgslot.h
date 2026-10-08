@@ -66,6 +66,26 @@ typedef struct AM2_Packet {
     uint32_t ack;               /* +0x10 PACKET_OFF_ACK */
 } AM2_Packet;
 
+/* The header every comm message starts with, COMMMSG_OFF_KIND and _SIZE. */
+typedef struct AM2_CommMsgHdr {
+    int32_t kind;                   /* +0x00 COMMMSG_OFF_KIND */
+    int32_t size;                   /* +0x04 COMMMSG_OFF_SIZE, the whole record */
+} AM2_CommMsgHdr;
+
+/* The chat message, kind 3, 0x108 bytes at ADDR_MSG_CHAT. */
+typedef struct AM2_ChatMsg {
+    AM2_CommMsgHdr hdr;             /* +0x00 */
+    uint8_t  ink;                   /* +0x08 MSG_CHAT_OFF_INK AM2_MSG_CHAT_SENDER, the sender's colour */
+    char     text[0xFF];            /* +0x09 MSG_CHAT_OFF_TEXT AM2_MSG_CHAT_TEXT */
+} AM2_ChatMsg;
+
+/* The pause message, kind 6, 0x10 bytes at ADDR_MSG_GAME_PAUSE. */
+typedef struct AM2_PauseMsg {
+    AM2_CommMsgHdr hdr;             /* +0x00 */
+    int32_t  pause;                 /* +0x08 MSG_PAUSE_OFF_PAUSE */
+    int32_t  flags;                 /* +0x0C MSG_PAUSE_OFF_FLAGS, the reason mask */
+} AM2_PauseMsg;
+
 /* A NACK, AM2_FLOW_NACK: the range of sequences to send again. It shares
  * the packet's first two dwords and nothing after them. */
 typedef struct AM2_FlowNack {
@@ -746,6 +766,8 @@ static_assert(offsetof(AM2_Flow, lagSpread)   == 0xB4,  "flow lag spread");
 static_assert(offsetof(AM2_Flow, queue)       == 0x78,  "flow queue");
 static_assert(sizeof(AM2_MsgNode)             == 0x28,  "msg node");
 static_assert(sizeof(AM2_MsgList)             == 0x10,  "msg list");
+static_assert(sizeof(AM2_ChatMsg)             == 0x108, "chat message");
+static_assert(sizeof(AM2_PauseMsg)            == 0x10,  "pause message");
 static_assert(offsetof(AM2_Comm, selfId)      == 0x3CC, "selfId");
 static_assert(offsetof(AM2_Comm, connected)   == 0x3E4, "connected");
 static_assert(offsetof(AM2_Comm, playerCount) == 0x3D0, "playerCount");

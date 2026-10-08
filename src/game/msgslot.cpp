@@ -241,13 +241,13 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
  * `system` is only ever tested for zero, so the 4 is not a flag value. */
 void __cdecl SendChatMsg(char *text, int32_t system)
 {
-    uint8_t *record = g_msgChat;
+    AM2_ChatMsg *record = g_msgChat;
     uint8_t  sender;
 
     if (strlen(text) > 0xFF)
         text[0xFE] = '\0';
 
-    strcpy((char *)(record + AM2_MSG_CHAT_TEXT), text);
+    strcpy(record->text, text);
 
     if (system)
         sender = 4;
@@ -255,7 +255,7 @@ void __cdecl SendChatMsg(char *text, int32_t system)
         sender = (uint8_t)((AM2_Comm *)kMsgCommObj)->CommArmyOfSlot(
                      (int32_t)g_defaultOwner);
 
-    record[AM2_MSG_CHAT_SENDER] = sender;
+    record->ink = sender;
     SendGameMsg(record, 0, 0);
 }
 

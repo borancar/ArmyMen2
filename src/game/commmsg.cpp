@@ -2533,23 +2533,23 @@ void __cdecl CommInitDefaults(void)
  */
 void __cdecl SendChatTo(char *text, int32_t slot)
 {
-    uint8_t *rec = g_msgChat;
+    AM2_ChatMsg *rec = g_msgChat;
 
     if (strlen(text) > AM2_CHAT_TEXT_MAX)
         text[AM2_CHAT_TEXT_MAX - 1] = 0;
 
-    strcpy((char *)(rec + MSG_CHAT_OFF_TEXT), text);
+    strcpy(rec->text, text);
 
     /* Stored, then tested and overwritten: the image writes the ink
      * before it knows whether it is zero. */
-    rec[MSG_CHAT_OFF_INK] =
+    rec->ink =
         *(g_objTableRecords
           + (uint32_t)kCommObj->CommArmyOfSlot(
                 *(const int32_t *)&g_defaultOwner)
             * AM2_OBJ_TABLE_REC_SIZE
           + OBJ_TABLE_REC_OFF_INK);
-    if (!rec[MSG_CHAT_OFF_INK])
-        rec[MSG_CHAT_OFF_INK] = g_whiteInk;
+    if (!rec->ink)
+        rec->ink = g_whiteInk;
 
     SendGameMsg(rec, kCommObj->CommPlayerId(slot), 0);
 }

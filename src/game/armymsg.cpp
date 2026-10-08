@@ -227,13 +227,13 @@ void __cdecl ArmyMessageSend(const void *msg)
  * literals and reports our own player id, so a capture shows who paused. */
 void __cdecl SendGamePause(int32_t pause, int32_t flags)
 {
-    uint8_t *msg = g_msgGamePause;
+    AM2_PauseMsg *msg = g_msgGamePause;
 
     if (kComm->active == 0)
         return;
 
-    *(int32_t *)(msg + MSG_PAUSE_OFF_PAUSE) = pause;
-    *(int32_t *)(msg + MSG_PAUSE_OFF_FLAGS) = flags;
+    msg->pause = pause;
+    msg->flags = flags;
 
     SendGameMsg(msg, 0, 1);
 
