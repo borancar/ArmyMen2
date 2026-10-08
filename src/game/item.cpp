@@ -12730,15 +12730,17 @@ after_flight:
 
                 {
                     /* Both coordinates computed before either is stored. */
-                    int16_t px = (int16_t)(int32_t)(
+                    AM2_Point np;
+
+                    np.x = (int16_t)(int32_t)(
                         Cos8(spread) * AM2_MISSILE_TRAIL_SPACING
                         + (float)ahead->pos.x);
-                    int16_t py = (int16_t)(int32_t)(
+                    np.y = (int16_t)(int32_t)(
                         Sin8(spread) * AM2_MISSILE_TRAIL_SPACING
                         + (float)ahead->pos.y);
 
-                    o->pos.x     = px;
-                    o->pos.y = py;
+                    o->pos.x = np.x;
+                    o->pos.y = np.y;
                 }
                 o->facing = ahead->facing;
             }
