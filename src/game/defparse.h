@@ -13,6 +13,7 @@
 #define AM2_DEFPARSE_H
 
 #include <stdint.h>
+#include "point.h"   /* AM2_Point, for AM2_DefLink */
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,8 +57,13 @@ typedef struct {
      * and the second to its y. Two independent readers agreeing on which is
      * which is better evidence than either alone, and it is the rule about
      * preferring a second toucher arriving for free. */
-    int16_t dx;         /* +0x0C, narrowed from a parsed int32 */
-    int16_t dy;         /* +0x0E, likewise */
+    union {
+        struct {
+            int16_t dx;     /* +0x0C, narrowed from a parsed int32 */
+            int16_t dy;     /* +0x0E, likewise */
+        };
+        AM2_Point off;      /* +0x0C the pair, as PlaceCursorPrepare reads it */
+    };
     int32_t c;          /* +0x10 */
 } AM2_DefLink;
 

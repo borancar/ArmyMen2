@@ -8002,7 +8002,7 @@ void __cdecl EnterVehicle(AM2_Object *unit, AM2_Object *vehicle)
             ((const AM2_Object *)unit)->uid;
     }
 
-    u->scriptState =
+    u->scriptPoint =
         g_zeroPoint;
     u->uid56C = 0;
 
@@ -8917,13 +8917,13 @@ void __cdecl ResetType2Fields(AM2_Object *obj)
 {
     AM2_Object *o = obj;
 
-    o->scriptId =
+    o->savedPoint =
         g_zeroPoint;
-    o->scriptState =
+    o->scriptPoint =
         g_zeroPoint;
-    o->scriptFrame =
+    o->goalPoint =
         g_zeroPoint;
-    o->scriptNext =
+    o->detour =
         g_zeroPoint;
     /* objdump.py reads 0xC0 as the destination point; orig.h names it
      * OBJ_OFF_FIELD_C0, and that is the name used here rather than a second
@@ -11262,7 +11262,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
  * drawing mode 0's cursor, defend drawing mode 1's, ignore its own, and evade
  * changing nothing. Numbering the arms top to bottom gives 0,1,2,3... and
  * loses the sharing entirely -- the SpriteKeyForKind trap. */
-void __cdecl OnSelectionChanged(uint32_t unusedPoint)
+void __cdecl OnSelectionChanged(AM2_Point unusedPoint)
 {
     AM2_UidList *list = g_selectedUids;
     AM2_Object  *local;

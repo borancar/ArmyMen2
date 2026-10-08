@@ -114,7 +114,7 @@ def _aggregated(va):
 # paint object wants both the 0x00511BC8 and the 0x004FC8C8 blocks; with
 # the useless casts gone it is the 0x00511BC8 block alone.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
+KEEP_DECLS = ((0x004F96C0, 0x004F96CC),)
 
 
 def _kept(va):

@@ -129,13 +129,13 @@ typedef struct AM2_PlayerMsg {
  * and PlaceScenario turns into units. See SCEN_ROW_OFF_* in orig.h. */
 typedef struct AM2_ScenRow {
     int32_t  kind;                  /* +0x00 SCEN_ROW_OFF_KIND, 0x8005 the leader */
-    struct { int16_t x, y; } pos;   /* +0x04 SCEN_ROW_OFF_POS */
+    AM2_Point pos;                  /* +0x04 SCEN_ROW_OFF_POS */
     uint8_t  _pad08[8];             /* +0x08 */
     uint8_t  amount;                /* +0x10 SCEN_ROW_OFF_AMOUNT */
     uint8_t  flag;                  /* +0x11 SCEN_ROW_OFF_FLAG, set when the wire byte was ZERO */
     uint8_t  field12;               /* +0x12 SCEN_ROW_OFF_FIELD_12, forced to 1 if zero */
     char     name[0x51];            /* +0x13 SCEN_ROW_OFF_NAME, unbounded on the wire */
-    uint32_t at;                    /* +0x64 SCEN_ROW_OFF_AT, a packed point */
+    AM2_Point at;                   /* +0x64 SCEN_ROW_OFF_AT */
     uint8_t  field68;               /* +0x68 SCEN_ROW_OFF_FIELD_68 */
     uint8_t  _pad69[3];
 } AM2_ScenRow;

@@ -125,7 +125,7 @@ void __cdecl ObjRemap(AM2_Object *obj, struct AM2_MapDesc *desc, int32_t force);
  * is gone, drop and un-flag destroyed ones, promote a leader to index 0, and
  * set the pointer mode -- but only when every selected unit agrees on its AI
  * mode. Its argument is never read; see item.cpp. */
-void __cdecl OnSelectionChanged(uint32_t unusedPoint);
+void __cdecl OnSelectionChanged(AM2_Point unusedPoint);
 
 /* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
  * of its six slots? Eight separate exits -- not the converging tail this

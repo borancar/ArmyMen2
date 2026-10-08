@@ -1182,11 +1182,11 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
     /* The three draw offsets, zeroed from the image's own {0,0}. */
     g_menuCursorDx =
-        *(const int32_t *)&g_zeroPoint;
+        g_zeroPoint;
     g_menuOverlayADx =
-        *(const int32_t *)&g_zeroPoint;
+        g_zeroPoint;
     g_menuOverlayBDx =
-        *(const int32_t *)&g_zeroPoint;
+        g_zeroPoint;
 
     g_menuRow        = row;
     g_animFrame = -1;
@@ -1257,7 +1257,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
             SET_CURSOR(PlaceSprite(0x21, (uint32_t)(army + 1) * 10));
             g_menuInk = (uint8_t *)0;
             g_menuCursorDx =
-                *(const int32_t *)&link->dx;
+                link->off;
         }
         link = DefFindLink((int32_t)key, 1);
         if (link) {
@@ -1265,7 +1265,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                 PlaceSprite(0x21, (uint32_t)army * 10 + 11);
             g_menuOverlayAInk = (uint8_t *)0;
             g_menuOverlayADx =
-                *(const int32_t *)&link->dx;
+                link->off;
         }
         link = DefFindLink((int32_t)key, 2);
         if (link) {
@@ -1273,7 +1273,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                 PlaceSprite(0x21, (uint32_t)army * 10 + 12);
             g_menuOverlayBInk = (uint8_t *)0;
             g_menuOverlayBDx =
-                *(const int32_t *)&link->dx;
+                link->off;
         }
         break;
     }

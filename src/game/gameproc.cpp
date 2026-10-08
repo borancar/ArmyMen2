@@ -1154,7 +1154,7 @@ int32_t __cdecl PlaceScenario(void)
             if (!(obj->flagsLo & 4)
                 && ObjIsTypeIn238(obj)
                 && obj->field94 == 0) {
-                obj->scriptState =
+                obj->scriptPoint =
                     g_zeroPoint;
                 /* A one-case switch, not `== 2`: the image tests the type
                  * with `sub eax, 2`. */

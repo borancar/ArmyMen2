@@ -1297,7 +1297,7 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
  * the address. */
 void __cdecl OverlayPrepare(int32_t row, int32_t force)
 {
-    uint32_t origin;
+    AM2_Point origin;
 
     if (row < 0 || row >= MENU_ROW_DIRECT)
         return;
@@ -1321,9 +1321,9 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
     g_cursorInk  = 0;
     g_overlayAInk = 0;
     g_overlayBInk = 0;
-    *(uint32_t *)&g_menuCursorDx    = origin;
-    *(uint32_t *)&g_menuOverlayADx = origin;
-    *(uint32_t *)&g_menuOverlayBDx = origin;
+    g_menuCursorDx   = origin;
+    g_menuOverlayADx = origin;
+    g_menuOverlayBDx = origin;
 }
 
 typedef uint32_t (__cdecl *am2_ticks_fn)(void);
@@ -1372,16 +1372,16 @@ static inline void TickMenuAnimation(void)
 
 /* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
  * point and the overlay's. The original writes this out twice. */
-static inline void DrawMenuOverlaySprite(AM2_Sprite *const &spr, uint32_t dxAddr, uint8_t *ink)
+static inline void DrawMenuOverlaySprite(AM2_Sprite *const &spr, const AM2_Point *d, uint8_t *ink)
 {
     int32_t x, y;
 
     if (!spr)
         return;
     x = g_cursorX + g_cursorSprite->attachX
-      + *(const int16_t *)(uintptr_t)dxAddr;
+      + d->x;
     y = g_cursorY + g_cursorSprite->attachY
-      + *(const int16_t *)(uintptr_t)(dxAddr + 2);
+      + d->y;
     spr->lut = ink;
     DrawSprite(spr, x, y, g_cursorInk != 0);
 }
@@ -1467,14 +1467,14 @@ void __cdecl DrawMenuCursor(void)
             if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
                 return;
             if (g_cursorSprite) {
-                int32_t x = g_cursorX + *(const int16_t *)&g_menuCursorDx;
-                int32_t y = g_cursorY + *(const int16_t *)(uintptr_t)(((uintptr_t)&g_menuCursorDx) + 2);
+                int32_t x = g_cursorX + g_menuCursorDx.x;
+                int32_t y = g_cursorY + g_menuCursorDx.y;
 
                 g_cursorSprite->lut = g_cursorInk;
                 DrawSprite(g_cursorSprite, x, y, g_cursorInk != 0);
-                DrawMenuOverlaySprite(g_overlayA, ((uintptr_t)&g_menuOverlayADx),
+                DrawMenuOverlaySprite(g_overlayA, &g_menuOverlayADx,
                                       g_overlayAInk);
-                DrawMenuOverlaySprite(g_overlayB, ((uintptr_t)&g_menuOverlayBDx),
+                DrawMenuOverlaySprite(g_overlayB, &g_menuOverlayBDx,
                                       g_overlayBInk);
             }
             UnlockSurface();

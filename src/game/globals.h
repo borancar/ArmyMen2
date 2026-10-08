@@ -400,17 +400,17 @@ struct AM2_Edit;
 #define g_markSpriteCount        (*(int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT)  /* 0x0048CBB4 */
 #define g_markSprites            (*(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES)  /* 0x0048CBB0 */
 #define g_medicHealPct           (*(int32_t *)(uintptr_t)ADDR_MEDIC_HEAL_PCT)  /* 0x006624F8 */
-#define g_menuCursorDx           (*(int32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX)  /* 0x004FCDBC */
+#define g_menuCursorDx           (*(AM2_Point *)(uintptr_t)ADDR_MENU_CURSOR_DX)  /* 0x004FCDBC */
 #define g_menuCursorPrev         ((uint8_t *)(uintptr_t)ADDR_MENU_CURSOR_PREV)  /* 0x004FCDC8 */
 #define g_menuCursorRect         ((uint8_t *)(uintptr_t)ADDR_MENU_CURSOR_RECT)  /* 0x004FCDD8 */
 #define g_menuEnabled            (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)  /* 0x004FCEF8 */
 #define g_menuInk                (*(uint8_t **)(uintptr_t)ADDR_MENU_INK)  /* 0x004FCDB0 */
 #define g_menuMsgList            (*(void **)(uintptr_t)ADDR_MENU_MSG_LIST)  /* 0x0051612C */
 #define g_menuOverlayA           (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_OVERLAY_A)  /* 0x004FCDA8 */
-#define g_menuOverlayADx         (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX)  /* 0x004FCDC0 */
+#define g_menuOverlayADx         (*(AM2_Point *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX)  /* 0x004FCDC0 */
 #define g_menuOverlayAInk        (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)  /* 0x004FCDB4 */
 #define g_menuOverlayB           (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_OVERLAY_B)  /* 0x004FCDAC */
-#define g_menuOverlayBDx         (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX)  /* 0x004FCDC4 */
+#define g_menuOverlayBDx         (*(AM2_Point *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX)  /* 0x004FCDC4 */
 #define g_menuOverlayBInk        (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)  /* 0x004FCDB8 */
 #define g_menuRequest            (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)  /* 0x00511DC8 */
 #define g_menuRequestSet         (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)  /* 0x00511DC4 */
@@ -909,7 +909,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_wincpuid               (*(am2_wincpuid_fn *)(uintptr_t)ADDR_WINCPUID_FN)  /* 0x004F9FE0 */
 #define g_windowed               (*(int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)  /* 0x00507344 */
 #define g_winEnabled             (*(int32_t *)(uintptr_t)ADDR_WIN_ENABLED)  /* 0x00512304 */
-#define g_zeroPoint              (*(uint32_t *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0 */
+#define g_zeroPoint              (*(AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0 */
 #define g_zeroXY                 (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0, as the point it is */
 #define g_zeroRect               ((const AM2_Rect *)(uintptr_t)ADDR_ZERO_RECT)  /* 0x005125A8 */
 
