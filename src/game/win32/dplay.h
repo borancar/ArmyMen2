@@ -255,7 +255,7 @@ int32_t __cdecl CommRegisterSelf(uint32_t id);
  * is refused) and `flags` is the DirectPlay send flags word. Answers an
  * HRESULT: 0, or E_FAIL / DPERR_SESSIONLOST / E_OUTOFMEMORY / DPERR_SENDTOOBIG
  * / whatever CommSend said. Cold past the first refusal. */
-int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags);
 
 }
 #endif

@@ -82,6 +82,12 @@ typedef struct AM2_OptionRec {
     const char *label;      /* +0x20 */
 } AM2_OptionRec;
 
+/* The header every comm message starts with, COMMMSG_OFF_KIND and _SIZE. */
+typedef struct AM2_CommMsgHdr {
+    int32_t kind;                   /* +0x00 COMMMSG_OFF_KIND */
+    int32_t size;                   /* +0x04 COMMMSG_OFF_SIZE, the whole record */
+} AM2_CommMsgHdr;
+
 /* One player's record inside the player message, 0x60 bytes. SendPlayerMsg
  * fills it from the comm object's slot of the same index. */
 typedef struct AM2_PlayerRec {
@@ -99,7 +105,7 @@ typedef struct AM2_PlayerRec {
 /* The player message, ADDR_PLAYER_MSG, 0x238 bytes: the host's view of the
  * session, one record per player slot. */
 typedef struct AM2_PlayerMsg {
-    uint32_t      header[2];        /* +0x00 kind and size */
+    AM2_CommMsgHdr hdr;             /* +0x00 kind and size */
     int32_t       count;            /* +0x08 MSG_PLAYER_COUNT */
     uint32_t      connected;        /* +0x0C MSG_PLAYER_CONNECTED */
     uint32_t      pad10;            /* +0x10 */

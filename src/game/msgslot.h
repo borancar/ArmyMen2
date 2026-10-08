@@ -66,12 +66,6 @@ typedef struct AM2_Packet {
     uint32_t ack;               /* +0x10 PACKET_OFF_ACK */
 } AM2_Packet;
 
-/* The header every comm message starts with, COMMMSG_OFF_KIND and _SIZE. */
-typedef struct AM2_CommMsgHdr {
-    int32_t kind;                   /* +0x00 COMMMSG_OFF_KIND */
-    int32_t size;                   /* +0x04 COMMMSG_OFF_SIZE, the whole record */
-} AM2_CommMsgHdr;
-
 /* The chat message, kind 3, 0x108 bytes at ADDR_MSG_CHAT. */
 typedef struct AM2_ChatMsg {
     AM2_CommMsgHdr hdr;             /* +0x00 */

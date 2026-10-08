@@ -42,7 +42,7 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
  * tools/checksplit.py refuses a flat module that reaches a Win32 header even
  * transitively. Its own signature names nothing platform, so a declaration
  * here is enough; `extern "C"` because that is how dplay.h declares it. */
-extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+extern "C" int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags);
 
 
 /* 0x00410420, and it names itself twice -- "ArmyMessageFlush: can't send since
@@ -124,7 +124,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
             continue;
         }
 
-        SendGameMsg(kPacket, id, (int32_t)kComm->sendFlags);
+        SendGameMsg((AM2_CommMsgHdr *)kPacket, id, (int32_t)kComm->sendFlags);
 
         /* Re-read rather than reuse `seq`: nothing in the loop bumps it, so
          * this is the original's spelling and not a second value. */
@@ -235,7 +235,7 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
     msg->pause = pause;
     msg->flags = flags;
 
-    SendGameMsg(msg, 0, 1);
+    SendGameMsg(&msg->hdr, 0, 1);
 
     if (kComm->verbose)
         orig_log("SendGamePause from %x  Pause =%s  Flags=%x \n",

@@ -93,7 +93,7 @@ int32_t __cdecl CommRegisterSelf(uint32_t id);
  * tools/checksplit.py refuses a flat module that reaches a Win32 header even
  * transitively. Its own signature names nothing platform, so a declaration
  * here is enough; `extern "C"` because that is how dplay.h declares it. */
-extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+extern "C" int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags);
 
 
 /* Fields of the comm object these two read. Named for position: what +0x3E4
@@ -107,16 +107,16 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
 #define kCommObj (g_commObject)
 
-static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
+static inline void SendValueMsg(AM2_ValueMsg *record, int32_t value, const char *fmt)
 {
     const AM2_Comm *comm = kCommObj;
 
-    *(int32_t *)(record + AM2_MSG_VALUE) = value;
+    record->value = value;
 
     if (!comm->connected)
         return;
 
-    SendGameMsg((void *)record, 0, 1);
+    SendGameMsg(&record->hdr, 0, 1);
 
     /* Re-read: the original does not reuse the register it had. */
     comm = kCommObj;
@@ -128,13 +128,13 @@ static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt
 
 void __cdecl SendColorMsg(int32_t colour)
 {
-    SendValueMsg(((uintptr_t)g_msgColor), colour,
+    SendValueMsg(g_msgColor, colour,
                  "SendColorMsg from %x , Color =%d \n");
 }
 
 void __cdecl SendTeamMsg(int32_t team)
 {
-    SendValueMsg(((uintptr_t)g_msgTeam), team,
+    SendValueMsg(g_msgTeam, team,
                  "SendTeamMsg from %x , Team =%d \n");
 }
 
@@ -290,9 +290,9 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
                 ready ? "TRUE" : "FALSE");
 #undef COMM
 
-    *(int32_t *)(g_msgReadyToLoad + AM2_MSG_VALUE)
+    g_msgReadyToLoad->value
         = ready;
-    SendGameMsg((void *)g_msgReadyToLoad, 0, 1);
+    SendGameMsg(&g_msgReadyToLoad->hdr, 0, 1);
 
     /* No null test on the dialog, unlike the host half. The original's. */
     dlg = g_paintObject;
@@ -323,14 +323,14 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
     int32_t        rc   = 0;
 
     (void)unused;   /* pushed by every call site, read by none. */
-    *(int32_t *)(g_msgMap + AM2_MSG_VALUE) = result;
+    g_msgMap->value = result;
 
     /* The host has nobody to tell, and says so with a 1 rather than a 0. */
     if (comm->isHost)
         return 1;
 
     if (comm->connected) {
-        rc   = SendGameMsg((void *)g_msgMap, 0, 1);
+        rc   = SendGameMsg(&g_msgMap->hdr, 0, 1);
         comm = kCommObj;
         if (comm->verbose) {
             /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is
@@ -496,9 +496,9 @@ void __cdecl SendGameReadyMsg(int32_t ready)
 
     /* The value is stored into the record BEFORE the arguments are complete --
      * the original writes it between the last push and the call. */
-    *(int32_t *)(g_msgGameReady + AM2_MSG_VALUE)
+    g_msgGameReady->value
         = ready;
-    SendGameMsg((void *)g_msgGameReady, 0, 1);
+    SendGameMsg(&g_msgGameReady->hdr, 0, 1);
 
 #undef comm
     CommEndSetupInline();
@@ -2462,10 +2462,10 @@ void __cdecl FlushDelayedSends(void)
  */
 void __cdecl CommInitDefaults(void)
 {
-#define MSG_KIND(addr, kind) \
-    *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_KIND) = (kind);
-#define MSG_SIZE(addr, size) \
-    *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_SIZE) = (size);
+#define MSG_KIND(addr, k) \
+    ((AM2_CommMsgHdr *)(uintptr_t)(addr))->kind = (k);
+#define MSG_SIZE(addr, n) \
+    ((AM2_CommMsgHdr *)(uintptr_t)(addr))->size = (n);
 #define MSG_INIT(addr, kind, size) MSG_KIND(addr, kind) MSG_SIZE(addr, size)
     MSG_KIND(((uintptr_t)&g_playerMsg)       , 0x08)
     MSG_INIT(((uintptr_t)g_msgKind01)       , 0x01, 0x404)
@@ -2538,7 +2538,7 @@ void __cdecl SendChatTo(char *text, int32_t slot)
     if (!rec->ink)
         rec->ink = g_whiteInk;
 
-    SendGameMsg(rec, kCommObj->CommPlayerId(slot), 0);
+    SendGameMsg(&rec->hdr, kCommObj->CommPlayerId(slot), 0);
 }
 
 
@@ -2768,10 +2768,8 @@ int commmsg_install(void)
 
 /* The NACK message this side sends, kind 0xC: the range lives where a data
  * message keeps its sequence and checksum. */
-#define FLOW_NACK_OUT_FIRST \
-    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_msgKind0c) + FLOWMSG_NACK_FIRST))
-#define FLOW_NACK_OUT_LAST \
-    (*(uint32_t *)(uintptr_t)(((uintptr_t)g_msgKind0c) + FLOWMSG_NACK_LAST))
+#define FLOW_NACK_OUT_FIRST (g_msgKind0c->first)
+#define FLOW_NACK_OUT_LAST  (g_msgKind0c->last)
 
 /* Both live in win32/dplay.cpp and win32/air.h's C++ half, and this is the
  * flat half, so they are declared here rather than included -- the same
@@ -3199,7 +3197,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                     am2_log("Flow Nacking %d thru %d  to %x at time %d I am good thru %d \n",
                             expected, last, FROM, now,
                             sender->nextExpected);
-                SendGameMsg(g_msgKind0c, (int32_t)FROM, 0);
+                SendGameMsg((AM2_CommMsgHdr *)g_msgKind0c, (int32_t)FROM, 0);
                 for (; expected <= last; expected++)
                     MsgSlotB2(sender, expected);
             }

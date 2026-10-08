@@ -453,24 +453,24 @@
 #define g_mpSession              (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)  /* 0x00511DA0 */
 #define g_mpTeamSprites          (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES)  /* 0x006645A0 */
 #define g_msgChat                ((struct AM2_ChatMsg *)(uintptr_t)ADDR_MSG_CHAT)  /* 0x004FA910 */
-#define g_msgColor               ((uint8_t *)(uintptr_t)ADDR_MSG_COLOR)  /* 0x004FC898 */
-#define g_msgEndSetup            ((void *)(uintptr_t)ADDR_MSG_END_SETUP)  /* 0x004FC3A8 */
+#define g_msgColor               ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_COLOR)  /* 0x004FC898 */
+#define g_msgEndSetup            ((struct AM2_CommMsgHdr *)(uintptr_t)ADDR_MSG_END_SETUP)  /* 0x004FC3A8 */
 #define g_msgGamePause           ((struct AM2_PauseMsg *)(uintptr_t)ADDR_MSG_GAME_PAUSE)  /* 0x004FAA50 */
-#define g_msgGameReady           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_READY)  /* 0x004FAA28 */
+#define g_msgGameReady           ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_GAME_READY)  /* 0x004FAA28 */
 #define g_msgGameStart           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_START)  /* 0x004FC5F0 */
 #define g_msgKind01              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND01)  /* 0x004FBF80 */
 #define g_msgKind02              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND02)  /* 0x004F48E8 */
 #define g_msgKind04              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND04)  /* 0x004FBB80 */
-#define g_msgKind0c              ((void *)(uintptr_t)ADDR_MSG_KIND0C)  /* 0x004FC388 */
+#define g_msgKind0c              ((struct AM2_FlowNack *)(uintptr_t)ADDR_MSG_KIND0C)  /* 0x004FC388 */
 #define g_msgKind0d              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND0D)  /* 0x004FC788 */
 #define g_msgKind10              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND10)  /* 0x004FAA38 */
 #define g_msgListB               ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_B)  /* 0x004F48C8 */
 #define g_msgListDelayed         ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_DELAYED)  /* 0x004F8780 */
 #define g_msgListPool            ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_POOL)  /* 0x0048D8E8 */
 #define g_msgListSendq           ((AM2_MsgList *)(uintptr_t)ADDR_MSG_LIST_SENDQ)  /* 0x0048D8D8 */
-#define g_msgMap                 ((uint8_t *)(uintptr_t)ADDR_MSG_MAP)  /* 0x004FB770 */
-#define g_msgReadyToLoad         ((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD)  /* 0x004FAA18 */
-#define g_msgTeam                ((uint8_t *)(uintptr_t)ADDR_MSG_TEAM)  /* 0x004FC8A8 */
+#define g_msgMap                 ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_MAP)  /* 0x004FB770 */
+#define g_msgReadyToLoad         ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_READY_TO_LOAD)  /* 0x004FAA18 */
+#define g_msgTeam                ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_TEAM)  /* 0x004FC8A8 */
 #define g_msgWantedFlags         (*(uint32_t *)(uintptr_t)ADDR_MSG_WANTED_FLAGS)  /* 0x004F8B98 */
 #define g_nameBluescore          ((uint8_t *)(uintptr_t)ADDR_NAME_BLUESCORE)  /* 0x00487C6C */
 #define g_nameBlueteamwins       ((uint8_t *)(uintptr_t)ADDR_NAME_BLUETEAMWINS)  /* 0x00478834 */

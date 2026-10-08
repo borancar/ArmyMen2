@@ -3074,7 +3074,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
                      msg->recs[i].id, msg->recs[i].colour);
     }
 
-    SendGameMsg(msg, 0, 1);
+    SendGameMsg(&msg->hdr, 0, 1);
 #undef comm
 }
 
@@ -3554,7 +3554,7 @@ void __cdecl ProcessResendQueue(void)
  * DirectPlay session, which this environment cannot open; what an A/B here
  * compares is the refusal. Verified by reading, like its siblings.
  */
-int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
+int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags)
 {
     AM2_Comm *comm = g_commObject;
     AM2_Packet *pkt  = (AM2_Packet *)msg;

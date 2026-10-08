@@ -263,7 +263,7 @@ void __cdecl SendChatMsg(char *text, int32_t system)
                      (int32_t)g_defaultOwner);
 
     record->ink = sender;
-    SendGameMsg(record, 0, 0);
+    SendGameMsg(&record->hdr, 0, 0);
 }
 
 int msgslot_install(void)
