@@ -427,7 +427,7 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
 {
     AM2_ItemMsg  msg;
     AM2_Object *t = trooper;
-    AM2_Object *it = (AM2_Object *)item;
+    AM2_Object *it = item;
 
     if (kComm->verbose)
         orig_log("<--Trooper Want Item Send: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d \n",
@@ -726,7 +726,7 @@ void __cdecl SendPairMessage(const AM2_Object *a, const AM2_Object *b, int32_t b
 {
     AM2_PairMsg        msg;
     const AM2_Object *pa = a;
-    const AM2_Object *pb = (const AM2_Object *)b;
+    const AM2_Object *pb = b;
 
     msg.hdr.len = AM2_MSG_PAIR_LEN;
     msg.hdr.uid =
@@ -745,7 +745,7 @@ void __cdecl SendPairMessage(const AM2_Object *a, const AM2_Object *b, int32_t b
 void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
 {
     AM2_DeployMsg        msg;
-    const AM2_Object *it = (const AM2_Object *)item;
+    const AM2_Object *it = item;
     const AM2_Comm *comm;
 
     if (!*(void *const *)&g_mpSession)
@@ -821,7 +821,7 @@ void __cdecl RecvDeath(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_DeathMsg *m  = (const AM2_DeathMsg *)msg;
     uint32_t       by = UidOnWire(m->by);
-    void          *obj;
+    AM2_Object    *obj;
 
     obj = LookupByUID(UidOnWire(m->hdr.uid));
     if (!obj)
@@ -830,9 +830,9 @@ void __cdecl RecvDeath(const AM2_ArmyMsgHdr *msg)
     /* The log prints the ATTACKER's army, not the victim's, and the victim's
      * LOCAL uid rather than the one that came over the wire. */
     orig_log("Received Death Message: item->uid %x, army %d\n",
-             ((const AM2_Object *)obj)->uid, UidArmy(by));
+             obj->uid, UidArmy(by));
 
-    ObjDie((AM2_Object *)obj, (int32_t)m->kind, by);
+    ObjDie(obj, (int32_t)m->kind, by);
 }
 
 /* 0x0042AF30, the far end of SendItemDeploy above -- and the pair is what
@@ -1060,7 +1060,7 @@ void __cdecl ItemPostCreate(int32_t army, AM2_Point where)
  */
 void __cdecl SendItemCreate(AM2_Object *obj)
 {
-    AM2_Object       *o = (AM2_Object *)obj;
+    AM2_Object       *o = obj;
     AM2_CreateMsg        msg;
     int32_t        nameidx;
     const char    *name;
@@ -1276,7 +1276,7 @@ void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
                              int32_t kind, const AM2_Point *where, int32_t unused)
 {
     AM2_DamageMsg        msg;
-    const AM2_Object *o = (const AM2_Object *)obj;
+    const AM2_Object *o = obj;
     const AM2_Comm *comm;
 
     (void)unused;
@@ -1337,14 +1337,14 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
 
     if (kComm->verbose)
         orig_log("<--Vehicle Exit Send: Vehicle: %x, item: %x\n",
-                 UidOnWire(((const AM2_Object *)vehicle)->uid),
+                 UidOnWire(vehicle->uid),
                  UidOnWire(((const AM2_Object *)occupant)->uid));
 
     if (!occupant)
         return;
 
     msg.hdr.len  = AM2_MSG_VEHICLE_EXIT_LEN;
-    msg.hdr.uid  = UidOnWire(((const AM2_Object *)vehicle)->uid);
+    msg.hdr.uid  = UidOnWire(vehicle->uid);
     msg.hdr.kind = AM2_MSG_VEHICLE_EXIT;  /* after uid, the original's order */
     msg.occupant = UidOnWire(((const AM2_Object *)occupant)->uid);
 
@@ -1635,7 +1635,7 @@ int armymsg_install(void)
  * anything is converted. */
 void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
 {
-    AM2_Object  *veh  = (AM2_Object *)vehicle;
+    AM2_Object  *veh  = vehicle;
     AM2_Object  *unt  = (AM2_Object *)unit;
     /* The comm object is read at every use. */
 #define comm (g_commObject)
@@ -1682,7 +1682,7 @@ void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
  * that only emitted the packet would fire every frame. */
 void __cdecl SendVehicleFire(AM2_Object *vehicle)
 {
-    AM2_Object  *veh  = (AM2_Object *)vehicle;
+    AM2_Object  *veh  = vehicle;
     /* The comm object is read at every use. */
 #define comm (g_commObject)
     AM2_VehicleFireMsg msg;
@@ -2089,8 +2089,8 @@ void __cdecl SendAllVehicleUpdates(void)
 void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t request,
                                  int8_t slot, int32_t quant)
 {
-    AM2_Object  *veh  = (AM2_Object *)vehicle;
-    AM2_Object  *itm  = (AM2_Object *)item;
+    AM2_Object  *veh  = vehicle;
+    AM2_Object  *itm  = item;
     /* The comm object is read at every use. */
 #define comm (g_commObject)
     AM2_ItemMsg msg;

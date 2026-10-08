@@ -127,7 +127,7 @@ struct AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 /* The object header's two halves and three of the eight per-type savers, all
  * writing from OBJ_OFF_FIELD_94. See gameproc.cpp. */
 int32_t __cdecl SaveItemHeader(am2_FILE *fp, struct AM2_Object *obj);
-int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
+int32_t __cdecl LoadItemHeader(am2_FILE *fp, struct AM2_Object *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, struct AM2_Object *obj);
 
 

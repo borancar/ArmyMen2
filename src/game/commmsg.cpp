@@ -1313,8 +1313,8 @@ void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
 void __cdecl RecvTroopPair(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_PairMsg *m = (const AM2_PairMsg *)msg;
-    void          *a;
-    void          *b;
+    AM2_Object    *a;
+    AM2_Object    *b;
 
     a = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (!a)
@@ -1324,10 +1324,10 @@ void __cdecl RecvTroopPair(const AM2_ArmyMsgHdr *msg)
     if (!b)
         return;
 
-    if (!ObjIsType4((const AM2_Object *)b))
+    if (!ObjIsType4(b))
         return;
 
-    orig_trooper_pair_apply((AM2_Object *)a, (AM2_Object *)b,
+    orig_trooper_pair_apply(a, b,
                             m->byteArg,
                             m->arg);
 }
@@ -1539,7 +1539,7 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, AM2_Object *vehicle)
 void __cdecl RecvVehicleExit(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
-    void          *vehicle;
+    AM2_Object    *vehicle;
 
     if (kCommObj->verbose)
         orig_log("-->Vehicle Exit Received: Vehicle: %x, trooper: %x\n",
@@ -1550,7 +1550,7 @@ void __cdecl RecvVehicleExit(const AM2_ArmyMsgHdr *msg)
     if (vehicle) {
         /* The trooper's uid is decoded before the vehicle is pushed. */
         uint32_t trooper = UidOnWire(m->occupant);
-        VehicleTakeOutOccupant(trooper, (AM2_Object *)vehicle);
+        VehicleTakeOutOccupant(trooper, vehicle);
     }
 }
 
@@ -3301,8 +3301,8 @@ void __cdecl RecvVehicle1B(const AM2_ArmyMsgHdr *msg, int32_t army)
 void __cdecl RecvVehicle1E(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
-    void          *vehicle;
-    void          *item;
+    AM2_Object    *vehicle;
+    AM2_Object    *item;
 
     vehicle = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
@@ -3312,7 +3312,7 @@ void __cdecl RecvVehicle1E(const AM2_ArmyMsgHdr *msg)
     if (item == 0)
         return;
 
-    if (!ObjIsType4((const AM2_Object *)item))
+    if (!ObjIsType4(item))
         return;
 
     /* The log that is a `ret`; see above. Emitted only under VC6, where
@@ -3338,7 +3338,7 @@ void __cdecl RecvVehicle24(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     AM2_Comm       *comm = g_commObject;
-    void          *vehicle;
+    AM2_Object    *vehicle;
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Received: Vehicle: %x, trooper: %x\n",
@@ -3352,7 +3352,7 @@ void __cdecl RecvVehicle24(const AM2_ArmyMsgHdr *msg)
     /* The trooper's uid is decoded before the vehicle is pushed. */
     {
         uint32_t trooper = UidOnWire(m->occupant);
-        BoardVehicle(trooper, (AM2_Object *)vehicle);
+        BoardVehicle(trooper, vehicle);
     }
 }
 
@@ -3620,7 +3620,7 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
     /* The comm object is read at every use. */
 #define comm (g_commObject)
     AM2_Object       *vehicle;
-    void          *item;
+    AM2_Object       *item;
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
@@ -3651,7 +3651,7 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
         return;
     }
 
-    if (!ObjIsType4((const AM2_Object *)item))
+    if (!ObjIsType4(item))
         return;
 
     if (comm->verbose)

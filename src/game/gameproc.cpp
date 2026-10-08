@@ -855,7 +855,7 @@ int32_t __cdecl SaveItemHeader(am2_FILE *fp, AM2_Object *obj)
     return 1;
 }
 
-int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr)
+int32_t __cdecl LoadItemHeader(am2_FILE *fp, AM2_Object *hdr)
 {
     orig_fread(hdr, (size_t)kItemHeaderSize, 1, fp);
     return 1;
@@ -2377,32 +2377,33 @@ typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
  * VERIFIED BY READING. Nothing in the suite loads a savegame. */
 AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
 {
-    uint8_t  hdr[AM2_ITEM_HEADER_BYTES];
+    uint8_t  buf[AM2_ITEM_HEADER_BYTES];
+    AM2_Object *hdr = (AM2_Object *)(void *)buf;   /* the leading 0x94 bytes only */
     AM2_Object *made = NULL;
     uint32_t footprint;
 
     if (!LoadItemHeader(fp, hdr))
         return NULL;
 
-    footprint = *(const uint32_t *)(hdr + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON;
-    *(uint32_t *)(hdr + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+    footprint = hdr->flags & OBJ_FLAG_FOOTPRINT_ON;
+    hdr->flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 
     /* Each loader's null test is inside its own case. DEFAULT HAS NONE: a
      * type outside 1..8 falls to the tail with `made` still NULL and reads
      * its flags through it -- the original's, and reproduced. */
-    switch (*(const int32_t *)hdr) {
+    switch ((int32_t)hdr->type) {
     case 1:
-        made = LoadType1(fp, (const AM2_Object *)hdr);
+        made = LoadType1(fp, hdr);
         if (!made)
             return NULL;
         break;
     case 2:
-        made = LoadType2(fp, (AM2_Object *)(void *)hdr, arg);
+        made = LoadType2(fp, hdr, arg);
         if (!made)
             return NULL;
         break;
     case 3:
-        made = LoadType3(fp, (const AM2_Object *)hdr);
+        made = LoadType3(fp, hdr);
         if (!made)
             return NULL;
         break;
@@ -2412,27 +2413,27 @@ AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
      * read whatever was on the stack for it. The call site settles it: it
      * pushes three and cleans 0xC. */
     case 4:
-        made = LoadType4(fp, (AM2_Object *)(void *)hdr, arg);
+        made = LoadType4(fp, hdr, arg);
         if (!made)
             return NULL;
         break;
     case 5:
-        made = LoadType5(fp, (AM2_Object *)hdr);
+        made = LoadType5(fp, hdr);
         if (!made)
             return NULL;
         break;
     case 6:
-        made = LoadType6(fp, (const AM2_Object *)hdr);
+        made = LoadType6(fp, hdr);
         if (!made)
             return NULL;
         break;
     case 7:
-        made = LoadType7(fp, (const AM2_Object *)hdr);
+        made = LoadType7(fp, hdr);
         if (!made)
             return NULL;
         break;
     case 8:
-        made = LoadType8(fp, (const AM2_Object *)hdr);
+        made = LoadType8(fp, hdr);
         if (!made)
             return NULL;
         break;
