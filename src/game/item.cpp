@@ -2105,9 +2105,9 @@ AM2_Object *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
  * each caller compiled to push/call/pop -- the relink found it. */
 static_assert(sizeof(AM2_MaskRec) == AM2_MASK_STRIDE, "mask record size");
 
-static inline void ObjFootprint(void *obj, int32_t set)
+static inline void ObjFootprint(AM2_Object *obj, int32_t set)
 {
-    AM2_Object        *o = (AM2_Object *)obj;
+    AM2_Object        *o = obj;
     const AM2_MapRow  *rows;
     int32_t         dir, i;
     int32_t         baseX, baseY;
