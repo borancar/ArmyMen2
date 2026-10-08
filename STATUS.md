@@ -66,8 +66,17 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1552 of
-  1645 byte-identical (2026-10-08), piecewise 399.** The last four
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1554 of
+  1645 byte-identical (2026-10-08), piecewise 399.** RemapSpriteRuns and
+  ObjInitCommon fell to COPY SUBSTITUTION: where one local is a plain copy
+  of another (`cols = width`, `x = at.x`), a use that names the other one
+  changes which value stays live, and that decides the register tie. The
+  run loop closes on `width`, not `cols`; three hit-box edges add `at.x`
+  rather than its int16 copy. These were exactly the misses called
+  "unreachable from source" a few hours earlier -- that claim was wrong.
+  `$T/copygreedy2.py FILE FUNC` searches it greedily (it does not check that
+  neither side is reassigned between copy and use, so a match is verified by
+  hand). The last four
   (SelectBestWeapon, SelectRankedWeapon, ObjCollidesWith, HudTopUpdate) came
   from holding a call result in a typed local and from spelling a stored
   value differently from the one compared next, which stops VC6 threading the
