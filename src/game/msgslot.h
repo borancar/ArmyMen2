@@ -88,6 +88,21 @@ typedef struct AM2_FlowCtlMsg {
     int32_t  lagSpread;             /* +0x10 FLOW_OFF_LAG_SPREAD's */
 } AM2_FlowCtlMsg;
 
+/* The one-value messages -- map, colour, team, ready: the header and an int. */
+typedef struct AM2_ValueMsg {
+    AM2_CommMsgHdr hdr;             /* +0x00 */
+    int32_t  value;                 /* +0x08 AM2_MSG_VALUE */
+} AM2_ValueMsg;
+
+/* The start message, kind 5, 0x194 bytes at ADDR_MSG_GAME_START. */
+typedef struct AM2_StartMsg {
+    AM2_CommMsgHdr hdr;             /* +0x00 */
+    int32_t  players;               /* +0x08 the host's player count */
+    int32_t  hostId;                /* +0x0C the host's own id */
+    uint8_t  pad10[0x190 - 0x10];   /* +0x10 */
+    int32_t  seed;                  /* +0x190 MSG_START_OFF_SEED, ADDR_GAME_SEED_SENT */
+} AM2_StartMsg;
+
 /* The pause message, kind 6, 0x10 bytes at ADDR_MSG_GAME_PAUSE. */
 typedef struct AM2_PauseMsg {
     AM2_CommMsgHdr hdr;             /* +0x00 */
@@ -191,7 +206,7 @@ void __cdecl MsgSlotB2(void *rec, uint32_t seq);
 /* 0x00401040. The dword at +0xC of a comm message. Callers are CommReceive,
  * PacketThreadProc and RemovePlayer, so it is the message rather than the comm
  * object; the same callers read the uid at +4. */
-uint32_t __cdecl MsgField12(const void *msg);
+uint32_t __cdecl MsgField12(const AM2_MsgList *list);
 
 /* 0x00402E90. Mean of the 32 dwords at +0x3A0 of a PLAYER record -- not of the
  * comm object, which is what this comment used to say. Its one caller passes
@@ -313,7 +328,7 @@ void __cdecl MsgListRemove(AM2_MsgList *list, AM2_MsgNode *node);
  * is verified by reading, like the rest of that group. It has the family's
  * (message, sender) parameters and reads neither; CommDispatchMessage passes
  * both, as every other handler is passed them. */
-void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from);
+void __cdecl ReceiveEndSetupMsg(const AM2_CommMsgHdr *msg, int32_t from);
 
 /* Original: 0x00410E90, "ReceiveGameReadyToLoadMsg". HOST ONLY -- it returns
  * at once unless COMM_OFF_IS_HOST is set, so a client that somehow received
@@ -331,7 +346,7 @@ void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from);
  * The slot lookup is called TWICE when logging is on -- once to store and once
  * to print -- which is the original's, not a tidy-up opportunity: the second
  * call is inside the `if`. */
-void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid);
+void __cdecl ReceiveGameReadyToLoadMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00410BB0, "ReceiveGameReadyMsg". Record the sender's flag in
  * `m_ArmyReady[slot]` -- 0x0274 of the per-army record, next door to
@@ -349,7 +364,7 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid);
  *
  * The player count is re-read from the comm object on every iteration rather
  * than hoisted. Reproduced. */
-void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid);
+void __cdecl ReceiveGameReadyMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00410D90, "SendGameReadyToLoadMsg". The CLIENT half of the pair
  * whose host half is ReceiveGameReadyToLoadMsg: it returns at once if this
@@ -423,7 +438,7 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused);
  * send half, so the seed is never in the log at either end.
  *
  * It posts 0x0469, which nothing in the image handles. */
-void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid);
+void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00410890, "RemoteGamePause from %x; playerIndex== %d paused = %d
  * pauseflags = %x (%x) (msg Pause=%x)". The pause mask has one bit per player
@@ -438,7 +453,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid);
  * The mask the log prints is whichever block ran LAST, and the log fires only
  * when a block actually ran: it is guarded on the mask being non-zero as well
  * as on the comm object's verbosity. */
-void __cdecl RemoteGamePause(void *msg, int32_t dpid);
+void __cdecl RemoteGamePause(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00411BD0, and the name is ours -- it carries no string of its
  * own. The host telling us how to send: the value becomes the comm object's
@@ -450,7 +465,7 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid);
  * sender's -- the one message in this family that does not use the dpid it is
  * given at all. If we have no flow record yet, the two fields are dropped and
  * the send flags are kept anyway. */
-void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid);
+void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00410720. One arriving packet: log it if the sequence number is
  * below five, verify the checksum, then walk the messages inside it.
@@ -470,7 +485,7 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid);
  *
  * And it re-reads the part's length AFTER handing the message on, so a handler
  * that rewrote those two bytes would move the cursor somewhere else. */
-void __cdecl ReceivePacket(void *packet, int32_t dpid);
+void __cdecl ReceivePacket(struct AM2_Packet *packet, int32_t dpid);
 
 /* Original: 0x004114E0, "ReceivePlayerMsg for %d Players. I reckoned there
  * were %d Players ". The host's whole view of the lobby, arriving at a client:
@@ -531,7 +546,7 @@ void __cdecl ReceiveArmyMsg(const struct AM2_ArmyMsgHdr *msg, int32_t slot, int3
  * message calls nominal takes the same arm as the failures. Transcribed from
  * the table at 0x00411998, not from the layout -- as always in this image, the
  * two differ. */
-void __cdecl ReceivedMapMsg(void *msg, int32_t dpid);
+void __cdecl ReceivedMapMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x00411A20 and 0x00411B20, the receive halves of SendColorMsg and
  * SendTeamMsg. Host only, and both end the same way: repaint the current
@@ -541,8 +556,8 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid);
  * CommSetArmyColour, which SWAPS the colour with whoever already had it, and
  * gives up if that returns -1; the team one writes the field directly with no
  * check of any kind. */
-void __cdecl ReceivedColorMsg(void *msg, int32_t dpid);
-void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
+void __cdecl ReceivedColorMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
+void __cdecl ReceivedTeamMsg(const AM2_CommMsgHdr *msg, int32_t dpid);
 
 /* Original: 0x0040FEA0, and the name is ours -- it has no string that names
  * itself, only "Unknown message type %d" for its default arm. The receive
@@ -564,7 +579,7 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
  * sender and addressee, the order CommSystemMessage takes them in -- of which
  * it reads two: the message, and the SENDER it hands every handler. It once
  * handed them the length, reading the node's +0x24 as a sender. */
-void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
+void __cdecl CommDispatchMessage(AM2_CommMsgHdr *msg, int32_t size, int32_t from,
                                  int32_t to);
 
 

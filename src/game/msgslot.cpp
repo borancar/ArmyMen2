@@ -33,9 +33,9 @@ void __cdecl MsgSlotB0(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_
 void __cdecl MsgSlotB1(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 1); }
 void __cdecl MsgSlotB2(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 2); }
 
-uint32_t __cdecl MsgField12(const void *msg)
+uint32_t __cdecl MsgField12(const AM2_MsgList *list)
 {
-    return *(const uint32_t *)((const uint8_t *)msg + 0x0C);
+    return (uint32_t)list->count;
 }
 
 /* cdq/and 0x1F/add/sar is the compiler's signed divide by 32, not a shift. */

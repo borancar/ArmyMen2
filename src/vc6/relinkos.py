@@ -107,9 +107,10 @@ def _aggregated(va):
 # records settle it with none kept; the typed AAI records bring back the
 # 0x00511BC8 block beside the 0x004F96C0 one; the explosion arm settles
 # it with none kept; the typed comm object wants the 0x00515FD8 block;
-# the typed object script-name binders want the 0x005127C8 block instead.
+# the typed object script-name binders want the 0x005127C8 block instead;
+# the typed comm-message receivers settle it with none kept.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x005127C8, 0x00512FD0),)
+KEEP_DECLS = ()
 
 
 def _kept(va):

@@ -342,11 +342,11 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
     return rc;
 }
 
-void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
+void __cdecl ReceivedMapMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
 #define COMM  (kCommObj)
-#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+#define VALUE (((const AM2_ValueMsg *)msg)->value)
     int32_t slot;
 
     if (!COMM->isHost)
@@ -391,7 +391,7 @@ static inline void RepaintDialogAndSendPlayers(void)
     SendPlayerMsg(0);
 }
 
-void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
+void __cdecl ReceivedColorMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
 #define COMM (kCommObj)
     if (COMM->isHost) {
@@ -399,17 +399,17 @@ void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
 
         if (COMM->verbose)
             am2_log("ReceivedColorMsg from %x  Color =%d \n",
-                    dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
+                    dpid, ((const AM2_ValueMsg *)msg)->value);
 
         slot = ((AM2_Comm *)COMM)->CommSlotOfId(dpid);
         if (((AM2_Comm *)COMM)->CommSetArmyColour(slot,
-                *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE)) != -1)
+                ((const AM2_ValueMsg *)msg)->value) != -1)
             RepaintDialogAndSendPlayers();
     }
 #undef COMM
 }
 
-void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
+void __cdecl ReceivedTeamMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
 #define COMM (kCommObj)
     /* comm is re-read at each use; the body sits inside the host test, so
@@ -419,12 +419,12 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
 
         if (COMM->verbose)
             am2_log("ReceivedTeamMsg from %x  Team =%d \n",
-                    dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
+                    dpid, ((const AM2_ValueMsg *)msg)->value);
 
         slot = ((AM2_Comm *)COMM)->CommSlotOfId(dpid);
         /* Written straight in, with none of the colour half's checking. */
         COMM->slots[(uint32_t)slot].team
-            = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
+            = ((const AM2_ValueMsg *)msg)->value;
 
         RepaintDialogAndSendPlayers();
     }
@@ -504,11 +504,11 @@ void __cdecl SendGameReadyMsg(int32_t ready)
     CommEndSetupInline();
 }
 
-void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
+void __cdecl ReceiveGameReadyMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object is re-read at every use, as the image does. */
 #define COMM (kCommObj)
-#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+#define VALUE (((const AM2_ValueMsg *)msg)->value)
     if (COMM->verbose)
         am2_log("ReceiveGameReadyMsg\n");
 
@@ -524,11 +524,11 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 #undef VALUE
 }
 
-void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
+void __cdecl ReceiveGameReadyToLoadMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
 #define COMM  (kCommObj)
-#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+#define VALUE (((const AM2_ValueMsg *)msg)->value)
     void *dlg;
 
     /* Host only. */
@@ -561,7 +561,7 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 #undef VALUE
 }
 
-void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from)
+void __cdecl ReceiveEndSetupMsg(const AM2_CommMsgHdr *msg, int32_t from)
 {
     const AM2_Comm *comm = kCommObj;
 
@@ -697,7 +697,7 @@ void __cdecl ExitGamePostClose(void)
 }
 
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
-typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
+typedef void (__cdecl *AM2_MsgHandlerFn)(const AM2_CommMsgHdr *msg, int32_t dpid);
 /* Forward-declared rather than reached through win32/widget.h, which is the
    same reason script.cpp forward-declares PreloadSprite: this module is in the
    flat half and that header names Win32 types. The definition is in
@@ -716,7 +716,7 @@ void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);
 /* The chat arm. Which of the two message sinks it uses depends on the screen
  * that is up: the three menu screens get the menu one, everything else the
  * in-game HUD. */
-static inline void DispatchChat(const uint8_t *msg)
+static inline void DispatchChat(const AM2_ChatMsg *msg)
 {
     /* The sender byte is read on each path: a byte for MenuMessage's colour,
      * SIGNED and then shifted left eight for the HUD's table -- a negative
@@ -725,22 +725,21 @@ static inline void DispatchChat(const uint8_t *msg)
     int32_t screen = g_subState;
 
     if (screen == 7 || screen == 9 || screen == 8) {
-        MenuMessage((const char *)(msg + AM2_MSG_TEXT),
-                    *(const uint8_t *)(msg + AM2_MSG_SENDER), 1);
+        MenuMessage(msg->text,
+                    msg->ink, 1);
         return;
     }
 
-    HudMessage((const char *)(msg + AM2_MSG_TEXT),
+    HudMessage(msg->text,
                *(const uint8_t *)(((uintptr_t)g_chatColourTable)
-                                  + (uintptr_t)((int32_t)*(const int8_t *)
-                                                (msg + AM2_MSG_SENDER) << 8)));
+                                  + (uintptr_t)((int32_t)(int8_t)msg->ink << 8)));
 }
 
 typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
 typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
 
-void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
+void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and each record's id are read at every use. */
 #define COMM (kCommObj)
@@ -758,7 +757,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
         /* "Seed is %d" pushes a literal 0 here as well as in the send half, so
          * the seed this function is about is never in either log. */
         am2_log("ReceiveStartGameMsg for %d Players.  Seed is %d \n",
-                *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE), 0);
+                ((const AM2_ValueMsg *)msg)->value, 0);
     }
 
     /* The count is re-read every iteration, as everywhere else in this file. */
@@ -791,7 +790,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
         g_stateEnterOnce = 1;
         g_netGame         = 1;
         g_gameSeed =
-            *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
+            ((const AM2_StartMsg *)msg)->seed;
     } else {
         AM2_THE_COMM->CommGetSessionDesc();
         am2_log("Error in start\n");
@@ -809,7 +808,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
  * cross-jumped by the compiler into one. A slot above 3 falls out with no
  * call made and the mask left alone. The message is read at every use. */
 #define PAUSE_BLOCK(base)                                                   \
-    if (*(const int32_t *)(m + AM2_MSG_PAUSE)) {                            \
+    if (m->pause) {                                                         \
         if (slot == 0)      { mask = (base);      PauseGame(mask); }        \
         else if (slot == 1) { mask = (base) << 1; PauseGame(mask); }        \
         else if (slot == 2) { mask = (base) << 2; PauseGame(mask); }        \
@@ -821,26 +820,26 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
         else if (slot == 3) { mask = (base) << 3; UnPauseGame(mask); }      \
     }
 
-void __cdecl RemoteGamePause(void *msg, int32_t dpid)
+void __cdecl RemoteGamePause(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
-    const uint8_t *m    = (const uint8_t *)msg;
+    const AM2_PauseMsg *m = (const AM2_PauseMsg *)msg;
     uint32_t       mask = 0;
     int32_t        slot = AM2_THE_COMM->CommPlayerSlot(dpid);
 
     /* Both blocks run if the message asks for both, and the second overwrites
      * the mask the log will print. */
-    if (*(const uint32_t *)(m + AM2_MSG_FLAGS) & MSG_PAUSE_FLAG_A) {
+    if (m->flags & MSG_PAUSE_FLAG_A) {
         PAUSE_BLOCK(PAUSE_BIT_A_SLOT0)
     }
-    if (*(const uint32_t *)(m + AM2_MSG_FLAGS) & MSG_PAUSE_FLAG_B) {
+    if (m->flags & MSG_PAUSE_FLAG_B) {
         PAUSE_BLOCK(PAUSE_BIT_B_SLOT0)
     }
 
     if (kCommObj->verbose && mask)
         am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
                 "pauseflags = %x (%x) (msg Pause=%x)\n",
-                dpid, slot, *(const int32_t *)(m + AM2_MSG_PAUSE),
-                GetPauseFlags(), mask, *(const uint32_t *)(m + AM2_MSG_FLAGS));
+                dpid, slot, m->pause,
+                GetPauseFlags(), mask, m->flags);
 }
 #undef PAUSE_BLOCK
 
@@ -1706,9 +1705,9 @@ void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq
 #undef uid
 }
 
-void __cdecl ReceivePacket(void *packet, int32_t dpid)
+void __cdecl ReceivePacket(AM2_Packet *packet, int32_t dpid)
 {
-    AM2_Packet  *pkt = (AM2_Packet *)packet;
+    AM2_Packet  *pkt = packet;
     /* The length as it arrived, read before the slot lookup. The loop below
      * decrements the field itself, and the bogus-length test is against
      * THIS, not against the remainder. */
@@ -1910,7 +1909,7 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 #undef comm
 }
 
-void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
+void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     const AM2_FlowCtlMsg *m = (const AM2_FlowCtlMsg *)msg;
     AM2_Comm       *comm = kCommObj;
@@ -1935,11 +1934,11 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
     q->lagSpread = m->lagSpread;
 }
 
-void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
+void __cdecl CommDispatchMessage(AM2_CommMsgHdr *msg, int32_t size, int32_t from,
                                  int32_t to)
 {
     const AM2_Comm *comm = kCommObj;
-    uint8_t       *m    = (uint8_t *)msg;
+    AM2_CommMsgHdr *m = msg;
     int32_t        type;
 
     /* The queue node's length and addressee: passed, not read. Every
@@ -1951,23 +1950,23 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
     if (!comm->msgsEnabled)
         return;
 
-    type = *(const int32_t *)(m + AM2_MSG_TYPE);
+    type = m->kind;
 
     /* The arms in the image's layout order, which is the source order VC6
      * keeps; the table at 0x00410044 is in TYPE order. */
     switch (type) {
     case 1:
         g_lastMsgValue =
-            *(const int32_t *)(m + AM2_MSG_VALUE);
+            ((const AM2_ValueMsg *)m)->value;
         g_lastMsgChecksum = XorChecksum(m);
         return;
 
     case 11:
-        ReceivePacket(m, from);
+        ReceivePacket((AM2_Packet *)m, from);
         /* The slot writer's first argument is a PLAYER record here, not the
          * comm object msgslot.h describes -- FindPlayerById returns one. */
         MsgSlotB0(FindPlayerById((uint32_t)from),
-                  *(const uint32_t *)(m + AM2_MSG_VALUE));
+                  (uint32_t)((const AM2_ValueMsg *)m)->value);
         return;
 
     case 5:
@@ -2008,7 +2007,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
         return;
 
     case 3:
-        DispatchChat(m);
+        DispatchChat((const AM2_ChatMsg *)m);
         return;
 
     case 6:
@@ -2199,7 +2198,7 @@ void __cdecl CommDrainMsgs(void)
         /* The node: +0x08 sender, +0x0C addressee, +0x20 message, +0x24
          * its length -- what IDirectPlay::Receive filled in. */
         int32_t  from = (int32_t)node->from;
-        void    *msg  = node->body;
+        AM2_CommMsgHdr *msg = (AM2_CommMsgHdr *)node->body;
 #define to ((int32_t)node->to)
 
         /* DPID_SYSMSG is 0: a system message goes to the system handler. */
