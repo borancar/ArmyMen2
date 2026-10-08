@@ -153,3 +153,38 @@ p->a = 0; return G[3];                                 store, THEN the load
   statements, both signednesses and three spellings of the test were tried
   in a clone (`checked` stays 26 lines off the image at best).
 - Whether the hidden C2 switches change any of this.
+
+## Running decomp-permuter against VC6
+
+[decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
+x86 but expects ELF objects scored with GNU `objdump`, and parses C with
+pycparser. Recipe used on OptionsDefaults (2026-10-09):
+
+- **base.c**: a C clone of the function (C structs, no `__cdecl`); any C++-only
+  construct is written as a stand-in call, e.g. `Paint_(box, box->rect)` for
+  the virtual call.
+- **compile.sh** calls a converter that keeps everything after the C
+  declarations (so the permuter's helper functions survive), swaps in a C++
+  header, rewrites the stand-in to `(box)->Paint(box->rect)`, adds
+  `extern "C"`, maps `long long` to `__int64`, compiles with the hosted VC6,
+  and converts the COFF object with `objcopy -I pe-i386 -O elf32-i386`.
+- **target.o**: the compiled base with its `.text` replaced by the image's
+  bytes (`objcopy --update-section`), after copying the base's own bytes into
+  every relocation field, so relocated operands compare equal and only real
+  code differences score. Works when the two differ only in registers, so
+  lengths and relocation offsets line up.
+- Its score weighs an inserted or deleted instruction at 100 and a register
+  difference at 5, so it happily trades order problems for register swaps
+  and produces nonsense along the way: check every candidate with
+  `tools/vc6lab.py` AND for behaviour before believing it.
+
+What it found on OptionsDefaults, which hand search had not: reusing `bit` to
+hold the ternary before reading `r->bit` (the load lands before the
+`disabled` store and `mask`/`bit` get the image's registers), splitting
+`mask = r->which; bit = mask ? flags : other;` (fixes the `test` operand
+order), and then a `widget` temporary plus an empty `if (!mask) {}`. The
+empty `if` executes nothing but adds a use of `mask` at the loop top, which
+keeps `mask` live and fixes `setne dl`. That took the clone from 26 lines
+off the image to 10, of which 4 are relocated constants and 6 are the `box`
+load's registers. No natural source with that effect has been found, so
+nothing is applied yet.
