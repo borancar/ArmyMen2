@@ -8475,11 +8475,14 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
  */
 void __cdecl SelectBestWeapon(AM2_Object *u)
 {
-    int32_t best;
-    int32_t bestSlot = 0;
-    int32_t i;
+    int32_t     best;
+    int32_t     bestSlot = 0;
+    int32_t     i;
+    AM2_Object *w;
 
-    best = MapCode(WeaponByUid(u->inventory[0])->typeRec->kind);
+    /* The weapon in a local, as SelectRankedWeapon: see there. */
+    w    = WeaponByUid(u->inventory[0]);
+    best = MapCode(w->typeRec->kind);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
         uint32_t uid = u->inventory[i];
@@ -8488,7 +8491,8 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
         if (!uid)
             continue;
 
-        code = MapCode(WeaponByUid(uid)->typeRec->kind);
+        w    = WeaponByUid(uid);
+        code = MapCode(w->typeRec->kind);
 
         if (code > best) {
             bestSlot = i;
@@ -9036,11 +9040,15 @@ void __cdecl ResetObjOnCof(AM2_Object *obj)
  */
 void __cdecl SelectRankedWeapon(AM2_Object *u)
 {
-    int32_t best;
-    int32_t bestSlot = 0;
-    int32_t i;
+    int32_t     best;
+    int32_t     bestSlot = 0;
+    int32_t     i;
+    AM2_Object *w;
 
-    best = MapCode18To28(WeaponByUid(u->inventory[0])->typeRec->kind);
+    /* The weapon is held in a local before its kind is read: as one
+     * expression VC6 gives `best` and the unit each other's registers. */
+    w    = WeaponByUid(u->inventory[0]);
+    best = MapCode18To28(w->typeRec->kind);
 
     for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
         int32_t rank;
@@ -9048,7 +9056,8 @@ void __cdecl SelectRankedWeapon(AM2_Object *u)
         if (!u->inventory[i])
             continue;
 
-        rank = MapCode18To28(WeaponByUid(u->inventory[i])->typeRec->kind);
+        w    = WeaponByUid(u->inventory[i]);
+        rank = MapCode18To28(w->typeRec->kind);
 
         if (rank > best) {
             bestSlot = i;
