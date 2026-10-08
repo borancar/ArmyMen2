@@ -148,9 +148,9 @@ void __cdecl ResetPairMask(uint32_t *a, uint32_t *b)
     *a &= 0xFFDBFFFDu;
 }
 
-int32_t __cdecl IsKind7(const void *p)
+int32_t __cdecl IsKind7(const AM2_Object *obj)
 {
-    return (*(const int32_t *)p == 7) ? 1 : 0;
+    return (obj->type == 7) ? 1 : 0;
 }
 
 uint32_t __cdecl SwapColourBytes(uint32_t colour)

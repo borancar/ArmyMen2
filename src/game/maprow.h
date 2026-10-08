@@ -172,9 +172,9 @@ void __cdecl RowPoolBFree(void);
 /* 0x004608C0. Release a pool-A entry. ANSWERS THE NEXT INDEX, corrected for
  * the compaction -- every caller but the evictor discards it, so `void` is
  * what this looks like and would break the evictor's second loop. */
-int32_t __cdecl RowPoolARelease(void *entry);
+int32_t __cdecl RowPoolARelease(struct AM2_RowSlot *entry);
 /* 0x00460B90. The same for pool B. */
-int32_t __cdecl RowPoolBRelease(void *entry);
+int32_t __cdecl RowPoolBRelease(struct AM2_RowSlot *entry);
 /* 0x004609D0. Pool A is over capacity: drop off-screen entries, then drop
  * from the head regardless if that did not free enough. */
 void __cdecl RowPoolAEvict(void);
@@ -261,7 +261,7 @@ void __cdecl LeaveRemainsRow(const struct AM2_MapRow *src);
 
 /* 0x00461F90. Pick a sprite from the grid by direction and elapsed time,
  * write it into the row, and answer whether more frames remain. */
-int32_t __cdecl TimedDirFrame(void *rows, uint8_t dir);
+int32_t __cdecl TimedDirFrame(struct AM2_MapRow *rows, uint8_t dir);
 
 /* 0x00460120. Build the weighted bag a respawn draws from: two passes over
  * ADDR_SPAWN_KIND_TABLE, the first to size it and the second to fill it. */

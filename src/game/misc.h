@@ -320,7 +320,7 @@ void __cdecl ResetPairMask(uint32_t *a, uint32_t *b);
 
 /* 0x00435640. The dword at +0 equals 7. No null check, unlike the ObjIsTypeN
  * family, so it is not one of them however much it looks like one. */
-int32_t __cdecl IsKind7(const void *p);
+int32_t __cdecl IsKind7(const struct AM2_Object *obj);
 
 
 

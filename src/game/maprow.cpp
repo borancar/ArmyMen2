@@ -534,7 +534,7 @@ typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
 
 static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
                                 int32_t cap, int32_t budget,
-                                int32_t (*release)(void *))
+                                int32_t (*release)(AM2_RowSlot *))
 {
     uint8_t scratch[16];
     int32_t left;
@@ -1678,10 +1678,10 @@ void __cdecl RowPoolAFree(void)
                     AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET);
 }
 
-int32_t __cdecl RowPoolARelease(void *e)
+int32_t __cdecl RowPoolARelease(AM2_RowSlot *e)
 {
     return RowPoolRelease(&g_rowPoolA.count, &g_rowPoolA.tail, g_rowPoolA.slots,
-                          (AM2_RowSlot *)e);
+                          e);
 }
 
 void __cdecl RowPoolAEvict(void)
@@ -1708,10 +1708,10 @@ void __cdecl RowPoolBFree(void)
                     AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET);
 }
 
-int32_t __cdecl RowPoolBRelease(void *e)
+int32_t __cdecl RowPoolBRelease(AM2_RowSlot *e)
 {
     return RowPoolRelease(&g_rowPoolB.count, &g_rowPoolB.tail, g_rowPoolB.slots,
-                          (AM2_RowSlot *)e);
+                          e);
 }
 
 void __cdecl RowPoolBEvict(void)
@@ -2383,11 +2383,11 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
  *
  * The direction goes through RoundTo8 with three bits, so the grid's rows are
  * eight facings; the row index is that times the column count. */
-int32_t __cdecl TimedDirFrame(void *rows, uint8_t dir)
+int32_t __cdecl TimedDirFrame(AM2_MapRow *rows, uint8_t dir)
 {
     /* The grid's width is re-read at each use, as the image does. */
 #define COLS (g_spriteGridCols)
-    AM2_MapRow *r = (AM2_MapRow *)rows;
+    AM2_MapRow *r = rows;
     int32_t  elapsed;
     int32_t  col;
 
