@@ -5625,18 +5625,18 @@ static void __cdecl TriggerItemDestroyed(AM2_Object *obj, AM2_Object *attacker)
 static void __cdecl SendDeathMessage(AM2_Object *obj, uint32_t attackerUid,
                                      int32_t kind)
 {
-    uint8_t msg[AM2_MSG_DEATH_BYTES];
+    AM2_DeathMsg msg;
 
     if (!g_mpSession)
         return;
 
-    *(uint16_t *)(msg + 0) = AM2_MSG_DEATH_BYTES;
-    *(uint16_t *)(msg + 2) = AM2_MSG_DEATH;
-    *(uint32_t *)(msg + 4) = UidOnWire(((const AM2_Object *)obj)->uid);
-    msg[12]                = (uint8_t)kind;
-    *(uint32_t *)(msg + 8) = UidOnWire(attackerUid);
+    msg.hdr.len = AM2_MSG_DEATH_BYTES;
+    msg.hdr.kind = AM2_MSG_DEATH;
+    msg.hdr.uid = UidOnWire(((const AM2_Object *)obj)->uid);
+    msg.kind                = (uint8_t)kind;
+    msg.by = UidOnWire(attackerUid);
 
-    ArmyMessageSend(msg);
+    ArmyMessageSend(&msg);
     am2_log("Send Death Message: uid %x, army %d\n",
             ((const AM2_Object *)obj)->uid, UidArmy(attackerUid));
 }

@@ -1139,10 +1139,10 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army)
  */
 void __cdecl RecvTrooperFire(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
-    uint32_t troopUid  = UidOnWire(*(const uint32_t *)(m + 4));
-    uint32_t targetUid = UidOnWire(*(const uint32_t *)(m + 8));
-    uint32_t weaponUid = UidOnWire(*(const uint32_t *)(m + 0x14));
+    const AM2_TrooperFireMsg *m = (const AM2_TrooperFireMsg *)msg;
+    uint32_t troopUid  = UidOnWire(m->hdr.uid);
+    uint32_t targetUid = UidOnWire(m->target);
+    uint32_t weaponUid = UidOnWire(m->shotAt);
     AM2_Object *unit;
     AM2_Object *weapon;
 
@@ -1162,9 +1162,9 @@ void __cdecl RecvTrooperFire(void *msg)
     unit->sight.hit   = 1;
     unit->sight.seen   = 1;
 
-    unit->sight.spot.at.x = *(const int16_t *)(m + 0x0C);
-    unit->sight.spot.at.y = *(const int16_t *)(m + 0x0E);
-    unit->sight.spot.ground = *(const int16_t *)(m + 0x10);
+    unit->sight.spot.at.x = m->x;
+    unit->sight.spot.at.y = m->y;
+    unit->sight.spot.ground = m->z;
 
     unit->sight.uid        = targetUid;
     unit->sight.weaponUid = weaponUid;
@@ -1182,17 +1182,17 @@ void __cdecl RecvTrooperFire(void *msg)
 #undef SEL
 
     unit->fireFlag =
-        *(const uint8_t *)(m + 0x18);
+        m->flag;
 
     if (kCommObj->verbose)
         am2_log("Trooper Fire Rec, trooper: %x,  face:%d, pos (%d,%d,%d),"
                 " loctarg %x, globTarg %x, weapidx %d\n",
                 troopUid,
                 (int32_t)unit->facing,
-                (int32_t)*(const int16_t *)(m + 0x0C),
-                (int32_t)*(const int16_t *)(m + 0x0E),
-                (int32_t)*(const int16_t *)(m + 0x10),
-                targetUid, *(const uint32_t *)(m + 8),
+                (int32_t)m->x,
+                (int32_t)m->y,
+                (int32_t)m->z,
+                targetUid, m->target,
                 unit->inventorySel);
 }
 
@@ -1539,18 +1539,18 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, AM2_Object *vehicle)
  */
 void __cdecl RecvVehicleExit(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     void          *vehicle;
 
     if (kCommObj->verbose)
         orig_log("-->Vehicle Exit Received: Vehicle: %x, trooper: %x\n",
-                 UidOnWire(*(const uint32_t *)(m + 4)),
-                 UidOnWire(*(const uint32_t *)(m + 8)));
+                 UidOnWire(m->hdr.uid),
+                 UidOnWire(m->occupant));
 
-    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    vehicle = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle) {
         /* The trooper's uid is decoded before the vehicle is pushed. */
-        uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
+        uint32_t trooper = UidOnWire(m->occupant);
         VehicleTakeOutOccupant(trooper, (AM2_Object *)vehicle);
     }
 }
@@ -2034,18 +2034,6 @@ void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
     }
 }
 
-/* +0x00 len, +0x02 kind, +0x04 uid -- AM2_ArmyMsgHdr -- then the rest. */
-typedef struct {
-    AM2_ArmyMsgHdr hdr;
-    uint32_t       target;     /* +0x08, the trooper's local target on the wire */
-    int16_t        x;          /* +0x0C */
-    int16_t        y;          /* +0x0E */
-    int16_t        z;          /* +0x10 */
-    uint16_t       pad12;      /* +0x12, never written */
-    uint32_t       shotAt;     /* +0x14, the target argument's uid on the wire */
-    uint8_t        flag;       /* +0x18, the byte at +0x529 */
-    uint8_t        pad19[3];
-} AM2_TrooperFireMsg;
 
 void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
 {
@@ -3315,15 +3303,15 @@ void __cdecl RecvVehicle1B(void *msg, int32_t army)
  * assume away. */
 void __cdecl RecvVehicle1E(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     void          *vehicle;
     void          *item;
 
-    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    vehicle = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 
-    item = LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+    item = LookupByUID(UidOnWire(m->occupant));
     if (item == 0)
         return;
 
@@ -3351,22 +3339,22 @@ void __cdecl RecvVehicle1E(void *msg)
  * which is why only one of the two is turned into a pointer. */
 void __cdecl RecvVehicle24(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     AM2_Comm       *comm = g_commObject;
     void          *vehicle;
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Received: Vehicle: %x, trooper: %x\n",
-                UidOnWire(*(const uint32_t *)(m + 4)),
-                UidOnWire(*(const uint32_t *)(m + 8)));
+                UidOnWire(m->hdr.uid),
+                UidOnWire(m->occupant));
 
-    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    vehicle = ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 
     /* The trooper's uid is decoded before the vehicle is pushed. */
     {
-        uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
+        uint32_t trooper = UidOnWire(m->occupant);
         BoardVehicle(trooper, (AM2_Object *)vehicle);
     }
 }
@@ -3515,78 +3503,78 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
  * call to the same address. */
 void __cdecl RecvVehicle1D(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object and the request are read afresh at every use. */
 #define comm    (g_commObject)
-#define request (*(const int32_t *)(m + 0x10))
+#define REQUEST (m->request)
     AM2_Object       *vehicle;
     AM2_Object       *item;
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
-                UidOnWire(*(const uint32_t *)(m + 4)),
-                UidOnWire(*(const uint32_t *)(m + 8)),
-                *(const int32_t *)(m + 0x10),
-                *(const int32_t *)(m + 0x18),
-                *(const int32_t *)(m + 0x14));
+                UidOnWire(m->hdr.uid),
+                UidOnWire(m->item),
+                m->request,
+                m->slot,
+                m->quant);
 
     if (comm->isHost != 0) {
-        if (request == 2)
+        if (REQUEST == 2)
             return;
-        if (request == 3)
+        if (REQUEST == 3)
             return;
     } else {
-        if (request == 0)
+        if (REQUEST == 0)
             return;
-        if (request == 1)
+        if (REQUEST == 1)
             return;
     }
 
-    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 
     /* The two DO arms are gated a second time, on the vehicle's own army --
      * a peer only acts on a grant it is entitled to see. */
-    if ((request == 2 || request == 3)
+    if ((REQUEST == 2 || REQUEST == 3)
         && !((AM2_Comm *)comm)->CommMustBroadcast(
                               (int16_t)vehicle->owner))
         return;
 
-    item = LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+    item = LookupByUID(UidOnWire(m->item));
     if (item == 0)
         return;
     if (!ObjIsType4(item))
         return;
 
-    if (request == 2) {
+    if (REQUEST == 2) {
         if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Tell pickup item received; ammo %d\n",
-                    *(const int32_t *)(m + 0x14));
+                    m->quant);
         return;
     }
 
-    if (request == 3) {
+    if (REQUEST == 3) {
         if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Tell Drop item received; ammo %d\n",
-                    *(const int32_t *)(m + 0x14));
+                    m->quant);
         /* The answer is discarded -- the original calls it and drops it. */
         (void)((AM2_Comm *)comm)->CommMustBroadcast(
                   (int16_t)vehicle->owner);
         return;
     }
 
-    if (request == 0) {
+    if (REQUEST == 0) {
         if ((uint8_t)item->owner == AM2_ARMY_NEUTRAL) {
             int32_t have    = item->ammo;
-            int32_t granted = *(const int32_t *)(m + 0x14);
+            int32_t granted = m->quant;
 
             if (granted >= have)
                 granted = have;
             item->ammo = have - granted;
 
             SendVehicleWantItem(vehicle, item, 2,
-                                (int8_t)*(const uint8_t *)(m + 0x18), granted);
+                                (int8_t)(uint8_t)m->slot, granted);
             am2_log((const char *)(uintptr_t)"Request pickup item received & OKed; ammo %d\n",
                     granted);
         } else {
@@ -3595,12 +3583,12 @@ void __cdecl RecvVehicle1D(void *msg)
         return;
     }
 
-    if (request == 1) {
+    if (REQUEST == 1) {
         if (comm->verbose)
             am2_log((const char *)(uintptr_t)"Request drop item received; ammo %d\n",
-                    *(const int32_t *)(m + 0x14));
+                    m->quant);
     }
-#undef request
+#undef REQUEST
 #undef comm
 }
 
@@ -3631,7 +3619,7 @@ void __cdecl RecvVehicle1D(void *msg)
  * All four Log calls carry format strings and are reproduced. */
 void __cdecl RecvVehicle1F(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
+    const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object is read at every use. */
 #define comm (g_commObject)
     AM2_Object       *vehicle;
@@ -3639,17 +3627,17 @@ void __cdecl RecvVehicle1F(void *msg)
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
-                UidOnWire(*(const uint32_t *)(m + 4)),
-                UidOnWire(*(const uint32_t *)(m + 8)),
-                *(const int32_t *)(m + 0x10),
-                *(const int32_t *)(m + 0x18),
-                *(const int32_t *)(m + 0x14));
+                UidOnWire(m->hdr.uid),
+                UidOnWire(m->item),
+                m->request,
+                m->slot,
+                m->quant);
 
-    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    vehicle = (AM2_Object *)(uint8_t *)ObjByUidAlias(UidOnWire(m->hdr.uid));
     if (vehicle == 0)
         return;
 
-    item = LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+    item = LookupByUID(UidOnWire(m->item));
 
     if (item == 0) {
         /* The item is already gone. Ask the VEHICLE's weapon, not the item:
@@ -3671,7 +3659,7 @@ void __cdecl RecvVehicle1F(void *msg)
 
     if (comm->verbose)
         am2_log((const char *)(uintptr_t)"Drop item received & performed; ammo %d\n",
-                *(const int32_t *)(m + 0x14));
+                m->quant);
 
     if (!((AM2_Comm *)comm)->CommMustBroadcast(
                            (int16_t)vehicle->owner))
@@ -3710,30 +3698,30 @@ void __cdecl RecvVehicle1F(void *msg)
  * the original's, reproduced. */
 void __cdecl RecvVehicle1C(void *msg)
 {
-    const uint8_t *m = (const uint8_t *)msg;
-    uint32_t       vehUid    = UidOnWire(*(const uint32_t *)(m + 4));
-    uint32_t       targetUid = UidOnWire(*(const uint32_t *)(m + 8));
+    const AM2_VehicleFireMsg *m = (const AM2_VehicleFireMsg *)msg;
+    uint32_t       vehUid    = UidOnWire(m->hdr.uid);
+    uint32_t       targetUid = UidOnWire(m->target);
     AM2_Object       *veh       = (AM2_Object *)ObjByUidAlias(vehUid);
 
     if (veh == 0)
         return;
 
-    veh->turretFacing    = *(const uint8_t *)(m + 0x12);
+    veh->turretFacing    = (uint8_t)m->gun;
     veh->ctl.hit = 1;
-    veh->ctl.spot.at.x      = *(const int16_t *)(m + 0x0C);
-    veh->ctl.spot.at.y      = *(const int16_t *)(m + 0x0E);
-    veh->ctl.spot.ground      = *(const int16_t *)(m + 0x10);
+    veh->ctl.spot.at.x      = m->x;
+    veh->ctl.spot.at.y      = m->y;
+    veh->ctl.spot.ground      = m->z;
     veh->ctl.uid   = targetUid;
     /* +0x529 is the spread seed; see SendVehicleFire on why it stays raw. */
-    veh->fireFlag               = *(const uint8_t *)(m + 0x14);
+    veh->fireFlag               = m->seed;
 
     if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"Vehicle Fire Rec, vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x\n",
                 vehUid,
                 (uint32_t)veh->turretFacing,
-                (int32_t)*(const int16_t *)(m + 0x0C),
-                (int32_t)*(const int16_t *)(m + 0x0E),
-                (int32_t)*(const int16_t *)(m + 0x10),
+                (int32_t)m->x,
+                (int32_t)m->y,
+                (int32_t)m->z,
                 targetUid,
-                *(const uint32_t *)(m + 8));
+                m->target);
 }

@@ -116,6 +116,45 @@ typedef struct AM2_DamageMsg {
     uint8_t   pad13;            /* +0x13 */
 } AM2_DamageMsg;
 
+/* AM2_MSG_TROOPER_FIRE, 0x1C bytes. */
+typedef struct AM2_TrooperFireMsg {
+    AM2_ArmyMsgHdr hdr;             /* +0x00 uid: the trooper */
+    uint32_t  target;               /* +0x08 the trooper's local target */
+    int16_t   x;                    /* +0x0C its aim spot */
+    int16_t   y;                    /* +0x0E */
+    int16_t   z;                    /* +0x10 the spot's ground height */
+    uint16_t  pad12;                /* +0x12 never written */
+    uint32_t  shotAt;               /* +0x14 the target argument; read back as the weapon */
+    uint8_t   flag;                 /* +0x18 the fire flag, the byte at +0x529 */
+    uint8_t   pad19[3];             /* +0x19 */
+} AM2_TrooperFireMsg;
+
+/* Kind 0x1C, a vehicle's shot, 0x18 bytes. */
+typedef struct AM2_VehicleFireMsg {
+    AM2_ArmyMsgHdr hdr;             /* +0x00 uid: the vehicle */
+    uint32_t  target;               /* +0x08 */
+    int16_t   x;                    /* +0x0C */
+    int16_t   y;                    /* +0x0E */
+    int16_t   z;                    /* +0x10 */
+    uint16_t  gun;                  /* +0x12 the turret facing */
+    uint8_t   seed;                 /* +0x14 the spread seed at +0x529 */
+    uint8_t   pad15[3];             /* +0x15 */
+} AM2_VehicleFireMsg;
+
+/* A vehicle and the unit getting in or out, 0x0C bytes. */
+typedef struct AM2_VehicleMsg {
+    AM2_ArmyMsgHdr hdr;             /* +0x00 uid: the vehicle */
+    uint32_t  occupant;             /* +0x08 */
+} AM2_VehicleMsg;
+
+/* AM2_MSG_DEATH, AM2_MSG_DEATH_BYTES. */
+typedef struct AM2_DeathMsg {
+    AM2_ArmyMsgHdr hdr;             /* +0x00 uid: the victim */
+    uint32_t  by;                   /* +0x08 the attacker */
+    uint8_t   kind;                 /* +0x0C how it died */
+    uint8_t   pad0D[3];             /* +0x0D */
+} AM2_DeathMsg;
+
 /* AM2_MSG_ITEM_CREATE, 0x70 bytes. */
 typedef struct AM2_CreateMsg {
     AM2_ArmyMsgHdr hdr;         /* +0x00 uid: MSG_CREATE_OFF_UID */
