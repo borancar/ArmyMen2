@@ -25,6 +25,16 @@
 #ifndef AM2_GLOBALS_H
 #define AM2_GLOBALS_H
 
+/* The record types some globals point at, declared at file scope so a
+ * global named inside a function body does not declare a local type there. */
+struct AM2_ScreenBase;
+struct AM2_HudPanel;
+struct AM2_CmdRec;
+struct AM2_PointerModeRec;
+struct AM2_BuildMenuRec;
+struct AM2_BuildButtonRec;
+struct AM2_Edit;
+
 
 #if defined(AM2_RELINK)
 #define g_pathNodes am2_os_path_nodes
@@ -537,7 +547,7 @@
 #define g_padCount               (*(int32_t *)(uintptr_t)ADDR_PAD_COUNT)  /* 0x00511DF8 */
 #define g_padNumbers             ((struct AM2_PadNumber *)(uintptr_t)ADDR_PAD_NUMBERS)  /* 0x0051F198 */
 #define g_pads                   ((struct AM2_Pad *)(uintptr_t)ADDR_PADS)  /* 0x00516198 */
-#define g_paintObject            (*(uint8_t * *)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
+#define g_paintObject            (*(struct AM2_ScreenBase **)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
 #define g_paletteCopy            ((void *)(uintptr_t)ADDR_PALETTE_COPY)  /* 0x005022C8 */
 #define g_paletteCycleCount      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)  /* 0x00486164 */
 #define g_paletteCycleIndex      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX)  /* 0x00486160 */

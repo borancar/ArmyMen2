@@ -110,9 +110,10 @@ def _aggregated(va):
 # the typed object script-name binders want the 0x005127C8 block instead;
 # the typed comm-message receivers settle it with none kept; the typed
 # outgoing message globals want the 0x004FC8C8 block; the typed start
-# message and spiral table want the 0x00511BC8 block instead.
+# message and spiral table want the 0x00511BC8 block instead; the typed
+# paint object wants both the 0x00511BC8 and the 0x004FC8C8 blocks.
 # Search the subsets (empty first) when it flips.
-KEEP_DECLS = ((0x00511BC8, 0x00511DA0),)
+KEEP_DECLS = ((0x00511BC8, 0x00511DA0), (0x004FC8C8, 0x004FC994))
 
 
 def _kept(va):

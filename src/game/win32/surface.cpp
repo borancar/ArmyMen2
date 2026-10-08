@@ -39,7 +39,8 @@
 #include "../misc.h"
 #include "../../inject/patch.h"
 #include "frame.h"     /* RefreshDraw */
-#include "movie.h"     /* AM2_Movie, for the current movie's size flag */
+#include "movie.h"
+#include "widget.h"    /* AM2_ScreenBase, the paint object */     /* AM2_Movie, for the current movie's size flag */
 
 #include <stdint.h>
 
@@ -1193,7 +1194,7 @@ void __cdecl DrawMenuOverlay(void)
         g_presentEnabled = 0;
         if (g_paintObj) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            ObjVPaint(g_paintObj, *(const AM2_Rect *)(g_paintObj + 0x14));
+            ObjVPaint(g_paintObj, *(const AM2_Rect *)&g_paintObj->rect);
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
         IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, (*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
@@ -1420,7 +1421,7 @@ void __cdecl DrawMenuCursor(void)
                                    DDBLT_WAIT, NULL);
 
         {
-            ObjVPaint(g_paintObj, *(AM2_Rect *)(g_paintObj + 0x14));
+            ObjVPaint(g_paintObj, *(AM2_Rect *)&g_paintObj->rect);
         }
 
         /* The sprite pointer is read again for each field. */

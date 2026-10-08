@@ -1586,7 +1586,7 @@ static inline void CloseCurrentScreen(void)
 
     if (cur) {
         WidgetVDelete(cur, 1);
-        (g_paintObject) = (uint8_t *)0;
+        (g_paintObject) = (AM2_ScreenBase *)0;
     }
 }
 
@@ -8812,7 +8812,7 @@ void __cdecl OpenCommPanel(void)
 {
     CloseCurrentScreen();
     CommCreateDirectPlay(g_commObject, (void *)0);
-    (g_paintObject) = (uint8_t *)new AM2_CommPanelScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_CommPanelScreen("01_000_00_screen.bmp");
 }
 
 /* WarMenuConstruct -- original 0x0042EED0, thiscall, `ret 4`. START A WAR,
@@ -8884,7 +8884,7 @@ AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
 void __cdecl OpenWarMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_WarMenuScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_WarMenuScreen("01_000_00_screen.bmp");
 }
 
 /* DlgBattleJoinConstruct -- original 0x0042F4C0, 944 bytes, thiscall
@@ -8965,7 +8965,7 @@ AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen()
 void __cdecl OpenBattleJoin(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
@@ -9117,7 +9117,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpDialogDelete(int32_t flags)
 void __cdecl OpenBattleName(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_BattleNameScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_BattleNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00430140 -- fill a list box from a text file in `rules/`, one row per
@@ -9190,7 +9190,7 @@ void __cdecl RefreshMapSelection(void)
     char        path[0x100];
     char        prev[0x100];
 
-    if ((g_paintObject) != (uint8_t *)0
+    if ((g_paintObject) != (AM2_ScreenBase *)0
         && g_gameState == AM2_STATE_MENU
         && g_subState == AM2_MENU_MP_HOST)
         preview = ((AM2_MpPanelScreen *)g_paintObject)->preview;
@@ -9962,7 +9962,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelPaint(RECT clip)
 void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_MpPanelScreen("01_001_00_mphost.bmp");
+    (g_paintObject) = new AM2_MpPanelScreen("01_001_00_mphost.bmp");
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
 }
@@ -10708,7 +10708,7 @@ void __cdecl OptionsSyncGroup(AM2_CheckBox *header)
 void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
+    (g_paintObject) = new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
 }
 
 /* 0x004329A0, thiscall `ret 0x24` -- nine stack dwords, four of them a
@@ -11302,7 +11302,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
+    (g_paintObject) = new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
 
@@ -11390,7 +11390,7 @@ void __cdecl OpenTitleScreen(void)
 
     /* No local: the screen is reached through g_paintObject throughout,
      * as the original re-reads it. */
-    (g_paintObject) = (uint8_t *)new AM2_ScreenBase("01_000_00_screen.bmp", 1);
+    (g_paintObject) = new AM2_ScreenBase("01_000_00_screen.bmp", 1);
     ((AM2_Widget *)(g_paintObject))->flag44 = 1;
 
     /* Seven buttons, written out as the original's seven blocks; the first
@@ -11554,7 +11554,7 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_SelectMapScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_SelectMapScreen("01_000_00_screen.bmp");
 }
 
 AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
@@ -11776,7 +11776,7 @@ void __cdecl OnMenuBack(AM2_Widget *w)
 void __cdecl OpenMovies(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_MoviesScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_MoviesScreen("01_000_00_screen.bmp");
 }
 
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
@@ -11847,7 +11847,7 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
 void __cdecl OpenDifficulty(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DifficultyDialog("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_DifficultyDialog("01_000_00_screen.bmp");
 }
 
 AM2_QuitDialogScreen::AM2_QuitDialogScreen(const char *bmp)
@@ -11910,7 +11910,7 @@ void __cdecl OnQuitOk(AM2_Widget *w)
 void __cdecl OpenQuitConfirm(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_QuitDialogScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_QuitDialogScreen("01_000_00_screen.bmp");
 }
 
 AM2_ReplayDialogScreen::AM2_ReplayDialogScreen(const char *bmp)
@@ -11986,7 +11986,7 @@ void __cdecl OnReplayOk(AM2_Widget *w)
 void __cdecl OpenReplayPrompt(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044F2A0: sound effects, demonstrated by playing wave 0x27. */
@@ -12207,9 +12207,9 @@ void __cdecl OpenAudioOptions(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = (uint8_t *)new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
+        (g_paintObject) = new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
     } else {
-        (g_paintObject) = (uint8_t *)new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
+        (g_paintObject) = new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12286,7 +12286,7 @@ void __cdecl OnAudioButton(AM2_Widget *w)
 void __cdecl OpenOptionsMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044FE50, thiscall. DELETE GAME -- and the ONE screen in the table that
@@ -12417,9 +12417,9 @@ void __cdecl OpenDeleteGame(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        (g_paintObject) = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        (g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        (g_paintObject) = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12429,9 +12429,9 @@ void __cdecl OpenDeleteGameB(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        (g_paintObject) = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        (g_paintObject) = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        (g_paintObject) = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12545,7 +12545,7 @@ void __cdecl OpenOverwriteGame(void)
 {
     CloseCurrentScreen();
     RefreshScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
+    (g_paintObject) = new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
 }
 
 AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
@@ -12676,7 +12676,7 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 void __cdecl OpenDeletePlayer(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
 }
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
@@ -12966,7 +12966,7 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
 void __cdecl OpenControls(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
+    (g_paintObject) = new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
 }
 
 /* 0x004512A0. SELECT PLAYER's row callback -- what a list box calls when its
@@ -13111,7 +13111,7 @@ AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen()
 void __cdecl OpenSelectPlayer(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451AC0. ENTER NAME's CANCEL, and the screen's escape action. */
@@ -13183,7 +13183,7 @@ AM2_EnterNameScreen::~AM2_EnterNameScreen()
 void __cdecl OpenEnterName(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_EnterNameScreen("01_000_00_screen.bmp");
+    (g_paintObject) = new AM2_EnterNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451EA0. LOAD GAME's row callback: copy the chosen save's name into the
@@ -13408,12 +13408,12 @@ void __cdecl OpenLoadGame(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         /* Constructed, THEN the screen refreshed, THEN published. */
-        uint8_t *screen = (uint8_t *)new AM2_LoadGameScreen("02_007_00_loadgame.bmp", 0);
+        AM2_ScreenBase *screen = new AM2_LoadGameScreen("02_007_00_loadgame.bmp", 0);
 
         RefreshScreen();
         (g_paintObject) = screen;
     } else {
-        (g_paintObject) = (uint8_t *)new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
+        (g_paintObject) = new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -13483,7 +13483,7 @@ AM2_DlgMessageScreen::~AM2_DlgMessageScreen()
 void __cdecl OpenMessage(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DlgMessageScreen(
+    (g_paintObject) = new AM2_DlgMessageScreen(
         g_messageBmpName, 0);
 }
 
@@ -13521,7 +13521,7 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
     dlg = *(AM2_Widget * *)&g_paintObject;
     if (dlg)
         WidgetVDelete(dlg, 1);
-    g_paintObject = (uint8_t *)0;
+    g_paintObject = (AM2_ScreenBase *)0;
 
     if (!g_mpSession)
         return;
@@ -13690,7 +13690,7 @@ void __cdecl GameMenuAbort(AM2_Widget *w)
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
+    (g_paintObject) = new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
     RefreshScreen();
 }
 
@@ -14020,7 +14020,7 @@ AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen()
 void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = (uint8_t *)new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
+    (g_paintObject) = new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
     RefreshScreen();
 }
 

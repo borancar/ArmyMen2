@@ -588,7 +588,7 @@ void __cdecl State1Menu(void)
 
     if (dlg) {
         ObjVDelete(dlg, 1);
-        g_paintObject = (uint8_t *)0;
+        g_paintObject = (AM2_ScreenBase *)0;
     }
 
     /* One arm per screen, in the image's layout order; the case values are
@@ -814,7 +814,7 @@ void __cdecl State2Enter(void)
 
     if (screen) {
         WidgetVDelete(screen, 1);
-        g_paintObject = (uint8_t *)0;
+        g_paintObject = (AM2_ScreenBase *)0;
     }
     if (g_currentBitmap)
         FreeBitmap(&g_currentBitmap);
