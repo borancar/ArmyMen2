@@ -269,8 +269,16 @@ main result so far (details in `src/vc6/README.md`):
       list and the packet pool, AM2_Packet and the AM2_FlowMsg union the
       flow handler switches on, and one struct per army message kind.
       The HUD and screen widget classes carry their members too.
-    - Code-offset uses left: about 310, mostly the widget list/dialog/edit
-      families. The two comm flag walks spell the slot id twice, which is
+    - The widget layer, the gameproc block, the army and comm messages
+      (item, pair, set-weapon, deploy, damage, create, fire, vehicle,
+      death, chat, pause, flow control) and the HUD command, build-menu
+      and pointer-mode tables are typed too. `*_OFF_*` uses outside
+      static_asserts are down to about 30, and raw `*(T *)(p + 0xNN)`
+      reads to about 25. What is left is mostly flat code reading widget
+      memory it cannot name (commmsg's dialog rects and chat box), byte
+      streams (sprite and surface encoders, the save header's object
+      prefix), and a few records not yet modelled (the start message,
+      the CRT debug-heap block ReportLeaks walks). The two comm flag walks spell the slot id twice, which is
       what puts VC6's induction pointer on the id; a pointer-to-member
       helper put it on the flag.
     - A struct-by-value parameter changes the CALLER's register
