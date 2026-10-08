@@ -925,7 +925,7 @@ void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
                     if (v >= from)
                         *p = table[v];
                 }
-            } while (covered < cols);
+            } while (covered < width);
         }
     } while (--rows);
 }
