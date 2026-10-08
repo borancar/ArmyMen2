@@ -278,7 +278,19 @@ main result so far (details in `src/vc6/README.md`):
       memory it cannot name (commmsg's dialog rects and chat box), byte
       streams (sprite and surface encoders, the save header's object
       prefix), and a few records not yet modelled (the start message,
-      the CRT debug-heap block ReportLeaks walks). The two comm flag walks spell the slot id twice, which is
+      the CRT debug-heap block ReportLeaks walks).
+    - Parameters followed: army messages pass as AM2_ArmyMsgHdr and comm
+      messages as AM2_CommMsgHdr (senders hand over `&msg.hdr`), the map
+      rows, message nodes and lists, flows, def records, row-pool slots and
+      the misc helpers take what they read, and the object creators,
+      UnitByUid and PreloadArmySprite return typed pointers.
+      g_paintObject is an AM2_ScreenBase. `void *` parameters left are the
+      generic ones -- qsort comparators, pixel/palette buffers, thread and
+      callback contexts. `-Wuseless-cast` found 120 casts made redundant by
+      all this; they are gone.
+    - KEEP_DECLS kept flipping between empty and one or two of the
+      0x004FC8C8/0x00511BC8/0x00515FD8/0x005127C8 blocks; CheatLine and
+      PlacementScreenClick are the two functions it decides. The two comm flag walks spell the slot id twice, which is
       what puts VC6's induction pointer on the id; a pointer-to-member
       helper put it on the flag.
     - A struct-by-value parameter changes the CALLER's register
