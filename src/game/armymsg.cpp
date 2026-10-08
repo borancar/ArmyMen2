@@ -787,8 +787,8 @@ void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
  * about their own tracing is exactly the sort of thing a rewrite unifies. */
 void __cdecl RecvObjDestroyed(void *msg)
 {
-    const uint8_t *m   = (const uint8_t *)msg;
-    AM2_Object          *obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + 4)));
+    const AM2_ArmyMsgHdr *m = (const AM2_ArmyMsgHdr *)msg;
+    AM2_Object          *obj = LookupByUID(UidOnWire(m->uid));
 
     if (!obj)
         return;
@@ -802,8 +802,8 @@ void __cdecl RecvObjDestroyed(void *msg)
 
 void __cdecl RecvItemGone(void *msg)
 {
-    const uint8_t *m   = (const uint8_t *)msg;
-    AM2_Object          *obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + 4)));
+    const AM2_ArmyMsgHdr *m = (const AM2_ArmyMsgHdr *)msg;
+    AM2_Object          *obj = LookupByUID(UidOnWire(m->uid));
     const AM2_Comm *comm;
 
     if (!obj)

@@ -79,6 +79,15 @@ typedef struct AM2_ChatMsg {
     char     text[0xFF];            /* +0x09 MSG_CHAT_OFF_TEXT AM2_MSG_CHAT_TEXT */
 } AM2_ChatMsg;
 
+/* The flow-control message the host sends: the send flags every peer takes,
+ * and the lag it is to simulate. */
+typedef struct AM2_FlowCtlMsg {
+    AM2_CommMsgHdr hdr;             /* +0x00 */
+    int32_t  sendFlags;             /* +0x08 AM2_MSG_VALUE, into COMM_OFF_SEND_FLAGS */
+    int32_t  lagMs;                 /* +0x0C FLOW_OFF_LAG_MS's new value */
+    int32_t  lagSpread;             /* +0x10 FLOW_OFF_LAG_SPREAD's */
+} AM2_FlowCtlMsg;
+
 /* The pause message, kind 6, 0x10 bytes at ADDR_MSG_GAME_PAUSE. */
 typedef struct AM2_PauseMsg {
     AM2_CommMsgHdr hdr;             /* +0x00 */

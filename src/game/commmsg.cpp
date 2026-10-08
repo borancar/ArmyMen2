@@ -1912,7 +1912,7 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 
 void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 {
-    const uint8_t *m    = (const uint8_t *)msg;
+    const AM2_FlowCtlMsg *m = (const AM2_FlowCtlMsg *)msg;
     AM2_Comm       *comm = kCommObj;
     AM2_Flow       *q;
 
@@ -1923,7 +1923,7 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
         return;
 
     comm->sendFlags =
-        *(const int32_t *)(m + AM2_MSG_VALUE);
+        (uint32_t)m->sendFlags;
 
     /* OUR record, not the sender's. */
     q = FindPlayerById(
@@ -1931,8 +1931,8 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
     if (!q)
         return;
 
-    q->lagMs = *(const int32_t *)(m + 0x0C);
-    q->lagSpread = *(const int32_t *)(m + 0x10);
+    q->lagMs = m->lagMs;
+    q->lagSpread = m->lagSpread;
 }
 
 void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
