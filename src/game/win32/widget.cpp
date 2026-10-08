@@ -9507,7 +9507,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * back-link scrolls nothing and looks perfectly constructed. */
         *(AM2_Widget **)((uint8_t *)*slot + 0x7C) = child;
         *(AM2_Widget **)((uint8_t *)child + 0x58) = *slot;
-        *(int32_t *)((uint8_t *)child + 0x50) = 0;
+        child->flag50 = 0;
     }
 
     /* The two ready lamps, green and red, at the same size and 0x35 apart. */
@@ -9548,7 +9548,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         *(AM2_Widget **)((uint8_t *)p + 0x34) = child;
         *(AM2_Widget **)((uint8_t *)child + 0x70) =
             p->blinker0;
-        *(int32_t *)((uint8_t *)child + 0x44) = 1;
+        child->flag44 = 1;
     }
 
     /* THE MESSAGE LIST'S ROWS ARE A GLOBAL SINGLETON, made once and kept.
@@ -9746,7 +9746,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                   g_backgroundColour);
         }
         ::WidgetAddChild(w, child);
-        *(int32_t *)((uint8_t *)child + 0x50) = 0;
+        child->flag50 = 0;
     }
 
     /* THE MAP LIST, in the field that actually holds it. It has to come AFTER
@@ -16275,7 +16275,7 @@ AM2_Typer::AM2_Typer(AM2_Rect box, const char *message)
 
     w->last    = 0;
     w->shown    = 0;
-    *(int32_t *)((uint8_t *)w + 0x50)               = 0;
+    w->flag50               = 0;
     w->blinker = (AM2_Widget *)0;
 }
 

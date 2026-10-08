@@ -114,7 +114,7 @@ uint32_t __cdecl ObjType2Field548(const AM2_Object *obj)
         return 0;
     if (obj->type != 2)
         return 0;
-    return *(const uint32_t *)((const uint8_t *)obj + 0x548);
+    return (uint32_t)obj->sarge;
 }
 
 /* The lookup and the test together. The original is branchless -- ObjIsType3's
@@ -164,7 +164,7 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
     int32_t mask = (int32_t)0x80000000;
 
     switch (((AM2_Comm *)kEventComm)->CommArmyOfSlot(
-                           *(const int8_t *)((const uint8_t *)obj + 0x10))) {
+                           obj->owner)) {
     case 0:  mask = (int32_t)0xC0000000; break;
     case 1:  mask = (int32_t)0xA0000000; break;
     case 2:  mask = (int32_t)0x90000000; break;

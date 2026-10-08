@@ -488,7 +488,7 @@ void __cdecl ShooterReact(struct AM2_Object *shooter, struct AM2_Object *target)
  * `at` is a point BY VALUE: CreateWatchedType loads the dword its point
  * lives in before its first push, as VC6 copies a struct argument, where a
  * uint32_t is loaded in argument order. */
-void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
+struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
                          int32_t orFlags, int32_t remote, uint32_t uid);
 
 /* 0x0045B700, two callers. Does `from` run into `obj`? Height first, then a

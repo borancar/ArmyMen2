@@ -211,14 +211,14 @@ void __cdecl DeclareRuleVars(void)
 
 void __cdecl EvtSetField540(uint32_t uid, int32_t value)
 {
-    void *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
     obj = LookupByUID(uid);
-    if (!ObjIsType2((const AM2_Object *)obj))
+    if (!ObjIsType2(obj))
         return;
-    *(int32_t *)((uint8_t *)obj + 0x540) = value;
+    obj->field540 = value;
 }
 
 /* The two that check the type. LookupByUID's answer goes straight into
@@ -226,26 +226,26 @@ void __cdecl EvtSetField540(uint32_t uid, int32_t value)
  * type test rather than by a test of its own. */
 void __cdecl EvtSetModeF0(uint32_t uid, int32_t value)
 {
-    void *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
     obj = LookupByUID(uid);
-    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+    if (!ObjIsTypeIn238(obj))
         return;
-    *(int32_t *)((uint8_t *)obj + 0xF0) = value;
+    obj->moveStateAlt = value;
 }
 
 void __cdecl EvtSetMode94(uint32_t uid, int32_t value)
 {
-    void *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
     obj = LookupByUID(uid);
-    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+    if (!ObjIsTypeIn238(obj))
         return;
-    *(int32_t *)((uint8_t *)obj + 0x94) = value;
+    obj->aiDriven = value;
 }
 
 /* Sets or clears bits 4 and 11 together in the flags word at +8 -- the same
@@ -295,14 +295,14 @@ void __cdecl EvtSetByte530(uint32_t uid, int8_t value)
     obj = LookupType3ByUID(uid);
     if (!obj)
         return;
-    *(int8_t *)((uint8_t *)obj + 0x530) = value;
+    obj->turretFacing = (uint8_t)value;
 }
 
 /* The clamp is applied to the caller's value before the object is looked up,
  * so it happens even when the store does not. */
 void __cdecl EvtSetWord60(uint32_t uid, int32_t value)
 {
-    void *obj;
+    AM2_Object *obj;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
@@ -311,7 +311,7 @@ void __cdecl EvtSetWord60(uint32_t uid, int32_t value)
     obj = LookupByUID(uid);
     if (!obj)
         return;
-    *(int16_t *)((uint8_t *)obj + 0x60) = (int16_t)value;
+    obj->maxHealth = (int16_t)value;
 }
 
 /* script.cpp's ActAiMode is where these codes come from. Only defend needs

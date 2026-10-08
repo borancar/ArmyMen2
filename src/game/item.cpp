@@ -2295,7 +2295,7 @@ void __cdecl WeaponRespawn(AM2_Object *obj)
 
     if (made)
         EventNotify(0, g_ruleUidC,
-                    *(const uint32_t *)((const uint8_t *)made + 4),
+                    ((const AM2_Object *)made)->uid,
                     0, 0, 0, 0, AM2_WEAPON_RESPAWN_MS, 0, 1);
 
 mark:
@@ -12186,7 +12186,7 @@ no_weapon:
  * read back off the object rather than from the argument, with a signed
  * compare on the byte.
  */
-void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
+struct AM2_Object *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
                          int32_t orFlags, int32_t remote, uint32_t uid)
 {
     AM2_DefLink *rec;
@@ -12201,7 +12201,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
     if (g_mpSession && remote == 0
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
-        return (void *)0;
+        return (AM2_Object *)0;
 
     rec = DefFindLink(key, 0);
     if (rec) {
@@ -12270,7 +12270,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
         if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
                             (int32_t)uid)) {
             am2_free(o);
-            return (void *)0;
+            return (AM2_Object *)0;
         }
 
         for (i = 0; i < o->rowSet.count; i++)
@@ -14013,7 +14013,7 @@ void __cdecl CreateWatchedItem(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
 {
     AM2_Object *o = obj;
     AM2_Point point;
-    void    *item;
+    AM2_Object *item;
 
     /* `at` is a packed point, read a half at a time from its slot. */
     point.x = (int16_t)(at.x
@@ -14030,15 +14030,15 @@ void __cdecl CreateWatchedItem(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
 
     ItemPostCreate(o->owner, point);
 
-    *(uint8_t *)((uint8_t *)item + 0x65u) = (uint8_t)o->heightSet;
-    ObjTileChanged((AM2_Object *)item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+    item->heightSet = o->heightSet;
+    ObjTileChanged(item, item->heightSet, 1);
 
     /* The original loads ecx with the comm object first and AllyFlag ignores
      * it -- army.h records that of both existing call sites, and this is a
      * third. Two stack arguments, owner then army. */
     if (!AM2_THE_COMM->AllyFlag(*(const int32_t *)&g_defaultOwner,
                                 o->owner))
-        ObjConceal((AM2_Object *)item, 1);
+        ObjConceal(item, 1);
 
     (void)weapon;
 }
@@ -14048,7 +14048,7 @@ void __cdecl CreateWatchedType(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
 {
     AM2_Object *o = obj;
     AM2_Point point;
-    void    *item;
+    AM2_Object *item;
 
     /* `at` is a packed point, read a half at a time from its slot. */
     point.x = (int16_t)(at.x
@@ -14063,8 +14063,8 @@ void __cdecl CreateWatchedType(AM2_Object *weapon, AM2_Object *obj, AM2_Point at
     if (item == 0)
         return;
 
-    *(uint8_t *)((uint8_t *)item + 0x65u) = (uint8_t)o->heightSet;
-    ObjTileChanged((AM2_Object *)item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+    item->heightSet = o->heightSet;
+    ObjTileChanged(item, item->heightSet, 1);
 
     (void)weapon;
 }
