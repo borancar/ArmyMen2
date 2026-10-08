@@ -9053,9 +9053,9 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     AM2_Edit *edit;
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_NAME_DLG);
 
-    strcpy((char *)this + 0x64,
+    strcpy(this->battle,
                &g_savedBattleName);
-    strcpy((char *)this + 0x84,
+    strcpy(this->player,
                &g_savedPlayerName);
     SetGameDir(g_dirScratch);
 
@@ -9491,9 +9491,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * allocation failure this faults, which VC6 makes possible because
          * its operator new returns null rather than throwing. Reproduced,
          * like LockSurface's descriptor defect, rather than repaired. */
-        *(int32_t *)((uint8_t *)*slot + 0x5C) = -1;
-        *(int32_t *)((uint8_t *)*slot + 0x4C) = 1;
-        *(int32_t *)((uint8_t *)*slot + 0x50) = 0;
+        (*slot)->chosen   = -1;
+        (*slot)->disabled = 1;
+        (*slot)->flag50   = 0;
         ::WidgetAddChild(w, *slot);
 
         child = new AM2_ArrowBar(*RectSet(&r, 0x121, 0xC2, 0x13, 0x68), w,
@@ -9505,8 +9505,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         /* The list and its bar point at each other -- the list's +0x7C is the
          * bar and the bar's +0x58 is the list. A scrollbar built without that
          * back-link scrolls nothing and looks perfectly constructed. */
-        *(AM2_Widget **)((uint8_t *)*slot + 0x7C) = child;
-        *(AM2_Widget **)((uint8_t *)child + 0x58) = *slot;
+        (*slot)->arrowBar = child;
+        ((AM2_ArrowBar *)child)->list = *slot;
         child->flag50 = 0;
     }
 
@@ -9519,8 +9519,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                 1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
         p->blinker0 = child;
         ::WidgetAddChild(w, child);
-        *(int32_t *)((uint8_t *)p->blinker0
-                     + 0x50) = 0;
+        p->blinker0->flag50 = 0;
     }
 
     {
@@ -9529,15 +9528,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                             1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
         p->blinker1 = child;
         ::WidgetAddChild(w, child);
-        *(int32_t *)((uint8_t *)p->blinker1
-                     + 0x50) = 0;
+        p->blinker1->flag50 = 0;
     }
 
     /* The chat line: its buffer is a FIELD of the panel, seeded from the
      * directory scratch, and the edit writes into it in place. */
-    strcpy((char *)((uint8_t *)p + 0xE4), g_dirScratch);
+    strcpy(p->chatText, g_dirScratch);
     {
-        AM2_Widget *child = new AM2_Edit((char *)((uint8_t *)p + 0xE4), 0x3C,
+        AM2_Edit *child = new AM2_Edit(p->chatText, 0x3C,
                                          *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
                                          g_hiliteColour,
                                          g_colourBelowBg,
@@ -9545,8 +9543,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                          OnChatEnter,
                                          0, 0);
         ::WidgetAddChild(w, child);
-        *(AM2_Widget **)((uint8_t *)p + 0x34) = child;
-        *(AM2_Widget **)((uint8_t *)child + 0x70) =
+        p->focusedChild = child;
+        child->dot =
             p->blinker0;
         child->flag44 = 1;
     }
