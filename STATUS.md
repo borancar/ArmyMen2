@@ -66,8 +66,13 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1548 of
-  1645 byte-identical (2026-10-07), piecewise 399.** The CheatLine /
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1552 of
+  1645 byte-identical (2026-10-08), piecewise 399.** The last four
+  (SelectBestWeapon, SelectRankedWeapon, ObjCollidesWith, HudTopUpdate) came
+  from holding a call result in a typed local and from spelling a stored
+  value differently from the one compared next, which stops VC6 threading the
+  compare. A greedy mutation climber (operand swaps, relational flips, hoisted
+  call results) over 30 of the remaining 93 moved none of them. The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
   externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
