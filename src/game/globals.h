@@ -457,7 +457,7 @@
 #define g_msgEndSetup            ((struct AM2_CommMsgHdr *)(uintptr_t)ADDR_MSG_END_SETUP)  /* 0x004FC3A8 */
 #define g_msgGamePause           ((struct AM2_PauseMsg *)(uintptr_t)ADDR_MSG_GAME_PAUSE)  /* 0x004FAA50 */
 #define g_msgGameReady           ((struct AM2_ValueMsg *)(uintptr_t)ADDR_MSG_GAME_READY)  /* 0x004FAA28 */
-#define g_msgGameStart           ((uint8_t *)(uintptr_t)ADDR_MSG_GAME_START)  /* 0x004FC5F0 */
+#define g_msgGameStart           ((struct AM2_StartMsg *)(uintptr_t)ADDR_MSG_GAME_START)  /* 0x004FC5F0 */
 #define g_msgKind01              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND01)  /* 0x004FBF80 */
 #define g_msgKind02              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND02)  /* 0x004F48E8 */
 #define g_msgKind04              ((uint8_t *)(uintptr_t)ADDR_MSG_KIND04)  /* 0x004FBB80 */
@@ -741,7 +741,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_spawnKindTable         ((uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE)  /* 0x0066205C */
 #define g_spiralDx               ((int32_t *)(uintptr_t)ADDR_SPIRAL_DX)  /* 0x0048782C */
 #define g_spiralDy               ((int32_t *)(uintptr_t)ADDR_SPIRAL_DY)  /* 0x0048783C */
-#define g_spiralStep             ((uint8_t *)(uintptr_t)ADDR_SPIRAL_STEP)  /* 0x00485340 */
+#define g_spiralStep             ((const struct AM2_SpiralStep *)(uintptr_t)ADDR_SPIRAL_STEP)  /* 0x00485340 */
 #define g_spriteFile             (*(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE)  /* 0x006598B8 */
 #define g_spriteGrid             (*(struct AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID)  /* 0x0048CA40 */
 #define g_spriteGridCols         (*(int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS)  /* 0x0048CA3C */

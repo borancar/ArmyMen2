@@ -2177,27 +2177,23 @@ int32_t __cdecl SaveType3(am2_FILE *fp, AM2_Object *obj)
  */
 int32_t __cdecl SaveType4(am2_FILE *fp, AM2_Object *obj)
 {
-    const uint8_t *rec = (const uint8_t *)&obj->field94;
-
     if (!SaveType1(fp, obj))
         return 0;
 
-    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x30));
-    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x34));
-    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x38));
+    WriteSaveTag(fp, obj->lastUse);
+    WriteSaveTag(fp, obj->pickupAfter);
+    WriteSaveTag(fp, (uint32_t)obj->ammo);
     return 1;
 }
 
 int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
 {
-    const uint8_t *rec = (const uint8_t *)&obj->field94;
+    WriteSaveTag(fp, (uint32_t)obj->def->kind);
+    WriteSaveTag(fp, obj->shooterUid);
 
-    WriteSaveTag(fp, **(const uint32_t *const *)rec);
-    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x04));
-
-    orig_fwrite(rec + 0x08, 4, 1, fp);
-    orig_fwrite(rec + 0x10, 4, 1, fp);
-    orig_fwrite(rec + 0x18, 4, 1, fp);
+    orig_fwrite(&obj->repairFrame, 4, 1, fp);
+    orig_fwrite(&obj->speedScale, 4, 1, fp);
+    orig_fwrite(&obj->flown, 4, 1, fp);
     return 1;
 }
 

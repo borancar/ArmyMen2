@@ -10138,7 +10138,7 @@ void __cdecl NearestClearVehiclePoint(AM2_Object *veh, uint8_t facing, AM2_Point
     snapped = (uint8_t)RoundTo8(facing & 0xFF, AM2_VEHICLE_FACING_BITS);
 
     for (;;) {
-        const uint8_t *entry;
+        const AM2_SpiralStep *entry;
 
         if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
             && VehicleBlockWeight(veh, snapped, *out, 0)
@@ -10157,14 +10157,13 @@ void __cdecl NearestClearVehiclePoint(AM2_Object *veh, uint8_t facing, AM2_Point
             }
         }
 
-        entry = g_spiralStep
-                + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
+        entry = &g_spiralStep[(uint32_t)dir];
 
         out->x = (int16_t)(out->x
-                           + (int16_t)((int16_t)*(const int16_t *)entry
+                           + (int16_t)(entry->dx
                                        << AM2_SPIRAL_STEP_SHIFT));
         out->y = (int16_t)(out->y
-                           + (int16_t)((int16_t)*(const int16_t *)(entry + 4)
+                           + (int16_t)(entry->dy
                                        << AM2_SPIRAL_STEP_SHIFT));
     }
 }
@@ -10205,7 +10204,7 @@ void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out)
     *out = from;
 
     for (;;) {
-        const uint8_t *entry;
+        const AM2_SpiralStep *entry;
 
         if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
             && BlockWeightAt((AM2_Object *)(void *)0, *out, *out) < AM2_BLOCK_CLEAR)
@@ -10223,14 +10222,13 @@ void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out)
             }
         }
 
-        entry = g_spiralStep
-                + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
+        entry = &g_spiralStep[(uint32_t)dir];
 
         out->x = (int16_t)(out->x
-                           + (int16_t)((int16_t)*(const int16_t *)entry
+                           + (int16_t)(entry->dx
                                        << AM2_SPIRAL_STEP_SHIFT));
         out->y = (int16_t)(out->y
-                           + (int16_t)((int16_t)*(const int16_t *)(entry + 4)
+                           + (int16_t)(entry->dy
                                        << AM2_SPIRAL_STEP_SHIFT));
     }
 }

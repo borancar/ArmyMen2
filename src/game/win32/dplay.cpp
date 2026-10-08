@@ -2074,7 +2074,7 @@ void __cdecl SendGameStartMsg(void)
     /* The comm object is read at every use. */
 #define COMM (g_commObject)
 #define DESC ((LPDPSESSIONDESC2)COMM->sessionDesc)
-    uint8_t *msg = g_msgGameStart;
+    AM2_StartMsg *msg = g_msgGameStart;
 
     /* NOT gated on the verbosity field, unlike the rest of this group. */
     orig_log("SendGameStartMsg\n");
@@ -2087,8 +2087,8 @@ void __cdecl SendGameStartMsg(void)
         if (!COMM->isHost)
             return;
 
-        *(int32_t *)(msg + 8) = COMM->playerCount;
-        *(int32_t *)(msg + 12) = (int32_t)COMM->selfId;
+        msg->players = COMM->playerCount;
+        msg->hostId  = (int32_t)COMM->selfId;
 
         /* The shared seed: read once here and sent, so every machine agrees. */
         seed = orig_crt_time((int32_t *)0);
@@ -2107,7 +2107,7 @@ void __cdecl SendGameStartMsg(void)
         desc->dwFlags |= AM2_SESSION_FLAGS_START;
         AM2_THE_COMM->CommSetSessionDesc(desc, 0);
 
-        AM2_THE_COMM->CommSend(0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
+        AM2_THE_COMM->CommSend(0, 1, msg, (uint32_t)msg->hdr.size);
     }
 
     /* Reached by the host AND by the already-started case. */

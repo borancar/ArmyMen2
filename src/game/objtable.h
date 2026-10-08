@@ -216,6 +216,15 @@ typedef struct AM2_TrooperDefRec {
     int32_t xp;                     /* +0x1C RANK_SRC_OFF_XP */
 } AM2_TrooperDefRec;
 
+/* One step of the spiral NearestClearVehiclePoint walks, AM2_SPIRAL_STEP_STRIDE
+ * bytes at ADDR_SPIRAL_STEP, indexed by direction. */
+typedef struct AM2_SpiralStep {
+    int16_t dx;                     /* +0x00 */
+    int16_t pad2;                   /* +0x02 */
+    int16_t dy;                     /* +0x04 */
+    int16_t pad6;                   /* +0x06 */
+} AM2_SpiralStep;
+
 /* One of ADDR_SOLDIER_NAMES' AM2_SOLDIER_NAMES entries: the name, and
  * whether a trooper has it. */
 typedef struct AM2_SoldierName {
