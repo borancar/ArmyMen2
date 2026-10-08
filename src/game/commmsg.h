@@ -61,7 +61,7 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, struct AM2_Object *vehicle);
 
 /* 0x00401210. Drain one message list into another, head first. Here rather
  * than in gameproc.cpp because of SELFTEST_SRC; see commmsg.cpp. */
-void __cdecl DrainMsgList(void *list);
+void __cdecl DrainMsgList(struct AM2_MsgList *list);
 
 /* 0x0044C550, one caller. Run one thing on every occupied comm slot that
  * CommMustBroadcast accepts -- so nothing at all in single player. */
@@ -137,7 +137,7 @@ const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army);
  * for every message on a reliable channel. Dispatches AM2_FLOW_DATA,
  * AM2_FLOW_NACK and AM2_FLOW_PULSE_ACK. Answers 1 when it has dealt with the
  * message and 0 when the caller should queue it. */
-int32_t __cdecl FlowRecvMessage(void *nodev);
+int32_t __cdecl FlowRecvMessage(struct AM2_MsgNode *nodev);
 
 /* 0x0045E590. The vehicle message dispatcher: eleven table slots over seven
  * handlers, with kinds 0x20..0x23 sharing the unknown-message arm. */

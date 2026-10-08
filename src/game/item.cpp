@@ -6230,7 +6230,7 @@ typedef void (__cdecl *AM2_StepFn)(void *obj);
 void __cdecl StepType8(AM2_Object *o)
 {
     AM2_RoachOut *facing;
-    void         *row;
+    AM2_MapRow   *row;
 
     ObjClearRoachFootprint(o);
     o->roachCtl.heading = o->facing;
@@ -6254,7 +6254,7 @@ void __cdecl StepType8(AM2_Object *o)
             if (!RowAnimFinished(row))
                 break;
             RowFaceSprite(row);
-            LeaveRemainsRow((const AM2_MapRow *)row);
+            LeaveRemainsRow(row);
             DestroyByType(o);
             break;
 

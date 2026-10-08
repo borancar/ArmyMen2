@@ -123,11 +123,11 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
 /* 0x0040A2D0. Whether the row's animation has reached its last cell and that
  * cell's hold has elapsed -- "the animation is over", not a per-cell tick.
  * See ADDR_ROW_ANIM_FINISHED in orig.h. */
-int32_t __cdecl RowAnimFinished(const void *row);
+int32_t __cdecl RowAnimFinished(const struct AM2_MapRow *row);
 
 /* 0x0040A310. Point the row's sprite at the animation cell for the heading it
  * is facing. See anim.cpp for why that cell is the last of its direction. */
-void __cdecl RowFaceSprite(void *row);
+void __cdecl RowFaceSprite(struct AM2_MapRow *row);
 
 void __cdecl LoadExplosionAnims(void);   /* 0x00422820 */
 void __cdecl LoadMissileAnims(void);     /* 0x0043C6F0 */

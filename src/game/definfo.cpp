@@ -610,7 +610,7 @@ void __cdecl FreeMissileDefs(void)
  *
  * So the shared constants ARE shared -- AM2_DEF_LINK_INITIAL and _GROW are
  * the table policy, not the trooper's -- and the record size is not. */
-void __cdecl AddVehicleDef(const void *rec)
+void __cdecl AddVehicleDef(const AM2_VehicleDef *rec)
 {
     uint8_t *tab = g_vehicleDefs;
     int32_t  cap;
@@ -658,7 +658,7 @@ void __cdecl AddVehicleDef(const void *rec)
  * established: the image has three functions and a helper would have to take
  * the record size as an argument, which is exactly the multiply the compiler
  * chose not to make general. */
-void __cdecl AddMissileDef(const void *rec)
+void __cdecl AddMissileDef(const AM2_MissileDefRec *rec)
 {
     uint8_t *tab = g_defMissileRecs;
     int32_t  cap;

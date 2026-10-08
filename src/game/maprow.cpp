@@ -683,9 +683,9 @@ void __cdecl RowInit(AM2_MapRow *r, AM2_Sprite *sprite, int32_t x, int32_t y)
  *
  * Id 0 is refused before the table is touched at all.
  */
-int32_t __cdecl RowAnimField4(const void *row, uint16_t id)
+int32_t __cdecl RowAnimField4(const AM2_MapRow *row, uint16_t id)
 {
-    const AM2_MapRow       *r = (const AM2_MapRow *)row;
+    const AM2_MapRow       *r = row;
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              value;

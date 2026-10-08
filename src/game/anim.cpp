@@ -373,9 +373,9 @@ void __cdecl FreeVehicleAnims(void)
  * leaves `mission` at 281 pixels, inside the band clean runs give. Neither
  * this nor TileToXY beside it is discriminated by anything in the suite.
  */
-int32_t __cdecl RowAnimFinished(const void *row)
+int32_t __cdecl RowAnimFinished(const AM2_MapRow *row)
 {
-    const AM2_MapRow  *r = (const AM2_MapRow *)row;
+    const AM2_MapRow  *r = row;
     const AM2_Anim *a;
 
     /* One conjunction onto one `return 1`, every failure sharing the
@@ -420,9 +420,9 @@ int32_t __cdecl RowAnimFinished(const void *row)
  * Worth saying which check found it, because three of the last four functions
  * were invisible to the pixels: this one is not, and dramatically so. A wrong
  * sprite per unit per frame is the most visible thing reconstructed lately. */
-void __cdecl RowFaceSprite(void *row)
+void __cdecl RowFaceSprite(AM2_MapRow *row)
 {
-    AM2_MapRow         *r = (AM2_MapRow *)row;
+    AM2_MapRow         *r = row;
     const AM2_Anim  *a;
     uint8_t          heading;
     int16_t          dir;

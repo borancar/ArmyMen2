@@ -196,12 +196,12 @@ extern "C" {
 #define AM2_MSGSLOT_A_OFF  0x420u
 #define AM2_MSGSLOT_B_OFF  0x600u
 
-void __cdecl MsgSlotA0(void *rec, uint32_t seq);
-void __cdecl MsgSlotA1(void *rec, uint32_t seq);
-void __cdecl MsgSlotA2(void *rec, uint32_t seq);
-void __cdecl MsgSlotB0(void *rec, uint32_t seq);
-void __cdecl MsgSlotB1(void *rec, uint32_t seq);
-void __cdecl MsgSlotB2(void *rec, uint32_t seq);
+void __cdecl MsgSlotA0(AM2_Flow *rec, uint32_t seq);
+void __cdecl MsgSlotA1(AM2_Flow *rec, uint32_t seq);
+void __cdecl MsgSlotA2(AM2_Flow *rec, uint32_t seq);
+void __cdecl MsgSlotB0(AM2_Flow *rec, uint32_t seq);
+void __cdecl MsgSlotB1(AM2_Flow *rec, uint32_t seq);
+void __cdecl MsgSlotB2(AM2_Flow *rec, uint32_t seq);
 
 /* 0x00401040. The dword at +0xC of a comm message. Callers are CommReceive,
  * PacketThreadProc and RemovePlayer, so it is the message rather than the comm
@@ -535,6 +535,7 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid);
  * otherwise. Both arms then request menu 0x22 and raise the state-pending flag
  * DIRECTLY, without going through RequestState -- which is the same pair
  * CLAUDE.md records as the route to the level teardown. */
+struct AM2_ArmyMsgHdr;
 void __cdecl ReceiveArmyMsg(const struct AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq);
 
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".

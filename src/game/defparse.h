@@ -113,7 +113,7 @@ int defparse_install(void);
 /* 0x0044CCC0 and 0x0044CF70. The third def table -- 32-byte records keyed on
  * their first dword, filled by the still-original parser at 0x0044CD70 whose
  * rejection message is "Bad Trooper Type". Append one, and drop the lot. */
-void __cdecl DefAddTrooperRec(const void *rec);
+void __cdecl DefAddTrooperRec(const struct AM2_TrooperDefRec *rec);
 /* 0x0044CDA0 -- the `trooperlevel1`..`trooperlevel8` lines of a .def file. */
 int32_t __cdecl DefTrooperLine(int32_t cmd, char *line);
 void __cdecl DefFreeTrooperRecs(void);

@@ -2219,11 +2219,11 @@ void __cdecl CommDrainMsgs(void)
 /* 0x00401210. Drain one message list into another, head first, until the
  * source is empty. RemHead answers null when there is nothing left, which is
  * both the loop's test and its value. */
-void __cdecl DrainMsgList(void *list)
+void __cdecl DrainMsgList(AM2_MsgList *list)
 {
     AM2_MsgNode *node;
 
-    while ((node = MsgListRemHead((AM2_MsgList *)list)) != (void *)0)
+    while ((node = MsgListRemHead(list)) != (void *)0)
         MsgListAdd(g_msgListPool, node);
 }
 
@@ -2819,13 +2819,13 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq);
  *
  * Nothing here can be A/B'd: no DirectPlay session opens on this machine, so
  * it is verified by reading and by the byte comparison. */
-int32_t __cdecl FlowRecvMessage(void *nodev)
+int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
 {
 #define comm (g_commObject)
 #define VERBOSE (comm->verbose)
 #define FROM (node->from)
 #define MINE (comm->selfId)
-    AM2_MsgNode *node = (AM2_MsgNode *)nodev;
+    AM2_MsgNode *node = nodev;
     AM2_FlowMsg *msg;
     AM2_Flow *sender, *me;
     AM2_MsgNode *sent;

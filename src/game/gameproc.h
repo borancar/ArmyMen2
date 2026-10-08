@@ -31,7 +31,7 @@ extern "C" {
 /* Six small teardown steps, none over thirty-two bytes; four of them run from
  * the level teardown and each ends by tail-jumping to the logger. */
 void __cdecl ZeroUnread50C34C(void);
-int32_t __cdecl NoteKind31(void *rec);
+int32_t __cdecl NoteKind31(struct AM2_MsgNode *rec);
 void __cdecl Call405220(struct AM2_Object *o, struct AM2_SightOut *out,
                         struct AM2_SightCtx *c);
 /* 0x00445FE0. Free the sprite registry, then log `msg`. The message is an

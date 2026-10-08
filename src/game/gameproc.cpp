@@ -2574,9 +2574,9 @@ void __cdecl ZeroUnread50C34C(void)
 
 /* 0x00402670. Its answer is always 0 and its one caller ignores it, so the
  * only thing it does is the flag. */
-int32_t __cdecl NoteKind31(void *rec)
+int32_t __cdecl NoteKind31(AM2_MsgNode *rec)
 {
-    if (**(const int32_t *const *)((const uint8_t *)rec + 0x20) == AM2_KIND_31)
+    if (((const AM2_CommMsgHdr *)rec->body)->kind == AM2_KIND_31)
         g_commObject->sawKind31 = 1;
 
     return 0;

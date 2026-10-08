@@ -19,19 +19,26 @@
 /* `inline` is load-bearing: the original has this body at every call site,
  * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
  * each caller compiled to push/call/pop -- the relink found it. */
-static inline void SetSlot(void *rec, uint32_t seq, uint32_t off, uint32_t value)
+static inline void SetSlotA(AM2_Flow *rec, uint32_t seq, int32_t value)
 {
     if (!rec)
         return;
-    ((uint32_t *)((uint8_t *)rec + off))[seq % AM2_MSGSLOT_COUNT] = value;
+    rec->ringA[seq % AM2_MSGSLOT_COUNT] = value;
 }
 
-void __cdecl MsgSlotA0(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 0); }
-void __cdecl MsgSlotA1(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 1); }
-void __cdecl MsgSlotA2(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 2); }
-void __cdecl MsgSlotB0(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 0); }
-void __cdecl MsgSlotB1(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 1); }
-void __cdecl MsgSlotB2(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 2); }
+static inline void SetSlotB(AM2_Flow *rec, uint32_t seq, int32_t value)
+{
+    if (!rec)
+        return;
+    rec->ringB[seq % AM2_MSGSLOT_COUNT] = value;
+}
+
+void __cdecl MsgSlotA0(AM2_Flow *rec, uint32_t seq) { SetSlotA(rec, seq, 0); }
+void __cdecl MsgSlotA1(AM2_Flow *rec, uint32_t seq) { SetSlotA(rec, seq, 1); }
+void __cdecl MsgSlotA2(AM2_Flow *rec, uint32_t seq) { SetSlotA(rec, seq, 2); }
+void __cdecl MsgSlotB0(AM2_Flow *rec, uint32_t seq) { SetSlotB(rec, seq, 0); }
+void __cdecl MsgSlotB1(AM2_Flow *rec, uint32_t seq) { SetSlotB(rec, seq, 1); }
+void __cdecl MsgSlotB2(AM2_Flow *rec, uint32_t seq) { SetSlotB(rec, seq, 2); }
 
 uint32_t __cdecl MsgField12(const AM2_MsgList *list)
 {

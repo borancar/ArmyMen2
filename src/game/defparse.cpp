@@ -193,7 +193,7 @@ void __cdecl DefAddObjRec(const int32_t *rec)
  * and the eight appends exercise the initial malloc but not the grow: fifty
  * records is the initial capacity and eight is well inside it.
  */
-void __cdecl DefAddTrooperRec(const void *rec)
+void __cdecl DefAddTrooperRec(const AM2_TrooperDefRec *rec)
 {
     uint8_t *tab = (uint8_t *)kDefTrooperRecs;
     int32_t  cap;
@@ -256,41 +256,41 @@ void __cdecl DefAddTrooperRec(const void *rec)
  * is shared with DefParseInfoFile, which is mid-file when this is called. */
 int32_t __cdecl DefTrooperLine(int32_t cmd, char *line)
 {
-    int32_t rec[AM2_DEF_TROOPER_REC_DWORDS];
+    AM2_TrooperDefRec rec;
 
     /* A switch with an arm per rank, and the seven number fields parsed one
      * after another, each with its own failure code: the image has neither
      * the subtraction nor the loop. */
     switch (cmd) {
-    case AM2_DEF_TROOPERLEVEL1 + 0: rec[0] = 0; break;
-    case AM2_DEF_TROOPERLEVEL1 + 1: rec[0] = 1; break;
-    case AM2_DEF_TROOPERLEVEL1 + 2: rec[0] = 2; break;
-    case AM2_DEF_TROOPERLEVEL1 + 3: rec[0] = 3; break;
-    case AM2_DEF_TROOPERLEVEL1 + 4: rec[0] = 4; break;
-    case AM2_DEF_TROOPERLEVEL1 + 5: rec[0] = 5; break;
-    case AM2_DEF_TROOPERLEVEL1 + 6: rec[0] = 6; break;
-    case AM2_DEF_TROOPERLEVEL1 + 7: rec[0] = 7; break;
+    case AM2_DEF_TROOPERLEVEL1 + 0: rec.rank = 0; break;
+    case AM2_DEF_TROOPERLEVEL1 + 1: rec.rank = 1; break;
+    case AM2_DEF_TROOPERLEVEL1 + 2: rec.rank = 2; break;
+    case AM2_DEF_TROOPERLEVEL1 + 3: rec.rank = 3; break;
+    case AM2_DEF_TROOPERLEVEL1 + 4: rec.rank = 4; break;
+    case AM2_DEF_TROOPERLEVEL1 + 5: rec.rank = 5; break;
+    case AM2_DEF_TROOPERLEVEL1 + 6: rec.rank = 6; break;
+    case AM2_DEF_TROOPERLEVEL1 + 7: rec.rank = 7; break;
     default:
         orig_log("Bad Trooper Type\n");
         return 1;
     }
 
-    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
+    if (!DefParseNumber(&rec.maxHealth, am2_strtok(line, kSep)))
         return 2;
-    if (!DefParseNumber(&rec[2], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.field04, am2_strtok((char *)0, kSep)))
         return 3;
-    if (!DefParseNumber(&rec[3], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.sightRange, am2_strtok((char *)0, kSep)))
         return 4;
-    if (!DefParseNumber(&rec[4], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.field08, am2_strtok((char *)0, kSep)))
         return 5;
-    if (!DefParseNumber(&rec[5], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.firePct, am2_strtok((char *)0, kSep)))
         return 6;
-    if (!DefParseNumber(&rec[6], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.threshold, am2_strtok((char *)0, kSep)))
         return 7;
-    if (!DefParseNumber(&rec[7], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.xp, am2_strtok((char *)0, kSep)))
         return 8;
 
-    DefAddTrooperRec(rec);
+    DefAddTrooperRec(&rec);
     return 0;
 }
 
@@ -816,30 +816,30 @@ void __cdecl FreeAaiTables(void)
  * own state, which is what NextNumber above is for. */
 int32_t __cdecl DefVehicleLine(int32_t code, char *line)
 {
-    int32_t rec[9];
+    AM2_VehicleDef rec;
 
     switch (code) {
-    case 0x35: rec[0] = 0; break;
-    case 0x36: rec[0] = 1; break;
-    case 0x37: rec[0] = 2; break;
-    case 0x38: rec[0] = 3; break;
-    case 0x39: rec[0] = 4; break;
-    case 0x3A: rec[0] = 5; break;
+    case 0x35: rec.kind = 0; break;
+    case 0x36: rec.kind = 1; break;
+    case 0x37: rec.kind = 2; break;
+    case 0x38: rec.kind = 3; break;
+    case 0x39: rec.kind = 4; break;
+    case 0x3A: rec.kind = 5; break;
     default:
         orig_log("Bad Vehicle Type\n");
         return 1;
     }
 
-    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))  return 2;
-    if (!NextNumber(&rec[2]))                              return 3;
-    if (!NextNumber(&rec[3]))                              return 4;
-    if (!NextNumber(&rec[4]))                              return 5;
-    if (!NextNumber(&rec[5]))                              return 6;
-    if (!NextNumber(&rec[6]))                              return 7;
-    if (!NextNumber(&rec[7]))                              return 8;
-    if (!NextNumber(&rec[8]))                              return 9;
+    if (!DefParseNumber(&rec.seats, am2_strtok(line, kSep)))  return 2;
+    if (!NextNumber(&rec.field08))                              return 3;
+    if (!NextNumber(&rec.field0C))                              return 4;
+    if (!NextNumber(&rec.accelRate))                              return 5;
+    if (!NextNumber(&rec.turnInterval))                              return 6;
+    if (!NextNumber(&rec.health))                              return 7;
+    if (!NextNumber(&rec.field1C))                              return 8;
+    if (!NextNumber(&rec.armour))                              return 9;
 
-    AddVehicleDef(rec);
+    AddVehicleDef(&rec);
     return 0;
 }
 
@@ -871,7 +871,7 @@ int32_t __cdecl DefVehicleLine(int32_t code, char *line)
  * and correcting it would diverge from the original for a `jeep` line. */
 int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
 {
-    int32_t rec[AM2_MISSILE_DEF_REC_SIZE / 4];
+    AM2_MissileDefRec rec;
 
     /* A switch with an arm per keyword, and the twelve fields parsed one
      * after another: the image has neither a table lookup nor a loop.
@@ -882,93 +882,93 @@ int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
      * index. Decoded from each jump-table entry's target and its immediate,
      * never from the order the arms are laid out in. */
     switch (cmd) {
-    case  1: rec[0] =  0; break;
-    case  2: rec[0] =  1; break;
-    case  3: rec[0] =  2; break;
-    case  4: rec[0] =  3; break;
-    case  5: rec[0] =  4; break;
-    case  6: rec[0] =  5; break;
-    case  7: rec[0] =  6; break;
-    case  8: rec[0] =  7; break;
-    case  9: rec[0] =  8; break;
-    case 10: rec[0] =  9; break;
-    case 11: rec[0] = 10; break;
-    case 12: rec[0] = 11; break;
-    case 13: rec[0] = 12; break;
-    case 14: rec[0] = 13; break;
-    case 15: rec[0] = 14; break;
-    case 16: rec[0] = 15; break;
-    case 17: rec[0] = 16; break;
-    case 18: rec[0] = 17; break;
-    case 19: rec[0] = 18; break;
-    case 20: rec[0] = 19; break;
-    case 21: rec[0] = 20; break;
-    case 22: rec[0] = 21; break;
-    case 23: rec[0] = 22; break;
-    case 24: rec[0] = 23; break;
-    case 25: rec[0] = 24; break;
-    case 26: rec[0] = 25; break;
-    case 27: rec[0] = 26; break;
-    case 28: rec[0] = 27; break;
-    case 29: rec[0] = 28; break;
-    case 30: rec[0] = 29; break;
-    case 31: rec[0] = 30; break;
-    case 32: rec[0] = 32; break;
-    case 33: rec[0] = 31; break;
-    case 34: rec[0] = 33; break;
-    case 35: rec[0] = 34; break;
-    case 36: rec[0] = 35; break;
-    case 37: rec[0] = 36; break;
-    case 38: rec[0] = 37; break;
-    case 39: rec[0] = 38; break;
-    case 40: rec[0] = 39; break;
-    case 41: rec[0] = 40; break;
-    case 42: rec[0] = 41; break;
-    case 43: rec[0] = 42; break;
-    case 44: rec[0] = 43; break;
+    case  1: rec.kind =  0; break;
+    case  2: rec.kind =  1; break;
+    case  3: rec.kind =  2; break;
+    case  4: rec.kind =  3; break;
+    case  5: rec.kind =  4; break;
+    case  6: rec.kind =  5; break;
+    case  7: rec.kind =  6; break;
+    case  8: rec.kind =  7; break;
+    case  9: rec.kind =  8; break;
+    case 10: rec.kind =  9; break;
+    case 11: rec.kind = 10; break;
+    case 12: rec.kind = 11; break;
+    case 13: rec.kind = 12; break;
+    case 14: rec.kind = 13; break;
+    case 15: rec.kind = 14; break;
+    case 16: rec.kind = 15; break;
+    case 17: rec.kind = 16; break;
+    case 18: rec.kind = 17; break;
+    case 19: rec.kind = 18; break;
+    case 20: rec.kind = 19; break;
+    case 21: rec.kind = 20; break;
+    case 22: rec.kind = 21; break;
+    case 23: rec.kind = 22; break;
+    case 24: rec.kind = 23; break;
+    case 25: rec.kind = 24; break;
+    case 26: rec.kind = 25; break;
+    case 27: rec.kind = 26; break;
+    case 28: rec.kind = 27; break;
+    case 29: rec.kind = 28; break;
+    case 30: rec.kind = 29; break;
+    case 31: rec.kind = 30; break;
+    case 32: rec.kind = 32; break;
+    case 33: rec.kind = 31; break;
+    case 34: rec.kind = 33; break;
+    case 35: rec.kind = 34; break;
+    case 36: rec.kind = 35; break;
+    case 37: rec.kind = 36; break;
+    case 38: rec.kind = 37; break;
+    case 39: rec.kind = 38; break;
+    case 40: rec.kind = 39; break;
+    case 41: rec.kind = 40; break;
+    case 42: rec.kind = 41; break;
+    case 43: rec.kind = 42; break;
+    case 44: rec.kind = 43; break;
     default:
         orig_log("Bad Weapon Type\n");
         return 1;
     }
 
-    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
+    if (!DefParseNumber((int32_t *)&rec.cooldown, am2_strtok(line, kSep)))
         return 2;
     /* FIELDS 4 AND 5 LAND IN EACH OTHER'S SLOT. The fourth number is
-     * stored at rec[5] and the fifth at rec[4]: in the original every
+     * stored at rec.range and the fifth at rec.rangeMin: in the original every
      * parse block is `lea` of the slot, `push`, `call`, and those two
      * blocks take the `lea` on the other side of a push from their
      * neighbours -- `lea edx,[esp+0x1c]` before the push at 0x0046059F
      * is +0x14, `lea eax,[esp+0x1c]` after it at 0x004605C7 is +0x10.
      * Read as twelve numbers in order, the rifle's range (the file's
-     * fourth field, 250) went to rec[4] where the item-type builder
-     * reads rec[5]: the port's rifle had range 0, and its first shot
+     * fourth field, 250) went to rec.rangeMin where the item-type builder
+     * reads rec.range: the port's rifle had range 0, and its first shot
      * detonated on Sarge's own position. Found by tools/sidebyside.py
      * on the first shot anyone fired in the port, reproduced from the
      * recorded input, and settled by espmap --site on the two blocks. */
-    if (!DefParseNumber(&rec[2], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.life, am2_strtok((char *)0, kSep)))
         return 3;
-    if (!DefParseNumber(&rec[3], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.field0C, am2_strtok((char *)0, kSep)))
         return 4;
-    if (!DefParseNumber(&rec[5], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.range, am2_strtok((char *)0, kSep)))
         return 5;
-    if (!DefParseNumber(&rec[4], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.rangeMin, am2_strtok((char *)0, kSep)))
         return 6;
-    if (!DefParseNumber(&rec[6], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.capacity, am2_strtok((char *)0, kSep)))
         return 7;
-    if (!DefParseBoolean(&rec[7], am2_strtok((char *)0, kSep)))
+    if (!DefParseBoolean(&rec.automatic, am2_strtok((char *)0, kSep)))
         return 8;
-    if (!DefParseNumber(&rec[8], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.damage, am2_strtok((char *)0, kSep)))
         return 9;
-    if (!DefParseNumber(&rec[9], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.blastDamage, am2_strtok((char *)0, kSep)))
         return 10;
-    if (!DefParseBoolean(&rec[10], am2_strtok((char *)0, kSep)))
+    if (!DefParseBoolean(&rec.field28, am2_strtok((char *)0, kSep)))
         return 11;
-    if (!DefParseNumber(&rec[11], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.weight, am2_strtok((char *)0, kSep)))
         return 12;
-    if (!DefParseNumber(&rec[12], am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.field30, am2_strtok((char *)0, kSep)))
         return 13;
 
-    AddMissileDef(rec);
+    AddMissileDef(&rec);
     return 0;
 }
 

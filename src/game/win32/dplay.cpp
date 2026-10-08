@@ -1899,7 +1899,7 @@ int32_t __cdecl RecvThreadProc(void *param)
     DPID   from;
     DPID   to;
     DWORD  size = PACKET_BUFFER_BYTES;
-    void  *msg  = (void *)0;
+    AM2_MsgNode *msg = (AM2_MsgNode *)0;
 
     (void)param;
 
@@ -1945,7 +1945,7 @@ int32_t __cdecl RecvThreadProc(void *param)
                 break;
             }
 
-            node = (AM2_MsgNode *)msg;
+            node = msg;
             node->bodyLen = PACKET_BUFFER_BYTES;
 
             if (!CommReceive(*(void * *)&g_commObject,
@@ -1958,10 +1958,10 @@ int32_t __cdecl RecvThreadProc(void *param)
 
             /* 0 means the flow layer did not consume it. */
             if (!FlowRecvMessage(msg))
-                MsgListAdd(g_msgListB, (AM2_MsgNode *)msg);
+                MsgListAdd(g_msgListB, msg);
 
             got = 1;
-            msg = (void *)0;
+            msg = (AM2_MsgNode *)0;
         }
 
         if (got)

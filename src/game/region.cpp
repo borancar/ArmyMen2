@@ -8366,7 +8366,7 @@ void __cdecl StepType3(AM2_Object *o)
             if (o->deathKind != 5)
                 goto post;
             {
-                void *row = o->rowSet.rows;
+                AM2_MapRow *row = o->rowSet.rows;
 
                 if (!RowAnimFinished(row))
                     goto post;

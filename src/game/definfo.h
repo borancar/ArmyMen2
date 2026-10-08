@@ -86,11 +86,11 @@ void __cdecl FreeMissileDefs(void);
 
 /* 0x0045EB40. Append one 36-byte vehicle def record, growing the table when
  * it is full. Reads as DefAddTrooperRec's twin and is not one. */
-void __cdecl AddVehicleDef(const void *rec);
+void __cdecl AddVehicleDef(const struct AM2_VehicleDef *rec);
 
 /* 0x00460200. Append one 52-byte missile def record. AddVehicleDef's near
  * sibling -- 0.868 -- differing only in what the record size implies. */
-void __cdecl AddMissileDef(const void *rec);
+void __cdecl AddMissileDef(const struct AM2_MissileDefRec *rec);
 
 /* 0x0045EBF0 and 0x004602C0. Binary-search the vehicle and missile def
  * tables by id. Each is the FIRST function in a merged functions.tsv entry;
