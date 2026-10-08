@@ -665,9 +665,9 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 
     /* The descriptor's width and height are read afresh at every use, and
      * the centring halves an UNSIGNED difference. */
-#define DESC   (*(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC))
-#define WIDTH  (DESC[1])
-#define HEIGHT (DESC[2])
+#define MOVIE  ((AM2_Movie *)self)
+#define WIDTH  ((int32_t)MOVIE->smack->width)
+#define HEIGHT ((int32_t)MOVIE->smack->height)
     if (dest == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
         to.left = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->right - ((LPRECT)((uintptr_t)g_screenClip))->left - WIDTH) / 2
                   + g_originDX;
@@ -690,13 +690,13 @@ void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
      * nothing reading it. */
     if (g_movieCurrent->sized)
         IDirectDrawSurface_Blt(dest, &to,
-                               *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
+                               MOVIE->surface,
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
     else
         IDirectDrawSurface_Blt(dest, &to,
-                               *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
+                               MOVIE->surface,
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
-#undef DESC
+#undef MOVIE
 #undef WIDTH
 #undef HEIGHT
 #undef self
@@ -831,7 +831,7 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
      * return value still sees zero. */
     *size = 0;
 
-    total = *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_SIZE);
+    total = (int32_t)((const BITMAPINFOHEADER *)hdr)->biSizeImage;
     if (!total) {
         orig_log("ERROR: %s has listed size of 0 (try resaving)\n", path);
         return (void *)0;
@@ -842,7 +842,7 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
         return (void *)0;   /* leaks `src` -- the original's only such exit */
 
     ReverseBlocks(dst, src, total,
-                  *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_BLOCKS));
+                  ((const BITMAPINFOHEADER *)hdr)->biHeight);
     *size = (uint16_t)total;
     orig_free(src);
     return dst;

@@ -70,14 +70,6 @@ extern "C" int32_t am2_trace_window(void) __attribute__((weak));
  * spelled `orig_`, and every non-orig_ #define was skipped. */
 void __cdecl DirtyCollect(const AM2_Rect *r);
 
-#define DEPTH_OBJ(n)  (*(AM2_MapRow **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
-#define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
-#define DEPTH_NEXT(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_NEXT))
-
-#define ROW_FLD(r, off, ty) (*(ty *)((uint8_t *)(r) + (off)))
-#define MAPDESC_CELL(d, i) \
-    ((void **)(*(uint8_t *const *)((const uint8_t *)(d) + MAPDESC_OFF_CELLS) \
-               + (uint32_t)(i) * 4))
 
 /* The projection the comparator turns a horizontal distance into: `dx` units
  * across, times the object's own slope, TRUNCATED TO 16 BITS.
