@@ -662,7 +662,7 @@ void __cdecl RecvItemCreate(void *msg);
  * codes are handled and which arm each takes. */
 int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
 {
-    uint32_t code = *(const uint16_t *)((const uint8_t *)msg + 2);
+    uint32_t code = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
     (void)army;   /* pushed by the caller and never read -- see above */
 
@@ -1172,7 +1172,7 @@ void __cdecl RecvItemCreate(void *msg)
     const char    *name = NULL;
     uint32_t       uid  = UidOnWire(m->hdr.uid);
     int32_t        army = (int32_t)UidArmy(uid);
-    void          *made;
+    AM2_Object    *made;
 
     orig_log("==> Receive Item Create [uid:%08x, item type: %d, subtype: %d\n", uid,
              (int32_t)m->type,
@@ -1184,7 +1184,7 @@ void __cdecl RecvItemCreate(void *msg)
 
     switch (m->type) {
     case 2:
-        made = orig_create_trooper(
+        made = (AM2_Object *)orig_create_trooper(
                    (char *)(uintptr_t)name,
                    (int32_t)m->pos.x,
                    (int32_t)m->pos.y,
@@ -1196,7 +1196,7 @@ void __cdecl RecvItemCreate(void *msg)
                    (int32_t)m->extra);
         if (m->subtype
             == AM2_TROOPER_SUBTYPE_LEADS)
-            SetLeadsAndAct((AM2_Object *)made);
+            SetLeadsAndAct(made);
         return;
 
     case 3:
@@ -1211,7 +1211,7 @@ void __cdecl RecvItemCreate(void *msg)
                    (int32_t)m->flags,
                    1, uid,
                    (int32_t)m->extra);
-        *(uint32_t *)((uint8_t *)made + 0x550) =
+        made->weaponUid =
             UidOnWire(m->ref);
         return;
 
@@ -1242,7 +1242,7 @@ void __cdecl RecvItemCreate(void *msg)
         /* ARMY first, not the object -- see ItemPostCreate above. */
         ItemPostCreate(army, m->pos);
         if (!(*(AM2_Comm *const *)&g_commObject)->AllyFlag(g_defaultOwner, army))
-            ObjConceal((AM2_Object *)made, 1);
+            ObjConceal(made, 1);
         return;
 
     default:

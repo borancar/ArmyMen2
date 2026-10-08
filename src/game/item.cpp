@@ -11945,7 +11945,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
  * three loaders memcpy AM2_TYPE3_RECORD_SIZE bytes over it, so the `1` written
  * here is that record's first field -- set unless this army is the player's in
  * a single-player game, or has a live player in its comm slot. */
-void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
+struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t table, int32_t army, int32_t flags,
                             int32_t remote, uint32_t uid, uint8_t facing)
 {
@@ -11960,12 +11960,12 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     if (g_mpSession && !remote
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
-        return (void *)0;
+        return (AM2_Object *)0;
 
     def = VehicleDefFind(kind);
     if (def == (const AM2_VehicleDef *)0) {
         orig_log("Vehicle aai entry not found for type %d\n", kind);
-        return (void *)0;
+        return (AM2_Object *)0;
     }
 
     o = (AM2_Object *)(uint8_t *)am2_malloc(AM2_VEHICLE_BYTES);

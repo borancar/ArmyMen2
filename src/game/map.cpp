@@ -21,6 +21,7 @@
 #include "maprow.h"    /* MapDescInit */
 #include "region.h"    /* BuildTileDeltas, SettlePointInRegion */
 #include "packkey.h"   /* PackKey */
+#include "spritetype.h" /* AM2_Sprite, its hot spot */
 #include "objtype.h"   /* EnsureSpriteAaiRecord */
 #include "item.h"      /* CreateItem, ApplyHeightItem */
 #include "air.h"      /* ObjConceal */
@@ -1831,13 +1832,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     BuildAaiBuiltins();
 
     if (g_loadPending == 0) {
-        void *cam = CreateItem((char *)"camera", 4,
+        AM2_Object *cam = CreateItem((char *)"camera", 4,
                                g_aaiKey980000,
                                g_zeroXY,
                                0, 1, 0);
 
         g_evtId15Uid =
-            *(const int32_t *)((const uint8_t *)cam + 4);
+            (int32_t)cam->uid;
     }
 
     BuildRespawnPool(g_gameSeed);
@@ -1872,13 +1873,13 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (type != 0x19) {
                 /* An ITEM. */
                 int32_t key = PackKey(type + 0x14, kind, 0);
-                void   *spr = PreloadSpriteByKey(key, 0x1000, 1);
+                AM2_Sprite *spr = PreloadSpriteByKey(key, 0x1000, 1);
 
                 at.x = r->x16;
                 at.y = r->y16;
                 if (spr != 0) {
-                    at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
-                    at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+                    at.x = (int16_t)(at.x + spr->hotX);
+                    at.y = (int16_t)(at.y + spr->hotY);
                 }
                 obj = CreateItem(r->script, army,
                                  PackKey(type + 0x14, kind, 0),
@@ -1907,7 +1908,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 int32_t  numb = r->numb;
                 int32_t  aai, key = PackKey(type + 0x14, kind, 0);
                 int32_t  code = kind;
-                void    *spr;
+                AM2_Sprite    *spr;
                 AM2_Point settled;
 
                 if (code >= 0x64) {
@@ -1935,8 +1936,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 at.x = r->x16;
                 at.y = r->y16;
                 if (spr != 0) {
-                    at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
-                    at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+                    at.x = (int16_t)(at.x + spr->hotX);
+                    at.y = (int16_t)(at.y + spr->hotY);
                 }
 
                 /* BOTH POINTS: SettlePointInRegion moves a copy, and the

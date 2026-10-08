@@ -10151,17 +10151,17 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     g_gameClockMs + 0x7D0u;
 
                 /* The comm object is read afresh at each use. */
-#define comm (*(void * *)&g_commObject)
+#define comm (g_commObject)
 
                 /* Two broadcast questions, not one: the first refuses
                  * outright when the host flag at +0x3D8 is set AND we would
                  * broadcast, and only the second decides whether a WANT is
                  * actually sent. */
                 if (g_mpSession != 0
-                    && !(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
+                    && !(comm->isHost != 0
                          && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)o->owner))) {
                     if (((AM2_Comm *)comm)->CommMustBroadcast((int16_t)o->owner)
-                        && *(const int32_t *)((uint8_t *)comm + 0x3D8u) == 0)
+                        && comm->isHost == 0)
                         SendVehicleWantItem(o, p, 0, 0, 0);
                 } else {
                     /* The refusal's log, two arguments and no format, to the

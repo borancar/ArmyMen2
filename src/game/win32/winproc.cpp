@@ -175,7 +175,7 @@ AM2_WP_INLINE void ReopenSession(void)
     desc = comm->sessionDesc;
     if (!desc)
         return;
-    *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
+    ((LPDPSESSIONDESC2)desc)->dwFlags &= ~0x21u;
     if (((AM2_Comm *)comm)->CommSetSessionDesc(desc, 0) < 0)
         orig_log("Set Session Failed to reopen Session\n");
 #undef comm

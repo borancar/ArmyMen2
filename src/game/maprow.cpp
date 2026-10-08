@@ -2134,10 +2134,10 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
     row->sprite =
         *KIND.sprites;
     row->pos.x =
-        (int16_t)(*(const int16_t *)&KIND.x + *(const int16_t *)at);
+        (int16_t)(KIND.x + at->x);
     row->pos.y =
-        (int16_t)(*(const int16_t *)&KIND.y
-                  + *(const int16_t *)((const uint8_t *)at + 2));
+        (int16_t)(KIND.y
+                  + at->y);
     row->yAdjust             = *(const int16_t *)&KIND.z;
     row->depthLayer = 0;
     row->lut = (const void *)(uintptr_t)rowField2C;

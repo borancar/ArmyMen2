@@ -15681,7 +15681,7 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
     self->list = 0;
     w->unknown48              = 0;
     self->shift = 0;
-    *(int32_t *)((uint8_t *)self + 0x6C) = 0;
+    self->field6C = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowDelete(int32_t flags)
@@ -15973,12 +15973,12 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
     ::WidgetScreenRect(w);
 
     self->span  = span;
-    *(int32_t *)((uint8_t *)self + 0x58)                = 0;
+    self->field58                = 0;
     w->unknown48                             = 0;
     self->pos   = 0;
     self->range = AM2_SCROLLBAR_RANGE;
     self->shift = 0;
-    *(int32_t *)((uint8_t *)self + 0x68)                = 0;
+    self->field68                = 0;
     self->onChange = 0;
 }
 

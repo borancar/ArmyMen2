@@ -1445,7 +1445,7 @@ void __cdecl RecvTrooperWantItem(void *msg);
 
 void __cdecl TroopMessageRecv(void *msg, int32_t army)
 {
-    uint32_t kind = *(const uint16_t *)((const uint8_t *)msg + 2);
+    uint32_t kind = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
     switch (kind) {
     case AM2_MSG_TROOP_FIRST:
@@ -1592,7 +1592,7 @@ typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
 void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 {
-    uint32_t kind = *(const uint16_t *)((const uint8_t *)msg + 2);
+    uint32_t kind = ((const AM2_ArmyMsgHdr *)msg)->kind;
 
     switch (kind) {
     case 0x1B: RecvVehicle1B(msg, army);        return;

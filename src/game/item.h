@@ -396,7 +396,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
  * `table` indexes the 256-byte records at ADDR_OBJ_TABLE_RECORDS and `facing`
  * lands in three fields at once. A second ROW is built, and given the turret
  * animation table, exactly when ADDR_TURRET_ANIMS[kind] is non-empty. */
-void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
+struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t table, int32_t army, int32_t flags,
                             int32_t remote, uint32_t uid, uint8_t facing);
 
