@@ -253,7 +253,7 @@ static inline int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t
 #endif
 
 /* 0x0045AFA0. The dword at +0x53C. */
-uint32_t __cdecl Field53C(const void *p);
+uint32_t __cdecl Field53C(const struct AM2_Object *vehicle);
 
 /* 0x0045F440. Adds `add` to the low byte of `base`.
  *
@@ -574,7 +574,7 @@ uint32_t __cdecl XorChecksum(const void *record);
 
 /* 0x004010B0. Follows the pointer at +4 and returns the dword at +0x14 of it,
  * or 0 when that pointer is null. */
-uint32_t __cdecl ChainField14(const void *p);
+uint32_t __cdecl ChainField14(const AM2_MsgList *list);
 
 /* 0x00429F20. Pushes a node onto the front of a doubly linked list: prev at
  * +4, next at +8, and `head` is the address of the head pointer. */
@@ -625,14 +625,14 @@ uint8_t *__cdecl RemapBytes(uint8_t *dst, const uint8_t *src,
  * held in registers, and that is reproduced: if the array ever overlapped the
  * record, the loop would see its own writes, and hoisting them would quietly
  * change that. */
-int32_t __cdecl SetFieldInAll(void *record, void *value);
+int32_t __cdecl SetFieldInAll(struct AM2_RowSet *set, void *value);
 
 /* 0x0040A490. Whether the byte at +0x51 is at least the word at +6 of the
  * record pointed to by +0x44; no record means no.
  *
  * The byte is zero-extended to 16 bits and the comparison is SIGNED, so a
  * threshold above 0x7FFF reads as negative and everything passes. */
-int32_t __cdecl Field51MeetsMin(const void *p);
+int32_t __cdecl Field51MeetsMin(const struct AM2_MapRow *row);
 
 /* 0x0040D860. Whether the dword at +0x538 is between 10 and 17 inclusive --
  * the same range IsKind10To17 tests, read from the object instead of taken as

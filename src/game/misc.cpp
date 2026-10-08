@@ -99,10 +99,11 @@ extern "C" const uint32_t am2_seq_k4_hold[4] = { 2, 3, 4, 5 };/* 0x0048CBC8, per
 #endif
 
 #include "../inject/patch.h"
+#include "anim.h"      /* AM2_Anim, what Field51MeetsMin reads */
 
-uint32_t __cdecl Field53C(const void *p)
+uint32_t __cdecl Field53C(const AM2_Object *vehicle)
 {
-    return *(const uint32_t *)((const uint8_t *)p + 0x53C);
+    return (uint32_t)vehicle->riders.count;
 }
 
 int32_t __cdecl AddByteSat(uint8_t base, int32_t add)
@@ -348,9 +349,7 @@ int32_t __cdecl IsKind14Or22(int32_t kind)
  * table at 0x0040D814. Written as the switch it is. */
 int32_t __cdecl ClassifyByCode74(const AM2_Object *obj)
 {
-    const uint8_t *sub = ((const uint8_t *)obj->rowSet.rows);
-
-    switch (*(const int16_t *)(sub + 0x4C)) {     /* movsx: signed */
+    switch (obj->rowSet.rows->frame) {     /* movsx: signed */
     case 7: case 10: case 12: case 14: case 19: case 42: case 43: case 45:
     case 49: case 50: case 51: case 70:
         return 1;
@@ -736,13 +735,13 @@ uint32_t __cdecl XorChecksum(const void *record)
     return acc;
 }
 
-uint32_t __cdecl ChainField14(const void *p)
+uint32_t __cdecl ChainField14(const AM2_MsgList *list)
 {
-    const uint8_t *q = *(const uint8_t *const *)((const uint8_t *)p + 4);
+    const AM2_MsgNode *q = list->head;
 
     if (!q)
         return 0;
-    return *(const uint32_t *)(q + 0x14);
+    return q->key;
 }
 
 void __cdecl ListPushFront(AM2_CellEntry *node, AM2_CellEntry **head)
@@ -815,25 +814,23 @@ uint8_t *__cdecl RemapBytes(uint8_t *dst, const uint8_t *src,
     return dst;
 }
 
-int32_t __cdecl SetFieldInAll(void *record, void *value)
+int32_t __cdecl SetFieldInAll(AM2_RowSet *set, void *value)
 {
-    uint8_t *r = (uint8_t *)record;
     int32_t  i;
 
     /* The rows pointer is re-read every iteration, as the original does. */
-    for (i = 0; i < *(const int32_t *)(r + 4); i++)
-        *(void **)(*(uint8_t **)(r + 8) + i * 0x60 + 0x2C) = value;
+    for (i = 0; i < set->count; i++)
+        set->rows[i].lut = value;
 
     return i;
 }
 
-int32_t __cdecl Field51MeetsMin(const void *p)
+int32_t __cdecl Field51MeetsMin(const AM2_MapRow *row)
 {
-    const uint8_t *b = (const uint8_t *)p;
-    const uint8_t *rec = *(const uint8_t *const *)(b + 0x44);
+    const AM2_Anim *rec = row->animPlaying;
 
     /* zero-extended byte, signed 16-bit compare */
-    if (rec && (int16_t)(uint16_t)b[0x51] >= *(const int16_t *)(rec + 6))
+    if (rec && (int16_t)(uint16_t)row->cell >= rec->field6)
         return 1;
     return 0;
 }
