@@ -723,7 +723,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         weapon = CreateWeapon(
                      g_dirScratch, slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)KIND, 0),
-                     g_zeroXY,
+                     g_zeroPoint,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
@@ -843,7 +843,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                          g_dirScratch, slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),
-                         g_zeroXY,
+                         g_zeroPoint,
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {

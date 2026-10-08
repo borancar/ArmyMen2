@@ -308,8 +308,13 @@ typedef struct AM2_Pad {
 typedef struct AM2_PadNumber {
     int16_t count;          /* +0x00 PADNUM_OFF_COUNT */
     int16_t pads[32];       /* +0x02 PADNUM_OFF_IDS, indices into the pad array */
-    int16_t cx;             /* +0x42 */
-    int16_t cy;             /* +0x44 */
+    union {
+        struct {
+            int16_t cx;     /* +0x42 */
+            int16_t cy;     /* +0x44 */
+        };
+        AM2_Point centre;   /* +0x42 the pair, copied whole */
+    };
     uint8_t _pad46[2];
     int32_t live;           /* +0x48 PADNUM_OFF_PADS: set by a damaging pad;
                              * zero means nothing to walk */
@@ -355,7 +360,6 @@ typedef struct AM2_ScriptAction {
     int32_t target;         /* +0x1C */
     union {
         AM2_Point pos;                  /* +0x20 */
-        int32_t                  both;  /* a pad centroid, two words at once */
     } u;
     int32_t relative;       /* +0x24, a leading `+` on the coordinates */
     int32_t xvar;           /* +0x28 */

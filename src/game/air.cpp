@@ -508,7 +508,7 @@ AM2_Point __cdecl ObjAnchorPoint(const AM2_Object *o)
     AM2_Point         pt;
 
     if (!o)
-        return g_zeroXY;
+        return g_zeroPoint;
 
     pt = o->pos;
     if (o->rowSet.count == 1)
@@ -1814,7 +1814,7 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
 
         weapon = CreateWeapon(g_dirScratch, army,
                               KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
-                              g_zeroXY,
+                              g_zeroPoint,
                               4, -1, 0, 0);
         if (!weapon)
             continue;

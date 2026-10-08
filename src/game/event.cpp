@@ -3603,7 +3603,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         weapon = CreateWeapon(
                      g_dirScratch, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
-                     g_zeroXY,
+                     g_zeroPoint,
                      4, -1, 0, 0);
         if (weapon == 0)
             return;

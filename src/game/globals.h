@@ -910,7 +910,6 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_windowed               (*(int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)  /* 0x00507344 */
 #define g_winEnabled             (*(int32_t *)(uintptr_t)ADDR_WIN_ENABLED)  /* 0x00512304 */
 #define g_zeroPoint              (*(AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0 */
-#define g_zeroXY                 (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)  /* 0x005125A0, as the point it is */
 #define g_zeroRect               ((const AM2_Rect *)(uintptr_t)ADDR_ZERO_RECT)  /* 0x005125A8 */
 
 #endif /* AM2_GLOBALS_H */

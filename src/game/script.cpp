@@ -1137,7 +1137,7 @@ fail:
         if (idx >= 0 && kScriptNames[idx].type == AM2_NAME_TYPE_PAD) {          /* a pad */
             int32_t number = kPads[kScriptNames[idx].value].number;
             /* Both centroid words at once, exactly as the original. */
-            act->u.both = *(const int32_t *)&kPadNumbers[number].cx;
+            act->u.pos = kPadNumbers[number].centre;
 
             am2_free(ctx->tokens[*at].value);
             ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
@@ -2556,7 +2556,6 @@ int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act)
 #define PAD          (kPads[kPadCount])
 #define PAD_LAYER    (g_mapPadLayer)
 #define PADBIT_LAYER (g_mapPadbitLayer)
-#define ZERO_POINT   (*(const int32_t *)&g_zeroPoint)
 #define MAP_TILES_H  (g_mapTilesH)
 #define MAP_TILES_W  (g_mapTilesW)
 
@@ -2595,7 +2594,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 /* One dword store covering both words -- the default before
                  * the scan. */
                 n = 0;
-                *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
+                kPadNumbers[number].centre = g_zeroPoint;
                 sx = 0;
                 total = MAP_TILES_W * MAP_TILES_H;
                 sy = 0;
@@ -2614,7 +2613,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
             }
         } else if (PADBIT_LAYER) {
             n = 0;
-            *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
+            kPadNumbers[number].centre = g_zeroPoint;
             sx = 0;
             sy = 0;
             total = MAP_TILES_W * MAP_TILES_H;
@@ -2752,7 +2751,6 @@ triggers_done:
 #undef PAD
 #undef PAD_LAYER
 #undef PADBIT_LAYER
-#undef ZERO_POINT
 #undef MAP_TILES_H
 #undef MAP_TILES_W
 

@@ -5107,7 +5107,7 @@ void __cdecl SetPointerMode(int32_t mode)
     g_pointerOverlay = REC->overlay;
 
     if (!PICK && !F14 && ACT) {
-        ACT((AM2_Object *)(void *)0, g_zeroXY);
+        ACT((AM2_Object *)(void *)0, g_zeroPoint);
         g_pointerMode = 0;
     }
 #undef REC
@@ -5655,7 +5655,7 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
         case 0x17: {
             int16_t hp = u->health;
             if (hp > 0 && hp < u->maxHealth)
-                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         }
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
@@ -5663,24 +5663,24 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
          * own and jumps into 0x26's. */
         case 0x23:
             if (u->field530 != 0)
-                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
 
         case 0x1A:
-            SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+            SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
 
         case 0x24:
             if (u->field530 != 1)
-                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x25:
             if (u->field530 != 2)
-                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x26:
             if (u->field530 != 3)
-                SetWeaponTarget((AM2_Object *)u, g_zeroXY);
+                SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x29: {
             uint32_t riding = u->riding;
@@ -5688,7 +5688,7 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
                 void *veh = LookupType3ByUID(riding);
                 if (veh)
                     SetWeaponTarget((AM2_Object *)veh,
-                        g_zeroXY);
+                        g_zeroPoint);
                 else
                     u->riding = 0;
             }
@@ -16511,7 +16511,7 @@ void __cdecl ObjFreeze(AM2_Object *o)
         return;
 
     obj->aiMode      = AM2_AI_MODE_IGNORE;
-    obj->scriptPoint = g_zeroXY;
+    obj->scriptPoint = g_zeroPoint;
 }
 
 void __cdecl PointerInvokeFreezeArmy(void)

@@ -3272,7 +3272,7 @@ waypoint:
 heading:
     if (ApproxDist(&o->pos, dest) < AM2_AI_ARRIVED_DIST) {
         out->state = 1;
-        *dest = g_zeroXY;
+        *dest = g_zeroPoint;
         return;
     }
 
@@ -3497,7 +3497,7 @@ walk:
                     < (int32_t)ob->moveCount - 1)
                     break;
                 ob->moveCount = 0;
-                ob->routeGoal = g_zeroXY;
+                ob->routeGoal = g_zeroPoint;
                 break;
             }
             at++;
@@ -3666,7 +3666,7 @@ waypoint:
 heading:
     if (ApproxDist(&o->pos, dest) < AM2_ROACH_ARRIVED_DIST) {
         out->state = 1;
-        *dest = g_zeroXY;
+        *dest = g_zeroPoint;
         return;
     }
 
@@ -3720,7 +3720,7 @@ void __cdecl AiStepIgnore(AM2_Object *o, AM2_SteerOut *out, const AM2_AiCtx *c)
         return;
     }
 
-    o->scriptPoint = g_zeroXY;
+    o->scriptPoint = g_zeroPoint;
 
     if (o->hitDir > 0) {    /* unsigned; `> 0` is the original's
                              * `test; jbe`-skip spelling */
@@ -3790,7 +3790,7 @@ void __cdecl AiStepDefend(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
     } else {
         uint8_t hit = o->hitDir;
 
-        o->scriptPoint = g_zeroXY;
+        o->scriptPoint = g_zeroPoint;
 
         if (hit > 0) {
             if (!c->observer)
@@ -3846,7 +3846,7 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
     } else {
         uint8_t hit = o->hitDir;
 
-        o->scriptPoint = g_zeroXY;
+        o->scriptPoint = g_zeroPoint;
 
         if (hit > 0) {
             if (!c->observer)
@@ -4027,7 +4027,7 @@ void __cdecl AiAttackBody(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
         if (c->found)
             AiPromoteFound(o, c);
     } else {
-        o->scriptPoint = g_zeroXY;
+        o->scriptPoint = g_zeroPoint;
     }
 
     seen = LEAD;
@@ -4289,7 +4289,7 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     }
 
     if (c->destDist > AM2_AI_ENGAGE_DEST) {
-        o->goalPoint = g_zeroXY;
+        o->goalPoint = g_zeroPoint;
         o->dest = o->scriptPoint;
         AiTrooperStep(o, out, c);
         if (FOUND)
@@ -4298,8 +4298,8 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     }
 
     /* Arrived: forget both remembered points and look for something to do. */
-    o->goalPoint = g_zeroXY;
-    o->scriptPoint = g_zeroXY;
+    o->goalPoint = g_zeroPoint;
+    o->scriptPoint = g_zeroPoint;
 
     if (LEAD) {
         /* Out of the band the current weapon wants: pick another and rebuild
@@ -4398,7 +4398,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     if ((uint16_t)o->scriptPoint.x)
         o->savedPoint = o->scriptPoint;
     else
-        o->savedPoint = g_zeroXY;
+        o->savedPoint = g_zeroPoint;
 
     if (o->fieldF4 <= 0
         && !o->ammo) {
@@ -4414,7 +4414,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                 AiTrooperStep(o, out, c);
                 goto tail;
             }
-            o->detour = g_zeroXY;
+            o->detour = g_zeroPoint;
             goto react;
         }
 
@@ -4425,7 +4425,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         }
 
         if (c->destDist > AM2_AI_REACHED_DIST) {
-            o->detour = g_zeroXY;
+            o->detour = g_zeroPoint;
             o->dest = o->scriptPoint;
             AiTrooperStep(o, out, c);
             goto tail;
@@ -4433,7 +4433,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 
         /* Arrived at the state point: clear the detour and reload the state
          * point from the copy the head made. */
-        o->detour = g_zeroXY;
+        o->detour = g_zeroPoint;
         o->scriptPoint = o->savedPoint;
         goto react;
     }
@@ -4441,7 +4441,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     /* A kind-7 sighting is not worth detouring for. */
     if (c->found
         && !IsKind7(c->found))
-        o->detour = g_zeroXY;
+        o->detour = g_zeroPoint;
 
     if (o->fieldEC) {
         if (c->destDist
@@ -4462,7 +4462,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
             AiTrooperStep(o, out, c);
             goto tail;
         }
-        o->detour = g_zeroXY;
+        o->detour = g_zeroPoint;
         goto react;
     }
 
@@ -4490,7 +4490,7 @@ seen_it:
         goto tail;
     }
 
-    o->dest = g_zeroXY;
+    o->dest = g_zeroPoint;
     o->targetUid = LEAD->uid;
     c->observer = LEAD;
     c->range = c->leadRange;
@@ -4580,7 +4580,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     if (state)
         o->savedPoint = o->scriptPoint;
     else
-        o->savedPoint = g_zeroXY;
+        o->savedPoint = g_zeroPoint;
 
     if (o->fieldF4 <= 0) {
         o->fieldEC = 0;
@@ -4589,7 +4589,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         if (dest > AM2_AI_PATROL_DETOUR) {
             /* Off the leash: drop the detour, restore the post and go back to it,
              * forgetting whatever was being chased. */
-            o->detour = g_zeroXY;
+            o->detour = g_zeroPoint;
             if (!state)
                 o->scriptPoint = o->savedPoint;
             o->dest = o->scriptPoint;
@@ -4607,7 +4607,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                 AiTrooperStep(o, out, c);
                 goto tail;
             }
-            o->detour = g_zeroXY;
+            o->detour = g_zeroPoint;
             goto react;
         }
 
@@ -4622,7 +4622,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 
     if (c->found
         && !IsKind7(c->found))
-        o->detour = g_zeroXY;
+        o->detour = g_zeroPoint;
 
     if (o->fieldEC) {
         if (c->destDist > AM2_AI_REACHED_DIST) {
@@ -4652,7 +4652,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
             AiTrooperStep(o, out, c);
             goto tail;
         }
-        o->detour = g_zeroXY;
+        o->detour = g_zeroPoint;
         goto react;
     }
 
@@ -4681,7 +4681,7 @@ seen_it:
             c->bearing = c->leadBearing;
             goto react;
         }
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
         o->targetUid = LEAD->uid;
         c->observer = LEAD;
         c->range = c->leadRange;
@@ -5130,7 +5130,7 @@ out:
  */
 void __cdecl AiStepFollow(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
 {
-    o->scriptPoint = g_zeroXY;
+    o->scriptPoint = g_zeroPoint;
 
     /* Two tests, each ending in the same route call -- one block in the
      * image, which both reach. */
@@ -5319,7 +5319,7 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     int32_t  range;
     int32_t  d;
 
-    o->scriptPoint = g_zeroXY;
+    o->scriptPoint = g_zeroPoint;
 
     if (!LEAD)
         goto hitreact;
@@ -5618,7 +5618,7 @@ void __cdecl AiWalkStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         return;
     }
 
-    o->scriptPoint = g_zeroXY;
+    o->scriptPoint = g_zeroPoint;
 
     AiHitReact(o, out, c);
 
@@ -6918,7 +6918,7 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
     } else {
         int32_t r;
 
-        o->scriptPoint = g_zeroXY;
+        o->scriptPoint = g_zeroPoint;
 
         r = orig_region_rand();
 
@@ -7329,7 +7329,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
         }
 
         if (!o->field10C)
-            *dest = g_zeroXY;
+            *dest = g_zeroPoint;
     }
 
     if (out->state == 2)
@@ -8609,7 +8609,7 @@ void __cdecl RoachBehaviour(AM2_Object *o, AM2_RoachOut *out, AM2_RoachCtx *c)
     }
 
     /* Arrived. */
-    o->scriptPoint = g_zeroXY;
+    o->scriptPoint = g_zeroPoint;
 
 #define LEADER (c->leader)
     /* The leader triple into the observer slot, re-reading the leader. */
@@ -8884,7 +8884,7 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define AM2_CHEAT_ABS(v)  abs(v)
 
 #define g_viewRect   ((AM2_Rect *)&g_viewX)
-#define g_defaultPos    (g_zeroXY)
+#define g_defaultPos    (g_zeroPoint)
 
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
@@ -9668,7 +9668,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
     }
 
     if (o->field10C == 0)
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
 
     if (o->field44 == 0)
         return;
@@ -10323,7 +10323,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         else
             r->heading = (uint8_t)(o->facing - 8);
         steered = 1;
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
         o->field10C = 0;
     }
 
@@ -10337,7 +10337,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         else
             r->heading = (uint8_t)(o->facing + 8);
         steered = 1;
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
         o->field10C = 0;
     }
 
@@ -10348,7 +10348,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         r->state = AM2_VEH_STATE_TURNING;
         r->stop = 0;
         steered = 1;
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
         o->field10C = 0;
     }
 
@@ -10357,7 +10357,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         r->stop = 0;
         r->field0C = 1;
         steered = 1;
-        o->dest = g_zeroXY;
+        o->dest = g_zeroPoint;
         o->field10C = 0;
     }
 
@@ -10448,7 +10448,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                 r->heading = AngleBetween(&o->pos,
                                   &cursorWorld);
                 r->state = AM2_VEH_STATE_TURNING;
-                o->dest = g_zeroXY;
+                o->dest = g_zeroPoint;
                 o->field10C = 0;
                 o->turnRecommit = 1;
 

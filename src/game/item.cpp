@@ -3042,10 +3042,10 @@ add:
                     if (cur < cnt - 1)
                         f->moveAt = (uint16_t)(cur + 1);
                     else
-                        f->dest = g_zeroXY;
+                        f->dest = g_zeroPoint;
                 } else if (PointsEqual(f->dest, f->scriptPoint)) {
-                    f->dest        = g_zeroXY;
-                    f->scriptPoint = g_zeroXY;
+                    f->dest        = g_zeroPoint;
+                    f->scriptPoint = g_zeroPoint;
                 }
             }
             return total;
@@ -4455,7 +4455,7 @@ void __cdecl PortalSpawn(void)
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[orig_game_rand() % 4],
                                      0),
-                     g_zeroXY,
+                     g_zeroPoint,
                      4, -1, 0, 0);
         if (!weapon)
             continue;
@@ -6924,7 +6924,7 @@ void __cdecl Type2ActionA(AM2_Object *obj)
                             (int32_t)o->owner,
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),
-                            g_zeroXY,
+                            g_zeroPoint,
                             4, -1, 0, 0);
     if (!made)
         return;
@@ -7584,7 +7584,7 @@ void __cdecl RankPromote(AM2_Object *obj)
         g_dirScratch,
         o->owner,
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
-        g_zeroXY,
+        g_zeroPoint,
         4, -1, 0, 0);
 
     if (!made)
@@ -8928,7 +8928,7 @@ void __cdecl ResetType2Fields(AM2_Object *obj)
     /* objdump.py reads 0xC0 as the destination point; orig.h names it
      * OBJ_OFF_FIELD_C0, and that is the name used here rather than a second
      * one. Deploying cancels wherever the vehicle was headed. */
-    o->dest = g_zeroXY;
+    o->dest = g_zeroPoint;
 
     o->followUid = 0;
     o->targetUid = 0;
@@ -10959,7 +10959,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
     ObjFlagSet0(row0);
     RowUpdate(row0, 0, g_mapDesc);
 
-    o->dest = g_zeroXY;
+    o->dest = g_zeroPoint;
 
     for (i = 1; i < o->rowSet.count; i++) {
         AM2_MapRow       *r = &o->rowSet.rows[i];
@@ -11066,7 +11066,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
     ObjFlagSet0(row0);
     RowUpdate(row0, 1, g_mapDesc);   /* force 1 here */
 
-    o->dest = g_zeroXY;
+    o->dest = g_zeroPoint;
     ResetType2Fields(o);
     memset(&o->sight, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
 
@@ -12083,7 +12083,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
         AM2_Object *w = CreateWeapon(g_dirScratch, army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                                (uint32_t)weaponKind, 0),
-                               g_zeroXY,
+                               g_zeroPoint,
                                AM2_VEHICLE_WEAPON_FLAGS, -1, remote, 0);
 
         if (w != (void *)0)

@@ -3444,7 +3444,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
 
     /* A received update always clears the destination: a remote vehicle is
      * driven by its owner's packets, not by a route of ours. */
-    o->dest = g_zeroXY;
+    o->dest = g_zeroPoint;
     ObjSetFootprint(o);
 
     if (g_commObject->verbose)

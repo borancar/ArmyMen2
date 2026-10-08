@@ -1834,7 +1834,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (g_loadPending == 0) {
         AM2_Object *cam = CreateItem((char *)"camera", 4,
                                g_aaiKey980000,
-                               g_zeroXY,
+                               g_zeroPoint,
                                0, 1, 0);
 
         g_evtId15Uid =

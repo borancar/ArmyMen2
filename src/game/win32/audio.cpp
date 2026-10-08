@@ -964,7 +964,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
-#define g_defaultPos    (g_zeroXY)
+#define g_defaultPos    (g_zeroPoint)
 
 /* ParseWave -- original 0x0040C220, one caller, and that caller is
  * ReadWaveFile below. The RIFF chunk walk: given the whole file in memory,

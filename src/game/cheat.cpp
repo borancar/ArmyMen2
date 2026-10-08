@@ -102,7 +102,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
 #define CHEAT_NEW_WEAPON(kind)                                               \
     (CreateWeapon(g_dirScratch, 0,   \
                  KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, (kind), 0),           \
-                 g_zeroXY, 4, -1, 0, 0))
+                 g_zeroPoint, 4, -1, 0, 0))
 
 /* 0x00417B80. */
 void __cdecl CheatLine(const char *line)

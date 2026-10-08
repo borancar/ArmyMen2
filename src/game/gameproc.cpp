@@ -423,7 +423,7 @@ int32_t __cdecl SaveDefaultCof(void)
             ObjDropAltRecord(obj);
 
             Type238Action(obj, (g_levelId * 5 + 5) * 2);
-            obj->dest = g_zeroXY;
+            obj->dest = g_zeroPoint;
 
             if (obj->riding) {
                 obj->riding = 0;
@@ -1071,7 +1071,7 @@ int32_t __cdecl PlaceScenario(void)
                 AM2_Object *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, 9, 0),
-                                       g_zeroXY,
+                                       g_zeroPoint,
                                        4, -1, 1, 0);
 
                 unit->inventory[0] =
@@ -1098,7 +1098,7 @@ int32_t __cdecl PlaceScenario(void)
                 AM2_Object *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, ScenRowWeapon(KIND), 0),
-                                       g_zeroXY,
+                                       g_zeroPoint,
                                        4, -1, 1, 0);
 
                 unit->inventory[0] =
