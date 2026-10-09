@@ -145,6 +145,15 @@ H[0]=G[0]; g(); H[1]=G[1];                             eax, then ecx after the c
 p->a = 0; return G[3];                                 store, THEN the load
 ```
 
+## A parameter copied into a local
+
+Using a parameter through a local copy (`T *c = param;` at the top, `c`
+everywhere after) is NOT always propagated away: it changed EvtCondition's
+base/index register order (`[eax + ebx]` against `[ebx + eax]`), which the
+IL-override probe had shown no operand order in the IL could reach. It is the
+`AM2_Object *o = obj;` idiom already common in this codebase, and worth trying
+early on any function whose parameter is used many times.
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.

@@ -1592,8 +1592,9 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
  */
 void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
                           int32_t a5, int32_t a6, int32_t a7,
-                          AM2_ScriptCond *c)
+                          AM2_ScriptCond *cond)
 {
+    AM2_ScriptCond *c = cond;
     int32_t hit = -1;
     int32_t i;
 

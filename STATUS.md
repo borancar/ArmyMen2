@@ -99,8 +99,10 @@ main result so far (details in `src/vc6/README.md`):
   compare. A greedy mutation climber (operand swaps, relational flips, hoisted
   call results) over 30 of the remaining 93 moved none of them.
   EvtCondition's two-byte miss (base/index order in one address) was taken to
-  the IL: c2 compiles operand-swapped IL to identical code, so that order is
-  decided inside the code generator and no source spelling reaches it. The CheatLine /
+  the IL: c2 compiles operand-swapped IL to identical code, so the order is
+  NOT an IL operand-order matter. It was reachable from source after all:
+  the condition parameter copied into a local (`AM2_ScriptCond *c = cond;`)
+  matches. Found by decomp-permuter in two minutes (2026-10-09). The CheatLine /
   PlacementScreenClick coin pair both match. It is an operand-order tie that
   VC6 breaks by state the whole TU builds up: adding struct members or
   externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
