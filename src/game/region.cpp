@@ -7969,6 +7969,9 @@ settle_facing:
                 AM2_Object *old;
                 int32_t     cap;
                 int32_t     had = 0;
+                /* Its own local, not `qty`: that one's address went to
+                 * CanPickUpWeapon, so it lives in memory. */
+                int32_t     want;
 
                 /* The hold is stamped BEFORE the quantity is worked out. */
                 at->pickupAfter = g_gameClockMs + AM2_SIGHT_REVEAL_MS;
@@ -7976,19 +7979,19 @@ settle_facing:
                 /* No slot -- not a weapon -- asks for one, and the slot is
                  * never indexed. */
                 if (slot < 0) {
-                    qty = 1;
+                    want = 1;
                     old = (AM2_Object *)0;
-                    cap = qty;
+                    cap = want;
                 } else {
                     old = WeaponByUid(o->inventory[slot]);
                     cap = at->typeRec->capacity;
                     if (!cap)
                         cap = AM2_TROOPER_NO_CAPACITY;
                     if (!old) {
-                        qty = at->ammo;
+                        want = at->ammo;
                     } else {
                         had = old->ammo;
-                        qty = cap - had;
+                        want = cap - had;
                     }
                 }
 
@@ -8000,10 +8003,10 @@ settle_facing:
                         (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                         (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
                                                     : AM2_STR_NO)),
-                        cap, at->typeRec->capacity, had, qty,
+                        cap, at->typeRec->capacity, had, want,
                         (int32_t)at->owner);
 
-                TrooperWantItemSend(o, at, 0, slot, qty);
+                TrooperWantItemSend(o, at, 0, slot, want);
             } else {
                 TrooperPickupItem(o, at, slot);
             }
