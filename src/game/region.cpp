@@ -9645,30 +9645,33 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
             r->heading = AngleBetween(&o->pos, &o->dest);
             r->state   = 4;
             d    = abs(AngleDelta(r->heading, o->facing));
-            dist = ApproxDist(&o->dest, &o->pos);
+            dist = ApproxDist(&o->pos, &o->dest);
             if (o->field548 == 0)
                 r->aim = r->heading;
 
-            /* Each distance band compares against its own limit and falls
-             * into one shared pair of stores. */
+            /* Each distance band has its own limit and its own pair of
+             * stores; VC6 merges the three pairs into one. */
             if (dist < 0x40) {
-                if (d < 0x10)
-                    goto banded;
+                if (d >= 0x10) {
+                    r->stop     = 1;
+                    r->approach = 1;
+                }
             } else if (dist < 0x60) {
-                if (d < 0x20)
-                    goto banded;
-            } else if (d < 0x40) {
-                goto banded;
+                if (d >= 0x20) {
+                    r->stop     = 1;
+                    r->approach = 1;
+                }
+            } else if (d >= 0x40) {
+                r->stop     = 1;
+                r->approach = 1;
             }
-            r->stop     = 1;
-            r->approach = 1;
-        banded:
-            ;
         }
-    }
 
-    if (o->field10C == 0)
-        o->dest = g_zeroPoint;
+        /* Inside the dest test: with no destination there is nothing to
+         * reset (the branch at 0x0045D4C9 skips it). */
+        if (o->field10C == 0)
+            o->dest = g_zeroPoint;
+    }
 
     if (o->field44 == 0)
         return;
