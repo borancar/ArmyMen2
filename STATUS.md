@@ -82,6 +82,9 @@ main result so far (details in `src/vc6/README.md`):
   test. `$T/sinkdup.py` copies the statement after an if into both arms and
   scores each site: VehicleBlockWeight went 72 -> 60, UpdateTrooperAction
   519 -> 511 and, without its empty `default:`, SelectWeapon 55 -> 46.
+  The biggest was HudEdgeUpdate, 129 -> 8 with `$T/swsink.py`: its two caption
+  switches pick a name and strcpy it once after the switch, but the image
+  strcpy's a literal in every arm.
   ScriptParseActionRecon's call counts differ from the image's, but
   tools/actcheck.py finds no behavioural difference in 13,122 cases: the
   image keeps apart copies that VC6 merges for us, because their registers
