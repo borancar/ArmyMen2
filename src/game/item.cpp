@@ -7182,10 +7182,13 @@ int32_t __cdecl WeaponPoseIndex(AM2_Object *obj, AM2_Object *weapon)
         case 43:
             return AM2_POSE_STAND;
         }
+        return (g_poseByClass)[cls];
+    } else {
+        /* The class table answers both ways, written out in each arm: the
+         * two returns are merged, and the split is the image's layout. */
+        return (g_poseByClass)[cls];
     }
 #undef ARMED
-
-    return (g_poseByClass)[cls];
 }
 
 /* SetAnimFrame is maprow.cpp's now; the image seam that stood here went
