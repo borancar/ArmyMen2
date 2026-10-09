@@ -5694,8 +5694,9 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
             }
             break;
         }
-        default:
-            break;   /* twelve kinds, and every kind outside 0x17..0x29 */
+        /* Twelve kinds, and every kind outside 0x17..0x29, do nothing. No
+         * `default: break;` -- with one, VC6 lays the jump table out
+         * differently from the image. */
         }
     }
 

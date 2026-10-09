@@ -10083,9 +10083,11 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
             rec = (v->vehicleKind
                    * AM2_VEHICLE_MASK_DIRS) + facing8;
         } while (i < AM2_MASK_REC(rec));
+        /* Inside the test: with no mask points the answer keeps the
+         * zero it was declared with, which is the weight too. */
+        answer = weight;
     }
 
-    answer = weight;
 
     /* One last sample, at the vehicle's own point, and a weight at or above
      * AM2_BLOCK_CLEAR replaces everything the mask accumulated. */
