@@ -9781,7 +9781,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             const AM2_NameRec *maps = ScriptListFind(
                 &g_mpScriptName);
 
-            if (maps && maps->count > 0) {
+            if (maps)
                 for (i = 0; i < maps->count; i++) {
                     AM2_Level *lvl = FindLevelByName(maps->maps[i]);
 
@@ -9793,12 +9793,16 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                         sel = i;
                 }
 
-                {
-                    AM2_Level *lvl = FindLevelByName(maps->maps[sel]);
+            /* OUTSIDE THE TEST: both the null-record `je` and the empty-list
+             * `jle` land on this lookup (0x00431221), so an unknown rules
+             * name reads through a null record here and faults, and an
+             * empty one looks up its first map anyway. Reproduced, like the
+             * unguarded stores above, rather than repaired. */
+            {
+                AM2_Level *lvl = FindLevelByName(maps->maps[sel]);
 
-                    if (lvl)
-                        SelectLevel(lvl);
-                }
+                if (lvl)
+                    SelectLevel(lvl);
             }
         }
 
