@@ -66,8 +66,8 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1564 of
-  1645 byte-identical (2026-10-09), piecewise 399.** The last four came from
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1565 of
+  1645 byte-identical (2026-10-09), piecewise 399.** Five of the last six came from
   writing code the compiler MERGES as separate source. FormationPoint and
   FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
   writes its stop/approach pair once per distance band instead of jumping to
@@ -77,7 +77,15 @@ main result so far (details in `src/vc6/README.md`):
   it. `$T/casesplit.py` and `$T/gotodup.py` try every such site; PlacementAllowed
   went 85 -> 77 bytes off. ScriptIf went 9 -> 3 by declaring the after-chain's event locals in
   the loop: VC6 reads a block-scoped, address-taken local before a store
-  through a heap pointer, and a function-scope one after it. RemapSpriteRuns,
+  through a heap pointer, and a function-scope one after it.
+  WeaponPoseIndex writes the class-table return in both arms of its weapon
+  test. `$T/sinkdup.py` copies the statement after an if into both arms and
+  scores each site: VehicleBlockWeight went 72 -> 60, UpdateTrooperAction
+  519 -> 511 and, without its empty `default:`, SelectWeapon 55 -> 46.
+  ScriptParseActionRecon's call counts differ from the image's, but
+  tools/actcheck.py finds no behavioural difference in 13,122 cases: the
+  image keeps apart copies that VC6 merges for us, because their registers
+  differ. RemapSpriteRuns,
   ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
   StepType5 to a struct local: a point built in an AM2_Point and stored a
   field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit
