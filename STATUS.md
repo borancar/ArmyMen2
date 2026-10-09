@@ -72,7 +72,15 @@ main result so far (details in `src/vc6/README.md`):
   docs/vc6-regalloc.md), and to RectMake by value. AddSightBlocker fell to a
   16-bit delta pair. An address-taken local reused for unrelated work lives in
   memory: UpdateTrooperAction's pickup quantity, given its own local, went
-  511 -> 420 bytes off. Five of the last six came from
+  511 -> 420 bytes off. Two misses were hiding BEHAVIOUR gaps (2026-10-10).
+  MpPanelScreen never set its game and map lists' chosen row and joiner lock,
+  nor cleared their scrollbars' +0x50: 918 -> 644 bytes off. A scan of image
+  stores that ours lacks, per miss (`$T/storegap.py`), found that one.
+  PointerActionMode5 re-read its formation anchor on every pass, so each unit
+  was placed off the previous unit's slot; the image reads it once, before
+  the loop. Bytes are unchanged there, because the load only moved. A big diff
+  is worth reading for a missing store or a moved loop head before treating it
+  as register noise. Five of the last six came from
   writing code the compiler MERGES as separate source. FormationPoint and
   FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
   writes its stop/approach pair once per distance band instead of jumping to
