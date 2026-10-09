@@ -7469,12 +7469,11 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
         return 0;
 
     {
-        uint32_t v = o->aai->key;
+        int32_t b = (int32_t)((o->aai->key >> AM2_OBJREC_SHIFT_B)
+                              & AM2_OBJREC_MASK_B);
 
-        if (ApplyObjFrame(o,
-                          (int32_t)((v >> AM2_OBJREC_SHIFT_B)
-                                    & AM2_OBJREC_MASK_B),
-                          (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+        if (ApplyObjFrame(o, b,
+                          (int32_t)((o->aai->key >> AM2_OBJREC_SHIFT_A)
                                     & AM2_OBJREC_MASK_A),
                           frame, flag))
             any = 1;
@@ -7493,13 +7492,11 @@ int32_t __cdecl ChangeObjectFrame(AM2_Object *o, int32_t frame, int32_t flag)
             return 0;
 
         if (!(link->flags & OBJ_FLAG_NO_FRAME)) {
-            uint32_t v =
-                link->aai->key;
+            int32_t b = (int32_t)((link->aai->key >> AM2_OBJREC_SHIFT_B)
+                                  & AM2_OBJREC_MASK_B);
 
-            if (ApplyObjFrame(link,
-                              (int32_t)((v >> AM2_OBJREC_SHIFT_B)
-                                        & AM2_OBJREC_MASK_B),
-                              (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+            if (ApplyObjFrame(link, b,
+                              (int32_t)((link->aai->key >> AM2_OBJREC_SHIFT_A)
                                         & AM2_OBJREC_MASK_A),
                               frame, flag))
                 any = 1;
