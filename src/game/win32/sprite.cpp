@@ -1471,12 +1471,12 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
     handle = orig_findfirst(pattern, &found);
     if (handle == -1) {
         spr->image.rle16 = 0;
-        return 0;
+        rc = 0;
+    } else {
+        rc = SpriteReloadNamed(spr, found.name,
+                               flags);
+        orig_findclose(handle);
     }
-
-    rc = SpriteReloadNamed(spr, found.name,
-                           flags);
-    orig_findclose(handle);
     return rc;
 }
 
