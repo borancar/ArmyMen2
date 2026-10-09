@@ -1860,7 +1860,7 @@ void __cdecl ViewUpdate(void)
     AM2_Point vpt;
     void   *obj;
 
-    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + BOUND_L,
+    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, (w >> 1) + BOUND_L,
                                     BOUND_R - halfW - 1);
     g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + BOUND_T,
                                     BOUND_B - (h >> 1) - 1);
