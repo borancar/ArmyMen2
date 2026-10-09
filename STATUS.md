@@ -74,7 +74,10 @@ main result so far (details in `src/vc6/README.md`):
   memory: UpdateTrooperAction's pickup quantity, given its own local, went
   511 -> 420 bytes off. Two misses were hiding BEHAVIOUR gaps (2026-10-10).
   MpPanelScreen never set its game and map lists' chosen row and joiner lock,
-  nor cleared their scrollbars' +0x50: 918 -> 644 bytes off. A scan of image
+  nor cleared their scrollbars' +0x50: 918 -> 644 bytes off. Its map
+  selection also belongs outside the null/empty guard (the image looks up
+  `maps->maps[sel]` either way, faulting on an unknown rules name); it is
+  642 now. A scan of image
   stores that ours lacks, per miss (`$T/storegap.py`), found that one.
   PointerActionMode5 re-read its formation anchor on every pass, so each unit
   was placed off the previous unit's slot; the image reads it once, before
