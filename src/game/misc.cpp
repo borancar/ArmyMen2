@@ -952,11 +952,11 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
             i++;
             *wr = values[i - 1];
 
-            /* Re-read, as the original does. Nothing in the loop writes it, so it
-             * cannot change -- unless the caller passed a count that lives inside
-             * the array, and reproducing the read costs nothing. */
-            n = *count;
-        } while (i < n);
+            /* The count is re-read for the loop test, as the original does;
+             * the inner bound keeps the value read on entry. Nothing in the
+             * loop writes it, so the two agree unless the count lives inside
+             * the array. */
+        } while (i < *count);
     }
 
     *count = kept + 1;
