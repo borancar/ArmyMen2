@@ -13711,9 +13711,9 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     if (!rows || row < 0 || row >= rows->count)
         return;
 
-    dlg = (AM2_DlgSaveListScreen *)g_paintObject;
-    if (!dlg)
+    if (!g_paintObject)
         return;
+    dlg = (AM2_DlgSaveListScreen *)g_paintObject;
 
     strcpy(dlg->name,
            rows->text + (size_t)row * LIST_ROW_STRIDE);
