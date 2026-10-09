@@ -2788,7 +2788,6 @@ int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
 int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 {
     int32_t objname = 0;
-    int32_t a, b, c3;
     int32_t na, nb, nc;     /* the butnot event's own */
     AM2_ScriptAction act;
     AM2_ScriptCond *cond;
@@ -2845,6 +2844,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         /* An `<event> after <event>` chain. */
         cond->kind = AM2_IF_AFTER;
         while (TOK->kind == AM2_TOKEN_STRING || TOK->kind == AM2_TOKEN_RESERVED) {
+            int32_t a, b, c3;   /* block-scoped: the image reads them past the realloc */
+
             if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, a, b, c3);
