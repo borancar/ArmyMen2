@@ -1687,7 +1687,8 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
         int16_t dx0 = (int16_t)(close.x - vx);
         int16_t dy0 = (int16_t)(close.y - vy);
         int32_t d0  = ApproxDistXY(dx0, dy0);
-        int32_t dx1, dy1, d1;
+        int16_t dx1, dy1;   /* 16-bit, like the near corner's */
+        int32_t d1;
 
         a0 = AngleOfDelta3(dx0, dy0, d0);
         dx1 = (int16_t)(farPt.x - v->pos.x);
