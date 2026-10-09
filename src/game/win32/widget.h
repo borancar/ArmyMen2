@@ -898,9 +898,9 @@ struct AM2_MpPanelScreen : AM2_ScreenBase {
     char          scoreText[0x20];          /* 0x01E4 MP_PANEL_OFF_SCORE_TEXT */
     AM2_ListBox  *typeBox;                  /* 0x0204 MP_PANEL_OFF_TYPE_BOX */
     AM2_ListBox  *gameBox;                  /* 0x0208 MP_PANEL_OFF_GAME_BOX */
-    AM2_Widget   *gameBar;                  /* 0x020C MP_PANEL_OFF_GAME_BAR */
+    AM2_ArrowBar *gameBar;                  /* 0x020C MP_PANEL_OFF_GAME_BAR */
     AM2_ListBox  *mapBox;                   /* 0x0210 MP_PANEL_OFF_MAP_BOX */
-    AM2_Widget   *mapBar;                   /* 0x0214 MP_PANEL_OFF_MAP_BAR */
+    AM2_ArrowBar *mapBar;                   /* 0x0214 MP_PANEL_OFF_MAP_BAR */
     AM2_Widget   *preview;                  /* 0x0218 MP_PANEL_OFF_PREVIEW */
     AM2_ListBox  *chatBox;                  /* 0x021C MP_PANEL_OFF_CHATBOX */
     AM2_Widget   *names[AM2_COMM_SLOTS];    /* 0x0220 MP_PANEL_OFF_NAMES */

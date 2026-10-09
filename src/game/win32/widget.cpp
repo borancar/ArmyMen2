@@ -9303,6 +9303,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     AM2_MpPanelScreen   *p = (AM2_MpPanelScreen *)w;
     AM2_Rect   r;
     int32_t    i;
+    int32_t   *points;
     /* The game box's rules path. Function scope: the image's 0x1a4 frame
      * gives it a slot of its own, where a block-scoped one shares. */
     char       path[0x40];
@@ -9331,11 +9332,12 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* FOUR PLAYER ROWS, three widgets each, into three PARALLEL arrays.  The
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
-    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+    points = g_armyPoints;
+    for (i = 0; i < AM2_COMM_SLOTS; i++, points++) {
         char       *name = this->playerNames[i];
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
-        AM2_Rect     box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
+        AM2_Rect     box;
 
         name[0] = '\0';
 
@@ -9354,6 +9356,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * listed as "apparently unread" and that was wrong -- widget.cpp
          * reads it; the grep that found the six only asked who WRITES. */
         this->colourSel[i] = -1;
+
+        box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
 
         /* The row's own name: the comm slot's player, or `-- Open --`. */
         {
@@ -9416,7 +9420,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * what the update displays. */
         last = i == 3;
         spin = new AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
-                              (g_armyPoints)[i],
+                              *points,
                               0, 0x1388, 0x64, w, MpCommitPoints,
                               g_hiliteColour,
                               g_colourBelowBg,
@@ -9698,21 +9702,29 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                 0, 1);
         ::WidgetAddChild(w, *slot);
 
+        /* THE CHOSEN ROW IS THE ONE THE NAME MATCHED, and a joiner cannot
+         * change it: 0x00430F4F stores `sel` at +0x5C and, with
+         * COMM_OFF_IS_HOST clear, sets +0x4C. Both were missing, so the list
+         * came up with no committed row and live for a joiner. */
+        (*slot)->chosen = sel;
+        if (!g_commObject->isHost)
+            (*slot)->disabled = 1;
+
         /* AND ITS SCROLLBAR. Built here rather than later because the child
          * ORDER is observable: the original stores this bar at 0x20C
          * immediately after the box, and a tree is ordered by when each child
-         * was added. */
-        {
-            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
-                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                        0x2A, 1);
-            p->gameBar = bar;
-            ::WidgetAddChild(w, bar);
+         * was added. The links are made through the panel's fields, which
+         * the original reads back for every store; the bar's +0x50 is
+         * cleared like every other fixed child's. */
+        p->gameBar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
+                                      (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                      (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
+                                      0x2A, 1);
+        ::WidgetAddChild(w, p->gameBar);
 
-            (*slot)->arrowBar = bar;
-            bar->list   = *slot;
-        }
+        p->gameBox->arrowBar = p->gameBar;
+        p->gameBar->list     = p->gameBox;
+        p->gameBar->flag50   = 0;
     }
 
     /* THE SCORE LIMIT: a spinner when hosting, a read-only label of the same
@@ -9769,11 +9781,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 &g_mpScriptName);
 
             if (maps && maps->count > 0) {
-                const char *names = maps->maps[0];
-
                 for (i = 0; i < maps->count; i++) {
-                    AM2_Level *lvl = FindLevelByName(
-                        (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
+                    AM2_Level *lvl = FindLevelByName(maps->maps[i]);
 
                     if (!lvl)
                         continue;
@@ -9784,8 +9793,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 }
 
                 {
-                    AM2_Level *lvl = FindLevelByName(
-                        (char *)names + (uint32_t)sel * AM2_MPMAP_STRIDE);
+                    AM2_Level *lvl = FindLevelByName(maps->maps[sel]);
 
                     if (lvl)
                         SelectLevel(lvl);
@@ -9797,21 +9805,22 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                 (int32_t)(uintptr_t)OnMpMapPick, 0, 1);
         ::WidgetAddChild(w, *slot);
 
-        /* AND ITS SCROLLBAR. Built here rather than later because the child
-         * ORDER is observable: the original stores this bar at 0x214
-         * immediately after the box, and a tree is ordered by when each child
-         * was added. */
-        {
-            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
-                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                        0x2F, 1);
-            p->mapBar = bar;
-            ::WidgetAddChild(w, bar);
+        /* The same two stores as the game box (0x004312D8). */
+        (*slot)->chosen = sel;
+        if (!g_commObject->isHost)
+            (*slot)->disabled = 1;
 
-            (*slot)->arrowBar = bar;
-            bar->list   = *slot;
-        }
+        /* AND ITS SCROLLBAR, at 0x214 immediately after the box, linked and
+         * cleared the same way as the game box's. */
+        p->mapBar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
+                                     (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                     (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
+                                     0x2F, 1);
+        ::WidgetAddChild(w, p->mapBar);
+
+        p->mapBox->arrowBar = p->mapBar;
+        p->mapBar->list     = p->mapBox;
+        p->mapBar->flag50   = 0;
     }
 
     /* THE MAP PREVIEW, with a fallback that also moves the data directory.
