@@ -9667,9 +9667,10 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_ListBox **slot = &p->gameBox;
         void        *rows;
-        int32_t      sel = 0;
+        int32_t      sel;
 
         rows = new AM2_Rec(0);
+        sel = 0;
 
         for (i = 0;
              i < g_nameTableCount; i++) {
