@@ -1835,10 +1835,10 @@ int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
               g_mapTilesH
                   - AM2_TILEMASK_MARGIN);
 
-    out->box.bottom = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then left, then right */
     out->box.left = c.left - AM2_TILEMASK_MARGIN;
     out->box.right = c.right + AM2_TILEMASK_MARGIN;
     out->box.top = c.top - AM2_TILEMASK_MARGIN;
+    out->box.bottom = c.bottom + AM2_TILEMASK_MARGIN;
 
     memset(out->cells, AM2_TILEMASK_PAD_CELL,
            (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
