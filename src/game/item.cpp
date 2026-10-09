@@ -1473,6 +1473,8 @@ void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
     rows->pos     = o->pos;
     rows->yAdjust = o->row0YAdjust;
 
+    /* Re-read for the loop (17 -> 11 bytes off the image). */
+    rows = o->rowSet.rows;
     for (i = 1; i < o->rowSet.count; i++) {
         AM2_MapRow *r = &o->rowSet.rows[i];
 
