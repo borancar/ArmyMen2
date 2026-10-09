@@ -66,8 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1565 of
-  1645 byte-identical (2026-10-09), piecewise 399.** Five of the last six came from
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1566 of
+  1645 byte-identical (2026-10-09), piecewise 399.** AddSightBlocker fell to a
+  16-bit delta pair. An address-taken local reused for unrelated work lives in
+  memory: UpdateTrooperAction's pickup quantity, given its own local, went
+  511 -> 420 bytes off. Five of the last six came from
   writing code the compiler MERGES as separate source. FormationPoint and
   FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
   writes its stop/approach pair once per distance band instead of jumping to
