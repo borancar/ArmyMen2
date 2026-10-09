@@ -16784,6 +16784,7 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
     AM2_Object *ctx = *&g_objCtxObjA;
     int32_t     type;
     int32_t     i;
+    AM2_Point   home;
 
     if (!ctx)
         return;
@@ -16805,8 +16806,13 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
     if (SelectIfOwn(tgt))
         return;
 
+    /* THE ANCHOR IS READ ONCE. The image loads it into ebx before the loop
+     * and its back edge lands after that load (0x0045875B), so every unit's
+     * slot is computed from the clicked point -- as in mode 6 -- while `at`
+     * is only the slot FormationSlotPoint writes. Copied per pass, each unit
+     * was placed relative to the slot of the one before it. */
+    home = at;
     for (i = 0; i < g_selectedCount; ) {
-        AM2_Point home = at;   /* this pass's point; `at` becomes the slot */
         AM2_Object *o = LookupByUID(
             (g_selectedItems)[i]);
         int32_t  ot;
@@ -16827,9 +16833,9 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
         o->aiMode = 1;
 
         /* The original passes the address of its `at` argument slot and
-         * never restores it, so each unit's slot is computed from the one
-         * before it -- the chain is the original's, reproduced. The value
-         * from before the call stays in a register for the row-8 order. */
+         * never restores it; the anchor is `home`, so the slot it leaves
+         * there is used only by this unit's order. The clicked point stays
+         * in a register for the row-8 order. */
         FormationSlotPoint(i, home, o, &at);
 
         /* Ordered PointActionA then ObjAttachTo -- the reverse of modes 4
