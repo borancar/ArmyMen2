@@ -1117,8 +1117,8 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
 
     cl = r->rect.left   >> 8;
     ct = r->rect.top    >> 8;
-    cr = (r->rect.left + spr->bounds.right) >> 8;
-    cb = (r->rect.top + spr->bounds.bottom) >> 8;
+    cr = r->rect.right  >> 8;
+    cb = r->rect.bottom >> 8;
 
 
     if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
