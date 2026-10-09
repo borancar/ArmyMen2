@@ -10015,14 +10015,16 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
     } else {
 
     int32_t facing8 = facing & 0xFF;
-    rec = (v->vehicleKind * AM2_VEHICLE_MASK_DIRS)
-        + facing8;
 
-    if (AM2_MASK_REC(rec) > 0) {
+    /* This loop indexes the masks afresh at every use; the boat loop
+     * above holds the index in `rec`. */
+#define REC (v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8)
+
+    if (AM2_MASK_REC(REC) > 0) {
         i = 0;
         do {
-            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + at.x);
-            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + at.y);
+            pt.x = (int16_t)(g_vehicleMasks[REC].pts[i].x + at.x);
+            pt.y = (int16_t)(g_vehicleMasks[REC].pts[i].y + at.y);
 
             list = ObjectsAtPoint((const AM2_Point *)&pt,
                                   g_objMapDesc);
@@ -10082,11 +10084,10 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
             }
 
             i++;
-            rec = (v->vehicleKind
-                   * AM2_VEHICLE_MASK_DIRS) + facing8;
-        } while (i < AM2_MASK_REC(rec));
+        } while (i < AM2_MASK_REC(REC));
         /* Inside the test: with no mask points the answer keeps the
          * zero it was declared with, which is the weight too. */
+#undef REC
         answer = weight;
     }
 
