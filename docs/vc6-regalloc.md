@@ -103,6 +103,13 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
   depends on the order the fields are referenced: in OptionsDefaults,
   reading `bit` last anchors on `bit`, and reading `which` last anchors on
   `which`. The rule is only partly pinned down.
+  Lab, 2026-10-10: in a straight-line loop body the anchor is the field read
+  LAST (`g(t[r].widget); g(t[r].last)` anchors on `last`; swap the calls and
+  it anchors on `widget`). Once the body opens with a test and `continue`,
+  indexing `t[r]` anchors on the first field read after the test. Holding a
+  record pointer (`p = &t[r]`, every read through `p`) anchors on the last
+  field read again, inner loops included. MpOptionsScreen's group pass
+  matched that way.
 
 ### Evaluation order
 

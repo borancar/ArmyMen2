@@ -10560,15 +10560,18 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
     if (host) {
 #define REC (g_optionTable[record])
         for (record = 0; record < AM2_OPTION_COUNT; record++) {
+            const AM2_OptionRec *r = &REC;
             AM2_CheckBox *head;
             int32_t     i;
 
-            if (!REC.group)
+            if (!r->group)
                 continue;
-            i = REC.first;
-            head = boxes[REC.widget];
-            for (; i <= REC.last; i++)
-                boxes[i]->disabled = (head->checked == 0);
+            head = boxes[r->widget];
+            for (i = r->first; i <= r->last; i++) {
+                AM2_CheckBox *b = boxes[i];
+
+                b->disabled = (head->checked == 0);
+            }
         }
 #undef REC
     }
