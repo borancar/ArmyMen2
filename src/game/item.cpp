@@ -1899,6 +1899,7 @@ int32_t __cdecl ObjIsWatchedKind(const AM2_Object *obj)
  */
 void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
 {
+    const AM2_MaskRec *m;
     AM2_Object       *o = obj;
     const AM2_MapRow *rows;
     int32_t        dir;
@@ -1921,10 +1922,11 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
                     + rows->heading) & 0xFF,
                    (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
-    /* The count and the points re-indexed from the table, as RoachMaskWeight
-     * reads them. */
-#define COUNT (g_roachMasks[dir].count)
-#define PTS   (g_roachMasks[dir].pts)
+    /* The direction's record is held in a pointer; its count is re-read
+     * from it at every pass. */
+    m = &g_roachMasks[dir];
+#define COUNT (m->count)
+#define PTS   (m->pts)
     for (i = 0; i < COUNT; i++) {
         AM2_Point        at;
         uint16_t *mark;
@@ -2744,6 +2746,7 @@ void __cdecl RoachBite(AM2_Object *o)
  */
 void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
 {
+    const AM2_MaskRec *m;
     AM2_Object       *o = obj;
     const AM2_MapRow *rows;
     int32_t        dir;
@@ -2766,10 +2769,11 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
                     + rows->heading) & 0xFF,
                    (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
-    /* The count and the points re-indexed from the table, as RoachMaskWeight
-     * reads them. */
-#define COUNT (g_roachMasks[dir].count)
-#define PTS   (g_roachMasks[dir].pts)
+    /* The direction's record is held in a pointer; its count is re-read
+     * from it at every pass. */
+    m = &g_roachMasks[dir];
+#define COUNT (m->count)
+#define PTS   (m->pts)
     for (i = 0; i < COUNT; i++) {
         AM2_Point        at;
         uint16_t *mark;
