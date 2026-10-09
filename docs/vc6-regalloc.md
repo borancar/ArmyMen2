@@ -154,6 +154,18 @@ IL-override probe had shown no operand order in the IL could reach. It is the
 `AM2_Object *o = obj;` idiom already common in this codebase, and worth trying
 early on any function whose parameter is used many times.
 
+## Spill slots follow the source before merging
+
+A spilled local reuses a dead argument's home slot, and which slot it gets is
+decided before identical blocks are merged. FormationPoint's `case 2: case 8:`
+arm, written as two separate arms that compile to the same merged code, swapped
+the slots of its two spilled byte locals (`leaderFacing` and `facing`) into the
+image's order. Use counts did not move them in a lab clone; neither did
+declaration order, `(void)` uses, or reordering the arms. When two spills trade
+slots, try writing a shared `case` label as separate arms, or duplicating some
+other block the compiler will merge. (decomp-permuter found this as an unnatural
+`if (slot) {...} else {...}` with the same body on both sides.)
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.
