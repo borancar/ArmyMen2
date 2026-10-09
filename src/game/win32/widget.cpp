@@ -10538,7 +10538,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
                 (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK3)),
-                *RectSet(AM2_TEMP(AM2_Rect), REC.x, REC.y, 0xC8, 0x0D),
+                RectMake(REC.x, REC.y, 0xC8, 0x0D),
                 record,
                 REC.label,
                 (void (__cdecl *)(AM2_Widget *))kOptionsSyncGroup);
@@ -10565,9 +10565,9 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
 
             if (!REC.group)
                 continue;
+            i = REC.first;
             head = boxes[REC.widget];
-            for (i = REC.first; i <= REC.last;
-                 i++)
+            for (; i <= REC.last; i++)
                 boxes[i]->disabled = (head->checked == 0);
         }
 #undef REC
