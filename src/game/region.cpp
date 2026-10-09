@@ -8074,7 +8074,7 @@ pose:
         int32_t v;
 
         if (o->field44) {
-            v = speed;
+            ObjMoveAlongFacing(o, speed, 0, 0);
         } else {
             int8_t h = o->heightSet;
 
@@ -8082,8 +8082,8 @@ pose:
                 v = h;
             else
                 v = speed;
+            ObjMoveAlongFacing(o, v, 0, 0);
         }
-        ObjMoveAlongFacing(o, v, 0, 0);
     }
 
     o->heightAdj = (int8_t)g_trooperClassValue[klass];
