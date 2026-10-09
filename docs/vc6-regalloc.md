@@ -199,6 +199,15 @@ image's result has not been found.
   statements, both signednesses and three spellings of the test were tried
   in a clone (`checked` stays 26 lines off the image at best).
 - Whether the hidden C2 switches change any of this.
+- What makes VC6 split a pointer's live range around a loop. In
+  PointerPickMode0/4/5/6 the image keeps the object in `esi` up to the
+  shared friend tail, then copies it to `ebp` (`mov ebp, esi`) so the
+  selection loop's index can take `esi`. That leaves `ebx` free, and the loop
+  holds the 0x400 flag in it (`test [eax+8], ebx`). Ours keeps the object in
+  `ebx` throughout and tests the flag as a byte (`test ch, 4`). A copy of the
+  parameter at function scope, a copy inside the inline tail, the tail's
+  board branch as an inline of its own, and a `const` parameter were all
+  propagated away and changed nothing (2026-10-10).
 
 ## Running decomp-permuter against VC6
 
