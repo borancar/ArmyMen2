@@ -559,8 +559,14 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
             goto fail;
         break;
 
-    /* The five soldiers, and the mine -- laid out last in the image. */
-    case 0: case 1: case 2: case 3: case 4: case 17:
+    /* The five soldiers, and the mine -- laid out last in the image. The
+     * mine's arm is written apart: VC6 merges the two, but the split is
+     * closer to the image (85 -> 77 bytes off). */
+    case 0: case 1: case 2: case 3: case 4:
+        weight = BlockWeightAt((AM2_Object *)(void *)0, where,
+                               where);
+        break;
+    case 17:
         weight = BlockWeightAt((AM2_Object *)(void *)0, where,
                                where);
         break;
