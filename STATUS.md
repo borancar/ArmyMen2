@@ -75,7 +75,9 @@ main result so far (details in `src/vc6/README.md`):
   source decides the spill slots and the register weights. Where our source
   shares a tail through a `goto` or a stacked `case` label, try duplicating
   it. `$T/casesplit.py` and `$T/gotodup.py` try every such site; PlacementAllowed
-  went 85 -> 77 bytes off. RemapSpriteRuns,
+  went 85 -> 77 bytes off. ScriptIf went 9 -> 3 by declaring the after-chain's event locals in
+  the loop: VC6 reads a block-scoped, address-taken local before a store
+  through a heap pointer, and a function-scope one after it. RemapSpriteRuns,
   ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
   StepType5 to a struct local: a point built in an AM2_Point and stored a
   field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit

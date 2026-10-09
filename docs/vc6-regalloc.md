@@ -89,6 +89,11 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
 - **Loads never move above stores.** VC6 does no alias analysis between a
   store through one pointer and a load through another, or from a global.
   So the image's order of a load relative to a store is the source's order.
+  One exception, measured on ScriptIf (2026-10-09): a local whose address
+  was passed to a call, but which is declared in an inner block, is read
+  before a store through a heap pointer. Declared at function scope, it is
+  read after the store. When the image reads a local before a store and we
+  read it after, try narrowing the local's scope.
   Loads DO sink toward their use: a value assigned early but used late can
   be loaded just before use, and then takes its register at that point in
   the rotation, not at its source position.
