@@ -8401,7 +8401,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     AM2_Widget *w = this;
 
     AM2_HudEdge   *e    = static_cast<AM2_HudEdge *>(w);
-    char          *capB = e->captionB;
+    char          *capB;
     const AM2_Object *obj;
     int32_t        i;
 
@@ -8427,7 +8427,8 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     e->healthPct = 0;
     e->captionA[0]     = '\0';
     e->secondPct = 0;
-    *capB                                    = '\0';
+    capB = e->captionB;
+    *capB = '\0';
     e->ammo       = -1;
 
     if (!obj) {
@@ -8440,20 +8441,18 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
 
     if (obj->riding) {
         const AM2_Object *veh = LookupType3ByUID(obj->riding);
-        const char    *name;
 
         if (veh) {
             /* A switch over string literals, and the image's jump table
              * (0x00419A18) sends kind 4 to the default. */
             switch ((uint32_t)veh->vehicleKind) {
-            case 0:  name = "JEEP"; break;
-            case 1:  name = "TANK"; break;
-            case 2:  name = "H|T";  break;
-            case 3:  name = "CONV"; break;
-            case 5:  name = "BOAT"; break;
-            default: name = "???";  break;
+            case 0:  strcpy(e->captionA, "JEEP"); break;
+            case 1:  strcpy(e->captionA, "TANK"); break;
+            case 2:  strcpy(e->captionA, "H|T");  break;
+            case 3:  strcpy(e->captionA, "CONV"); break;
+            case 5:  strcpy(e->captionA, "BOAT"); break;
+            default: strcpy(e->captionA, "???");  break;
             }
-            strcpy(e->captionA, name);
             e->secondPct = EdgeBar(veh->health, veh->maxHealth);
         }
         ::WidgetUpdate(w);
@@ -8462,7 +8461,6 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
 
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
         const AM2_Object *item;
-        const char    *name;
 
         if (!obj->inventory[i])
             break;
@@ -8478,33 +8476,32 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
              * byte table at 0x00419A94 and the jump table before it. The
              * case order is the arms' order in the image. */
             switch ((uint32_t)item->typeRec->kind) {
-                case 2: name = "GREN"; break;
-                case 3: name = "FLAM"; break;
-                case 4: name = "BAZ"; break;
-                case 5: name = "MORT"; break;
-                case 9: name = "RIFLE"; break;
-                case 10: name = "AUTO"; break;
-                case 11: name = "MINE"; break;
-                case 12: name = "EXPL"; break;
-                case 15: case 16: case 17: case 18: case 19: name = "FLAG"; break;
-                case 20: name = "MSWP"; break;
-                case 23: name = "MEDI"; break;
-                case 24: name = "AIRS"; break;
-                case 25: name = "PARA"; break;
-                case 26: name = "RECO"; break;
-                case 27: name = "NOTE"; break;
-                case 28: name = "FLAK"; break;
-                case 8: name = "HvMG"; break;
-                case 29: name = "VULC"; break;
-                case 30: name = "SNIP"; break;
-                case 35: case 36: case 37: case 38: name = "DISG"; break;
-                case 39: name = "MAG"; break;
-                case 40: name = "AERO"; break;
-                case 41: name = "WREN"; break;
-                case 42: name = "M80"; break;
-            default: name = "???"; break;
+                case 2: strcpy(capB, "GREN"); break;
+                case 3: strcpy(capB, "FLAM"); break;
+                case 4: strcpy(capB, "BAZ"); break;
+                case 5: strcpy(capB, "MORT"); break;
+                case 9: strcpy(capB, "RIFLE"); break;
+                case 10: strcpy(capB, "AUTO"); break;
+                case 11: strcpy(capB, "MINE"); break;
+                case 12: strcpy(capB, "EXPL"); break;
+                case 15: case 16: case 17: case 18: case 19: strcpy(capB, "FLAG"); break;
+                case 20: strcpy(capB, "MSWP"); break;
+                case 23: strcpy(capB, "MEDI"); break;
+                case 24: strcpy(capB, "AIRS"); break;
+                case 25: strcpy(capB, "PARA"); break;
+                case 26: strcpy(capB, "RECO"); break;
+                case 27: strcpy(capB, "NOTE"); break;
+                case 28: strcpy(capB, "FLAK"); break;
+                case 8: strcpy(capB, "HvMG"); break;
+                case 29: strcpy(capB, "VULC"); break;
+                case 30: strcpy(capB, "SNIP"); break;
+                case 35: case 36: case 37: case 38: strcpy(capB, "DISG"); break;
+                case 39: strcpy(capB, "MAG"); break;
+                case 40: strcpy(capB, "AERO"); break;
+                case 41: strcpy(capB, "WREN"); break;
+                case 42: strcpy(capB, "M80"); break;
+            default: strcpy(capB, "???"); break;
             }
-            strcpy(capB, name);
         }
 
         /* Falls through from the branch above, deliberately. */
