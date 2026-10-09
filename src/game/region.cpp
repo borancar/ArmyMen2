@@ -9257,8 +9257,8 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
             goto tail;
 
         out->spot.at.x = (uint16_t)aim.x;
-        out->spot.at.y = (uint16_t)aim.y;
         out->seen = 1;
+        out->spot.at.y = (uint16_t)aim.y;
         o->dest = g_defaultPos;
         out->bearing = (uint8_t)AngleBetween(&o->pos, &aim);
         o->deadlineD0 = 0;
