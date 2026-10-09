@@ -876,8 +876,9 @@ done:
  * once into a local and the loop bound comes from that, not from the global
  * the header word was written to.
  */
-int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
+int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
 {
+    int32_t        remaining = remaining_in;
     int32_t        count;
     AM2_Scenario  *table;
     int32_t        i;
