@@ -9204,7 +9204,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                     /* The directions count is read afresh for each call,
                      * as the image has it. */
 #define dirs (o->rowSet.rows->animPlaying->directionBits)
-                    if (RoundTo8(out->bearing, dirs) != RoundTo8(face, dirs)) {
+                    if (RoundTo8(face, dirs) != RoundTo8(out->bearing, dirs)) {
 #undef dirs
                         out->bearing = (uint8_t)(face + AngleDelta(face, out->bearing) / 2);
                         out->spot.at.x = 0;
