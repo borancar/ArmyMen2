@@ -568,8 +568,8 @@ void __cdecl FormationPointFar(AM2_Object *follower, AM2_Object *leader, AM2_Poi
 
     (void)follower;
 
-    out->y = l->pos.y;
     out->x = l->pos.x;
+    out->y = l->pos.y;
 
     switch (*(const int32_t *)l) {
     case 3:
@@ -577,6 +577,9 @@ void __cdecl FormationPointFar(AM2_Object *follower, AM2_Object *leader, AM2_Poi
         shift        = 1;
         break;
     case 2:
+        leaderFacing = l->facing;
+        shift        = 0;
+        break;
     case 8:
         leaderFacing = l->facing;
         shift        = 0;
@@ -659,12 +662,17 @@ void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point 
     out->x = l->pos.x;
     out->y = l->pos.y;
 
+    /* One arm per type, 2 and 8 written out twice: the code is merged, but
+     * the extra assignment decides which argument slots the spills reuse. */
     switch (*(const int32_t *)l) {
     case 3:
         leaderFacing = l->facing;
         shift        = 1;
         break;
     case 2:
+        leaderFacing = l->facing;
+        shift        = 0;
+        break;
     case 8:
         leaderFacing = l->facing;
         shift        = 0;
