@@ -1214,9 +1214,9 @@ void __cdecl ScrollMapCache(void)
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
         tiles.left   = sx;
-        tiles.top    = (0 < dy) ? dy : 0;   /* spelled as the image compares it */
         tiles.bottom = g_camera->bottom - ady - g_camera->top + sy;
         tiles.right  = g_camera->right - adx - g_camera->left + sx;
+        tiles.top    = (0 < dy) ? dy : 0;   /* spelled as the image compares it */
 
         src.left   = sx << TILE_SHIFT;
         src.top    = sy << TILE_SHIFT;

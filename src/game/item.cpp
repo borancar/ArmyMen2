@@ -10008,7 +10008,8 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
             i++;
             rec = (v->vehicleKind
                    * AM2_VEHICLE_MASK_DIRS) + facing8;
-        } while (i < AM2_MASK_REC(rec));
+        } while (i < AM2_MASK_REC((v->vehicleKind
+                                   * AM2_VEHICLE_MASK_DIRS) + facing8));
 
         return weight;
         }
