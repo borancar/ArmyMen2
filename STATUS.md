@@ -66,8 +66,16 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1557 of
-  1645 byte-identical (2026-10-08), piecewise 399.** RemapSpriteRuns,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1564 of
+  1645 byte-identical (2026-10-09), piecewise 399.** The last four came from
+  writing code the compiler MERGES as separate source. FormationPoint and
+  FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
+  writes its stop/approach pair once per distance band instead of jumping to
+  one shared pair. VC6 merges the copies into identical code, but the extra
+  source decides the spill slots and the register weights. Where our source
+  shares a tail through a `goto` or a stacked `case` label, try duplicating
+  it. `$T/casesplit.py` and `$T/gotodup.py` try every such site; PlacementAllowed
+  went 85 -> 77 bytes off. RemapSpriteRuns,
   ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
   StepType5 to a struct local: a point built in an AM2_Point and stored a
   field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit
@@ -76,7 +84,7 @@ main result so far (details in `src/vc6/README.md`):
   sweep (2026-10-09) took every remaining function under ~600 bytes through
   the searches and by hand: OptionsDefaults, SaveListOnPick, PointActionC,
   SpriteRebuildAlt, StepRowAnim, BoxAction, the two footprint pairs,
-  ParseScenarioPart, Step3RouteAndBoard, PointerActionMode5, SelectWeapon,
+  ParseScenarioPart, PointerActionMode5, SelectWeapon,
   BlockWeightTroops, AddToItemList and SelectionClick are each held by two
   variables in swapped registers, a scratch-register rotation offset by one,
   a scheduling swap, or (SelectWeapon) VC6 keeping the EARLIER copy of a
@@ -1364,6 +1372,11 @@ main result so far (details in `src/vc6/README.md`):
     extra row. The reconstruction had indexed the rows; it now reproduces
     the image. `where` is an AM2_Point by value. Lockstep unchanged (Boot
     Camp's one PlaceObj is on a one-row object).
+  - **Step3RouteAndBoard cleared a destination it did not have** (2026-10-09):
+    the image resets `o->dest` to the zero point only inside the
+    `dest.x != 0` test (0x0045D4C9 jumps past it); ours did it always, so a
+    unit with dest.x == 0 had its dest.y cleared too. Found by byte-matching;
+    not driven.
   - **PointerActionMode5 chains its formation slots** (2026-09-30): the image
     passes the address of its own `at` argument as FormationSlotPoint's out
     slot and re-reads `at` as the next unit's base, so each selected unit's
