@@ -166,6 +166,19 @@ slots, try writing a shared `case` label as separate arms, or duplicating some
 other block the compiler will merge. (decomp-permuter found this as an unnatural
 `if (slot) {...} else {...}` with the same body on both sides.)
 
+## Which copy of a merged tail survives
+
+When two switch arms end in the same code (`case 2: return 6;` in two inner
+switches), VC6 keeps the copy from the arm that comes LATER in the source and
+points the other arm at it. Arms are laid out in source order, so the
+surviving block normally sits in the later arm (lab, 2026-10-09, a
+WeaponPoseIndex clone). WeaponPoseIndex, SelectWeapon, ShotHitsObj and
+CommSend all have the image keeping the EARLIER copy while arms are still laid
+out in source order. Changing the order of arms inside one switch moves
+nothing. A fall-through from one arm into the next does put the shared block
+where the image has it, but it also moves the arm. The source that gives the
+image's result has not been found.
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.
