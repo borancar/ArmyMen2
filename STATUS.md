@@ -66,8 +66,10 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1566 of
-  1645 byte-identical (2026-10-09), piecewise 399.** AddSightBlocker fell to a
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1567 of
+  1645 byte-identical (2026-10-10), piecewise 399.** MpOptionsScreen fell to a
+  record pointer, which moves the loop's walking-pointer anchor (see
+  docs/vc6-regalloc.md), and to RectMake by value. AddSightBlocker fell to a
   16-bit delta pair. An address-taken local reused for unrelated work lives in
   memory: UpdateTrooperAction's pickup quantity, given its own local, went
   511 -> 420 bytes off. Five of the last six came from
