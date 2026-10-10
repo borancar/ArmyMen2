@@ -920,11 +920,13 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
         wr = values;
         do {
             int32_t delta, j;
-            /* Read and advanced together, so the first pass reads values[0]
-             * and writes values[1]. As one statement, VC6 walks the run with
-             * a pointer as the image does. */
-            int32_t prev = *wr++;
+            /* Advanced, then read one behind, so the first pass reads
+             * values[0] and writes values[1]. The image adds before it loads
+             * (`add ebx, 2` ahead of `mov dx, [ebx-2]`); `*wr++` loads first. */
+            int32_t prev;
 
+            wr++;
+            prev = wr[-1];
             delta = (int32_t)values[i] - prev;
             kept++;
 
