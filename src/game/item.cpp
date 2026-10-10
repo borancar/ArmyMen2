@@ -1895,7 +1895,6 @@ int32_t __cdecl ObjIsWatchedKind(const AM2_Object *obj)
  */
 void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
 {
-    const AM2_MaskRec *m;
     AM2_Object       *o = obj;
     const AM2_MapRow *rows;
     int32_t        dir;
@@ -1918,16 +1917,15 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
                     + rows->heading) & 0xFF,
                    (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
-    /* The direction's record is held in a pointer; its count is re-read
-     * from it at every pass. */
-    m = &g_roachMasks[dir];
-    for (i = 0; i < m->count; i++) {
+    /* The direction's record is indexed at every use, its count re-read
+     * at every pass. */
+    for (i = 0; i < g_roachMasks[dir].count; i++) {
         AM2_Point        at;
         uint16_t *mark;
         int32_t   tile;
 
-        at.x = m->pts[i].x + o->pos.x;
-        at.y = m->pts[i].y + o->pos.y;
+        at.x = g_roachMasks[dir].pts[i].x + o->pos.x;
+        at.y = g_roachMasks[dir].pts[i].y + o->pos.y;
 
         mark = g_roachMark
                + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
@@ -2723,7 +2721,6 @@ void __cdecl RoachBite(AM2_Object *o)
  */
 void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
 {
-    const AM2_MaskRec *m;
     AM2_Object       *o = obj;
     const AM2_MapRow *rows;
     int32_t        dir;
@@ -2746,16 +2743,15 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
                     + rows->heading) & 0xFF,
                    (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
-    /* The direction's record is held in a pointer; its count is re-read
-     * from it at every pass. */
-    m = &g_roachMasks[dir];
-    for (i = 0; i < m->count; i++) {
+    /* The direction's record is indexed at every use, its count re-read
+     * at every pass. */
+    for (i = 0; i < g_roachMasks[dir].count; i++) {
         AM2_Point        at;
         uint16_t *mark;
         int32_t   tile;
 
-        at.x = m->pts[i].x + o->pos.x;
-        at.y = m->pts[i].y + o->pos.y;
+        at.x = g_roachMasks[dir].pts[i].x + o->pos.x;
+        at.y = g_roachMasks[dir].pts[i].y + o->pos.y;
 
         mark = g_roachMark
                + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
