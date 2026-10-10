@@ -4783,10 +4783,7 @@ void __cdecl HudPostUpdate(void)
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
             g_dragRect.left = ax < px ? ax : px;
             g_dragRect.right = ax > px ? ax : px;
-            if (g_dragAnchor.y < py)
-                g_dragRect.top = g_dragAnchor.y;
-            else
-                g_dragRect.top = py;
+            g_dragRect.top = g_dragAnchor.y < py ? g_dragAnchor.y : py;
             g_dragRect.bottom = g_dragAnchor.y > py ? g_dragAnchor.y : py;
         }
     }
@@ -4896,14 +4893,12 @@ void __cdecl HudPostUpdate(void)
     goto tail;
 
 hit_ours:
-    if (!g_mouseChanged)
-        goto hold;
-    if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_weaponFnSlot1))
-        goto claim;
-    (*(AM2_PointerActionFn *)&g_weaponFnSlot1)(obj, at);
-    goto tail;
-
-hold:
+    if (g_mouseChanged) {
+        if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_weaponFnSlot1))
+            goto claim;
+        (*(AM2_PointerActionFn *)&g_weaponFnSlot1)(obj, at);
+        goto tail;
+    }
     /* The button did not change, so this is a hold. Only a weapon whose kind
      * record allows repeating gets to act again. */
     if (!repeat)
