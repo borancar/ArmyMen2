@@ -322,6 +322,12 @@ variable, `return 0` at the sites, nested tests, an if-chain and `goto` to
 a label before the return all keep the copies. What stopped VC6 copying the
 epilogue in the original is not known.
 
+Partly solved in the real function (2026-10-10): writing `return 0` at the
+LAST site only (the NACK arm's `!me` test), with the other three left as
+`break`, makes that log the copy the second and third jump into, and the
+shape goes 25 -> 19. `return 0` at all four, or at any other single site,
+changes nothing or is worse. The first site still keeps its own copy.
+
 ## Loop and temporary shapes that show in the image
 
 - **A rotated `while (p->next) { ... }` is not `while (1) { if (!p->next) break;
