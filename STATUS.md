@@ -67,7 +67,12 @@ main result so far (details in `src/vc6/README.md`):
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
 - **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1568 of
-  1645 byte-identical (2026-10-10), piecewise 399.** MpOptionsScreen fell to a
+  1645 byte-identical (2026-10-10), piecewise 399.** Shorthand read macros and
+  file-local global aliases are gone from `src/game` (2026-10-10, ~640 of
+  them), and the globals they re-typed have their real types in
+  `globals.h`; every function compiled identically. Left for later:
+  `AM2_Rec` carries five `AM2_PtrList` methods (PtrListPush, ListRemoveAt,
+  ...), so their 47 callers cast to `AM2_Rec *`. MpOptionsScreen fell to a
   record pointer, which moves the loop's walking-pointer anchor (see
   docs/vc6-regalloc.md), and to RectMake by value. AddSightBlocker fell to a
   16-bit delta pair. An address-taken local reused for unrelated work lives in
