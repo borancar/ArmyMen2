@@ -4813,153 +4813,153 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
         uint8_t  candBearing = 0x80;
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
-        if (ObjsAreAllied(o, it, 0))
-            goto allied;
-
-        if (IsKind7(it)) {
-            candBearing = AngleBetween(&o->pos,
-                                       &it->pos);
-            candRange   = AM2_SIGHT_KIND7_RANGE;
-            cand        = it;
+        /* An if/else, not `goto allied`: the image lays the allied arm out
+         * after the rest, where a goto pulls it up behind the test. */
+        if (!ObjsAreAllied(o, it, 0)) {
+            if (IsKind7(it)) {
+                candBearing = AngleBetween(&o->pos,
+                                           &it->pos);
+                candRange   = AM2_SIGHT_KIND7_RANGE;
+                cand        = it;
 score:
-            if (!cand)
-                continue;
-            ++*nOther;
-            ++o->fieldF4;
-            /* Discarded two instructions later; a call, so it counts. */
-            (void)AngleDelta(facing, candBearing);
-            if (candRange >= bestRange + slack)
-                continue;
-            best        = cand;
-            bestRange   = candRange;
-            slack       = 0;
-            bestBearing = candBearing;
-            continue;
-        }
-
-        /* The sight test, inline. Same shape as AM2_AI_SIGHT_TEST and NOT the same
-         * code -- a normalised diff finds no shared run of ten. */
-        {
-            uint8_t  look = o->facing;
-            int32_t  viewerAttr, dx, dy, delta;
-            uint32_t dir;
-
-            if (ObjIsType3(o)
-                && o->rowSet.count > 1)
-                look = o->turretFacing;
-
-            viewerAttr = ObjTileAttr(o);
-            dx = (int32_t)it->pos.x
-                 - (int32_t)o->pos.x;
-            dy = (int32_t)it->pos.y
-                 - (int32_t)o->pos.y;
-            candRange   = ApproxDistXY(dx, dy);
-            candBearing = (uint8_t)AngleOfDelta(dx, dy);
-
-            delta = AngleDelta(look, candBearing);
-            delta = abs(delta);
-            if (delta > g_rankRecords[o->rank].field_04) {
-                if (g_rankRecords[o->rank].field_08 <= candRange)
+                if (!cand)
                     continue;
-                goto in_sight;
+                ++*nOther;
+                ++o->fieldF4;
+                /* Discarded two instructions later; a call, so it counts. */
+                (void)AngleDelta(facing, candBearing);
+                if (candRange >= bestRange + slack)
+                    continue;
+                best        = cand;
+                bestRange   = candRange;
+                slack       = 0;
+                bestBearing = candBearing;
+                continue;
             }
 
-            /* Keyed on the BEARING, not the facing -- see orig.h. */
-            dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
-            if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
-                AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration);
+            /* The sight test, inline. Same shape as AM2_AI_SIGHT_TEST and NOT the same
+             * code -- a normalised diff finds no shared run of ten. */
+            {
+                uint8_t  look = o->facing;
+                int32_t  viewerAttr, dx, dy, delta;
+                uint32_t dir;
 
-            if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
-                int32_t mine = ObjHeight(o);
-                int32_t his  = ObjHeight(it);
+                if (ObjIsType3(o)
+                    && o->rowSet.count > 1)
+                    look = o->turretFacing;
 
-                if (his >= mine) {
-                    if (candRange > g_sightBlockByDir[dir].low)
+                viewerAttr = ObjTileAttr(o);
+                dx = (int32_t)it->pos.x
+                     - (int32_t)o->pos.x;
+                dy = (int32_t)it->pos.y
+                     - (int32_t)o->pos.y;
+                candRange   = ApproxDistXY(dx, dy);
+                candBearing = (uint8_t)AngleOfDelta(dx, dy);
+
+                delta = AngleDelta(look, candBearing);
+                delta = abs(delta);
+                if (delta > g_rankRecords[o->rank].field_04) {
+                    if (g_rankRecords[o->rank].field_08 <= candRange)
                         continue;
-                } else if (his + AM2_SIGHT_BAND_STEP < mine) {
-                    if (candRange > g_sightBlockByDir[dir].high)
-                        continue;
-                } else if (candRange > g_sightBlockByDir[dir].mid) {
-                    continue;
+                    goto in_sight;
                 }
-            } else {
-                if (candRange > g_rankRecords[o->rank].sight_range)
-                    continue;
+
+                /* Keyed on the BEARING, not the facing -- see orig.h. */
+                dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
+                if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
+                    AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration);
+
+                if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
+                    int32_t mine = ObjHeight(o);
+                    int32_t his  = ObjHeight(it);
+
+                    if (his >= mine) {
+                        if (candRange > g_sightBlockByDir[dir].low)
+                            continue;
+                    } else if (his + AM2_SIGHT_BAND_STEP < mine) {
+                        if (candRange > g_sightBlockByDir[dir].high)
+                            continue;
+                    } else if (candRange > g_sightBlockByDir[dir].mid) {
+                        continue;
+                    }
+                } else {
+                    if (candRange > g_rankRecords[o->rank].sight_range)
+                        continue;
+                }
             }
-        }
 
 in_sight:
-        /* Modes 2 and 3 refuse a candidate that is allied WITH US, but only
-         * once a second has passed since we were last hit -- and the refusal
-         * skips recording it while still revealing it below. */
-        cand = it;
-        if ((o->aiMode == 3
-             || o->aiMode == 2)
-            && (uint32_t)(g_gameClockMs
-                          - o->hitTime)
-                   > AM2_SIGHT_KIND7_RANGE
-            && ObjsAreAllied(it, o, 0))
-            cand = (AM2_Object *)0;
+            /* Modes 2 and 3 refuse a candidate that is allied WITH US, but only
+             * once a second has passed since we were last hit -- and the refusal
+             * skips recording it while still revealing it below. */
+            cand = it;
+            if ((o->aiMode == 3
+                 || o->aiMode == 2)
+                && (uint32_t)(g_gameClockMs
+                              - o->hitTime)
+                       > AM2_SIGHT_KIND7_RANGE
+                && ObjsAreAllied(it, o, 0))
+                cand = (AM2_Object *)0;
 
-        if (ObjIsOurs(o, 0)) {
-            RevealObj(it);
-            it->revealedUntil =
-                g_gameClockMs
-                + AM2_SIGHT_REVEAL_MS;
-        }
-
-        goto score;
-
-allied:
-        if (ObjIsTypeIn238(it)) {
-
-            ++*nAllied;
-            if (!it->targetUid)
-                continue;
-            cand = LookupByUID(
-                it->targetUid);
-            if (!cand) {
-                it->targetUid = 0;
-                goto score;                 /* cand is null; score refuses */
+            if (ObjIsOurs(o, 0)) {
+                RevealObj(it);
+                it->revealedUntil =
+                    g_gameClockMs
+                    + AM2_SIGHT_REVEAL_MS;
             }
-            if (cand->health <= 0
-                || ((int32_t)cand->flags & 0x204)) {
-                it->targetUid = 0;
-                continue;
+
+            goto score;
+        } else {
+            if (ObjIsTypeIn238(it)) {
+
+                ++*nAllied;
+                if (!it->targetUid)
+                    continue;
+                cand = LookupByUID(
+                    it->targetUid);
+                if (!cand) {
+                    it->targetUid = 0;
+                    goto score;                 /* cand is null; score refuses */
+                }
+                if (cand->health <= 0
+                    || ((int32_t)cand->flags & 0x204)) {
+                    it->targetUid = 0;
+                    continue;
+                }
+                if (ObjsAreAllied(o, cand, 0))
+                    continue;
+                DistAndAngle(&o->pos,
+                             &cand->pos,
+                             &candRange, &candBearing);
+                /* Only mode 1 adopts an ally's target, and only close by. */
+                if (o->aiMode != 1)
+                    goto score;
+                if (candRange > AM2_AI_PATROL_DETOUR)
+                    continue;
+                goto score;
             }
-            if (ObjsAreAllied(o, cand, 0))
+
+            /* Not a unit: a dropped weapon worth walking to. */
+            if (!flags || !ObjIsType4(it))
                 continue;
             DistAndAngle(&o->pos,
-                         &cand->pos,
+                         &it->pos,
                          &candRange, &candBearing);
-            /* Only mode 1 adopts an ally's target, and only close by. */
-            if (o->aiMode != 1)
-                goto score;
-            if (candRange > AM2_AI_PATROL_DETOUR)
+            if (!RegionsNear(it, o, solve)) {
+                solve = 0;
                 continue;
-            goto score;
-        }
-
-        /* Not a unit: a dropped weapon worth walking to. */
-        if (!flags || !ObjIsType4(it))
-            continue;
-        DistAndAngle(&o->pos,
-                     &it->pos,
-                     &candRange, &candBearing);
-        if (!RegionsNear(it, o, solve)) {
+            }
             solve = 0;
-            continue;
-        }
-        solve = 0;
-        {
-            int32_t n = TryTakeWeapon(it, o);
+            {
+                int32_t n = TryTakeWeapon(it, o);
 
-            if (n <= bestScore)
-                continue;
-            alt         = it;
-            bestScore   = n;
-            bestRange   = candRange;
-            bestBearing = candBearing;
+                if (n <= bestScore)
+                    continue;
+                alt         = it;
+                bestScore   = n;
+                bestRange   = candRange;
+                bestBearing = candBearing;
+            }
         }
     }
 

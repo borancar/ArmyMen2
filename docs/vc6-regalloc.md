@@ -297,6 +297,17 @@ helper), and ours merges two of the three into CREATETROOPER's.
   pointer is initialised together with other induction variables, try
   the index.
 
+## A forward goto pulls its target up
+
+`if (x) goto L;` with `L:` at the end of a loop body did NOT keep the block
+at the end: VC6 inverted the jump and laid the target out straight after
+the test, ahead of the code the source has between them. SightScan's
+`if (ObjsAreAllied(o, it, 0)) goto allied;` put the allied arm first; the
+image has it last. Written as `if (!ObjsAreAllied(...)) { ... } else
+{ allied }`, the arm stays where the source puts it (1324 -> 1048 bytes
+off). When the image's block order matches the source text but ours does
+not, look for a forward goto over the code in between.
+
 ## Declarations ahead of a function can turn its ties
 
 A type declared earlier in the translation unit can change a function that
