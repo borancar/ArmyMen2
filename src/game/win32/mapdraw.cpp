@@ -951,8 +951,8 @@ subdivide:
     {
         int32_t   top    = world->top;
         int32_t   left   = world->left;
-        int32_t   right  = world->right;
         int32_t   bottom = world->bottom;
+        int32_t   right  = world->right;
         int32_t   dh     = bottom - top;
         int32_t   dw     = right - left;
         int32_t   half;
@@ -1208,8 +1208,8 @@ void __cdecl ScrollMapCache(void)
         src.top    = tiles.top << TILE_SHIFT;
         dstX       = ((dx > 0) ? 0 : -dx) << TILE_SHIFT;
         dstY       = ((dy > 0) ? 0 : -dy) << TILE_SHIFT;
-        src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
+        src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
 
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
@@ -1881,8 +1881,8 @@ void __cdecl ViewUpdate(void)
     } else {
         g_viewHold = 0;
     }
-    vpt.y = (int16_t)(dy + g_listenerPos.y);
     tx = (int16_t)(dx + g_listenerPos.x);
+    vpt.y = (int16_t)(dy + g_listenerPos.y);
 
 clamp_eye:
     vpt.x = (int16_t)Clamp(tx, halfW + g_mapInset.left, g_mapInset.right - halfW - 1);

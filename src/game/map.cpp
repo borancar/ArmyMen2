@@ -765,8 +765,8 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
     n = *(const int32_t *)cur;
     cur += 8;
     if (n > 0) {
-        took  = n * 4 + 8;
         cur  += (uint32_t)n * 4;
+        took  = n * 4 + 8;
     } else
         took  = 8;
 

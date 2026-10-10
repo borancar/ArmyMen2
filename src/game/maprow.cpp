@@ -1161,8 +1161,8 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         AM2_Rect box;
 
         box.top    = r->rect.top;
-        box.right  = r->rect.right;
         box.left   = r->rect.left;
+        box.right  = r->rect.right;
         box.bottom = r->rect.bottom;
         DirtyCollect(&box);
     }

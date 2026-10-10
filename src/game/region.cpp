@@ -1358,8 +1358,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 g_pathNodes[t].stamp  = g_pathGeneration;
                 g_pathNodes[t].g      = (uint16_t)g;
                 g_pathNodes[t].h      = (uint16_t)h;
-                g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
                 g_pathNodes[t].parent = (uint16_t)cur;
+                g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
                 g_pathNodes[t].state  = 1;
             }
 
@@ -2038,8 +2038,8 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
-    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
     out->box.top = tile.top - AM2_TILEMASK_MARGIN;
+    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
     out->box.left = tile.left - AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
@@ -2687,8 +2687,8 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 
     phase = world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
-        k        = (1 << AM2_TILE_SHIFT) - phase;
         splitOdd = 0;
+        k        = (1 << AM2_TILE_SHIFT) - phase;
     } else {
         splitOdd = 1;
         k        = 8 - phase;
@@ -3270,8 +3270,8 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         goto walk;
 
     if (BeginMoveTo(ob, &pt)) {
-        ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
         pt            = *dest;
+        ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
         ob->moveFrom  = *pos;
         ob->routeGoal = pt;
         ob->moveTo    = pt;
@@ -7720,8 +7720,8 @@ board:
 swept:
     /* One dispatch for every way out of the step and the sweep. */
     if (i == 0) {
-        speed = 0;
         out->bearing = facing;
+        speed = 0;
         goto settle_facing;
     }
     if (i < tries) {
@@ -9764,8 +9764,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             animRec = &turret->animPlaying;
             {
-                int32_t dirBits = (*animRec)->directionBits;
                 int32_t bias    = turret->headingBias;
+                int32_t dirBits = (*animRec)->directionBits;
 
                 first  = RoundTo8((bias + turret->heading) & 0xFF,
                                   dirBits);
