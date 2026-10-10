@@ -67,7 +67,12 @@ main result so far (details in `src/vc6/README.md`):
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
 - **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1571 of
-  1645 byte-identical (2026-10-10), piecewise 399.** Step3Input matches:
+  1646 byte-identical (2026-10-10), piecewise 399.** RecvThreadProc
+  (0x00401F00) is in the manifest now, beside the other OS callbacks
+  (bytematch.REGISTERED_FNS): it was reconstructed but never patched, so the
+  relink did not know it and FlowRecvMessage's span ran on through it
+  (FlowRecvMessage's real shape is 26, not 124). Its loop is `while (1)`,
+  which VC6 does not rotate (122 -> 16 bytes). Step3Input matches:
   it read g_mouseButton/g_mouseChanged through local pointers, which put the
   load in ecx (a six-byte `mov`) where the image's eax takes the five-byte
   short form, shifting every later jump by one. SelectionClick 46 -> 14

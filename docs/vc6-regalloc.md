@@ -329,6 +329,16 @@ epilogue in the original is not known.
   pointer is initialised together with other induction variables, try
   the index.
 
+## `for (;;)` and `while (1)` are different loops to VC6
+
+The two compile differently (2026-10-10). VC6 rotates `for (;;) { if (c)
+break; ... }`, copying the test to the bottom of the loop, and leaves
+`while (1) { if (c) break; ... }` tested at the top with a `jmp` back.
+RecvThreadProc's outer loop is the image's `while (1)` (shape 17 -> 2,
+bytes 122 -> 16); UpdateTrooperAction's claimed-weapon walk is the image's
+`for (;;)`. A sweep of every such loop in the mismatching functions, and of
+`while (c)` against `for (; c; )`, found no others.
+
 ## A forward goto pulls its target up
 
 `if (x) goto L;` with `L:` at the end of a loop body did NOT keep the block
