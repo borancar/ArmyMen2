@@ -1790,7 +1790,7 @@ int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
 
     stride = out->box.right - out->box.left + 1;
     for (y = c.top; c.bottom >= y; y++) {
-        if (c.right < c.left)
+        if (c.left > c.right)
             continue;
         memset(out->cells + (y - out->box.top) * stride - out->box.left + c.left,
                AM2_TILEMASK_BOX_CELL, (size_t)(c.right - c.left + 1));
