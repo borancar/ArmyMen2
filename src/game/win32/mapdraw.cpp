@@ -805,9 +805,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         AT_FRONT(at);               /* off the front */
     }
 
-    while (1) {
-        if (!g_depthCursor->next)
-            break;
+    while (g_depthCursor->next) {
         g_depthCursor = g_depthCursor->next;
         if (DepthCompare(obj, g_depthCursor->obj) <= 0)
             goto before;
