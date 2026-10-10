@@ -2542,7 +2542,6 @@ int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act)
 int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 {
     int32_t name, number;
-    int32_t i, sx, sy, n, total;
 
     if (!ScriptExpect(ctx, at, AM2_TOKEN_STRING))
         return 0;
@@ -2571,6 +2570,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     if (g_padNumbers[number].count == 0) {
         if (number >= 8) {
             if (g_mapPadLayer) {
+                int32_t i, sx, sy, n, total;
+
                 /* One dword store covering both words -- the default before
                  * the scan. */
                 n = 0;
@@ -2592,6 +2593,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 }
             }
         } else if (g_mapPadbitLayer) {
+            int32_t i, sx, sy, n, total;
+
             n = 0;
             g_padNumbers[number].centre = g_zeroPoint;
             sx = 0;
