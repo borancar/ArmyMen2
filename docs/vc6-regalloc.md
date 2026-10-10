@@ -227,9 +227,8 @@ A label on the first copy and ONE `goto` to it from any other arm, with the
 remaining arms still written as plain returns, makes the first copy the one
 the others jump to, as in the image. Which arm holds the `goto` does not
 matter, and the other arms do not need one. The same fix applies to its two
-`ScriptObjectUid` tails (shape 295 -> 243). `tmp/retmerge.py` in the
-session tried this for every repeated `return X;` in the mismatching
-functions, and these were the only hits.
+`ScriptObjectUid` tails (shape 295 -> 243). A sweep that tried this for
+every repeated `return X;` in the mismatching functions found no other hits.
 
 Writing the tail out once per arm does not keep the copies apart either
 (2026-10-10). VC6 cross-jumps code that is identical AFTER register
