@@ -12,6 +12,7 @@
 #include "air.h"    /* RevealObj -- reconstructed */
 
 #include "region.h"
+#include "mousepress.h"  /* g_mousePress */
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "maprow.h"   /* RowAnimField4 -- reconstructed */
@@ -7037,7 +7038,7 @@ void __cdecl RoachAliveStepA(AM2_Object *o, AM2_RoachOut *out)
 /* GetTickCount through the game's own IAT slot, the same seam air.cpp and
  * commmsg.cpp use: an import of our own would resolve through our IAT, and
  * this file is flat. */
-typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
+typedef uint32_t (__stdcall *AM2_TickFn)(void);
 #if defined(_MSC_VER) && !defined(__GNUC__)
 /* The import itself under VC6: a function that calls it more than once loads
  * the IAT slot into a register (`call ebp`), which a read through our pointer
@@ -7045,8 +7046,7 @@ typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
 extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 #define orig_get_tick_count GetTickCount
 #else
-#define orig_get_tick_count \
-    (*(AM2_RegionTickFn *)g_iatGetTickCount)
+#define orig_get_tick_count g_iatGetTickCount
 #endif
 
 /* Type2PlayerStep -- original 0x0044AD40, one caller: StepType2's player arm,
@@ -7181,7 +7181,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
 
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
      * spells the same two fields as AM2_MousePress, privately. */
-    if (orig_get_tick_count() - (g_mousePress)[1] > AM2_VIEW_SNAP_MS
+    if (orig_get_tick_count() - g_mousePress[0].tick > AM2_VIEW_SNAP_MS
         && !o->field10C) {
         g_viewSnap  = 1;
         g_objCtxSet = 1;
@@ -9110,7 +9110,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
          * Both bounds are the press record's, not this frame's. */
         if (orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS
             && ApproxDist((const AM2_Point *)&g_cursorPoint,
-                          (const AM2_Point *)g_mousePress) < 4) {
+                          (const AM2_Point *)&g_mousePress[0].point) < 4) {
             out->bearing = (uint8_t)AngleBetween(&o->pos,
                                          &at);
             o->field574 = out->bearing;
@@ -10251,7 +10251,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                           < AM2_CLICK_TAP_MS
                        && ApproxDist(
                               (const AM2_Point *)&g_cursorPoint,
-                              (const AM2_Point *)g_mousePress) < 4) {
+                              (const AM2_Point *)&g_mousePress[0].point) < 4) {
                 /* A TAP, not a drag: released within 500 ms and within four
                  * pixels of where it went down. That orders a move. */
                 if (dist > 0x30) {

@@ -662,7 +662,7 @@ int32_t __cdecl LoadGame(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\gameproc.cpp", 0x53D))
         goto fail;
 
-    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
+    ScriptResetTokens(&g_scriptContext);
 
     if (!LoadGameProcSection(fp))   goto fail;
     if (!LoadMapSection(fp))        goto fail;

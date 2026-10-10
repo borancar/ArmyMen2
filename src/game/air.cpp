@@ -149,9 +149,8 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 #define g_airFlagA   (g_airSaveBlock->flagA)
 #define g_airFlagB   (g_airSaveBlock->flagB)
 
-typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
-#define orig_get_tick_count \
-    (*(AM2_GetTickCountFn *)g_iatGetTickCount)
+typedef uint32_t (__stdcall *AM2_TickFn)(void);
+#define orig_get_tick_count g_iatGetTickCount
 
 /* PeerShouldNack -- original 0x00402C30, one caller. Should a NACK go out for
  * this sequence number, or has one gone recently enough? It names itself twice

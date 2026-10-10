@@ -464,7 +464,6 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
 #define orig_fread  (*(am2_fread_fn)ADDR_FREAD)
 #define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
 
-#define kScriptContext (*(AM2_ScriptCtx *)g_scriptContext)
 
 int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
 {
@@ -496,9 +495,9 @@ int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
             buf[len] = '\0';
             /* Kind 5 is the one that owns a malloc'd copy, so the token list
              * becomes the string's owner. `at` is read before the append. */
-            at = kScriptContext.count;
-            ScriptAddToken(&kScriptContext, AM2_TOKEN_STRING, buf, 0);
-            cond->actions[i].text = (char *)kScriptContext.tokens[at].value;
+            at = g_scriptContext.count;
+            ScriptAddToken(&g_scriptContext, AM2_TOKEN_STRING, buf, 0);
+            cond->actions[i].text = (char *)g_scriptContext.tokens[at].value;
         }
     }
 

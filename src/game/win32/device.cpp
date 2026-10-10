@@ -32,6 +32,7 @@
 
 #include "surface.h"
 #include "device.h"
+#include "../mousepress.h"
 #include "../crt.h"
 #include "report.h"
 #include "../rect.h"
@@ -394,11 +395,6 @@ static_assert(sizeof(DIDEVICEOBJECTDATA) == 16, "DIDEVICEOBJECTDATA");
 
 
 
-/* One per button, in the order the button arrays use. */
-typedef struct {
-    int32_t  point;     /* the packed cursor at the moment it went down */
-    uint32_t tick;      /* GetTickCount then */
-} AM2_MousePress;
 
 
 typedef int32_t (__cdecl *am2_clamp_fn)(int32_t v, int32_t lo, int32_t hi);
@@ -440,18 +436,18 @@ void __cdecl UpdateMouseState(void)
      * -- and the left one's whole condition is asked a second time for the
      * grab clear: the image branches on the change flag again there. */
     if ((&g_mouseButton)[0] && (&g_mouseChanged)[0]) {
-        ((AM2_MousePress *)g_mousePress)[0].point = g_cursorPoint;
-        ((AM2_MousePress *)g_mousePress)[0].tick  = tick;
+        g_mousePress[0].point = g_cursorPoint;
+        g_mousePress[0].tick  = tick;
     }
     if ((&g_mouseButton)[0] && (&g_mouseChanged)[0])
         g_mouseGrab = 0;
     if ((&g_mouseButton)[1] && (&g_mouseChanged)[1]) {
-        ((AM2_MousePress *)g_mousePress)[1].point = g_cursorPoint;
-        ((AM2_MousePress *)g_mousePress)[1].tick  = tick;
+        g_mousePress[1].point = g_cursorPoint;
+        g_mousePress[1].tick  = tick;
     }
     if ((&g_mouseButton)[2] && (&g_mouseChanged)[2]) {
-        ((AM2_MousePress *)g_mousePress)[2].point = g_cursorPoint;
-        ((AM2_MousePress *)g_mousePress)[2].tick  = tick;
+        g_mousePress[2].point = g_cursorPoint;
+        g_mousePress[2].tick  = tick;
     }
 
     if ((&g_mouseChanged)[0] || (&g_mouseChanged)[1])

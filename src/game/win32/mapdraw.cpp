@@ -2391,7 +2391,7 @@ void __cdecl DrawEffectLayer(void)
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
         if ((g_aimLiveA)[army]) {
-            const AM2_Point *ptA = &((const AM2_Point *)g_aimPointA)[army];
+            const AM2_Point *ptA = &g_aimPointA[army];
             int32_t frame;
             RECT    box, hit;
 
@@ -2468,7 +2468,7 @@ void __cdecl DrawEffectLayer(void)
         }
 
         if ((g_aimLiveB)[army]) {
-            const int16_t *ptB = (const int16_t *)(g_aimPointB + army * 4);
+            const int16_t *ptB = (const int16_t *)&g_aimPointB[army];
             int32_t *held = &g_aimFrameB[army];
             int32_t  frameB;
 

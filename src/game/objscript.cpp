@@ -636,7 +636,7 @@ void __cdecl FreeObjScripts(void)
  * against it. Reproduced; no name in a shipped script comes close. */
 int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 {
-    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)g_scriptContext;
+    AM2_ScriptCtx *ctx = &g_scriptContext;
     char           buf[2048];
     int32_t        n;
     int32_t        i, j, k, m;

@@ -26,7 +26,7 @@ typedef uint32_t (__stdcall *AM2_TickFn)(void);
 extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 #define orig_get_tick_count GetTickCount
 #else
-#define orig_get_tick_count (*(AM2_TickFn *)g_iatGetTickCount)
+#define orig_get_tick_count g_iatGetTickCount
 #endif
 
 /* The length is the packet's own +4 field, reached through the packet so
@@ -2170,8 +2170,8 @@ void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
     if (mean > 1750)
         colour = g_hudColour;
 
-    DrawSeqBar(((const AM2_Point *)g_mpRowCoords)[slot + row * 4].x + 0x37,
-               ((const AM2_Point *)g_mpRowCoords)[slot + row * 4].y + 0x12,
+    DrawSeqBar(g_mpRowCoords[slot + row * 4].x + 0x37,
+               g_mpRowCoords[slot + row * 4].y + 0x12,
                colour,
                (int32_t)player->sentPackets,
                (int32_t)player->acksSeen);

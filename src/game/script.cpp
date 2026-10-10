@@ -3161,7 +3161,7 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
          * in. They are the same object for every caller in the image, but the
          * original reads the global and so does this. */
         const AM2_ScriptCtx *g =
-            (const AM2_ScriptCtx *)g_scriptContext;
+            &g_scriptContext;
         am2_log("lines: %d  tokens: %d  names: %d  compounds: %d\n",
                 lines, g->count, kScriptNameCount, compounds);
         am2_log("Finished Processing Script... "
@@ -3211,7 +3211,7 @@ static inline void ScriptReadWithLog(const char *path)
     if (kCommObject->verbose)
         am2_log("reading script %s: ", path);
 
-    ok = ReadScript(path, (AM2_ScriptCtx *)g_scriptContext);
+    ok = ReadScript(path, &g_scriptContext);
 
     /* Re-read the flag: ReadScript can have changed it. */
     if (kCommObject->verbose) {
@@ -3234,7 +3234,7 @@ void __cdecl LoadLevelScript(void)
     else
         sprintf(path, "%s.txt", kMapName);
 
-    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
+    ScriptResetTokens(&g_scriptContext);
 
     /* The five score variables, declared before anything can reference them.
      * `gamescorelimit` is seeded with the configured limit and its index is

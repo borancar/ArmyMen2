@@ -38,7 +38,7 @@
 /* GetTickCount through the game's own IAT slot, the same seam air.cpp uses:
  * an import of our own would resolve through our IAT, and this file is flat. */
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
-#define orig_get_tick_count (*(AM2_TickFn *)g_iatGetTickCount)
+#define orig_get_tick_count g_iatGetTickCount
 /* SendPlayerMsg is reconstructed, in win32/dplay.cpp. Declared here rather
  * than by including that header because commmsg.cpp is on the flat side of
  * the split; its signature names no Win32 type. */

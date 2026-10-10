@@ -722,7 +722,7 @@ void __cdecl LevelTeardown(void)
     StopAllSounds();
     FreeObjScripts();
     ResetScriptState();
-    ScriptResetTokens((AM2_ScriptCtx *)g_scriptContext);
+    ScriptResetTokens(&g_scriptContext);
     ResetPads();
     call0(ADDR_FREE_ARMY_LISTS_ALIAS);
     FreeSeqContexts();
@@ -1128,7 +1128,7 @@ void __cdecl TakeMenuRequest(void)
             g_scriptReloading = 1;
 
         ReadScript(g_scriptReloadPath,
-                   (AM2_ScriptCtx *)g_scriptContext);
+                   &g_scriptContext);
         DeclareRuleVars();
         MissionStartup();
 
@@ -1837,8 +1837,7 @@ void __cdecl PausedFrameStep(void)
     }
 
     idx = active - 1;
-    row = (const int16_t *)(g_mpRowCoords
-                            + (uint32_t)idx * 16u);
+    row = (const int16_t *)&g_mpRowCoords[idx * 4];
     xy = row;
 
     for (slot = 0; slot < 4; slot++) {

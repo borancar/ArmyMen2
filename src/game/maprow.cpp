@@ -1594,10 +1594,7 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind)
  * without any per-draw arithmetic. */
 void __cdecl BuildRespawnPool(int32_t seed)
 {
-    /* The kind records, 0x34 bytes each, their first field the count. */
-#define KINDS 44   /* (ADDR_SPAWN_KIND_TABLE_END - ADDR_SPAWN_KIND_TABLE) / 0x34 */
-#define COUNT(k) (*(const int32_t *)(g_spawnKindTable \
-                                     + (uint32_t)(k) * AM2_SPAWN_KIND_STRIDE))
+    /* Each kind contributes its missile def's respawn weight in entries. */
     int32_t  kind;
     int32_t  total;
     int32_t  at;
@@ -1610,21 +1607,19 @@ void __cdecl BuildRespawnPool(int32_t seed)
         am2_free(*(void * *)&g_respawnKinds);
 
     total = 0;
-    for (kind = 0; kind < (int32_t)KINDS; kind++)
+    for (kind = 0; kind < AM2_MISSILE_DEF_COUNT; kind++)
         if (RespawnKindAllowed(kind))
-            total += COUNT(kind);
+            total += g_missileDefs[kind].weight;
 
     bag = (int32_t *)am2_malloc((size_t)total * 4);
     g_respawnKindCount = total;
     at = 0;
     g_respawnKinds = bag;
 
-    for (kind = 0; kind < (int32_t)KINDS; kind++)
+    for (kind = 0; kind < AM2_MISSILE_DEF_COUNT; kind++)
         if (RespawnKindAllowed(kind))
-            for (n = 0; n < COUNT(kind); n++)
+            for (n = 0; n < g_missileDefs[kind].weight; n++)
                 (g_respawnKinds)[at++] = kind;
-#undef KINDS
-#undef COUNT
 }
 
 /* 0x004601D0. Pick a respawn kind at random.

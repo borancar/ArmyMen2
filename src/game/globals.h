@@ -57,7 +57,7 @@ struct AM2_Edit;
 #define g_actionProne            ((int32_t *)(uintptr_t)ADDR_ACTION_PRONE)  /* 0x004750A8 */
 #define g_activePalette          (*(uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)  /* 0x00477A58 */
 #define g_aimDamage              (*(int32_t *)(uintptr_t)ADDR_AIM_DAMAGE)  /* 0x00662838 */
-#define g_aimDeadlineA           ((uint8_t *)(uintptr_t)ADDR_AIM_DEADLINE_A)  /* 0x004FC910 */
+#define g_aimDeadlineA           ((int32_t *)(uintptr_t)ADDR_AIM_DEADLINE_A)  /* 0x004FC910 */
 #define g_aimDeadlineB           ((int32_t *)(uintptr_t)ADDR_AIM_DEADLINE_B)  /* 0x004FC984 */
 #define g_aimDisplaceMap         ((int16_t *)(uintptr_t)ADDR_AIM_DISPLACE_MAP)  /* 0x00478CDC */
 #define g_aimFrameB              ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)  /* 0x004FC964 */
@@ -67,8 +67,8 @@ struct AM2_Edit;
 #define g_aimLiveB               ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)  /* 0x004FC944 */
 #define g_aiMoveState            ((int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE)  /* 0x004750B4 */
 #define g_aiMoveStateAlt         ((int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE_ALT)  /* 0x004750C0 */
-#define g_aimPointA              ((uint8_t *)(uintptr_t)ADDR_AIM_POINT_A)  /* 0x004FC8F0 */
-#define g_aimPointB              ((uint8_t *)(uintptr_t)ADDR_AIM_POINT_B)  /* 0x004FC954 */
+#define g_aimPointA              ((AM2_Point *)(uintptr_t)ADDR_AIM_POINT_A)  /* 0x004FC8F0 */
+#define g_aimPointB              ((AM2_Point *)(uintptr_t)ADDR_AIM_POINT_B)  /* 0x004FC954 */
 #define g_aimSpawnArg            (*(int32_t *)(uintptr_t)ADDR_AIM_SPAWN_ARG)  /* 0x0066286C */
 #define g_aimSpritesA            ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A)  /* 0x004FC8C8 */
 #define g_aimSpritesB            ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B)  /* 0x004FC920 */
@@ -309,7 +309,7 @@ struct AM2_Edit;
 #define g_hudWidgetB             (*(AM2_HudPanel **)(uintptr_t)ADDR_HUD_WIDGET_B)  /* 0x004FCF54 */
 #define g_hudWidgetC             (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)  /* 0x004FCF4C */
 #define g_hudWidgetTable         ((AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE)  /* 0x004FCF04 */
-#define g_iatGetTickCount        ((void *)(uintptr_t)ADDR_IAT_GET_TICK_COUNT)  /* 0x0046F084 */
+#define g_iatGetTickCount        (*(AM2_TickFn *)(uintptr_t)ADDR_IAT_GET_TICK_COUNT)  /* 0x0046F084 */
 #define g_iatIntersectRect       (*(AM2_IntersectRectFn *)(uintptr_t)ADDR_IAT_INTERSECT_RECT)  /* 0x0046F258 */
 #define g_iatSmackClose          (*(am2_smack_close_fn *)(uintptr_t)ADDR_IAT_SMACK_CLOSE)  /* 0x0046F2C0 */
 #define g_iatSmackDdtype         (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_DDTYPE)  /* 0x0046F2CC */
@@ -432,7 +432,7 @@ struct AM2_Edit;
 #define g_mouseDZ                (*(int32_t *)(uintptr_t)ADDR_MOUSE_DZ)  /* 0x00485460 */
 #define g_mouseGrab              (*(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB)  /* 0x004854B4 */
 #define g_mouseMoved             (*(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)  /* 0x00485494 */
-#define g_mousePress             ((uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS)  /* 0x00485498 */
+#define g_mousePress             ((AM2_MousePress *)(uintptr_t)ADDR_MOUSE_PRESS)  /* 0x00485498 */
 #define g_mousePress2Ms          (*(uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS2_MS)  /* 0x004854A4 */
 #define g_mousePressMs           (*(uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS)  /* 0x0048549C */
 #define g_movieCount             (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)  /* 0x00512328 */
@@ -451,7 +451,7 @@ struct AM2_Edit;
 #define g_mpPanelSpritesA        ((AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A)  /* 0x00516118 */
 #define g_mpPanelSpritesB        ((AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B)  /* 0x00515FA0 */
 #define g_mpPanelSpritesBEnd     ((AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END)  /* 0x00515FD4 */
-#define g_mpRowCoords            ((uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS)  /* 0x0048C768 */
+#define g_mpRowCoords            ((AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)  /* 0x0048C768 */
 #define g_mpScriptChecksum       (*(uint32_t *)(uintptr_t)ADDR_MP_SCRIPT_CHKSUM_VAL)  /* 0x00511CD0 */
 #define g_mpScriptDefault        (*(char **)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT)  /* 0x0048510C */
 #define g_mpScriptName           (*(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME)  /* 0x00511C08 */
@@ -543,7 +543,7 @@ struct AM2_Edit;
 #define g_padNumbers             ((struct AM2_PadNumber *)(uintptr_t)ADDR_PAD_NUMBERS)  /* 0x0051F198 */
 #define g_pads                   ((struct AM2_Pad *)(uintptr_t)ADDR_PADS)  /* 0x00516198 */
 #define g_paintObject            (*(struct AM2_ScreenBase **)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
-#define g_paletteCopy            ((void *)(uintptr_t)ADDR_PALETTE_COPY)  /* 0x005022C8 */
+#define g_paletteCopy            ((uint8_t *)(uintptr_t)ADDR_PALETTE_COPY)  /* 0x005022C8 */
 #define g_paletteCycleCount      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)  /* 0x00486164 */
 #define g_paletteCycleIndex      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX)  /* 0x00486160 */
 #define g_paletteCycleInterval   (*(uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INTERVAL)  /* 0x00486168 */
@@ -611,7 +611,6 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_primarySurface         (*(void **)(uintptr_t)ADDR_PRIMARY_SURFACE)  /* 0x00502AD4 */
 #define g_radarColours           ((uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS)  /* 0x004FCF5C */
 #define g_randSeed               (*(uint32_t *)(uintptr_t)ADDR_RAND_SEED)  /* 0x0048CC1C */
-#define g_rankExpTable           ((uint8_t *)(uintptr_t)ADDR_RANK_EXP_TABLE)  /* 0x00473DD8 */
 #define g_rankRecords            ((AM2_RankRec *)(uintptr_t)ADDR_RANK_RECORDS)  /* 0x00473DC0 */
 #define g_readFailed             (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)  /* 0x004FA458 */
 #define g_recordListCap          (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP)  /* 0x00516138 */
@@ -687,7 +686,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_screenRect             (*(AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)  /* 0x00485330 */
 #define g_screenW                (*(int32_t *)(uintptr_t)ADDR_SCREEN_W)  /* 0x004852D8 */
 #define g_scriptConditions       (*(AM2_ScriptCond **)(uintptr_t)ADDR_SCRIPT_CONDITIONS)  /* 0x00510214 */
-#define g_scriptContext          ((void *)(uintptr_t)ADDR_SCRIPT_CONTEXT)  /* 0x00656478 */
+#define g_scriptContext          (*(AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT)  /* 0x00656478 */
 #define g_scriptKindNames        ((uint8_t *)(uintptr_t)ADDR_SCRIPT_KIND_NAMES)  /* 0x00487C74 */
 #define g_scriptNameCap          (*(int32_t *)(uintptr_t)ADDR_SCRIPT_NAME_CAP)  /* 0x00656460 */
 #define g_scriptNameCount        (*(int32_t *)(uintptr_t)ADDR_SCRIPT_NAME_COUNT)  /* 0x00656464 */
@@ -743,7 +742,6 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_soundSlotsEnd          ((struct AM2_SoundSlot *)(uintptr_t)ADDR_SOUND_SLOTS_END)  /* 0x004FA3C0 */
 #define g_spawnExtra6622bc       (*(int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC)  /* 0x006622BC */
 #define g_spawnExtra6628d4       (*(int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4)  /* 0x006628D4 */
-#define g_spawnKindTable         ((uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE)  /* 0x0066205C */
 #define g_spiralDx               ((int32_t *)(uintptr_t)ADDR_SPIRAL_DX)  /* 0x0048782C */
 #define g_spiralDy               ((int32_t *)(uintptr_t)ADDR_SPIRAL_DY)  /* 0x0048783C */
 #define g_spiralStep             ((const struct AM2_SpiralStep *)(uintptr_t)ADDR_SPIRAL_STEP)  /* 0x00485340 */

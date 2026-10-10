@@ -870,7 +870,7 @@ typedef uint32_t (__attribute__((stdcall)) *AM2_TickFn)(void);
 extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 #define orig_get_tick_count GetTickCount
 #else
-#define orig_get_tick_count (**(AM2_TickFn *)(uintptr_t)IAT_GET_TICK_COUNT)
+#define orig_get_tick_count g_iatGetTickCount
 #endif
 
 /* 250 ms before a held button starts repeating, 150 ms between repeats. */
@@ -4323,34 +4323,30 @@ void __cdecl AimMarkerAge(void)
  */
 void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
 {
-    int32_t   off = (int32_t)army * 4;
     AM2_Point hit;
     AM2_Object  *o;
 
-    /* Four parallel per-army tables, indexed through one scaled offset. */
-#define AIM(addr) (*(int32_t *)((uint8_t *)((void *)(uintptr_t)(addr)) + off))
-    AIM(((uintptr_t)g_aimLiveA)) = 1;
-    *(AM2_Point *)&AIM(((uintptr_t)g_aimPointA)) = at;
+    g_aimLiveA[(int32_t)army] = 1;
+    g_aimPointA[(int32_t)army] = at;
 
-    if (!AIM(((uintptr_t)g_aimStampA)))
-        AIM(((uintptr_t)g_aimStampA)) = *(const int32_t *)&g_gameClockMs;
+    if (!g_aimStampA[(int32_t)army])
+        g_aimStampA[(int32_t)army] = *(const int32_t *)&g_gameClockMs;
 
     if (g_mpSession
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army)) {
-        AIM(((uintptr_t)g_aimDeadlineA)) =
+        g_aimDeadlineA[(int32_t)army] =
             *(const int32_t *)&g_gameClockMs
             + AM2_AIM_LIFE_REMOTE_MS;
         return;
     }
 
-    AIM(((uintptr_t)g_aimDeadlineA)) =
+    g_aimDeadlineA[(int32_t)army] =
         *(const int32_t *)&g_gameClockMs
         + g_aimLifeHalfA * 2 - 1;
 
-    hit.x = (int16_t)(*(const int16_t *)&g_viewRect.left + ((int16_t *)(g_aimPointA + off))[0]);
-    hit.y = (int16_t)(((int16_t *)(g_aimPointA + off))[1] + *(const int16_t *)&g_viewRect.top);
-#undef AIM
+    hit.x = (int16_t)(*(const int16_t *)&g_viewRect.left + g_aimPointA[(int32_t)army].x);
+    hit.y = (int16_t)(g_aimPointA[(int32_t)army].y + *(const int16_t *)&g_viewRect.top);
 
     o = ObjectsHitByPoint(&hit,
                                      g_objMapDesc);
@@ -4389,7 +4385,7 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, AM2_Point at)
      * the pointer live in edi across the broadcast test for the one read. */
 
     g_aimLiveB[(int32_t)army] = 1;
-    *(&((AM2_Point *)g_aimPointB)[((int32_t)army)]) = at;
+    g_aimPointB[(int32_t)army] = at;
 
     if (!g_aimStampB[(int32_t)army])
         g_aimStampB[(int32_t)army] =
@@ -4406,8 +4402,8 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, AM2_Point at)
             *(const int32_t *)&g_gameClockMs
             + g_aimLifeHalfB * 2 - 1;
 
-    orig_spawn_at_aim((&((AM2_Point *)g_aimPointB)[(int32_t)army])->x + g_viewRect.left,
-                      ((AM2_Point *)g_aimPointB)[(int32_t)army].y + g_viewRect.top,
+    orig_spawn_at_aim((&g_aimPointB[(int32_t)army])->x + g_viewRect.left,
+                      g_aimPointB[(int32_t)army].y + g_viewRect.top,
                       AM2_AIM_SPAWN_KIND, (int32_t)army, uid,
                       g_aimSpawnArg,
                       0, 0, 0, 0);
@@ -6419,9 +6415,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 
         a = obj->repairFrame;
         if (a >= AM2_SQUAD_STAT_CAP) a = AM2_SQUAD_STAT_CAP;
-        c = *(const int32_t *)(g_rankExpTable
-              + (size_t)obj->rank
-                * AM2_RANK_EXP_STRIDE);
+        c = g_rankRecords[obj->rank].xp;
         if (c >= AM2_SQUAD_STAT_CAP) c = AM2_SQUAD_STAT_CAP;
         am2_sprintf(line, "%4d/%4d", a, c);
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "EXP:");

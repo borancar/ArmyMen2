@@ -281,6 +281,25 @@ helper), and ours merges two of the three into CREATETROOPER's.
   `int32_t` local, which gives a signed `jle` on the widened value, nor a
   `uint8_t` local, which spills it (1368 -> 1358).
 
+## Declarations ahead of a function can turn its ties
+
+A type declared earlier in the translation unit can change a function that
+never names it. Measured while typing globals (2026-10-10):
+
+- **One more struct in `globaltypes.h` broke CheatLine**, which every TU
+  reaches through `globals.h`. `AM2_MousePress` added there swapped edx/eax
+  in CheatLine's view-origin adds (OK -> 7 bytes off). Tagged or untagged,
+  first or last in the header, the same. In a header only its two readers
+  include (`mousepress.h`), CheatLine matches again.
+- **A typedef's POSITION in the file mattered to SightScan.** The
+  GetTickCount function-pointer typedef in `globaltypes.h` (so, before
+  SightScan) cost it 2 bytes (419 -> 421); the identical typedef at
+  region.cpp's tick seam, after SightScan, costs nothing. So each seam keeps
+  its own `AM2_TickFn` typedef rather than sharing one from a header.
+
+So a change that only adds declarations to a widely included header is not
+free: relink and compare every function, not just the ones the change names.
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.

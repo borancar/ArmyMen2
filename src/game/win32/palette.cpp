@@ -778,7 +778,7 @@ void __cdecl BuildRemapTables(void)
 
             obj[army][i] = NearestPalIndexRGB(
                 g_activePalette,
-                ((const uint8_t *)g_paletteCopy)[c], ((const uint8_t *)g_paletteCopy)[c + 1], ((const uint8_t *)g_paletteCopy)[c + 2],
+                g_paletteCopy[c], g_paletteCopy[c + 1], g_paletteCopy[c + 2],
                 AM2_PAL_REMAP_FROM);
         }
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
