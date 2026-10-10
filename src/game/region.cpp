@@ -1338,7 +1338,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
             int32_t  nb = curTile + step[i];
             uint32_t t;
-            int32_t  nbRegion, g, h, prev, next, fNew;
+            int32_t  g, h, prev, next, fNew;
             uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
@@ -1346,9 +1346,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
             t = nb & 0xFFFF;
-            nbRegion = region[t];
-            if (nbRegion > 0 && nbRegion != startRegion
-                && nbRegion != goalRegion)
+            if (region[t] > 0 && region[t] != startRegion
+                && region[t] != goalRegion)
                 continue;
 
             /* Twice the step, plus a penalty for each flag the tile LACKS.
