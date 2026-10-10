@@ -2015,7 +2015,7 @@ void __cdecl DrawSelection(void)
         && !(leader->flags & AM2_MARK_GONE)
         && leader->health != 0) {
         AM2_Sprite *spr =
-            (g_markSprites)
+            g_markSprites
                 [AM2_MARK_LEADER];
 
         DrawSprite(spr,
@@ -2031,7 +2031,7 @@ void __cdecl DrawSelection(void)
 
     for (i = 0; i < g_selectedCount; ) {
         AM2_Object *obj = LookupByUID(
-            (g_selectedItems)[i]);
+            g_selectedItems[i]);
         int32_t  x, y, wide, drop, fill;
         RECT     box;
         uint8_t  ink;
@@ -2297,7 +2297,7 @@ void __cdecl AirFrameDraw(void)
             const int16_t *hot =
                 g_airFrameHotspots;
 
-            DrawSprite((g_airSprites6)
+            DrawSprite(g_airSprites6
                            [frame],
                        x - hot[frame * 2],
                        y - hot[frame * 2 + 1],
@@ -2389,12 +2389,12 @@ void __cdecl DrawEffectLayer(void)
     int32_t             army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
-        if ((g_aimLiveA)[army]) {
+        if (g_aimLiveA[army]) {
             const AM2_Point *ptA = &g_aimPointA[army];
             int32_t frame;
             RECT    box, hit;
 
-            frame = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampA)[army])
+            frame = (int32_t)((uint32_t)(g_gameClockMs - g_aimStampA[army])
                               / AM2_AIM_STEP_MS) + 1;
             if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
                 frame = AM2_AIM_FRAMES_A;
@@ -2459,19 +2459,19 @@ void __cdecl DrawEffectLayer(void)
             if (!LockSurface(target))
                 return;
 
-            DrawSprite((g_aimSpritesA)[frame], ptA->x, ptA->y, 0);
-            DrawSprite((g_aimSpritesA)[0],
+            DrawSprite(g_aimSpritesA[frame], ptA->x, ptA->y, 0);
+            DrawSprite(g_aimSpritesA[0],
                        ptA->x + AM2_AIM_BOX_LEFT, ptA->y + AM2_AIM_BOX_TOP, 0);
 
             UnlockSurface();
         }
 
-        if ((g_aimLiveB)[army]) {
+        if (g_aimLiveB[army]) {
             const int16_t *ptB = (const int16_t *)&g_aimPointB[army];
             int32_t *held = &g_aimFrameB[army];
             int32_t  frameB;
 
-            frameB = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampB)[army])
+            frameB = (int32_t)((uint32_t)(g_gameClockMs - g_aimStampB[army])
                                / AM2_AIM_B_STEP_MS) + 1;
 
             /* Past the fourth step it stops counting and starts flickering. */
@@ -2489,9 +2489,9 @@ void __cdecl DrawEffectLayer(void)
             if (!LockSurface(target))
                 return;
 
-            DrawSprite((g_aimSpritesB)[0],
+            DrawSprite(g_aimSpritesB[0],
                        ptB[0] + AM2_AIM_B_OFF_X, ptB[1] + AM2_AIM_B_OFF_Y, 0);
-            DrawSprite((g_aimSpritesB)[frameB],
+            DrawSprite(g_aimSpritesB[frameB],
                        ptB[0] + AM2_AIM_B_OFF_X2, ptB[1] + AM2_AIM_B_OFF_Y2, 0);
 
             UnlockSurface();
@@ -2622,10 +2622,10 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
     if (index < 1)
         return;
 
-    StartShake((g_shakePresets)[index].a,
-               (g_shakePresets)[index].b,
-               (g_shakePresets)[index].c,
-               (g_shakePresets)[index].d);
+    StartShake(g_shakePresets[index].a,
+               g_shakePresets[index].b,
+               g_shakePresets[index].c,
+               g_shakePresets[index].d);
 }
 
 /* 0x0042A240, three callers, 400 bytes. Every object in a world rectangle,
@@ -2897,7 +2897,7 @@ int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out)
         for (col = (g_mapTilesW - 1) & first; col <= (int32_t)((g_mapTilesW - 1) & last);
              col++) {
             /* Signed, as the image's `jge`. */
-            if ((g_cellWeights)
+            if (g_cellWeights
                     [tile & 0xFFFF] < AM2_BLOCK_CLEAR) {
                 here = PointOfTile(tile);
                 d = ApproxDist((const AM2_Point *)&here, pos);

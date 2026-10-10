@@ -3480,7 +3480,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
 /* The shot's TILE, re-read at each use. */
 
     /* Nested onto the struck-ground return the image lays out last. */
-    if ((int16_t)*(const int8_t *)((g_tileAttrs) + s->tile)
+    if ((int16_t)*(const int8_t *)(g_tileAttrs + s->tile)
         >= (int16_t)height) {
         if (code != 3) {
             if ((g_tileFlags[s->tile] & 1)
@@ -7297,7 +7297,7 @@ void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
             *(const int32_t *)&g_zeroPoint;
 
         if (o->field5A8 > 0)
-            SetFieldInAll(&o->rowSet, (g_kind7Names)[o->field5A8]);
+            SetFieldInAll(&o->rowSet, g_kind7Names[o->field5A8]);
 
         o->health = (int16_t)(int32_t)
             ((double)o->maxHealth
@@ -8006,7 +8006,7 @@ void __cdecl ResetItemsAndUids(void)
     ItemsReset();
 
     for (i = 0; i < AM2_UID_ARMY_OWNERS; i++)
-        (g_uidCounter)[i] = AM2_UID_COUNTER_START;
+        g_uidCounter[i] = AM2_UID_COUNTER_START;
 }
 
 /* 0x0045F2D0, one caller. HAS THIS WEAPON RECHARGED -- the difference between
@@ -9230,7 +9230,7 @@ void __cdecl SelectionClick(void)
                 int32_t seen = 0;
 
                 for (i = 0; i < n; i++)
-                    if ((g_selectedItems)[i]
+                    if (g_selectedItems[i]
                         == (e)->uid) {
                         seen = 1;
                         break;
@@ -9292,7 +9292,7 @@ void __cdecl SelectionClick(void)
         int32_t i;
 
         for (i = 0; i < n; i++) {
-            if ((g_selectedItems)[i]
+            if (g_selectedItems[i]
                 != (e)->uid)
                 continue;
 
@@ -9790,7 +9790,7 @@ void __cdecl ToggleSelect(AM2_Object *obj)
         i = 0;
         if (n > 0) {
             for (; i < n; i++) {
-                if ((g_selectedItems)[i]
+                if (g_selectedItems[i]
                     == o->uid) {
                     /* The last selected unit cannot be toggled off, and
                      * that refusal returns WITHOUT OnSelectionChanged --
@@ -10667,7 +10667,7 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(AM2_Object *obj))
     int32_t i = 0;
 
     while (i < g_selectedCount) {
-        AM2_Object *obj = LookupByUID((g_selectedItems)[i]);
+        AM2_Object *obj = LookupByUID(g_selectedItems[i]);
 
         if (!obj) {
             /* No step: the shifted entry is next. */
@@ -11513,7 +11513,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
 
     tile = TileOfPoint(at);
     o->heightSet =
-        (uint8_t)((g_tileAttrs)
+        (uint8_t)(g_tileAttrs
                       [(uint16_t)tile]
                   + AM2_EXPL_HEIGHT_BIAS);
 
@@ -11625,7 +11625,7 @@ void __cdecl StepType6(AM2_Object *obj)
             tile = (uint16_t)TileOfPoint(*pos);
 
             if ((( g_tileFlags)[tile] & 1)
-                && (g_cellWeights)[tile]
+                && g_cellWeights[tile]
                    >= AM2_BLOCK_CLEAR)     /* signed, as the image's `jl` */
                 orig_spawn_at(pos->x, o->pos.y, 0x90,
                               o->owner,
@@ -11925,7 +11925,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
     o->vehicleKind = kind;
     /* An int32 table read one byte at a time -- all six values fit. */
     o->heightAdj = (uint8_t)
-        (g_vehicleHeightByKind)[kind];
+        g_vehicleHeightByKind[kind];
 
     ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
                   g_vehicleBox, remote, uid);

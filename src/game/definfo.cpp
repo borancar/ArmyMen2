@@ -635,7 +635,7 @@ void __cdecl AddVehicleDef(const AM2_VehicleDef *rec)
 
     memcpy(tab + n * AM2_VEHICLE_DEF_REC_SIZE, rec, AM2_VEHICLE_DEF_REC_SIZE);
 
-    (g_vehicleDefCount)++;
+    g_vehicleDefCount++;
 }
 
 /* AddMissileDef -- original 0x00460200, one caller. The same append for the
@@ -683,7 +683,7 @@ void __cdecl AddMissileDef(const AM2_MissileDefRec *rec)
 
     memcpy(tab + n * AM2_MISSILE_DEF_REC_SIZE, rec, AM2_MISSILE_DEF_REC_SIZE);
 
-    (g_defMissileCount)++;
+    g_defMissileCount++;
 }
 
 /* The image's bsearch and the dword comparator both def-find uses. Neither is

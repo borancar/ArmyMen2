@@ -1292,7 +1292,7 @@ void __cdecl StateEnter0(void)
     RefreshGate(0);
 
     over = GameOverState();
-    (g_stateActions)[over].onEnter();
+    g_stateActions[over].onEnter();
 
     g_stateEntered = 0;
 }
@@ -1888,7 +1888,7 @@ void __cdecl PausedFrameStep(void)
             variant = 1;
         }
 
-        DrawSprite((g_mpMarkGrid)
+        DrawSprite(g_mpMarkGrid
                        [g_commObject->CommArmyOfSlot(slot) * 5 + variant],
                    xy[0], xy[1], 0);
 
@@ -1897,7 +1897,7 @@ void __cdecl PausedFrameStep(void)
              * (team) marker and 0x3E for any other. The image's `sub 3; neg;
              * sbb; and ~0x1F; add 0x5E` is VC6's branchless form of a
              * two-constant ternary, not a rounding of x. */
-            DrawSprite((g_mpTeamSprites)
+            DrawSprite(g_mpTeamSprites
                            [g_commObject->slots[slot].team],
                        (variant == 3 ? 0x5E : 0x3E) + xy[0],
                        xy[1] + 3, 0);

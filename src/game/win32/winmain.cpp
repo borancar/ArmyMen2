@@ -302,9 +302,9 @@ void __cdecl ResetToTitle(void)
 
     /* The game-over snapshot is int32[3], cleared element by element. */
     g_mpSession                    = 0;
-    (g_gameOverSource)[0]          = 0;
-    (g_gameOverSource)[1]          = 0;
-    (g_gameOverSource)[2]          = 0;
+    g_gameOverSource[0]          = 0;
+    g_gameOverSource[1]          = 0;
+    g_gameOverSource[2]          = 0;
     *(int32_t *)&g_objCtxObj                   = 0;
     g_objCtxVal                   = 0;
     *(int32_t *)&g_objCtxObjPrev              = 0;

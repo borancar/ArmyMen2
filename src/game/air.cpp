@@ -1359,14 +1359,14 @@ void __cdecl AirDeliver(void)
 
             orig_spawn_at(g_airSaveBlock->where[0].x + dx,
                           g_airSaveBlock->where[0].y + dy,
-                          (g_airStrikeKinds)
+                          g_airStrikeKinds
                               [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                           (int32_t)UidArmy(g_airSaveBlock->from[0]), g_airSaveBlock->from[0],
                           AM2_AIR_STRIKE_EXTRA, delay, 0, 0, 0);
         }
 
         orig_spawn_at(g_airSaveBlock->where[0].x, g_airSaveBlock->where[0].y,
-                      (g_airStrikeKinds)
+                      g_airStrikeKinds
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                       (int32_t)UidArmy(g_airSaveBlock->from[0]), g_airSaveBlock->from[0],
                       AM2_AIR_STRIKE_EXTRA, AM2_AIR_STRIKE_JITTER, 0, 0, 0);
@@ -1425,7 +1425,7 @@ void __cdecl AirPassesDraw(void)
                 ((g_airSaveBlock->passTimer[i] - (g_airPassMs >> 1)) * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
         }
 
-        DrawSprite((g_airSprites3)[frame],
+        DrawSprite(g_airSprites3[frame],
                    x, y, 0);
 
         g_airSaveBlock->passTimer[i] += g_frameDeltaMs;

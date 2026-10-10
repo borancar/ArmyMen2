@@ -435,7 +435,7 @@ void __cdecl RowFaceSprite(AM2_MapRow *row)
                         + r->heading);
     dir     = RoundTo8(heading, a->directionBits);
     cell    = (dir + 1) * a->frames - 1;
-    sprite  = (g_spriteList)[a->cells[cell].sprite];
+    sprite  = g_spriteList[a->cells[cell].sprite];
 
     if (((AM2_Sprite *)r->sprite) != sprite)
         RowSetSprite(r, sprite, g_mapDesc);

@@ -627,7 +627,7 @@ void __cdecl CyclePalette(void)
     i = g_paletteCycleIndex;
 
     {
-        uint32_t which = (g_paletteCycleSeq)[i];
+        uint32_t which = g_paletteCycleSeq[i];
 
         SetPaletteRange((PALETTEENTRY *)(uintptr_t)
                             (((uintptr_t)g_tilesetPalettes) + which * AM2_TILESET_PALETTE_BYTES),
@@ -806,7 +806,7 @@ void __cdecl BuildRemapTables(void)
     }
 
     for (i = 0; i < AM2_REMAP_COLOURS; i++)
-        ((uint8_t *)g_rowLutDoubles)[i] =
+        g_rowLutDoubles[i] =
             NearestPalIndexRGB(
                 g_activePalette,
                 (uint32_t)(uint8_t)(0x24 - i * 4),
@@ -815,7 +815,7 @@ void __cdecl BuildRemapTables(void)
                 AM2_PAL_REMAP_FROM);
 
     for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
-        ((uint8_t *)g_rowLutDoubles)[i] = (uint8_t)i;
+        g_rowLutDoubles[i] = (uint8_t)i;
 }
 
 int palette_install(void)

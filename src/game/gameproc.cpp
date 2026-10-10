@@ -250,7 +250,7 @@ void __cdecl LoadOptions(void)
 
         for (i = 0; i < (int32_t)(((uintptr_t)g_keyBindingsEnd) - ((uintptr_t)g_keyBindings)) / 2; i++)
             ((uint8_t (*)[2])((uintptr_t)g_keyBindings))[i][0] =
-                (g_keyDefaults)[i];
+                g_keyDefaults[i];
     }
 }
 

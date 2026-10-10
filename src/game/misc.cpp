@@ -588,7 +588,7 @@ void __cdecl LoadMask(AM2_ObjMask *out, int32_t set, int32_t index, int32_t fram
 
     am2_sprintf(dir, "%s\\%s\\masks",
                 g_mapBlock,
-                (g_spriteSetDirs)[set]);
+                g_spriteSetDirs[set]);
     SetGameDir(dir);
 
     am2_sprintf(pattern, "%02d_%03d_%02d_*.msk",
@@ -2201,7 +2201,7 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
     row->stamp54 = 0;
     row->flags                = 1;
     row->sprite     =
-        (g_seqSprites7)
+        g_seqSprites7
             [variant * *(const int32_t *)((void *)(uintptr_t)(AM2_SEQ_VARIANT_STRIDE))];
     row->pos      = *at;
     row->yAdjust = 0;
@@ -3091,7 +3091,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         if (row->yAdjust + r->height <= ground) {
             row->yAdjust = (int16_t)((int16_t)ground - (int16_t)r->height);
 
-            if ((g_tileFlags)[tile] & 1) {
+            if (g_tileFlags[tile] & 1) {
                 CreateExplosion(row->pos.x,
                                 row->pos.y,
                                 0x93, 4, 0, 0, 0, 0, 0, 0);

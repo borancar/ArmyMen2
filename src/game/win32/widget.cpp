@@ -1585,7 +1585,7 @@ static inline void CloseCurrentScreen(void)
 
     if (cur) {
         WidgetVDelete(cur, 1);
-        (g_paintObject) = (AM2_ScreenBase *)0;
+        g_paintObject = (AM2_ScreenBase *)0;
     }
 }
 
@@ -2631,7 +2631,7 @@ static inline int32_t PointerFriendTail(AM2_Object *o)
                    < AM2_CLICK_MS) {
                 for (i = 0; i < g_selectedCount;
                      i++) {
-                    const AM2_Object *sel = LookupByUID((g_selectedItems)[i]);
+                    const AM2_Object *sel = LookupByUID(g_selectedItems[i]);
 
                     if (ObjIsType3Inline(sel)
                         && (sel->flags & OBJ_FLAG_SELECTED))
@@ -4145,24 +4145,24 @@ void __cdecl AimInit(void)
     uint32_t i;
 
     for (i = 0; i < AM2_AIM_SPRITES_A; i++)
-        (g_aimSpritesA)[i] =
+        g_aimSpritesA[i] =
             PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_A, (int32_t)i,
                           AM2_AIM_PRELOAD_FLAGS, 1);
 
     for (i = 0; i < AM2_AIM_ARMIES; i++) {
-        (g_aimLiveA)[i]  = 0;
-        (g_aimStampA)[i] = 0;
+        g_aimLiveA[i]  = 0;
+        g_aimStampA[i] = 0;
     }
 
     for (i = 0; i < AM2_AIM_SPRITES_B; i++)
-        (g_aimSpritesB)[i] =
+        g_aimSpritesB[i] =
             PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_B, (int32_t)i,
                           AM2_AIM_PRELOAD_FLAGS, 1);
 
     for (i = 0; i < AM2_AIM_ARMIES; i++) {
-        (g_aimLiveB)[i]  = 0;
-        (g_aimFrameB)[i] = 0;
-        (g_aimStampB)[i] = 0;
+        g_aimLiveB[i]  = 0;
+        g_aimFrameB[i] = 0;
+        g_aimStampB[i] = 0;
     }
 }
 
@@ -4195,8 +4195,8 @@ void __cdecl FreeAimSprites(void)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
-        (g_aimLiveA)[i]  = 0;
-        (g_aimStampA)[i] = 0;
+        g_aimLiveA[i]  = 0;
+        g_aimStampA[i] = 0;
     }
 
     for (spr = g_aimSpritesB;
@@ -4204,9 +4204,9 @@ void __cdecl FreeAimSprites(void)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
-        (g_aimLiveB)[i]  = 0;
-        (g_aimFrameB)[i] = 0;
-        (g_aimStampB)[i] = 0;
+        g_aimLiveB[i]  = 0;
+        g_aimFrameB[i] = 0;
+        g_aimStampB[i] = 0;
     }
 }
 
@@ -4247,49 +4247,45 @@ void __cdecl FreeAimSprites(void)
  */
 void __cdecl AimMarkerAge(void)
 {
-    /* Indexed, not a walked pointer: the image's loop test is a signed jl. */
-#define LIVE(off)  ((g_aimLiveA)[army + (off) / 4])
-#define XY(off)    (((int16_t *)g_aimLiveA)[army * 2 + (off) / 2])
     int32_t  owner   = *(const int32_t *)&g_defaultOwner;
     uint32_t now     = g_gameClockMs;
     int32_t  army;
 
+    /* Indexed, not a walked pointer: the image's loop test is a signed jl. */
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
         if (owner == army) {
-            if (LIVE(0)) {
-                if (now >= (uint32_t)LIVE(0x30)) {
-                    LIVE(0)    = 0;
-                    LIVE(0x20) = 0;
+            if (g_aimLiveA[army]) {
+                if (now >= (uint32_t)g_aimDeadlineA[army]) {
+                    g_aimLiveA[army]  = 0;
+                    g_aimStampA[army] = 0;
                 }
-                XY(0x10) = (int16_t)g_cursorX;
-                XY(0x12) = (int16_t)g_cursorY;
+                g_aimPointA[army].x = (int16_t)g_cursorX;
+                g_aimPointA[army].y = (int16_t)g_cursorY;
             }
         }
 
-        if (LIVE(0) && now >= (uint32_t)LIVE(0x30)) {
-            LIVE(0)    = 0;
-            LIVE(0x20) = 0;
+        if (g_aimLiveA[army] && now >= (uint32_t)g_aimDeadlineA[army]) {
+            g_aimLiveA[army]  = 0;
+            g_aimStampA[army] = 0;
         }
 
         if (owner == army) {
-            if (LIVE(0x64)) {
-                if (now >= (uint32_t)LIVE(0xA4)) {
-                    LIVE(0x64) = 0;
-                    LIVE(0x94) = 0;
+            if (g_aimLiveB[army]) {
+                if (now >= (uint32_t)g_aimDeadlineB[army]) {
+                    g_aimLiveB[army]  = 0;
+                    g_aimStampB[army] = 0;
                 }
-                XY(0x74) = (int16_t)g_cursorX;
-                XY(0x76) = (int16_t)g_cursorY;
+                g_aimPointB[army].x = (int16_t)g_cursorX;
+                g_aimPointB[army].y = (int16_t)g_cursorY;
             }
         }
 
-        if (LIVE(0x64) && now >= (uint32_t)LIVE(0xA4)) {
-            LIVE(0x64) = 0;
-            LIVE(0x84) = 0;   /* and the frame, unlike above */
-            LIVE(0x94) = 0;
+        if (g_aimLiveB[army] && now >= (uint32_t)g_aimDeadlineB[army]) {
+            g_aimLiveB[army]  = 0;
+            g_aimFrameB[army] = 0;   /* and the frame, unlike above */
+            g_aimStampB[army] = 0;
         }
     }
-#undef LIVE
-#undef XY
 }
 
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
@@ -4428,7 +4424,7 @@ void __cdecl BuildHudWidgets(void)
 
         g_hudDirty = 0;
         g_ourPoints =
-            (g_armyPoints)[slot];
+            g_armyPoints[slot];
         orig_log_noargs();
     }
 
@@ -4517,7 +4513,7 @@ void __cdecl HudRepaintOne(void)
 
     g_hudDirty = 0;
 
-    w = (g_hudWidgetTable)
+    w = g_hudWidgetTable
             [g_hudIndex];
 
     ((AM2_CountButton *)w)->lit = 0;
@@ -5727,10 +5723,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
             if (!(self->sprites[self->slots[i].index]))
                 continue;
 
-            cell.left   = (g_hudSargeOffsets)[i * 2]
+            cell.left   = g_hudSargeOffsets[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + (g_hudSargeOffsets)[i * 2 + 1];
+                          + g_hudSargeOffsets[i * 2 + 1];
             cell.right  = (self->sprites[self->slots[i].index])->bounds.right  + cell.left;
             cell.bottom = (self->sprites[self->slots[i].index])->bounds.bottom + cell.top;
 
@@ -5861,9 +5857,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
         if (!self->sprites[rec->index])
             continue;
 
-        x = box.left = (g_hudSargeOffsets)[i * 2]
+        x = box.left = g_hudSargeOffsets[i * 2]
                        + w->rect.left;
-        y = box.top  = (g_hudSargeOffsets)[i * 2 + 1]
+        y = box.top  = g_hudSargeOffsets[i * 2 + 1]
                        + w->rect.top;
         box.right  = self->sprites[rec->index]->bounds.right + box.left;
         box.bottom = self->sprites[rec->index]->bounds.bottom + box.top;
@@ -6077,10 +6073,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             else
                 spr = sq->pairLo[sq->recs[i].index];
 
-            cell.left   = (g_hudSquadSlotXy)[i * 2]
+            cell.left   = g_hudSquadSlotXy[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + (g_hudSquadSlotXy)[i * 2 + 1];
+                          + g_hudSquadSlotXy[i * 2 + 1];
             cell.right  = spr->bounds.right  + cell.left;
             cell.bottom = spr->bounds.bottom + cell.top;
 
@@ -6185,7 +6181,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         if (slot >= AM2_HUD_SQUAD_SLOTS)
             break;
 
-        obj = LookupByUID((g_selectedItems)[i]);
+        obj = LookupByUID(g_selectedItems[i]);
         if (!obj) {
             ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->ListRemoveAt(i);
             continue;
@@ -6598,10 +6594,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
 
         /* The origin is copied as it is computed: x and y go to ClipRect,
          * which adjusts them; the box keeps the unadjusted pair. */
-        x = box.left = (g_hudSquadSlotXy)[slot * 2]
+        x = box.left = g_hudSquadSlotXy[slot * 2]
                        + w->rect.left;
         y = box.top  = w->rect.top
-                       + (g_hudSquadSlotXy)[slot * 2 + 1];
+                       + g_hudSquadSlotXy[slot * 2 + 1];
         box.right  = box.left + spr->bounds.right;
         box.bottom = spr->bounds.bottom + box.top;
 
@@ -6782,15 +6778,15 @@ AM2_HudCmd::~AM2_HudCmd()
 {
     AM2_Widget *w = this;
 
-    AM2_Sprite **spr;
+    AM2_CmdRec *rec;
 
     AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
 
-    /* signed address compare, as the original (`jl`) */
-    for (spr = g_hudCmdSprites;
-         (int32_t)(uintptr_t)spr < (int32_t)((uintptr_t)g_hudCmdSpritesEnd);
-         spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
-        ReleaseSprite(*spr);
+    /* signed address compare, as the original (`jl`), on the sprite field */
+    for (rec = g_hudCmdSpec;
+         (int32_t)(uintptr_t)&rec->sprite < (int32_t)((uintptr_t)g_hudCmdSpritesEnd);
+         rec++)
+        ReleaseSprite(rec->sprite);
 }
 
 /* HudCmdInvoke -- original 0x00417180, 56 bytes, thiscall, six callers (one
@@ -6897,10 +6893,10 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
             if (((int32_t *)((uint8_t *)self + HUDCMD_OFF_SLOTS))[i] < 0)
                 continue;
 
-            cell.left   = (g_hudSquadSlotXy)[i * 2]
+            cell.left   = g_hudSquadSlotXy[i * 2]
                           + w->rect.left;
             cell.top    = w->rect.top
-                          + (g_hudSquadSlotXy)[i * 2 + 1];
+                          + g_hudSquadSlotXy[i * 2 + 1];
             cell.right  = CMD_SPEC(((int32_t *)((uint8_t *)self + HUDCMD_OFF_SLOTS))[i]).sprite
                               ->bounds.right + cell.left;
             cell.bottom = CMD_SPEC(((int32_t *)((uint8_t *)self + HUDCMD_OFF_SLOTS))[i]).sprite
@@ -6985,12 +6981,10 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
         RECT           hit;
         int32_t        x, y;
 
-/* The slot's sprite, looked up again at each use as the original does. */
-#define HUDCMD_SPRITE(s) (*(AM2_Sprite **)((uint8_t *)g_hudCmdSprites \
-                                           + (s) * AM2_POINTER_MODE_SIZE))
+/* The slot's sprite is looked up again at each use, as the original does. */
         if (*slot < 0)
             continue;
-        if (!HUDCMD_SPRITE(*slot))
+        if (!g_hudCmdSpec[*slot].sprite)
             continue;
 
         /* The origin is copied as it is computed: ClipRect takes x and y as
@@ -6999,25 +6993,24 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
          * and the draw uses its ADJUSTED pair. This drew at the unadjusted
          * box origin until the byte match read the frame slots: a partly
          * clipped icon was placed as though nothing had been cut. */
-        x = box.left = (g_hudCmdOffsets)[i * 2] + w->rect.left;
-        y = box.top  = (g_hudCmdOffsets)[i * 2 + 1] + w->rect.top;
-        box.right  = HUDCMD_SPRITE(*slot)->bounds.right + box.left;
-        box.bottom = HUDCMD_SPRITE(*slot)->bounds.bottom + box.top;
+        x = box.left = g_hudCmdOffsets[i * 2] + w->rect.left;
+        y = box.top  = g_hudCmdOffsets[i * 2 + 1] + w->rect.top;
+        box.right  = g_hudCmdSpec[*slot].sprite->bounds.right + box.left;
+        box.bottom = g_hudCmdSpec[*slot].sprite->bounds.bottom + box.top;
 
         if (!IntersectRect(&hit, (const RECT *)&box, &clip))
             continue;
 
         /* Exits rather than continues -- see above. Clipped against the
          * icon's own visible part, which is what the frame slot holds. */
-        if (!ClipRect(&HUDCMD_SPRITE(*slot)->bounds, (const AM2_Rect *)&hit,
+        if (!ClipRect(&g_hudCmdSpec[*slot].sprite->bounds, (const AM2_Rect *)&hit,
                       &x, &y, &part))
             return;
 
         if (i == self->selected)
             ClearRegion((const RECT *)&hit, AM2_HUD_CMD_HIGHLIGHT);
 
-        DrawSpriteClipped(HUDCMD_SPRITE(*slot), x, y, &part, 0);
-#undef HUDCMD_SPRITE
+        DrawSpriteClipped(g_hudCmdSpec[*slot].sprite, x, y, &part, 0);
     }
 }
 
@@ -7206,9 +7199,8 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 
     line = hud->typed;
     HudMessage(line,
-        *(const uint8_t *)(g_chatColourTable
-            + ((size_t)AM2_THE_COMM->CommArmyOfSlot(
-                                      (int32_t)g_defaultOwner) << 8)));
+        g_chatColourTable[(size_t)AM2_THE_COMM->CommArmyOfSlot(
+                              (int32_t)g_defaultOwner) << 8]);
 
     cb = hud->checkbox;
     if (cb && cb->checked) {
@@ -7870,7 +7862,7 @@ void __cdecl BuildOnToggle(AM2_Widget *w)
             return;
     }
 
-    (g_hudWidgetB)->focusedChild = w;
+    g_hudWidgetB->focusedChild = w;
 
     row = self->menuRow;
     g_hudIndex = row;
@@ -8634,7 +8626,7 @@ void __cdecl OnAppActivated(void)
     if (g_gameState == 2)
         RefreshScreen();
 
-    if ((g_paintObject)) {
+    if (g_paintObject) {
         SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
         WidgetVPaint((AM2_Widget *)(g_paintObject),
                      ((AM2_Widget *)(g_paintObject))->rect);
@@ -8711,7 +8703,7 @@ void __cdecl OpenCommPanel(void)
 {
     CloseCurrentScreen();
     CommCreateDirectPlay(g_commObject, (void *)0);
-    (g_paintObject) = new AM2_CommPanelScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_CommPanelScreen("01_000_00_screen.bmp");
 }
 
 /* WarMenuConstruct -- original 0x0042EED0, thiscall, `ret 4`. START A WAR,
@@ -8783,7 +8775,7 @@ AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
 void __cdecl OpenWarMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_WarMenuScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_WarMenuScreen("01_000_00_screen.bmp");
 }
 
 /* DlgBattleJoinConstruct -- original 0x0042F4C0, 944 bytes, thiscall
@@ -8864,7 +8856,7 @@ AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen()
 void __cdecl OpenBattleJoin(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
@@ -9013,7 +9005,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpDialogDelete(int32_t flags)
 void __cdecl OpenBattleName(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_BattleNameScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_BattleNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00430140 -- fill a list box from a text file in `rules/`, one row per
@@ -9086,7 +9078,7 @@ void __cdecl RefreshMapSelection(void)
     char        path[0x100];
     char        prev[0x100];
 
-    if ((g_paintObject) != (AM2_ScreenBase *)0
+    if (g_paintObject != (AM2_ScreenBase *)0
         && g_gameState == AM2_STATE_MENU
         && g_subState == AM2_MENU_MP_HOST)
         preview = ((AM2_MpPanelScreen *)g_paintObject)->preview;
@@ -9858,7 +9850,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelPaint(RECT clip)
 void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_MpPanelScreen("01_001_00_mphost.bmp");
+    g_paintObject = new AM2_MpPanelScreen("01_001_00_mphost.bmp");
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
 }
@@ -10402,7 +10394,7 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
     /* The row is read AFTER the atoi, which matters not at all -- but the
      * original reads it there and nothing between the two touches it. */
     value = orig_atoi(edit->text);
-    (g_armyPoints)
+    g_armyPoints
         [((AM2_MpSpin *)w)->row] = value;
     SendPlayerMsg(0);
 }
@@ -10593,7 +10585,7 @@ void __cdecl OptionsSyncGroup(AM2_CheckBox *header)
 void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
+    g_paintObject = new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
 }
 
 /* 0x004329A0, thiscall `ret 0x24` -- nine stack dwords, four of them a
@@ -10919,7 +10911,7 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
     if (comm->slots[row].colour != 0x63)
         which = ((AM2_Comm *)comm)->CommArmyOfSlot(row);
 
-    w->sprite = (g_mpPanelSpritesA)[which];
+    w->sprite = g_mpPanelSpritesA[which];
     ::WidgetPaint(w, clip);
 }
 
@@ -11020,7 +11012,7 @@ void __attribute__((thiscall)) AM2_Widget::MpTeamPaint(RECT clip)
     int32_t        row  = self->row;
     int32_t        team = comm->slots[row].team;
 
-    w->sprite = (g_mpPanelSpritesB)[team];
+    w->sprite = g_mpPanelSpritesB[team];
     ::WidgetPaint(w, clip);
 }
 
@@ -11169,7 +11161,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
 void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
+    g_paintObject = new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
 
@@ -11255,7 +11247,7 @@ void __cdecl OpenTitleScreen(void)
 
     /* No local: the screen is reached through g_paintObject throughout,
      * as the original re-reads it. */
-    (g_paintObject) = new AM2_ScreenBase("01_000_00_screen.bmp", 1);
+    g_paintObject = new AM2_ScreenBase("01_000_00_screen.bmp", 1);
     ((AM2_Widget *)(g_paintObject))->flag44 = 1;
 
     /* Seven buttons, written out as the original's seven blocks; the first
@@ -11419,7 +11411,7 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_SelectMapScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_SelectMapScreen("01_000_00_screen.bmp");
 }
 
 AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
@@ -11641,7 +11633,7 @@ void __cdecl OnMenuBack(AM2_Widget *w)
 void __cdecl OpenMovies(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_MoviesScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_MoviesScreen("01_000_00_screen.bmp");
 }
 
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
@@ -11712,7 +11704,7 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
 void __cdecl OpenDifficulty(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DifficultyDialog("01_000_00_screen.bmp");
+    g_paintObject = new AM2_DifficultyDialog("01_000_00_screen.bmp");
 }
 
 AM2_QuitDialogScreen::AM2_QuitDialogScreen(const char *bmp)
@@ -11775,7 +11767,7 @@ void __cdecl OnQuitOk(AM2_Widget *w)
 void __cdecl OpenQuitConfirm(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_QuitDialogScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_QuitDialogScreen("01_000_00_screen.bmp");
 }
 
 AM2_ReplayDialogScreen::AM2_ReplayDialogScreen(const char *bmp)
@@ -11851,7 +11843,7 @@ void __cdecl OnReplayOk(AM2_Widget *w)
 void __cdecl OpenReplayPrompt(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044F2A0: sound effects, demonstrated by playing wave 0x27. */
@@ -12072,9 +12064,9 @@ void __cdecl OpenAudioOptions(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
+        g_paintObject = new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
     } else {
-        (g_paintObject) = new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
+        g_paintObject = new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12151,7 +12143,7 @@ void __cdecl OnAudioButton(AM2_Widget *w)
 void __cdecl OpenOptionsMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
 }
 
 /* 0x0044FE50, thiscall. DELETE GAME -- and the ONE screen in the table that
@@ -12282,9 +12274,9 @@ void __cdecl OpenDeleteGame(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        g_paintObject = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        (g_paintObject) = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        g_paintObject = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12294,9 +12286,9 @@ void __cdecl OpenDeleteGameB(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        (g_paintObject) = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+        g_paintObject = new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        (g_paintObject) = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+        g_paintObject = new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -12410,7 +12402,7 @@ void __cdecl OpenOverwriteGame(void)
 {
     CloseCurrentScreen();
     RefreshScreen();
-    (g_paintObject) = new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
+    g_paintObject = new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
 }
 
 AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
@@ -12541,7 +12533,7 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 void __cdecl OpenDeletePlayer(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
 }
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
@@ -12831,7 +12823,7 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
 void __cdecl OpenControls(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
+    g_paintObject = new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
 }
 
 /* 0x004512A0. SELECT PLAYER's row callback -- what a list box calls when its
@@ -12976,7 +12968,7 @@ AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen()
 void __cdecl OpenSelectPlayer(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451AC0. ENTER NAME's CANCEL, and the screen's escape action. */
@@ -13048,7 +13040,7 @@ AM2_EnterNameScreen::~AM2_EnterNameScreen()
 void __cdecl OpenEnterName(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_EnterNameScreen("01_000_00_screen.bmp");
+    g_paintObject = new AM2_EnterNameScreen("01_000_00_screen.bmp");
 }
 
 /* 0x00451EA0. LOAD GAME's row callback: copy the chosen save's name into the
@@ -13060,7 +13052,7 @@ void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
     (void)list;
     if (!rows || selected < 0 || selected >= rows->count)
         return;
-    if (!(g_paintObject))
+    if (!g_paintObject)
         return;
     strcpy(((AM2_LoadGameScreen *)g_paintObject)->name,
            rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
@@ -13076,7 +13068,7 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w)
     const char *name;
 
     (void)w;
-    if (!(g_paintObject))
+    if (!g_paintObject)
         return;
     name = ((AM2_LoadGameScreen *)g_paintObject)->name;
     if (strlen(name) < 1) {
@@ -13143,7 +13135,7 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     const char *name;
 
     (void)w;
-    if (!(g_paintObject))
+    if (!g_paintObject)
         return;
     name = ((AM2_LoadGameScreen *)g_paintObject)->name;
     if (strlen(name) < 1) {
@@ -13276,9 +13268,9 @@ void __cdecl OpenLoadGame(void)
         AM2_ScreenBase *screen = new AM2_LoadGameScreen("02_007_00_loadgame.bmp", 0);
 
         RefreshScreen();
-        (g_paintObject) = screen;
+        g_paintObject = screen;
     } else {
-        (g_paintObject) = new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
+        g_paintObject = new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -13348,7 +13340,7 @@ AM2_DlgMessageScreen::~AM2_DlgMessageScreen()
 void __cdecl OpenMessage(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DlgMessageScreen(
+    g_paintObject = new AM2_DlgMessageScreen(
         g_messageBmpName, 0);
 }
 
@@ -13555,7 +13547,7 @@ void __cdecl GameMenuAbort(AM2_Widget *w)
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
+    g_paintObject = new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
     RefreshScreen();
 }
 
@@ -13885,7 +13877,7 @@ AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen()
 void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
-    (g_paintObject) = new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
+    g_paintObject = new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
     RefreshScreen();
 }
 
@@ -16538,7 +16530,7 @@ void __cdecl PointerActionMode4(AM2_Object *target, AM2_Point at)
 
     for (i = 0; i < g_selectedCount; ) {
         AM2_Object *o = LookupByUID(
-            (g_selectedItems)[i]);
+            g_selectedItems[i]);
         AM2_Point slot;
         int32_t  ot;
 
@@ -16647,7 +16639,7 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
     home = at;
     for (i = 0; i < g_selectedCount; ) {
         AM2_Object *o = LookupByUID(
-            (g_selectedItems)[i]);
+            g_selectedItems[i]);
         int32_t  ot;
 
         if (!o) {
@@ -16741,7 +16733,7 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
 
     for (i = 0; i < g_selectedCount; ) {
         AM2_Object *o = LookupByUID(
-            (g_selectedItems)[i]);
+            g_selectedItems[i]);
         int32_t  ot;
 
         if (!o) {

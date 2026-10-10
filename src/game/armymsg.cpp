@@ -1002,7 +1002,7 @@ void __cdecl ItemPostCreate(int32_t army, AM2_Point where)
 
             for (col = x0; col <= x1; col++) {
                 /* The grid pointer is re-read at every tile. */
-                ((uint8_t *const *)g_tileRevealGrids)[other]
+                g_tileRevealGrids[other]
                     [at & 0xFFFF]++;
                 at++;
             }

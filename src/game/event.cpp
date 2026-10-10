@@ -3604,7 +3604,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * They are not the same call and not the same direction. */
         CreateVehicle(act->n0, act->text, at.x, at.y,
                       kCommObject->CommArmyOfSlot(act->army),
-                      ((g_mpSession) != 0)
+                      (g_mpSession != 0)
                           ? kCommObject->CommSlotForArmy(act->army)
                           : act->army,
                       0, 0, 0, 0);

@@ -480,7 +480,7 @@ void __cdecl InitMenuScreen(void)
 {
     /* The same buffer ADDR_FLAME_RECORD names -- see orig.h. Two subsystems,
      * one 256 bytes, and neither is up while the other is. */
-    uint8_t       *digits  = (uint8_t *)g_flameRecord;
+    uint8_t       *digits  = g_flameRecord;
     uint8_t       *shades  = g_paletteGlyphs;
     AM2_Rect       r;
     int32_t        i, row, frame, rows;
@@ -1611,10 +1611,10 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
             GrowSpriteList();
 
         spr = (AM2_Sprite *)am2_malloc(0x40);
-        (g_spriteList)[g_spriteListN] = spr;
+        g_spriteList[g_spriteListN] = spr;
         /* Re-read from the list rather than reusing the pointer, as the
          * original does -- twice, once for each of the next two uses. */
-        spr = (g_spriteList)[g_spriteListN];
+        spr = g_spriteList[g_spriteListN];
         memset(spr, 0, 0x40);
 
         /* Each field has its own local, read in pairs and then stored. */
@@ -1853,7 +1853,7 @@ void __cdecl BuildRoachMask(void)
     /* No early return for zero directions: the loop's own test is the only
      * one, as the image has it. */
     for (facing = 0; facing < a->directions; facing++) {
-        AM2_Sprite *spr = (g_spriteList)[a->cells[(int32_t)a->frames * facing]
+        AM2_Sprite *spr = g_spriteList[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
         AM2_Point   found[AM2_MASK_POINTS];
         int32_t     count = 0;
@@ -1939,7 +1939,7 @@ void __cdecl BuildVehicleMask(int32_t kind)
         if (g_traceVeh)
             am2_log("vehicle mask direction: %d\n", dir);
 
-        spr = (g_spriteList)[a->cells[(int32_t)a->frames * dir].sprite];
+        spr = g_spriteList[a->cells[(int32_t)a->frames * dir].sprite];
 
         count = 0;
         /* Block centres, as BuildRoachMask. */
@@ -2300,7 +2300,7 @@ void __cdecl FreeSpriteRegistry(void)
         for (i = 0; i < g_spriteRegCount;
              i++) {
             AM2_Sprite *spr =
-                (g_spriteTable)[i];
+                g_spriteTable[i];
 
             if (!spr)
                 continue;
@@ -2308,7 +2308,7 @@ void __cdecl FreeSpriteRegistry(void)
             if (spr->refs > 1)
                 spr->refs = 1;
 
-            ReleaseSprite((g_spriteTable)[i]);
+            ReleaseSprite(g_spriteTable[i]);
         }
 
         am2_free(g_spriteTable);

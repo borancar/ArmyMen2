@@ -258,7 +258,7 @@ struct AM2_Edit;
 #define g_fixedStep              (*(int32_t *)(uintptr_t)ADDR_FIXED_STEP)  /* 0x00512598 */
 #define g_flameNextMs            (*(uint32_t *)(uintptr_t)ADDR_FLAME_NEXT_MS)  /* 0x004FCFA4 */
 #define g_flameOn                (*(int32_t *)(uintptr_t)ADDR_FLAME_ON)  /* 0x004FCFA0 */
-#define g_flameRecord            ((void *)(uintptr_t)ADDR_FLAME_RECORD)  /* 0x004FCDF8 */
+#define g_flameRecord            ((uint8_t *)(uintptr_t)ADDR_FLAME_RECORD)  /* 0x004FCDF8 */
 #define g_floatZero              (*(float *)(uintptr_t)ADDR_FLOAT_ZERO)  /* 0x0046F928 */
 #define g_focusedEdit            (*(struct AM2_Edit **)(uintptr_t)ADDR_FOCUSED_EDIT)  /* 0x0065A05C */
 #define g_fogOfWar               (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)  /* 0x00476FB0 */
@@ -659,7 +659,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_roachRevvel            (*(int32_t *)(uintptr_t)ADDR_ROACH_REVVEL)  /* 0x00487BBC */
 #define g_roachRowSpec           ((const struct AM2_RowSpec *)(uintptr_t)ADDR_ROACH_ROW_SPEC)  /* 0x00487BE8 */
 #define g_roachStartFrame        (*(int16_t *)(uintptr_t)ADDR_ROACH_START_FRAME)  /* 0x00487BFC */
-#define g_rowLutDoubles          ((void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)  /* 0x004F9EDC */
+#define g_rowLutDoubles          ((uint8_t *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)  /* 0x004F9EDC */
 #define g_rowPoolA               (*(AM2_RowPoolA *)(uintptr_t)ADDR_ROWPOOL_A_COUNT)  /* 0x00662938 */
 #define g_rowPoolB               (*(AM2_RowPoolB *)(uintptr_t)ADDR_ROWPOOL_B_COUNT)  /* 0x006640C8 */
 #define g_rulesChecksum          (*(uint32_t *)(uintptr_t)ADDR_RULES_CHECKSUM_VAL)  /* 0x00511CD4 */
@@ -814,7 +814,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_tileLineBuf            ((uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF)  /* 0x00523DE0 */
 #define g_tilemaskNeighbours     ((int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS)  /* 0x00554B84 */
 #define g_tileNeighbours         ((int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)  /* 0x00654BD8 */
-#define g_tileRevealGrids        ((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)  /* 0x00514ED8 */
+#define g_tileRevealGrids        ((uint8_t **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)  /* 0x00514ED8 */
 #define g_tileRing4              ((int32_t *)(uintptr_t)ADDR_TILE_RING4)  /* 0x00554B70 */
 #define g_tileRing8              ((int32_t *)(uintptr_t)ADDR_TILE_RING8)  /* 0x0053C480 */
 #define g_tilesetPalettes        ((uint8_t *)(uintptr_t)ADDR_TILESET_PALETTES)  /* 0x00503108 */

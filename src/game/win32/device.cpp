@@ -318,7 +318,7 @@ int32_t __cdecl InitInput(HWND hWnd)
     memset(g_keysBufferA, 0x100, 0);
     memset(g_keysBufferB, 0x100, 0);
     *(uint32_t *)&g_prevKeys = ((uintptr_t)g_keysBufferB);
-    memset((void *)g_keyPressed, 0x400, 0);
+    memset(g_keyPressed, 0x400, 0);
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif

@@ -1034,7 +1034,7 @@ void __cdecl AddLevelRecord(const AM2_Level *record)
     memcpy(&table[g_levelCount],
            record, AM2_LEVEL_RECORD_SIZE);
 
-    (g_levelCount)++;
+    g_levelCount++;
 }
 
 /* The `rules` / `rulemap` trio -- originals 0x0043EA30, 0x0043EAC0 and
@@ -1213,7 +1213,7 @@ void __cdecl AddNameRecord(const AM2_NameRec *record)
     memcpy(&table[g_nameTableCount],
            record, AM2_NAME_RECORD_SIZE);
 
-    (g_nameTableCount)++;
+    g_nameTableCount++;
 }
 
 /* AmmChecksum -- original 0x0042C350, one caller.
@@ -1369,9 +1369,9 @@ void __cdecl FreeMapLayers(void)
 #undef FREE_LAYER
 
     for (i = 0; i < AM2_REVEAL_ARMIES; i++) {
-        if ((g_tileRevealGrids)[i]) {
-            am2_free((g_tileRevealGrids)[i]);
-            (g_tileRevealGrids)[i] = 0;
+        if (g_tileRevealGrids[i]) {
+            am2_free(g_tileRevealGrids[i]);
+            g_tileRevealGrids[i] = 0;
         }
     }
 
@@ -1481,10 +1481,10 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
  * at all and are created only here. */
 /* Allocate and zero a layer the file did not supply; the size is re-read
  * for each of the two uses, as the original does. */
-#define DEFAULT_LAYER(slot)                     \
-    if (*(slot) == 0) {                         \
-        *(slot) = am2_malloc((g_mapTilesW * g_mapTilesH)); \
-        memset(*(slot), 0, (g_mapTilesW * g_mapTilesH)); \
+#define DEFAULT_LAYER(layer)                              \
+    if ((layer) == 0) {                                   \
+        *(void **)&(layer) = am2_malloc(g_mapTilesW * g_mapTilesH); \
+        memset((layer), 0, g_mapTilesW * g_mapTilesH);    \
     }
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
@@ -1499,8 +1499,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     int32_t   objCount = 0, nfields;
 
     SetGameDir(folder);
-    memset((g_mapBlock), 0, 0x1A0);
-    strcpy((g_mapBlock), folder);
+    memset(g_mapBlock, 0, 0x1A0);
+    strcpy(g_mapBlock, folder);
 
     sprintf(path, "%s.atl", base);
     if (LoadAtlFile(path) == 0) {
@@ -1551,12 +1551,12 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (size != 0xC) MISMATCH();
             orig_map_fread(hdr, 0xC, 1, f);
             consumed += 0xC;
-            (g_mapTilesW)      = hdr[0];
-            (g_mapExtentX)     = (g_mapTilesW) << 4;
-            (g_mapTilesH)      = hdr[1];
+            g_mapTilesW      = hdr[0];
+            g_mapExtentX     = g_mapTilesW << 4;
+            g_mapTilesH      = hdr[1];
             (*(int32_t *)&g_mapRowShift)    = Log2Mask(hdr[0]) & 0xFF;
-            (g_mapExtentY)     = (g_mapTilesH) << 4;
-            (g_mapExtentShift) = Log2Mask((g_mapExtentX)) & 0xFF;
+            g_mapExtentY     = g_mapTilesH << 4;
+            g_mapExtentShift = Log2Mask(g_mapExtentX) & 0xFF;
             if ((*(int32_t *)&g_mapRowShift) < 1) {
                 FreeMapLayers();
                 goto bad;
@@ -1566,23 +1566,23 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
              * inset rect has four field names here, so it is written over
              * them as a whole. */
             {
-                AM2_Rect r0 = RectMake(0, 0, (g_mapExtentX), (g_mapExtentY));
+                AM2_Rect r0 = RectMake(0, 0, g_mapExtentX, g_mapExtentY);
                 g_mapBounds = r0;
             }
             {
-                AM2_Rect r1 = RectMake(0x40, 0x40, (g_mapExtentX) - 0x40, (g_mapExtentY) - 0x40);
+                AM2_Rect r1 = RectMake(0x40, 0x40, g_mapExtentX - 0x40, g_mapExtentY - 0x40);
                 g_mapInset = r1;
             }
             *(uint32_t *)&g_listenerPos = MakePoint(0x10, 0x10);
             g_listenerPosPrev = g_listenerPos;
             {
-                AM2_Rect r2 = RectMake(1, 1, (g_viewTilesW) + 1, (g_viewTilesH) + 1);
+                AM2_Rect r2 = RectMake(1, 1, g_viewTilesW + 1, g_viewTilesH + 1);
                 g_visibleTiles = r2;
             }
 
             MapDescInit(g_objMapDesc,
-                        (g_mapExtentX), (g_mapExtentY));
-            MapDescInit(g_mapDesc, (g_mapExtentX), (g_mapExtentY));
+                        g_mapExtentX, g_mapExtentY);
+            MapDescInit(g_mapDesc, g_mapExtentX, g_mapExtentY);
             BuildTileDeltas();
             break;
         }
@@ -1668,7 +1668,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 break;
             /* Both refusals are FATAL and skip nothing, each with its own
              * line -- not the planes' "chunksize/targetsize different". */
-            if (w != (g_mapTilesW) || h != (g_mapTilesH)) {
+            if (w != g_mapTilesW || h != g_mapTilesH) {
                 am2_log("tile layer size different from map size\n");
                 goto bad;
             }
@@ -1733,7 +1733,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 /* v is not cleared: a field narrower than four bytes keeps
                  * the upper bytes of the one before, as the image has it. */
                 for (i = 0; i < nfields; i++) {
-                    orig_map_fread(&v, (g_mapFieldDescs)[i].size, 1, f);
+                    orig_map_fread(&v, g_mapFieldDescs[i].size, 1, f);
                     consumed += (int32_t)(g_mapFieldDescs)[i].size;
 
                     switch ((int32_t)(g_mapFieldDescs)[i].tag) {
@@ -1796,27 +1796,27 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     } while (consumed < (int32_t)formSize);
 
     /* Nine layers every consumer may assume exists. */
-    DEFAULT_LAYER((void * *)&g_cellWeights);
-    DEFAULT_LAYER((void * *)&g_tileAttrs);
-    DEFAULT_LAYER((void * *)&g_regionOfCell);
-    DEFAULT_LAYER((void * *)&g_mapPadbitLayer);
-    DEFAULT_LAYER((void * *)&g_mapPadLayer);
-    DEFAULT_LAYER((void * *)&g_tileKind);
-    DEFAULT_LAYER((void * *)&g_tileFlags);
+    DEFAULT_LAYER(g_cellWeights);
+    DEFAULT_LAYER(g_tileAttrs);
+    DEFAULT_LAYER(g_regionOfCell);
+    DEFAULT_LAYER(g_mapPadbitLayer);
+    DEFAULT_LAYER(g_mapPadLayer);
+    DEFAULT_LAYER(g_tileKind);
+    DEFAULT_LAYER(g_tileFlags);
     /* AND A LOOP, WHICH IS WHY ENUMERATING THE EXPLICIT BLOCKS MISSED THESE.
      * The original walks every pointer from ADDR_TILE_REVEAL_GRIDS up to
      * ADDR_TILE_COVER four bytes at a time -- the four per-army reveal grids
      * -- and fills each null one.  Leaving them null does not fault: it makes
      * SettlePointInRegion spiral for a passable tile it can never find. */
     {
-        void **slot = g_tileRevealGrids;
+        uint8_t **slot = g_tileRevealGrids;
 
         while ((intptr_t)slot < (intptr_t)&g_tileCover) {
-            DEFAULT_LAYER(slot);
+            DEFAULT_LAYER(*slot);
             slot++;
         }
     }
-    DEFAULT_LAYER((void * *)&g_tileCover);
+    DEFAULT_LAYER(g_tileCover);
 
     /* FOUR THINGS THE DEFAULTING IS FOLLOWED BY, and leaving them out is what
      * cost this function four attempts.  ADDR_LOAD_PENDING is a FLAG tested
@@ -1970,14 +1970,14 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     }
 
     orig_map_fclose(f);
-    SetGameDir((g_mapBlock));
+    SetGameDir(g_mapBlock);
     return 1;
 
 #undef MISMATCH
 bad:
     am2_log("Error in loadmap()\n");
     orig_map_fclose(f);
-    SetGameDir((g_mapBlock));
+    SetGameDir(g_mapBlock);
     return 0;
 #undef DEFAULT_LAYER
 }

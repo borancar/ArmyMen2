@@ -1566,7 +1566,7 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
     if (index < 0 || index > SOUND_DYNAMIC_MAX_INDEX)
         return;
 
-    rec = (g_dynamic)[index];
+    rec = g_dynamic[index];
     if (!rec)
         return;
 

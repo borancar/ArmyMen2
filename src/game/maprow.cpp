@@ -517,7 +517,7 @@ extern "C" __declspec(dllimport) int32_t __stdcall IntersectRect(
 typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
                                                  const void *b);
 #define orig_intersect_rect \
-    (g_iatIntersectRect)
+    g_iatIntersectRect
 #endif
 
 static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
@@ -809,14 +809,14 @@ found:
     row->cell        = 0;
     row->frame       = frame;
     row->animPlaying = t->entries[i].anim;
-    row->headingBias = (g_frameHeadingBias)[frame];
+    row->headingBias = g_frameHeadingBias[frame];
     row->animNextId  = (int16_t)t->entries[i].next;
 
     heading = (uint8_t)(row->heading + row->headingBias);
 
     dir = RoundTo8(heading, row->animPlaying->directionBits);
     RowSetSprite(row,
-                 (AM2_Sprite *)((g_spriteList)
+                 (AM2_Sprite *)(g_spriteList
                      [row->animPlaying->cells[dir * row->animPlaying->frames
                                               + row->cell].sprite]),
                  g_mapDesc);
@@ -1566,7 +1566,7 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind)
     uint32_t mask;
 
     if (g_mpSession != 0
-        && (mask = (g_respawnKindMask)[kind]) != 0
+        && (mask = g_respawnKindMask[kind]) != 0
         && (g_gameOverFlags & mask) == 0)
         return 0;
     return 1;
@@ -1619,7 +1619,7 @@ void __cdecl BuildRespawnPool(int32_t seed)
     for (kind = 0; kind < AM2_MISSILE_DEF_COUNT; kind++)
         if (RespawnKindAllowed(kind))
             for (n = 0; n < g_missileDefs[kind].weight; n++)
-                (g_respawnKinds)[at++] = kind;
+                g_respawnKinds[at++] = kind;
 }
 
 /* 0x004601D0. Pick a respawn kind at random.
@@ -1641,7 +1641,7 @@ int32_t __cdecl RandomRespawnKind(int32_t *out)
 {
     int32_t r = orig_game_rand()
                 % g_respawnKindCount;
-    int32_t kind = (g_respawnKinds)[r];
+    int32_t kind = g_respawnKinds[r];
 
     *out = g_missileDefs[kind].field30;
     return kind;
@@ -2359,7 +2359,7 @@ int32_t __cdecl TimedDirFrame(AM2_MapRow *rows, uint8_t dir)
         col = elapsed;
 
     r->sprite =
-        (g_spriteGrid)
+        g_spriteGrid
             [(RoundTo8(dir, 3) & 0xFF) * g_spriteGridCols + col];
 
     return col < g_spriteGridCols - 1;

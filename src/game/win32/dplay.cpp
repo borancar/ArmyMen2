@@ -3004,7 +3004,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
         msg->recs[i].team        = comm->slots[i].team;
         msg->recs[i].readyToLoad = comm->slots[i].readyToLoad;
         msg->recs[i].zero        = 0;
-        msg->recs[i].setting     = (g_armyPoints)[i];
+        msg->recs[i].setting     = g_armyPoints[i];
         msg->recs[i].wasHere     = comm->slots[i].wasHere;
 
         strcpy(msg->recs[i].name, comm->slots[i].name);

@@ -851,7 +851,7 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
         *(const int32_t *)&g_gameClockMs;
 
     BuildRowsFromDef(&obj->rowSet,
-                     (g_recordLists)
+                     g_recordLists
                          [rec->listSlot],
                      (int32_t)at.x,
                      (int32_t)at.y,
@@ -1268,7 +1268,7 @@ int32_t __cdecl ApplyObjFrame(AM2_Object *obj, int32_t set, int32_t index,
     sub = (uint8_t *)&o->rowSet;
     FreeSubrecordRows((AM2_RowSet *)sub);
     BuildRowsFromDef((AM2_RowSet *)sub,
-                     (g_recordLists)[slot],
+                     g_recordLists[slot],
                      (int32_t)o->pos.x,
                      (int32_t)o->pos.y,
                      o->flags);

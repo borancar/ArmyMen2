@@ -748,7 +748,7 @@ void __cdecl FreeAaiTables(void)
         for (i = 0; i < g_recordListCount;
              i++)
             FreeRecordList(
-                (g_recordLists)[i]);
+                g_recordLists[i]);
 
         am2_free(g_recordLists);
         g_recordLists         = (AM2_RecordList **)0;
@@ -764,7 +764,7 @@ void __cdecl FreeAaiTables(void)
     if (g_keyTableN) {
         for (i = 0; i < g_keyTableN; i++)
             FreeIfNotNull(
-                (g_aaiRecords)[i]);
+                g_aaiRecords[i]);
 
         am2_free(g_aaiRecords);
         g_aaiRecords       = (AM2_AaiRec **)0;

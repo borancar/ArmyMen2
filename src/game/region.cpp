@@ -359,7 +359,7 @@ int32_t __cdecl PointRuleVehicle(int32_t tile)
     const uint16_t t    = (uint16_t)tile;
     int32_t        army;
 
-    if ((g_cellWeights)[t]
+    if (g_cellWeights[t]
         >= (int8_t)AM2_BLOCK_FULL)
         return 1;
 
@@ -381,7 +381,7 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
     const uint16_t t    = (uint16_t)tile;
     int32_t        army;
 
-    if (!((g_tileFlags)[t]
+    if (!(g_tileFlags[t]
           & AM2_TILE_OPEN))
         return 1;
 
@@ -558,7 +558,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
        write the stamp byte into the cost entry as the last thing they do. The
        inverted version re-solved every solved pair and skipped every unsolved
        one; see ActivateRegion for why nothing here caught it. */
-    if ((g_regionCost)
+    if (g_regionCost
             [stride * from + to]
         == g_regionStamp) {
         /* already solved */
@@ -664,7 +664,7 @@ void __cdecl ActivateRegion(int32_t region)
         return;
 
     *rec = 1;
-    (g_regionStamp)++;
+    g_regionStamp++;
 }
 
 void __cdecl InactivateRegion(int32_t region)
@@ -680,7 +680,7 @@ void __cdecl InactivateRegion(int32_t region)
         return;
 
     *rec = 0;
-    (g_regionStamp)++;
+    g_regionStamp++;
 }
 
 typedef int32_t (__cdecl *AM2_PointRuleFn)(uint16_t tile);
@@ -743,8 +743,8 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, AM2_Point *pt)
         tried = 0;
 
         for (;;) {
-            x += (g_spiralDx)[dir];
-            y += (g_spiralDy)[dir];
+            x += g_spiralDx[dir];
+            y += g_spiralDy[dir];
 
             if (x > 0 && x < g_mapTilesW && y > 0 && y < g_mapTilesH) {
                 int32_t cand = (y << (*(const int32_t *)&g_mapRowShift)) + x;
@@ -860,8 +860,8 @@ uint16_t __cdecl NearestAllowedTile(AM2_Object *obj, uint32_t tile, AM2_Point *p
         tried = 0;
 
         for (;;) {
-            x += (g_spiralDx)[dir];
-            y += (g_spiralDy)[dir];
+            x += g_spiralDx[dir];
+            y += g_spiralDy[dir];
 
             if (x > 0 && x < g_mapTilesW && y > 0 && y < g_mapTilesH) {
                 int32_t cand = (y << (*(const int32_t *)&g_mapRowShift)) + x;
@@ -1034,7 +1034,7 @@ int32_t __cdecl AnimStepPoint(AM2_Object *obj, uint8_t heading, int32_t pose,
     AM2_Object   *o    = obj;
     AM2_Point *out  = outPt;
     int32_t    animId =
-        (g_weaponPoseFrames)[pose];
+        g_weaponPoseFrames[pose];
     AM2_MapRow *rows = o->rowSet.rows;
     const AM2_AnimTable *table;
     int32_t              i;
@@ -1075,7 +1075,7 @@ found:
         speed += speed;
 
     /* The bias is a byte local, pushed as the byte argument it is. */
-    bias = (g_frameHeadingBias)[animId];
+    bias = g_frameHeadingBias[animId];
     return MoveStepPoint(obj, heading, bias, speed, 0, 0, out);
 }
 
@@ -1317,7 +1317,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
                           | (uint16_t)((uint32_t)g + g_pathNodes[curTile].g));
             {
-                uint8_t f = (g_tileFlags)[t];
+                uint8_t f = g_tileFlags[t];
                 if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
                     g += 3;
                 if (!(f & AM2_TILE_LITTLE_COVER_NEAR))
@@ -1556,7 +1556,7 @@ int32_t __cdecl BeginMoveTo(AM2_Object *o, AM2_Point *to)
 
     for (i = 0; i < count; i++) {
         if ((*(AM2_PointRuleFn *)&g_pointRule)(
-                (g_tileLineBuf)[i]))
+                g_tileLineBuf[i]))
             return 0;                   /* the rule refused this tile */
     }
 
@@ -1629,7 +1629,7 @@ void __cdecl TileCoverAdd(uint16_t tile)
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
         g_tileCover[(int32_t)tile
-              + (g_tileNeighbours)[i]]++;
+              + g_tileNeighbours[i]]++;
 }
 
 /* TileCoverSub -- original 0x00438520, two callers, and TileCoverAdd with
@@ -1657,7 +1657,7 @@ void __cdecl TileCoverSub(uint16_t tile)
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
         g_tileCover[(int32_t)tile
-              + (g_tileNeighbours)[i]]--;
+              + g_tileNeighbours[i]]--;
 }
 
 /* MarkOpenTile -- original 0x0043A4F0, one caller.
@@ -1710,10 +1710,10 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     }
 
     if (weighted < 1)
-        (g_tileFlags)[tile]
+        g_tileFlags[tile]
             |= AM2_TILE_NO_WEIGHT_NEAR;
     if (covered < 2)
-        (g_tileFlags)[tile]
+        g_tileFlags[tile]
             |= AM2_TILE_LITTLE_COVER_NEAR;
 
     return 0;
@@ -2594,7 +2594,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     const AM2_RecordList *h = hdr;
     AM2_Rect       *box   = &out->box;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                (g_bitFromN);
+                                g_bitFromN;
     const AM2_ObjMask *m;
     const uint8_t  *bits;
     const AM2_Sprite *spr;
@@ -5122,7 +5122,7 @@ void __cdecl AiStep(AM2_Object *o, AM2_SteerOut *out)
     default: AiStepTrack(o, out, &ctx);  break;
     }
 
-    o->region = (g_regionOfCell)[o->tile];
+    o->region = g_regionOfCell[o->tile];
 }
 
 typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
@@ -5370,7 +5370,7 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
             int32_t slot = c->klass * 2
                            + (c->seed >= 0x80 ? 1 : 0);
 
-            out->state = (g_hitPoseByClass)[slot];
+            out->state = g_hitPoseByClass[slot];
         } else if ((int32_t)c->seed < limit) {
             out->state = AM2_POSE_HIT_HEAVY;
         }
@@ -5876,7 +5876,7 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
                     int32_t cols = x1 - x0 + 1;
 
                     do {
-                        ((uint8_t * *)g_tileRevealGrids)[slot]
+                        g_tileRevealGrids[slot]
                             [(uint32_t)at_i & 0xFFFFu]--;
                         at_i++;
                     } while (--cols);
@@ -7175,8 +7175,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
                 ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
 
     if (RowAnimField4(o->rowSet.rows,
-                      (uint16_t)*(const int16_t *)((const uint8_t *)g_weaponPoseFrames
-                               + (uint32_t)out->state * 4)) <= 0)
+                      (uint16_t)*(const int16_t *)&g_weaponPoseFrames[out->state]) <= 0)
         return;
 
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
@@ -7191,7 +7190,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
         return;
 
     for (i = 0; i < g_selectedCount; i++) {
-        AM2_Object *other = LookupByUID((g_selectedItems)[i]);
+        AM2_Object *other = LookupByUID(g_selectedItems[i]);
 
         if (!other || other == o)
             continue;
@@ -9511,7 +9510,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
      * tail. Kept separate rather than ANDed: equivalent today, and the order
      * is what the image states. */
     for (i = 0; i < g_selectedCount; i++) {
-        AM2_Object *other = LookupByUID((g_selectedItems)[i]);
+        AM2_Object *other = LookupByUID(g_selectedItems[i]);
 
         if (other == 0)
             continue;

@@ -1203,7 +1203,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
         ink = g_objTableRecords
               + ((uint32_t)((AM2_Comm *)g_armyTable)->CommArmyOfSlot((int32_t)g_defaultOwner) << 8);
     } else {
-        ink = (uint8_t *)g_flameRecord;
+        ink = g_flameRecord;
         g_menuInk           = ink;
         g_menuOverlayAInk = ink;
     }
