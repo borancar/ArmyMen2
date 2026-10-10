@@ -1057,7 +1057,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             result = EncodeBig(pixels, dest, dest->width, dest->height, remap);
             dest->flags |= 4;
         }
-        return result;
+        goto done;
     }
 
     {

@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1572 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1573 of
   1646 byte-identical (2026-10-10), piecewise 399.** RecvThreadProc
   (0x00401F00) is in the manifest now, beside the other OS callbacks
   (bytematch.REGISTERED_FNS): it was reconstructed but never patched, so the
