@@ -797,8 +797,8 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
     if (count <= 0)
         return took;
 
-    for (i = 0; i < count; i++) {
-        AM2_ScenRow   *row = &rows[i];
+    for (i = 0; i < count; i++, rows++) {
+        AM2_ScenRow   *row = rows;
         const uint8_t *q;
         int8_t         len;
 
