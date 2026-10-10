@@ -2807,10 +2807,13 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                     ctx->tokens[*at].line);
             goto fail;
         }
-        if (++(*at) < ctx->count)
-            goto then_word;
-        am2_log("Unexpected end of script.\n");
-        return 0;
+        /* Then on to the testvar clause like every other form: the image
+         * jumps to the TESTVAR test (0x004438D2), not to `then`, so
+         * `timeabsolute N testvar ...` is accepted. This skipped it. */
+        if (++(*at) >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
 
     } else if (ScriptScanFor(ctx, *at, AM2_TOK_AFTER, AM2_TOK_THEN)) {
         /* An `<event> after <event>` chain. */
@@ -2890,10 +2893,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, na, nb, nc);
-            if (*at >= ctx->count) {
-                am2_log("Unexpected end of script.\n");
-                return 0;
-            }
+            if (*at >= ctx->count)
+                goto end_of_script;
         }
 
     } else if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
