@@ -364,6 +364,14 @@ paid off on 2026-10-10, often with bytes following:
   register, and `or byte [c], 3` when it lives in memory, as in
   ObjHitMaskAction's image. That one is the allocator's, not the shape's.
 
+Store order is cheap to search mechanically. Swapping each pair of adjacent
+single-line assignments that do not read each other's target, scoring the
+register-masked shape and keeping the winners, then running again until
+nothing moves, took eleven functions closer in two passes (UpdateTrooperAction
+109 -> 101, ListMaskAction 49 -> 44, AiTrooperStep 56 -> 52). Check each winner
+by hand for a dependency the filter missed: the first, unfiltered pass
+proposed swapping `delta = AngleDelta(...)` with `delta = abs(delta)`.
+
 ## Declarations ahead of a function can turn its ties
 
 A type declared earlier in the translation unit can change a function that

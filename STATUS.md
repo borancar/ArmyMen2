@@ -103,7 +103,14 @@ main result so far (details in `src/vc6/README.md`):
   insertion walk a for loop), DrawSelection 23 -> 13 (box stores in the
   image's order), HudPostUpdate 12 -> 8, VehicleUpdateAppend 19 -> 13 (an
   else-if with two copies of the or), Step3Drive 110 -> 108,
-  CollapseEqualDeltas 6 -> 4, OptionsDefaults 2 -> 0. The rest of the top of the list is register priority: FindPath
+  CollapseEqualDeltas 6 -> 4, OptionsDefaults 2 -> 0. Then a sweep that swaps each
+  pair of adjacent independent single-line assignments and keeps the ones the
+  shape prefers, run to a fixed point: UpdateTrooperAction 109 -> 101,
+  ListMaskAction 49 -> 44, Step3Drive 108 -> 105, AiTrooperStep 56 -> 52,
+  FindPath 95 -> 93, ObjHitMaskAction 59 -> 57, ParseScenarioPart 17 -> 15,
+  RowUpdate 23 -> 21, DrawMapObjects 11 -> 9, ViewUpdate 9 -> 7,
+  ScrollMapCache 15 -> 14. Sweeps that flip ternaries or split `||` into
+  else-if found nothing further. The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
