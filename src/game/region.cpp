@@ -4969,6 +4969,9 @@ in_sight:
             DistAndAngle(&o->pos,
                          &it->pos,
                          &candRange, &candBearing);
+            /* Asked again here, as the image does (0x004041B0). */
+            if (!it)
+                continue;
             if (!RegionsNear(it, o, solve)) {
                 solve = 0;
                 continue;
