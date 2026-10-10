@@ -83,7 +83,17 @@ main result so far (details in `src/vc6/README.md`):
   on +6 against +0, unmoved by indexing, pointer walks or store order),
   DepthResort, BoxAction, RowUpdate (the image re-reads rect.top after
   storing it), PlacementAllowed (its final compare and `return 0` blocks
-  swap places; every spelling compiles the same). The rest of the top of the list is register priority: FindPath
+  swap places; every spelling compiles the same).
+  Shape-first pass (2026-10-10, Boran: "ignore register differences if
+  the shape is the same"): ranked by a register-masked diff
+  ($T/shape.py, reg-reg moves and spills dropped), total 1884 -> about
+  1760. FindPath 1358 -> 1162 (top-tested loop, stamp arms, uint16 g,
+  front insert through `from`), ViewUpdate 186 -> 90 (store order, eye y
+  from the clamp), DrawEffectLayer 616 -> 584 (indexed A point moves the
+  anchor), ScrollMapCache 252 -> 236, SightScan 1048 -> 1028,
+  UpdateTrooperAction 952 -> 934; AiTrooperStep, DepthResort, Step3Drive and
+  DrawMapObjects took the image's shape at a small byte cost from moved
+  registers (see docs/vc6-regalloc.md, "Shape first, then registers"). The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
