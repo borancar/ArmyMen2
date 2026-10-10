@@ -1331,13 +1331,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
             if (g_pathNodes[t].stamp == g_pathGeneration) {
                 /* Seen: improve it if it is open and cheaper now. */
-                if (g_pathNodes[t].state & 1) {
+                if (g_pathNodes[(curTile + g_tileStep8[i]) & 0xFFFF].state & 1) {
                     if ((uint16_t)g >= g_pathNodes[t].g)
                         continue;   /* already there by a cheaper route */
 
                     g_pathNodes[t].parent = (uint16_t)cur;
                     g_pathNodes[t].g      = (uint16_t)g;
-                    g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
+                    g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[cur & 0xFFFF].depth + 1);
 
                     /* Unlink so the improved node can be re-inserted in order.
                      * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
@@ -1348,7 +1348,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                         from = 0;
                     if (g_pathNodes[t].next > 0)
                         g_pathNodes[g_pathNodes[t].next].prev = g_pathNodes[t].prev;
-                } else if (g_pathNodes[t].state & 2) {
+                } else if (g_pathNodes[(curTile + g_tileStep8[i]) & 0xFFFF].state & 2) {
                     /* Closed: done with. */
                     continue;
                 }
@@ -2094,7 +2094,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
     rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
-    rowbytes = rowbits >> 3;
+    rowbytes = ((world.right - world.left) + 31 - ((world.right - world.left + 31) % 32)) >> 3;
     if (rowbits == 0)
         return 0;
 
@@ -3292,7 +3292,9 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
     if (BeginMoveTo(ob, &pt)) {
         pt            = *dest;
         ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
-        ob->moveFrom  = *pos;
+        /* The copies re-address the object rather than going through
+         * `pos`/`dest`: the image recomputes the field address at each one. */
+        ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
         ob->routeGoal = pt;
         ob->moveEnd   = 0;
@@ -3371,15 +3373,15 @@ after_region:
         if (BeginMoveTo(ob, &pt)) {
             ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
             /* The goal it was ASKED for, not the point it is walking to. */
-            ob->routeGoal = *dest;
-            ob->moveFrom  = *pos;
+            ob->routeGoal = *(&ob->dest);
+            ob->moveFrom  = *(&ob->pos);
             goto set_move_to;
         }
 
         ob->routeGoal = pt;
         if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
-            ob->routeGoal = *dest;
-            ob->moveFrom  = *pos;
+            ob->routeGoal = *(&ob->dest);
+            ob->moveFrom  = *(&ob->pos);
             goto set_move_to;
         }
         /* A route was found; PlanPathTo filled the waypoints itself. */
@@ -3387,7 +3389,7 @@ after_region:
         goto walk;
     } else {
         ob->routeGoal = pt;
-        ob->moveFrom  = *pos;
+        ob->moveFrom  = *(&ob->pos);
     }
 set_move_to:
     ob->moveTo = pt;
@@ -4873,7 +4875,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 dx = (int32_t)it->pos.x
                      - (int32_t)o->pos.x;
                 highest     = AM2_AI_SIGHT_FLOOR;
-                candRange   = ApproxDistXY(dx, dy);
+                candRange   = ApproxDistXY((int32_t)it->pos.x
+                                           - (int32_t)o->pos.x, dy);
                 candBearing = AI_ANGLE3(dx, dy, candRange);
 
                 if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
@@ -7690,7 +7693,6 @@ sweep:
         else
             tries = AM2_STEP_SWEEP_OTHER;
         {
-            const int32_t *step = g_stepFacingSweep;
             /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
              * 0x0044B174 -- and stops when the count reaches the limit, so the
              * limit is one more than the headings tried: three for the player's
@@ -7698,7 +7700,7 @@ sweep:
              * SAVED pose from ObjNextKind538 (slot +0x2c), not the state. */
             i = 1;
 
-            while (facing = (uint8_t)(facing + (uint8_t)*step),
+            while (facing = (uint8_t)(facing + (uint8_t)g_stepFacingSweep[i - 1]),
                    AnimStepPoint(o, facing, pose, &stepPoint, 0),
                    (at = ObjectsAtPoint(&stepPoint, g_objMapDesc)),
                    BlockWeightRoute(o, stepPoint, at, &inside)
@@ -7716,7 +7718,6 @@ sweep:
                         }
                 }
                 i++;
-                step++;
                 if (i >= tries)
                     break;
             }
@@ -7952,17 +7953,11 @@ pose:
          * Boot Camp's hut. */
         int32_t v;
 
-        if (o->field44) {
-            ObjMoveAlongFacing(o, speed, 0, 0);
-        } else {
-            int8_t h = o->heightSet;
-
-            if ((uint8_t)h != g_tileAttrs[o->tile])
-                v = h;
-            else
-                v = speed;
-            ObjMoveAlongFacing(o, v, 0, 0);
-        }
+        if (!o->field44 && (uint8_t)o->heightSet != g_tileAttrs[o->tile])
+            v = (int8_t)o->heightSet;
+        else
+            v = speed;
+        ObjMoveAlongFacing(o, v, 0, 0);
     }
 
     o->heightAdj = (int8_t)g_trooperClassValue[klass];
@@ -9652,8 +9647,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
         turn = AngleDelta(o->facing, r->heading);
         turn = Clamp(turn, -8, 8);
 
-        animRec = &gun->animPlaying;
-        first  = RoundTo8((gun->headingBias + gun->heading) & 0xFF,
+        /* The row is re-read for its animation and bias; only the heading
+         * comes through `gun`. */
+        animRec = &o->rowSet.rows->animPlaying;
+        first  = RoundTo8((o->rowSet.rows->headingBias + gun->heading) & 0xFF,
                           (*animRec)->directionBits);
         second = RoundTo8((gun->headingBias + turn
                            + gun->heading) & 0xFF,
@@ -9797,12 +9794,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             swing = Clamp(swing, turn - 0x0F, turn + 0x0F);
 
             animRec = &turret->animPlaying;
-            {
-                int32_t dirBits = (*animRec)->directionBits;
-
-                first  = RoundTo8((turret->headingBias + turret->heading) & 0xFF,
-                                  dirBits);
-            }
+            first  = RoundTo8((turret->headingBias + turret->heading) & 0xFF,
+                              (*animRec)->directionBits);
             second = RoundTo8((turret->headingBias + swing
                                + turret->heading) & 0xFF,
                               (*animRec)->directionBits);

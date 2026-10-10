@@ -73,7 +73,17 @@ main result so far (details in `src/vc6/README.md`):
   malloc(...)`. Also: FindPath 82 -> 60 (the budget test's refusal
   written in its own arm), SightScan 78 -> 66 (the kind-7 arm scores in
   place, `score:` at the loop end), ScriptParseActionRecon 243 -> 234
-  (DROPITEM jumps into 0x1F's count test). PlacementAllowed
+  (DROPITEM jumps into 0x1F's count test). Sixth round (2026-10-11): ScriptIf
+  had a behaviour bug the relink exposed -- `timeabsolute N` jumped past
+  the testvar clause the original then parses; fixed (bytes 8 -> 12 after
+  re-shaping). RegionFindPath 11 -> 4 (the row shift as a uint16 cast),
+  Step3Drive 83 -> 61 (two nested AngleDelta calls computed before their
+  Clamp, the gun row taken after the turn-state call, copies re-read),
+  SightScan 66 -> 52 (its sight test opens as AM2_AI_SIGHT_TEST does,
+  AngleOfDelta getting the unread distance argument), MpPanelScreen 27 ->
+  23 (the row loop on the army-points pointer, colour reset first),
+  UpdateTrooperAction 99 -> 90 (one move call with the value chosen
+  first), FindPath 60 -> 56, ObjHitMaskAction 54 -> 51. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

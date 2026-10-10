@@ -364,6 +364,18 @@ changes nothing or is worse. The first site still keeps its own copy.
   outright (40 -> 0 bytes each) and the fourth comes to 2. Locals alone, or
   the indexing alone, changed nothing.
 
+- **A call nested as an argument is evaluated after the outer call's later
+  arguments are pushed.** `turn = Clamp(AngleDelta(a, b), -8, 8)` pushes 8
+  and -8, then calls AngleDelta; the image calls AngleDelta first and pushes
+  the constants afterwards, which is `turn = AngleDelta(a, b); turn =
+  Clamp(turn, -8, 8);` (Step3Drive, twice: shape 83 -> 67). A sweep that
+  hoisted every nested call into an `int32_t` temporary found nothing else.
+- **An unread argument still shows in the caller.** Every image caller of
+  AngleOfDelta pushes the distance it has just computed as a third
+  argument the callee never reads. SightScan called it with two and so
+  pushed one dword less, which moved every later stack offset and cleanup.
+  `AI_ANGLE3` (region.cpp) and `AngleOfDelta3` (air.cpp) pass the third.
+
 ## `for (;;)` and `while (1)` are different loops to VC6
 
 The two compile differently (2026-10-10). VC6 rotates `for (;;) { if (c)
