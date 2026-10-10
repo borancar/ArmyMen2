@@ -1818,9 +1818,10 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
     {
         uint32_t age = seq - obj->vSentIntFacingSeq;
 
-        if ((age >= interval && obj->ctl.heading != obj->vSentIntFacing)
-            || (age >= g_commObject->enoughChangeLimit
-                && (((uint32_t)obj->vSentIntFacing ^ (uint32_t)obj->ctl.heading) & 0xFFFFFFF0u)))
+        if (age >= interval && obj->ctl.heading != obj->vSentIntFacing)
+            flags |= 0x20000000u;
+        else if (age >= g_commObject->enoughChangeLimit
+                 && (((uint32_t)obj->vSentIntFacing ^ (uint32_t)obj->ctl.heading) & 0xFFFFFFF0u))
             flags |= 0x20000000u;
     }
 

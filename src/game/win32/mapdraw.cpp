@@ -798,17 +798,20 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         AT_FRONT(at);               /* off the front */
     }
 
-    while (g_depthCursor->next) {
+    /* The run-out arm inside the walk and the stop a `break`: written as a
+     * `while` with `goto before`, the shared tail was laid out after the
+     * append arm, where the image keeps it last. */
+    for (;;) {
+        if (!g_depthCursor->next) {
+            at = g_depthCursor;
+        append:
+            APPEND(at);
+            goto done;
+        }
         g_depthCursor = g_depthCursor->next;
         if (DepthCompare(obj, g_depthCursor->obj) <= 0)
-            goto before;
+            break;
     }
-    at = g_depthCursor;
-append:
-    APPEND(at);
-    goto done;
-
-before:
     at = g_depthCursor;
 link_before:
     LINK_BEFORE(at);
