@@ -1271,7 +1271,11 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     goalTile   = goal & 0xFFFF;
     goalRegion = g_regionOfCell[goalTile];
 
-    while ((uint16_t)from) {
+    /* Top-tested with a jump back, as the image has it: `while (from)`
+     * rotates into an entry test plus a bottom test. */
+    while (1) {
+        if (!(uint16_t)from)
+            break;
         cur     = from;
         curTile = cur & 0xFFFF;
 
@@ -1297,7 +1301,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
             int32_t  nb = curTile + g_tileStep8[i];
             uint32_t t;
-            int32_t  g, h, prev, next, fNew;
+            uint16_t g;
+            int32_t  h, prev, next, fNew;
             uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
@@ -1310,12 +1315,11 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 continue;
 
             /* Twice the step, plus a penalty for each flag the tile LACKS.
-             * The accumulation into `g` is sixteen bits wide and the penalties
-             * are not -- the original does `add di, [g]` and then `add edi,3`
-             * on the full register. */
-            g = PathDistXY(curTile, t) * 2;
-            g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
-                          | (uint16_t)((uint32_t)g + g_pathNodes[curTile].g));
+             * `g` is sixteen bits: the image adds the parent's G as a word
+             * (`add di, [g]`) and the penalties to the full register, which is
+             * what VC6 does for a uint16_t. */
+            g = (uint16_t)(PathDistXY(curTile, t) * 2);
+            g += g_pathNodes[curTile].g;
             {
                 uint8_t f = g_tileFlags[t];
                 if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
@@ -1325,40 +1329,40 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             }
             h = PathHeuristic(t, goalTile);
 
-            if (g_pathNodes[t].stamp != g_pathGeneration) {
-                /* Never seen this search: claim it and fall through to the
-                 * insert with the current head. */
+            if (g_pathNodes[t].stamp == g_pathGeneration) {
+                /* Seen: improve it if it is open and cheaper now. */
+                if (g_pathNodes[t].state & 1) {
+                    if ((uint16_t)g >= g_pathNodes[t].g)
+                        continue;   /* already there by a cheaper route */
+
+                    g_pathNodes[t].parent = (uint16_t)cur;
+                    g_pathNodes[t].g      = (uint16_t)g;
+                    g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
+
+                    /* Unlink so the improved node can be re-inserted in order.
+                     * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
+                     * than the successor. Reproduced -- see the header. */
+                    next = g_pathNodes[t].next;
+                    prev = g_pathNodes[t].prev;
+                    if (prev)
+                        g_pathNodes[prev].next = (uint16_t)next;
+                    else
+                        from = 0;
+                    if (next)
+                        g_pathNodes[next].prev = (uint16_t)prev;
+                } else if (g_pathNodes[t].state & 2) {
+                    /* Closed: done with. */
+                    continue;
+                }
+            } else {
+                /* Never seen this search: claim it, then insert it with the
+                 * current head. The image lays this arm out last. */
                 g_pathNodes[t].stamp  = g_pathGeneration;
                 g_pathNodes[t].g      = (uint16_t)g;
                 g_pathNodes[t].h      = (uint16_t)h;
                 g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
                 g_pathNodes[t].parent = (uint16_t)cur;
                 g_pathNodes[t].state  = 1;
-            } else if (!(g_pathNodes[t].state & 1)) {
-                /* Seen, and not open. Closed nodes are done with; anything
-                 * else falls through to the insert, which cannot happen while
-                 * STATE only ever holds 1 or 2. */
-                if (g_pathNodes[t].state & 2)
-                    continue;
-            } else {
-                if ((uint16_t)g >= g_pathNodes[t].g)
-                    continue;   /* already there by a cheaper route */
-
-                g_pathNodes[t].parent = (uint16_t)cur;
-                g_pathNodes[t].g      = (uint16_t)g;
-                g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
-
-                /* Unlink so the improved node can be re-inserted in order.
-                 * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
-                 * than the successor. Reproduced -- see the header. */
-                next = g_pathNodes[t].next;
-                prev = g_pathNodes[t].prev;
-                if (prev)
-                    g_pathNodes[prev].next = (uint16_t)next;
-                else
-                    from = 0;
-                if (next)
-                    g_pathNodes[next].prev = (uint16_t)prev;
             }
 
             /* Insert, sorted by g+h ascending. */
@@ -1392,7 +1396,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 /* Cheapest so far: in front of the head. */
                 g_pathNodes[t].next = from;
                 g_pathNodes[t].prev = 0;
-                g_pathNodes[g_pathNodes[t].next & 0xFFFF].prev = (uint16_t)t;
+                g_pathNodes[from & 0xFFFF].prev = (uint16_t)t;
                 from = (uint16_t)t;
             } else {
                 uint16_t after = g_pathNodes[before & 0xFFFF].next;
