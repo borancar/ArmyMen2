@@ -1283,7 +1283,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         from = g_pathNodes[cur & 0xFFFF].next;
         if (0 < (uint16_t)from)
             g_pathNodes[from & 0xFFFF].prev = 0;
-        g_pathNodes[curTile].state = 2;
+        g_pathNodes[cur & 0xFFFF].state = 2;
 
         if (considered > g_pathMaxNodes)
             goto budget;
@@ -1305,7 +1305,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             int32_t  h;
             uint16_t walk, before;
 
-            if (nb <= 0 || nb >= AM2_PATH_TILES)
+            if (curTile + g_tileStep8[i] <= 0 || nb >= AM2_PATH_TILES)
                 continue;
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
