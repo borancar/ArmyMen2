@@ -9663,7 +9663,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             else
                 target = o->dest;
 
-            noTarget = ((uint16_t)target.x <= 0);
+            noTarget = ((uint16_t)target.x == 0);
 
             if (!noTarget
                 && ApproxDist(&target,
