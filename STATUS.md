@@ -83,7 +83,10 @@ main result so far (details in `src/vc6/README.md`):
   was placed off the previous unit's slot; the image reads it once, before
   the loop. Bytes are unchanged there, because the load only moved. A big diff
   is worth reading for a missing store or a moved loop head before treating it
-  as register noise. Five of the last six came from
+  as register noise. All 78 misses were then screened with an order-free diff
+  (normalised instructions, registers and frame offsets abstracted; what does
+  not cancel is a real difference). Every remaining entry traced to merged or
+  duplicated tails, register choice or scheduling, not to behaviour. Five of the last six came from
   writing code the compiler MERGES as separate source. FormationPoint and
   FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
   writes its stop/approach pair once per distance band instead of jumping to
