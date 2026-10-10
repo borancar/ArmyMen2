@@ -3310,72 +3310,71 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         (void)TileRegionOrBorrow((uint16_t)fromTile);
     if (!toRegion)
         (void)TileRegionOrBorrow((uint16_t)toTile);
-    if (!fromRegion)
-        goto no_region;
-    if (!toRegion)
-        goto no_region;
-
-    /* The region hop, skipped when we are already routing to this goal from
-     * the region we were last in, and when both ends are in one region. */
-    if ((PointsEqual(ob->routeGoal, pt) && ob->prevRegion == fromRegion)
-        || toRegion == fromRegion)
-        goto after_region;
-
-    {
-        int16_t link;
-
-        if (g_regionCost[(uint32_t)(fromRegion * g_regionStride + toRegion)]
-            != g_regionStamp)
-            RegionSolvePair(fromRegion, toRegion);
-
-        {
-            int16_t hop = g_regionNext[(uint32_t)(fromRegion * g_regionStride
-                                                 + toRegion)];
-
-            link = (int16_t)MiddleRegionLink(fromRegion, hop);
-        }
-        if (link < 0)
+    /* An if/else rather than `if (!fromRegion) goto no_region;`: the goto
+     * pulls the no-region arm up behind the test, where the image keeps
+     * it after the routing code. */
+    if (fromRegion && toRegion) {
+        /* The region hop, skipped when we are already routing to this goal from
+         * the region we were last in, and when both ends are in one region. */
+        if ((PointsEqual(ob->routeGoal, pt) && ob->prevRegion == fromRegion)
+            || toRegion == fromRegion)
             goto after_region;
 
-        /* NearestAllowedTile writes the point, so the x half is cleared first
-         * rather than the whole local -- the original's `mov word`. */
-        pt.x = 0;
-        NearestAllowedTile(ob, kLinks(fromRegion)[link].into,
-                           &pt);
-    }
+        {
+            int16_t link;
+
+            if (g_regionCost[(uint32_t)(fromRegion * g_regionStride + toRegion)]
+                != g_regionStamp)
+                RegionSolvePair(fromRegion, toRegion);
+
+            {
+                int16_t hop = g_regionNext[(uint32_t)(fromRegion * g_regionStride
+                                                     + toRegion)];
+
+                link = (int16_t)MiddleRegionLink(fromRegion, hop);
+            }
+            if (link < 0)
+                goto after_region;
+
+            /* NearestAllowedTile writes the point, so the x half is cleared first
+             * rather than the whole local -- the original's `mov word`. */
+            pt.x = 0;
+            NearestAllowedTile(ob, kLinks(fromRegion)[link].into,
+                               &pt);
+        }
 
 after_region:
-    /* Keep the route we have when it still aims at this point AND either has
-     * waypoints left or has run past its cooldown. Both arms of that second
-     * test skip the re-plan; see the header. */
-    if (PointsEqual(pt, ob->routeGoal)) {
-        if (ob->moveCount > 0 && ob->moveAt < ob->moveCount)
-            goto walk;
-        if ((uint32_t)g_gameClockMs > (uint32_t)ob->moveUntil)
-            goto walk;
-    }
+        /* Keep the route we have when it still aims at this point AND either has
+         * waypoints left or has run past its cooldown. Both arms of that second
+         * test skip the re-plan; see the header. */
+        if (PointsEqual(pt, ob->routeGoal)) {
+            if (ob->moveCount > 0 && ob->moveAt < ob->moveCount)
+                goto walk;
+            if ((uint32_t)g_gameClockMs > (uint32_t)ob->moveUntil)
+                goto walk;
+        }
 
-    if (BeginMoveTo(ob, &pt)) {
-        ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
-        /* The goal it was ASKED for, not the point it is walking to. */
+        if (BeginMoveTo(ob, &pt)) {
+            ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
+            /* The goal it was ASKED for, not the point it is walking to. */
+            ob->routeGoal = *dest;
+            ob->moveFrom  = *pos;
+            goto set_move_to;
+        }
+
+        ob->routeGoal = pt;
+        if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
+            ob->routeGoal = *dest;
+            ob->moveFrom  = *pos;
+            goto set_move_to;
+        }
+        /* A route was found; PlanPathTo filled the waypoints itself. */
         ob->routeGoal = *dest;
+        goto walk;
+    } else {
+        ob->routeGoal = pt;
         ob->moveFrom  = *pos;
-        goto set_move_to;
     }
-
-    ob->routeGoal = pt;
-    if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
-        ob->routeGoal = *dest;
-        ob->moveFrom  = *pos;
-        goto set_move_to;
-    }
-    /* A route was found; PlanPathTo filled the waypoints itself. */
-    ob->routeGoal = *dest;
-    goto walk;
-
-no_region:
-    ob->routeGoal = pt;
-    ob->moveFrom  = *pos;
 set_move_to:
     ob->moveTo = pt;
     ob->moveEnd = 0;
