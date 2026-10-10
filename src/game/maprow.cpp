@@ -1360,15 +1360,10 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
             if (!e->next) {
                 /* Ran off the end: unlink and append after `e`, the last
                  * node. */
-                {
-                    AM2_CellEntry *pv = n->prev;
-                    AM2_CellEntry *nx = n->next;
-
-                    if (!pv)
-                        *head = nx;
-                    else
-                        pv->next = nx;
-                }
+                if (!n->prev)
+                    *head = n->next;
+                else
+                    n->prev->next = n->next;
                 n->next->prev = n->prev;
 
                 n->prev = e;
@@ -1382,15 +1377,10 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
         }
 
         /* Unlink, then insert before `e`. */
-        {
-            AM2_CellEntry *pv = n->prev;
-            AM2_CellEntry *nx = n->next;
-
-            if (!pv)
-                *head = nx;
-            else
-                pv->next = nx;
-        }
+        if (!n->prev)
+            *head = n->next;
+        else
+            n->prev->next = n->next;
         n->next->prev = n->prev;
 
         n->prev = e->prev;
@@ -1404,31 +1394,33 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
         || DepthCompare(n->obj, n->prev->obj) >= 0)
         return;
 
-    for (e = n->prev; e->prev; ) {
-        e = e->prev;
-        if (DepthCompare(n->obj, e->obj) >= 0) {
-            /* Unlink, then insert after `e`. */
+    for (e = n->prev; ; ) {
+        if (!e->prev) {
+            /* Ran off the front: unlink and make `n` the head, before `e`. */
             n->prev->next = n->next;
             if (n->next)
                 n->next->prev = n->prev;
 
-            n->prev = e;
-            n->next = e->next;
-            e->next->prev = n;
-            e->next = n;
+            n->prev = (AM2_CellEntry *)0;
+            n->next = e;
+            e->prev = n;
+            *head = n;
             return;
         }
+        e = e->prev;
+        if (DepthCompare(n->obj, e->obj) >= 0)
+            break;
     }
 
-    /* Ran off the front: unlink and make `n` the head, before `e`. */
+    /* Unlink, then insert after `e`. */
     n->prev->next = n->next;
     if (n->next)
         n->next->prev = n->prev;
 
-    n->prev = (AM2_CellEntry *)0;
-    n->next = e;
-    e->prev = n;
-    *head = n;
+    n->prev = e;
+    n->next = e->next;
+    e->next->prev = n;
+    e->next = n;
 }
 
 /* BuildRowsFromDef -- original 0x00434C90, two callers, and BuildRowSet's

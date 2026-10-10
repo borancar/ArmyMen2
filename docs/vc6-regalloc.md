@@ -87,6 +87,20 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
   function that passes a `RECT` by value has `ebp` "available", and a
   temporary can land there.
 
+- **The rotation follows SOURCE order where layout and source disagree.**
+  DepthResort's two backward-walk arms were laid out identically by both
+  compilers, ran-off-front first, yet the insert-after arm's temporaries
+  were one register out until the source put the arms in that order too
+  (`for (;;) { if (!e->prev) { ran-off; return; } ...; if (found) break; }`
+  with the insert after the loop). Same instructions, same layout, and the
+  choices still followed the text.
+- **Two locals copied out for an `if` cost a temporary.** The same
+  function's `{ pv = n->prev; nx = n->next; if (!pv) *head = nx; else
+  pv->next = nx; }` and the direct `if (!n->prev) *head = n->next; else
+  n->prev->next = n->next;` generate the same loads, but the locals shift
+  the rotation after the join. With both changes DepthResort matched
+  outright (2026-10-11).
+
 ### Constraints that redirect registers
 
 - **Byte operations need `al`, `bl`, `cl` or `dl`.** `setne` writes its
