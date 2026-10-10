@@ -487,7 +487,7 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
     int32_t  rec;
 
     if (!CanAffordUnit(type, pts))
-        goto fail;
+        return 0;
 
     tile = TileOfPoint(where);
     /* `cmp ax, 0xFFFF; ja` -- vacuous, and the original's; see above. */
@@ -496,7 +496,7 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #endif
     if ((uint16_t)tile > (uint16_t)0xFFFF)
-        goto fail;
+        return 0;
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
@@ -543,17 +543,15 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
 
     case 15:  /* radar */
         rec = EnsureSpriteAaiRecord(0x2A, 1, 0);
-        if (rec == -1 || CanPlaceAt(where, rec, kind))
-            break;
-        /* The one `return 0` every refusal shares, laid out here. */
-    fail:
-        return 0;
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            return 0;
+        break;
 
     case 16:  /* aagun */
         army = ARMY();
         rec = EnsureSpriteAaiRecord(0x1F, army * 10 + 10, 0);
         if (rec != -1 && !CanPlaceAt(where, rec, kind))
-            goto fail;
+            return 0;
         break;
 
     /* The five soldiers, and the mine -- laid out last in the image. The
@@ -573,12 +571,14 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
     }
 #undef ARMY
 
-    /* A heavy tile shares the arms' `return 0`; the answer is then the
-     * tile-kind compare itself, a setcc in the image. */
-    if (weight >= AM2_BLOCK_FULL)
-        goto fail;
-    return ((const uint8_t *)*(void *const *)&g_tileKind)
-               [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind;
+    /* The answer is the tile-kind compare itself, a setcc in the image.
+     * Every refusal is its own `return 0`, which VC6 merges into the one
+     * block it lays out after the radar arm; a shared `fail:` label there
+     * instead pulled the setcc tail up into that slot. */
+    if (weight < AM2_BLOCK_FULL)
+        return ((const uint8_t *)*(void *const *)&g_tileKind)
+                   [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind;
+    return 0;
 
 }
 

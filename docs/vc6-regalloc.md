@@ -401,6 +401,15 @@ A ternary lays its FIRST value out as the fall-through. Step3Drive's clamp
 jle; c; jmp; t` is `speed = (c > t) ? c : t`, the same function written with
 the arms the other way round (shape 110 -> 108).
 
+- **Separate `return 0`s are not one `fail:` label.** PlacementAllowed's
+  refusals all went to a `fail: return 0;` written inside the radar arm,
+  and the function ended `if (weight >= FULL) goto fail; return <setcc>;`.
+  VC6 then laid the setcc tail right after the radar arm and put the
+  `return 0` last. Writing every refusal as its own `return 0` and ending
+  with `if (weight < FULL) return <setcc>; return 0;` lets VC6 merge the
+  returns into the block after the radar arm, with the setcc tail last
+  as the image has it (36 -> 0 bytes).
+
 ## Shape first, then registers
 
 Ranking misses by a register-masked diff (registers and stack offsets
