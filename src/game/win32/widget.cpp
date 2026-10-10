@@ -9222,8 +9222,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         int32_t      last;        /* the image takes (i == 3) before the new */
         AM2_Rect     box;
 
-        name[0] = '\0';
-
         /* THE COLOUR SELECTION STARTS AT -1, PER ROW, and nothing here wrote
          * it. The original does it inside this same loop -- `mov dword ptr
          * [ebx + 0x38], 0xffffffff` at 0x0043062A, with ebx walking 4 bytes a
@@ -9239,6 +9237,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * listed as "apparently unread" and that was wrong -- widget.cpp
          * reads it; the grep that found the six only asked who WRITES. */
         this->colourSel[i] = -1;
+        name[0] = '\0';
 
         box = *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12);
 
