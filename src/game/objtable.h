@@ -309,6 +309,10 @@ typedef struct AM2_SteerOut {
     AM2_FireSpot spot;              /* +0x18 SIGHTOUT_OFF_X / _Y / _YADJ */
     uint8_t      _pad1e[2];
     uint32_t     uid;               /* +0x20 SIGHTOUT_OFF_UID, the target */
+    int32_t      gate;              /* +0x24 OBJ_OFF_FIELD_59C on a vehicle: 0 seeds the
+                                     * record. Step3Drive clears it through the
+                                     * record pointer it is handed, so it is the
+                                     * record's, not the object's. */
 } AM2_SteerOut;
 
 /* The roach's steering record (SIGHTBOUT_OFF_*), at +0x540: a third layout,
@@ -620,8 +624,7 @@ typedef struct AM2_Object {
             uint32_t  blockedSince; /* +0x56C the clock when a turn was first refused */
             int32_t   searchBase;   /* +0x570 the facing the turn search fans out from */
             int32_t   searchTries;  /* +0x574 the search's attempts, kept across frames */
-            AM2_SteerOut ctl;       /* +0x578 its steering record */
-            int32_t   gate;         /* +0x59C OBJ_OFF_FIELD_59C: 0 seeds the record */
+            AM2_SteerOut ctl;       /* +0x578 its steering record, through +0x59F */
             uint32_t  field5A0;     /* +0x5A0 */
             uint8_t   turnCommitted;/* +0x5A4 the row facing last committed */
             uint8_t   _pad5a5[3];
@@ -720,7 +723,7 @@ static_assert(offsetof(AM2_Object, sight)         == 0x57C, "sight");
 static_assert(offsetof(AM2_Object, ctl)           == 0x578, "vehicle ctl");
 static_assert(offsetof(AM2_Object, roachCtl)      == 0x540, "roach ctl");
 static_assert(sizeof(AM2_SightOut) == 0x24, "sight record");
-static_assert(sizeof(AM2_SteerOut) == 0x24, "steer record");
+static_assert(sizeof(AM2_SteerOut) == 0x28, "steer record");
 static_assert(sizeof(AM2_RoachOut) == 0x20, "roach record");
 static_assert(sizeof(AM2_SightCtx) == 0x58, "AM2_SIGHTC_BYTES");
 static_assert(sizeof(AM2_AiCtx)    == 0x44, "AM2_AI_CONTEXT_BYTES");
@@ -748,7 +751,7 @@ static_assert(offsetof(AM2_Object, lastSeq)       == 0x5CC, "lastSeq");
 static_assert(offsetof(AM2_Object, posePending)   == 0x53C, "posePending");
 static_assert(offsetof(AM2_Object, riders.count)  == 0x53C, "riders.count");
 static_assert(offsetof(AM2_Object, searchTries)   == 0x574, "searchTries");
-static_assert(offsetof(AM2_Object, gate)          == 0x59C, "gate");
+static_assert(offsetof(AM2_Object, ctl.gate)      == 0x59C, "gate");
 static_assert(offsetof(AM2_Object, turnRecommit)  == 0x5A8, "turnRecommit");
 static_assert(offsetof(AM2_Object, nameIndex)     == 0x5AC, "nameIndex");
 static_assert(offsetof(AM2_Object, field540)      == 0x540, "field540");

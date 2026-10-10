@@ -3367,7 +3367,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
         {
             uint8_t action = *at++;
 
-            o->gate = 1;
+            o->ctl.gate = 1;
             o->ctl.state = (int32_t)(action & 7u);
             o->ctl.field0C = (int32_t)((uint32_t)action >> 7);
             o->ctl.stop = (int32_t)(((uint32_t)action >> 6) & 1u);
@@ -3378,13 +3378,13 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
     if (head & 0x40000000u) {
         o->facing = *at++;
         o->turretFacing = *at++;
-        o->gate = 1;
+        o->ctl.gate = 1;
     }
 
     if (head & 0x20000000u) {
         o->ctl.heading = *at++;
         o->ctl.aim = *at++;
-        o->gate = 1;
+        o->ctl.gate = 1;
     }
 
     /* A received update always clears the destination: a remote vehicle is

@@ -1615,7 +1615,7 @@ void __cdecl VehicleDied(AM2_Object *obj, uint32_t by)
     (void)by;
 
     o->ctl.state = 5;
-    o->gate        = 1;
+    o->ctl.gate    = 1;
 
     if (o->rowSet.count > 1)
         ObjFlagClear0(&o->rowSet.rows[1]);
@@ -5336,7 +5336,7 @@ void __cdecl DamageVehicle(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
     ExitAllFromVehicle(obj, attacker);
 
     o->ctl.state = 5;
-    o->gate        = 1;
+    o->ctl.gate    = 1;
 
     if (o->rowSet.count > 1)
         ObjFlagClear0(&o->rowSet.rows[1]);
@@ -10911,7 +10911,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
 
         /* Re-stamped after the clear, and this is why the clear must come
          * first: 0x578 and 0x579 are inside it. */
-        obj->gate = 0;
+        obj->ctl.gate = 0;
         obj->ctl.heading    = obj->facing;
         obj->ctl.aim = obj->turretFacing;
         obj->ctl.state = 1;

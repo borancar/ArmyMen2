@@ -8173,7 +8173,7 @@ void __cdecl StepType3(AM2_Object *o)
         o->revealedUntil = 0;
     }
 
-    if (o->gate == 0) {
+    if (o->ctl.gate == 0) {
         o->ctl.heading  = o->facing;
         o->ctl.aim      = o->turretFacing;
         o->ctl.field0C  = 0;
@@ -8237,7 +8237,7 @@ void __cdecl StepType3(AM2_Object *o)
                     PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
                                 o->pos.x,
                                 o->pos.y);
-                    o->gate = 0;
+                    o->ctl.gate = 0;
                     DestroyByType(o);
                     return;
                 default:
@@ -8246,13 +8246,13 @@ void __cdecl StepType3(AM2_Object *o)
                 }
 
                 /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
-                o->gate = 0;
+                o->ctl.gate = 0;
                 LeaveRemainsRow((const AM2_MapRow *)row);
                 DestroyByType(o);
             }
             goto post;
         }
-        o->gate = 0;
+        o->ctl.gate = 0;
         DestroyByType(o);
         goto post;
     }
@@ -8265,7 +8265,7 @@ void __cdecl StepType3(AM2_Object *o)
      * player or the AI: every truck sat where the mission placed it and the
      * player's keys did nothing once Sarge had boarded. Found by loading one
      * save in the native build and in the original and holding D. */
-    if (o->gate == 0
+    if (o->ctl.gate == 0
         && (!g_mpSession
             || AM2_THE_COMM->CommMustBroadcast(
                    (int16_t)o->owner))) {
@@ -9810,7 +9810,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 if (g_mpSession == 0
                     || AM2_THE_COMM->CommMustBroadcast(
                            (int16_t)o->owner)) {
-                    o->gate = 0;
+                    r->gate = 0;
                     o->fireFlag = (uint8_t)orig_step3_rand();
                 }
 
