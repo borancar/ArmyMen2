@@ -1880,23 +1880,6 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
     }
 }
 
-/* MarkTileRing taking the cell pointer, the index taken once inside: in
- * ObjHitMaskAction this hoists it out of the ring loop as the image does
- * (shape 57 -> 54). ListMaskAction gets worse with it and keeps the other. */
-static inline void MarkTileRingAt(uint8_t *cells, const int32_t *ring, uint8_t *c)
-{
-    int32_t i;
-    int32_t idx = (int32_t)(c - cells);
-
-    for (i = 0; i < AM2_TILEMASK_RING; i++) {
-        int32_t at = ring[i] + idx;
-
-        if (at < 0)
-            return;
-        cells[at] |= AM2_TILEMASK_PAD_CELL;
-    }
-}
-
 /* ObjHitMaskAction -- original 0x004389D0, 1,056 bytes, two callers, and both
  * of them are ItemTeardown and ObjAfterMove above.
  *
@@ -2003,6 +1986,23 @@ static inline void MarkTileRingAt(uint8_t *cells, const int32_t *ring, uint8_t *
  * regressed. It also means this function cannot be behind a difference in any
  * configuration -- worth knowing when `mission`'s frame gate fails, which it
  * does on this machine for reasons of its own. */
+/* MarkTileRing through the mask itself, for ObjHitMaskAction: the image
+ * reaches the cells at +0x10 from the mask and walks a cell INDEX beside
+ * the cell pointer, which VC6 folds into one induction variable plus a
+ * hoisted offset (`lea eax, [ebx + ecx]`). */
+static inline void MarkTileRingIdx(AM2_TileMask *m, const int32_t *ring, int32_t idx)
+{
+    int32_t i;
+
+    for (i = 0; i < AM2_TILEMASK_RING; i++) {
+        int32_t at = ring[i] + idx;
+
+        if (at < 0)
+            return;
+        m->cells[at] |= AM2_TILEMASK_PAD_CELL;
+    }
+}
+
 int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 {
     /* No locals for the record's parts: the box is the record itself, the
@@ -2113,6 +2113,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
         int32_t col = AM2_TILEMASK_MARGIN;
         uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
+        int32_t ci  = (int32_t)(c - out->cells);
 
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
@@ -2120,23 +2121,24 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRingAt(out->cells, g_tilemaskNeighbours, c);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
                 }
 
                 col++;
                 c++;
+                ci++;
                 if (col == span + AM2_TILEMASK_MARGIN)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRingAt(out->cells, g_tilemaskNeighbours, c);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRingAt(out->cells, g_tilemaskNeighbours, c);
+                MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
             }
         } while (++off < end);
     }
