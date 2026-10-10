@@ -9636,7 +9636,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     AM2_Anim *const *animRec;     /* E-12, the address of a row's animPlaying */
 
     if ((uint16_t)o->health != 0) {
-        AM2_MapRow *gun = o->rowSet.rows;
+        AM2_MapRow *gun;
         AM2_Point target;
         int32_t   turn;
         int32_t   noTarget;
@@ -9647,15 +9647,13 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             Step3TurnState(o, &o->ctl);
 
         /* The hull's turn for this frame, capped at 8 either way. */
-        turn = Clamp(AngleDelta(o->facing, r->heading), -8, 8);
+        gun = o->rowSet.rows;
+        turn = AngleDelta(o->facing, r->heading);
+        turn = Clamp(turn, -8, 8);
 
         animRec = &gun->animPlaying;
-        {
-            int32_t heading = gun->heading;
-
-            first  = RoundTo8((o->rowSet.rows->headingBias + heading) & 0xFF,
-                              (*animRec)->directionBits);
-        }
+        first  = RoundTo8((gun->headingBias + gun->heading) & 0xFF,
+                          (*animRec)->directionBits);
         second = RoundTo8((gun->headingBias + turn
                            + gun->heading) & 0xFF,
                           (*animRec)->directionBits);
