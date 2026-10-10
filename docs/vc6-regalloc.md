@@ -334,6 +334,11 @@ and threaded the scan's NULL straight to the return. Written as
 with the scan as a static inline returning NULL at its end, the function
 matched outright.
 
+A ternary lays its FIRST value out as the fall-through. Step3Drive's clamp
+`speed = (c <= t) ? t : c` came out `cmp; jg; t; jmp; c`; the image's `cmp;
+jle; c; jmp; t` is `speed = (c > t) ? c : t`, the same function written with
+the arms the other way round (shape 110 -> 108).
+
 ## Shape first, then registers
 
 Ranking misses by a register-masked diff (registers and stack offsets
