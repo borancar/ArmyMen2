@@ -9944,11 +9944,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     /* A stopped state-5 vehicle draws through the identity remap and a
      * moving one through the bright remap -- the headlights. */
     if (o->vehicleKind == 5) {
-        AM2_MapRow *g = o->rowSet.rows;
-
-        g->palette = (o->field44 == 0)
-                                    ? *(void * *)&g_remapIdent
-                                    : g_remapBright;
+        if (o->field44 == 0)
+            o->rowSet.rows->palette = g_remapIdent;
+        else
+            o->rowSet.rows->palette = g_remapBright;
     }
 
     /* Everything under the point the vehicle is MOVING TO, not where it is:
