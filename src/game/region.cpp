@@ -3296,9 +3296,9 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
         /* The copies re-address the object rather than going through
          * `pos`/`dest`: the image recomputes the field address at each one. */
+        ob->routeGoal = pt;
         ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
-        ob->routeGoal = pt;
         ob->moveEnd   = 0;
         goto two_waypoints;
     }
@@ -3412,7 +3412,7 @@ walk:
      * two dead compares are the sort of thing a tidier reading silently drops
      * along with a live one. */
     if (PointsEqual(ob->routeGoal, pt) && ob->moveAt < ob->moveCount) {
-        uint32_t at = ob->moveAt;
+        uint16_t at = ob->moveAt;
 
         pt = ob->waypoints[at];
         d = ApproxDist(pos, &pt);
