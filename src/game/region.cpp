@@ -1302,7 +1302,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             int32_t  nb = curTile + g_tileStep8[i];
             uint32_t t;
             uint16_t g;
-            int32_t  h, prev, next, fNew;
+            int32_t  h;
             uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
@@ -1342,14 +1342,12 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                     /* Unlink so the improved node can be re-inserted in order.
                      * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
                      * than the successor. Reproduced -- see the header. */
-                    next = g_pathNodes[t].next;
-                    prev = g_pathNodes[t].prev;
-                    if (prev)
-                        g_pathNodes[prev].next = (uint16_t)next;
+                    if (g_pathNodes[t].prev > 0)
+                        g_pathNodes[g_pathNodes[t].prev].next = g_pathNodes[t].next;
                     else
                         from = 0;
-                    if (next)
-                        g_pathNodes[next].prev = (uint16_t)prev;
+                    if (g_pathNodes[t].next > 0)
+                        g_pathNodes[g_pathNodes[t].next].prev = g_pathNodes[t].prev;
                 } else if (g_pathNodes[t].state & 2) {
                     /* Closed: done with. */
                     continue;
@@ -1380,25 +1378,14 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * nothing at all -- so a node re-inserted after an improvement is
              * ordered by its NEW g against its OLD h. Using the locals here
              * would be tidier and would sort a different list. */
-            walk = from;
-            if (walk > 0) {
-                fNew = g_pathNodes[t].h + g_pathNodes[t].g;
-                do {
-                    if (g_pathNodes[walk & 0xFFFF].h + g_pathNodes[walk & 0xFFFF].g
-                        >= fNew)
-                        break;
-                    before = walk;
-                    walk   = g_pathNodes[walk & 0xFFFF].next;
-                } while (walk > 0);
+            for (walk = from; walk > 0; walk = g_pathNodes[walk & 0xFFFF].next) {
+                if (g_pathNodes[walk & 0xFFFF].h + g_pathNodes[walk & 0xFFFF].g
+                    >= g_pathNodes[t].h + g_pathNodes[t].g)
+                    break;
+                before = walk;
             }
 
-            if (!(before > 0)) {
-                /* Cheapest so far: in front of the head. */
-                g_pathNodes[t].next = from;
-                g_pathNodes[t].prev = 0;
-                g_pathNodes[from & 0xFFFF].prev = (uint16_t)t;
-                from = (uint16_t)t;
-            } else {
+            if (before > 0) {
                 uint16_t after = g_pathNodes[before & 0xFFFF].next;
 
                 g_pathNodes[t].next = after;
@@ -1406,6 +1393,12 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                     g_pathNodes[after & 0xFFFF].prev = (uint16_t)t;
                 g_pathNodes[before & 0xFFFF].next = (uint16_t)t;
                 g_pathNodes[t].prev = before;
+            } else {
+                /* Cheapest so far: in front of the head. */
+                g_pathNodes[t].next = from;
+                g_pathNodes[t].prev = 0;
+                g_pathNodes[from & 0xFFFF].prev = (uint16_t)t;
+                from = (uint16_t)t;
             }
         }
     }
