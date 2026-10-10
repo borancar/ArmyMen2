@@ -110,6 +110,11 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
   record pointer (`p = &t[r]`, every read through `p`) anchors on the last
   field read again, inner loops included. MpOptionsScreen's group pass
   matched that way.
+  Advancing the array pointer itself is a third shape: ParseScenarioPart's
+  `for (i = 0; i < count; i++) { row = &rows[i]; ... }` anchored on pos.y,
+  six bytes in, whatever order the fields were written in; written
+  `for (i = 0; i < count; i++, rows++) { row = rows; ... }` it anchors on
+  the row's start as the image does (82 -> 48 bytes).
 
 ### Evaluation order
 
