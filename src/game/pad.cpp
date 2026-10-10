@@ -294,8 +294,10 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     uint32_t tile;
     uint32_t       prev;
     int32_t        changed = 0;
-    uint8_t        curBits = 0, prevBits = 0;
-    uint8_t        curPad = 0, prevPad = 0;
+    uint8_t        curBits = 0;
+    uint8_t        prevPad = 0;
+    uint8_t        curPad = 0;
+    uint8_t        prevBits = 0;
     int32_t        i;
 
     /* The damage pass, before the early exit. The original indexes the
@@ -306,13 +308,11 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
 
         if (num->live != 0
             && num->count > 0) {
-            const int16_t *ids = num->pads;
-
             /* The count is re-read each pass, as the image compares it; the
              * test above stands for the first. */
             i = 0;
             do {
-                const AM2_Pad *pad = &g_pads[ids[i]];
+                const AM2_Pad *pad = &g_pads[num->pads[i]];
 
                 if (pad->damage != 0
                     && g_gameClockMs
