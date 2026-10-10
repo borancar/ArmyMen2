@@ -4393,9 +4393,9 @@ void __cdecl PortalSpawn(void)
 
     for (i = 0; i < AM2_PORTAL_COUNT; i++) {
         int32_t   x = (int32_t)(orig_game_rand() % AM2_PORTAL_SPAN_X)
-                      + g_viewX;
+                      + g_viewRect.left;
         int32_t   y = (int32_t)(orig_game_rand() % AM2_PORTAL_SPAN_Y)
-                      + g_viewY;
+                      + g_viewRect.top;
         AM2_Object  *trooper;
         AM2_Object  *weapon;
 
@@ -4427,7 +4427,7 @@ void __cdecl PortalSpawn(void)
 
         trooper->facing =
             AngleBetween(&trooper->pos,
-                         (const AM2_Point *)&g_listenerPos);
+                         &g_listenerPos);
 
         Type238Action(trooper, AM2_PORTAL_ACTION);
     }
@@ -8721,9 +8721,9 @@ void __cdecl SpawnRandomBarrage(void)
          * right-to-left evaluation -- delay, kind, y, x -- which is the code
          * the image has. Other compilers get the explicit sequence below. */
         orig_spawn_at(orig_rand() % AM2_BARRAGE_SPAN_X
-                          + g_viewX,
+                          + g_viewRect.left,
                       orig_rand() % AM2_BARRAGE_SPAN_Y
-                          + g_viewY,
+                          + g_viewRect.top,
                       kinds[orig_rand() % AM2_BARRAGE_KINDS],
                       0, 0, AM2_BARRAGE_ARG6,
                       orig_rand() % AM2_BARRAGE_DELAY_MAX, 0, 0, 0);
@@ -8731,9 +8731,9 @@ void __cdecl SpawnRandomBarrage(void)
         int32_t delay = orig_rand() % AM2_BARRAGE_DELAY_MAX;
         int32_t kind  = kinds[orig_rand() % AM2_BARRAGE_KINDS];
         int32_t y     = orig_rand() % AM2_BARRAGE_SPAN_Y
-                        + g_viewY;
+                        + g_viewRect.top;
         int32_t x     = orig_rand() % AM2_BARRAGE_SPAN_X
-                        + g_viewX;
+                        + g_viewRect.left;
 
         orig_spawn_at(x, y, kind, 0, 0, AM2_BARRAGE_ARG6, delay, 0, 0, 0);
 #endif
@@ -9202,20 +9202,20 @@ void __cdecl SelectionClick(void)
     AM2_Point world;
     AM2_Object  *e;
 
-    world.x = (int16_t)(g_viewX
+    world.x = (int16_t)(g_viewRect.left
                         + ((const AM2_Point *)&g_cursorPoint)->x);
     world.y = (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                        + *(const int16_t *)&g_viewY);
+                        + *(const int16_t *)&g_viewRect.top);
 
-    if (g_viewRectOn) {
+    if (g_dragRectOn) {
         /* A rubber band exists: the let-go arm is laid out first, then the
          * renormalise while the drag is under way, then the plain click. */
         if (!g_mouseButton1) {
             /* The drag has been let go. */
-            g_viewRectOn = 0;
+            g_dragRectOn = 0;
 
             e = ObjectsInRect(
-                    (const AM2_Rect *)g_viewRect_,
+                    &g_dragRect,
                     g_objMapDesc,
                     ObjIsSelectable);
             if (!e)
@@ -9259,7 +9259,7 @@ void __cdecl SelectionClick(void)
         {
             const AM2_Point *a = &g_dragAnchor;
             const AM2_Point *w = &world;
-            AM2_Rect *r = (AM2_Rect *)g_viewRect_;
+            AM2_Rect *r = &g_dragRect;
 
             r->left   = (a->x < w->x) ? a->x : w->x;
             r->right  = (a->x > w->x) ? a->x : w->x;
@@ -10071,7 +10071,7 @@ void __cdecl NearestClearVehiclePoint(AM2_Object *veh, uint8_t facing, AM2_Point
     for (;;) {
         const AM2_SpiralStep *entry;
 
-        if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
+        if (PointInRect(&g_mapInset, out)
             && VehicleBlockWeight(veh, snapped, *out, 0)
                < AM2_VEHICLE_CLEAR_WEIGHT)
             return;
@@ -10137,7 +10137,7 @@ void __cdecl NearestClearPoint(AM2_Point from, AM2_Point *out)
     for (;;) {
         const AM2_SpiralStep *entry;
 
-        if (PointInRect((const AM2_Rect *)&g_mapBoundsLeft, out)
+        if (PointInRect(&g_mapInset, out)
             && BlockWeightAt((AM2_Object *)(void *)0, *out, *out) < AM2_BLOCK_CLEAR)
             return;
 
@@ -13353,8 +13353,8 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
     case 39:
         PlaySoundAt(0x2B, 1, 0,
                     pt[0], pt[1]);
-        pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewX);
-        pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewY);
+        pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewRect.left);
+        pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewRect.top);
         AimStart(u->uid,
                  u->owner, spot.at);
         return 1;
@@ -13362,8 +13362,8 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
     case 40:
         PlaySoundAt(0x2C, 1, 0,
                     pt[0], pt[1]);
-        pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewX);
-        pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewY);
+        pt[0] = (int16_t)(pt[0] - *(const int16_t *)&g_viewRect.left);
+        pt[1] = (int16_t)(pt[1] - *(const int16_t *)&g_viewRect.top);
         AimStartB(u->uid,
                   u->owner, spot.at);
         return 1;

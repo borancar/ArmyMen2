@@ -1569,17 +1569,17 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
              * them as a whole. */
             {
                 AM2_Rect r0 = RectMake(0, 0, (g_mapExtentX), (g_mapExtentY));
-                (*(AM2_Rect *)g_mapBounds) = r0;
+                g_mapBounds = r0;
             }
             {
                 AM2_Rect r1 = RectMake(0x40, 0x40, (g_mapExtentX) - 0x40, (g_mapExtentY) - 0x40);
-                *(AM2_Rect *)&g_mapBoundsLeft = r1;
+                g_mapInset = r1;
             }
-            (g_listenerPos)  = MakePoint(0x10, 0x10);
-            (g_listenerPosPrev) = (g_listenerPos);
+            *(uint32_t *)&g_listenerPos = MakePoint(0x10, 0x10);
+            g_listenerPosPrev = g_listenerPos;
             {
                 AM2_Rect r2 = RectMake(1, 1, (g_viewTilesW) + 1, (g_viewTilesH) + 1);
-                (*(AM2_Rect *)g_visibleTiles) = r2;
+                g_visibleTiles = r2;
             }
 
             MapDescInit(g_objMapDesc,
@@ -1716,8 +1716,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             for (;;) {
                 if (i >= nfields)
                     break;
-                orig_map_fread(&(g_mapFieldDescs)[i].tag, 4, 1, f);
-                orig_map_fread(&(g_mapFieldDescs)[i].size, 4, 1, f);
+                orig_map_fread(&g_mapFieldDescs[i].tag, 4, 1, f);
+                orig_map_fread(&g_mapFieldDescs[i].size, 4, 1, f);
                 consumed += 8;
                 i++;
             }

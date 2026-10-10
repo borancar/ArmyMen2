@@ -1236,8 +1236,8 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     if (x != 0) {
         AM2_Point ear, where;
 
-        ear.x   = (*(const AM2_Point *)&g_listenerPos).x;
-        ear.y   = (*(const AM2_Point *)&g_listenerPos).y;
+        ear.x   = g_listenerPos.x;
+        ear.y   = g_listenerPos.y;
         where.x = x;
         where.y = y;
         dist = ApproxDist(&ear, &where);
@@ -1484,8 +1484,8 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
         AM2_Point where;
 
         /* Both points copied a field at a time before they are measured. */
-        ear.x   = (*(const AM2_Point *)&g_listenerPos).x;
-        ear.y   = (*(const AM2_Point *)&g_listenerPos).y;
+        ear.x   = g_listenerPos.x;
+        ear.y   = g_listenerPos.y;
         where.x = x;
         where.y = y;
         dist  = ApproxDist(&ear, &where);
@@ -1670,8 +1670,8 @@ void __cdecl Update3DAudioVolumes(void)
              * path does NOT clear the active flag, unlike the two above. Both
              * points are copied a field at a time before they are measured. */
             if (where.x != 0) {
-                ear.x = (*(const AM2_Point *)&g_listenerPos).x;
-                ear.y = (*(const AM2_Point *)&g_listenerPos).y;
+                ear.x = g_listenerPos.x;
+                ear.y = g_listenerPos.y;
                 at.x  = where.x;
                 at.y  = where.y;
                 dist = ApproxDist(&ear, &at);

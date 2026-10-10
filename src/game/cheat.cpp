@@ -58,7 +58,6 @@ extern "C" const char *const am2_cheat_words[41] = {
 };
 #endif
 
-#define g_viewRect   ((AM2_Rect *)&g_viewX)
 
 /* Every arm's reply colour is one byte read from one of ten globals. */
 #define kColour(a)      (*(const uint8_t *)(uintptr_t)(a))
@@ -156,10 +155,10 @@ again:
 
         /* x adds the two PACKED dwords and keeps the low word; y adds the
          * two high words as words. */
-        where.x = (int16_t)(g_cursorPoint + g_viewRect->left);
+        where.x = (int16_t)(g_cursorPoint + g_viewRect.left);
         where.y = (int16_t)(((const int16_t *)&g_cursorPoint)[1]
-                            + *(const int16_t *)&g_viewRect->top);
-        if (!PointInRect(&(*(const AM2_Rect *)g_secondRect), &where))
+                            + *(const int16_t *)&g_viewRect.top);
+        if (!PointInRect(&g_secondRect, &where))
             return;
 
         CreateExplosion(where.x, where.y, 0x85, 0, 0, 0, 0, 0, 0, 0);

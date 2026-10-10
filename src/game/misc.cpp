@@ -2183,7 +2183,7 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
     AM2_Seq *seq;
     AM2_MapRow *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
+    if (!PointInRect(&g_mapInset, at))
         return;
 
     seq = SeqAlloc(g_seqCtxA);
@@ -2246,7 +2246,7 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
     AM2_Seq *seq;
     AM2_MapRow *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
+    if (!PointInRect(&g_mapInset, at))
         return;
 
     seq = SeqAlloc(g_seqCtxB);
@@ -2335,7 +2335,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 
         row->stamp54 = 0;
 
-        if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
+        if (!PointInRect(&g_mapInset,
                          &row->pos))
             return SeqRetire(ctx, rec);
 
@@ -2506,7 +2506,7 @@ void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
     AM2_Seq *seq;
     AM2_MapRow *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft, at))
+    if (!PointInRect(&g_mapInset, at))
         return;
 
     seq = SeqAlloc(g_seqCtxA);
@@ -2543,7 +2543,7 @@ void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
     (void)b;
     (void)c;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
+    if (!PointInRect(&g_mapInset,
                      at))
         return;
 
@@ -3081,7 +3081,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
          * its height subtracted from z -- not on the ground position. */
         pt = row->pos;
         pt.y -= row->yAdjust;
-        if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
+        if (!PointInRect(&g_mapInset,
                          &pt))
             return SeqRetire(ctx, rec);
 

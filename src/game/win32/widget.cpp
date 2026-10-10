@@ -4348,8 +4348,8 @@ void __cdecl AimStart(uint32_t uid, int8_t army, AM2_Point at)
         *(const int32_t *)&g_gameClockMs
         + g_aimLifeHalfA * 2 - 1;
 
-    hit.x = (int16_t)(*(const int16_t *)&g_viewX + ((int16_t *)(g_aimPointA + off))[0]);
-    hit.y = (int16_t)(((int16_t *)(g_aimPointA + off))[1] + *(const int16_t *)&g_viewY);
+    hit.x = (int16_t)(*(const int16_t *)&g_viewRect.left + ((int16_t *)(g_aimPointA + off))[0]);
+    hit.y = (int16_t)(((int16_t *)(g_aimPointA + off))[1] + *(const int16_t *)&g_viewRect.top);
 #undef AIM
 
     o = ObjectsHitByPoint(&hit,
@@ -4406,8 +4406,8 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, AM2_Point at)
             *(const int32_t *)&g_gameClockMs
             + g_aimLifeHalfB * 2 - 1;
 
-    orig_spawn_at_aim((&((AM2_Point *)g_aimPointB)[(int32_t)army])->x + g_viewX,
-                      ((AM2_Point *)g_aimPointB)[(int32_t)army].y + g_viewY,
+    orig_spawn_at_aim((&((AM2_Point *)g_aimPointB)[(int32_t)army])->x + g_viewRect.left,
+                      ((AM2_Point *)g_aimPointB)[(int32_t)army].y + g_viewRect.top,
                       AM2_AIM_SPAWN_KIND, (int32_t)army, uid,
                       g_aimSpawnArg,
                       0, 0, 0, 0);
@@ -4591,10 +4591,10 @@ void __cdecl PlacementScreenClick(AM2_Point at)
     /* The argument's own slot becomes the point -- see above. */
     ((int16_t *)&at)[0] =
         (int16_t)((int32_t)*(const uint32_t *)&g_cursorPoint
-                  + g_viewX);
+                  + g_viewRect.left);
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                  + *(const int16_t *)&g_viewY);
+                  + *(const int16_t *)&g_viewRect.top);
 
     obj = ObjectsHitByPoint(&at, g_objMapDesc);
 
@@ -4735,11 +4735,11 @@ void __cdecl HudPostUpdate(void)
      * a carry out of x is discarded; written as int16 arithmetic, which is
      * what that amounts to. */
     ((int16_t *)&at)[0] =
-        (int16_t)(g_viewX
+        (int16_t)(g_viewRect.left
                   + (int32_t)*(const uint32_t *)&g_cursorPoint);
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                  + *(const int16_t *)&g_viewY);
+                  + *(const int16_t *)&g_viewRect.top);
 
     /* The test is on the CURSOR against the view rectangle, not on the world
      * point just built -- ADDR_BLIT_RECT is in screen space. */
@@ -4782,22 +4782,22 @@ void __cdecl HudPostUpdate(void)
          * rectangle is not published until it is crossed. Once ON it is not
          * recomputed here -- the test is on the flag, so the corners are the
          * ones the crossing frame wrote. */
-        if (!g_viewRectOn
+        if (!g_dragRectOn
             && ApproxDist(&at, &g_dragAnchor)
                    > AM2_DRAG_DEAD_ZONE) {
             int16_t ax = g_dragAnchor.x;
             int16_t px = at.x;
             int16_t py = at.y;
 
-            g_viewRectOn = 1;
+            g_dragRectOn = 1;
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
-            (g_viewRect_)[0] = ax < px ? ax : px;
-            (g_viewRect_)[2] = ax > px ? ax : px;
+            g_dragRect.left = ax < px ? ax : px;
+            g_dragRect.right = ax > px ? ax : px;
             if (g_dragAnchor.y < py)
-                g_viewRect_[1] = g_dragAnchor.y;
+                g_dragRect.top = g_dragAnchor.y;
             else
-                (g_viewRect_)[1] = py;
-            g_viewRect_[3] = g_dragAnchor.y > py ? g_dragAnchor.y : py;
+                g_dragRect.top = py;
+            g_dragRect.bottom = g_dragAnchor.y > py ? g_dragAnchor.y : py;
         }
     }
 
@@ -4859,11 +4859,11 @@ void __cdecl HudPostUpdate(void)
     /* The world point is built AGAIN here, the same two adds as at the top,
      * straight into the same slot. */
     ((int16_t *)&at)[0] =
-        (int16_t)(g_viewX
+        (int16_t)(g_viewRect.left
                   + (int32_t)*(const uint32_t *)&g_cursorPoint);
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                  + *(const int16_t *)&g_viewY);
+                  + *(const int16_t *)&g_viewRect.top);
     obj = ObjectsHitByPoint(&at, g_objMapDesc);
     for (; obj; obj = obj->queryNext) {
         if (ours) {
@@ -5383,7 +5383,7 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 {
     AM2_Widget *w = this;
 
-    const AM2_Rect *view  = (const AM2_Rect *)g_secondRect;
+    const AM2_Rect *view  = &g_secondRect;
     /* The map's extent is read at every use. */
     const uint8_t  *pal   = g_radarColours;
     AM2_Rect        box;

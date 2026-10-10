@@ -525,8 +525,8 @@ void __cdecl InitMenuScreen(void)
     g_animNext = Ticks() + MENU_ANIM_PERIOD;
 
     r = RectMake(0, 0, 0, 0);
-    *(AM2_Rect *)g_menuCursorPrev = r;
-    *(AM2_Rect *)g_menuCursorRect = r;
+    g_menuCursorPrev = r;
+    g_menuCursorRect = r;
 
     g_menuSurface = CreateOffscreenSurface(0x20, 0x20, 0x40, -1);
 }

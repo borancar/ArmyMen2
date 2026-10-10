@@ -112,14 +112,14 @@ void __cdecl BlitMapBackdrop(AM2_Rect world)
     RECT src;
 
     /* The far edges as the near ones plus the extent, as the image has it. */
-    src.left   = world.left - (g_cameraX << TILE_SHIFT);
-    src.top    = world.top  - (g_cameraY << TILE_SHIFT);
+    src.left   = world.left - (g_visibleTiles.left << TILE_SHIFT);
+    src.top    = world.top  - (g_visibleTiles.top << TILE_SHIFT);
     src.right  = world.right  - world.left + src.left;
     src.bottom = world.bottom - world.top  + src.top;
 
     IDirectDrawSurface_BltFast(g_offscreen,
-                               (DWORD)(world.left - g_viewX),
-                               (DWORD)(world.top  - g_viewY),
+                               (DWORD)(world.left - g_viewRect.left),
+                               (DWORD)(world.top  - g_viewRect.top),
                                g_mapCache, &src, DDBLTFAST_WAIT);
 }
 
@@ -195,15 +195,15 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
         return;
 
     if (!IntersectRect((LPRECT)&clipped, (const RECT *)tiles,
-                       (const RECT *)((const AM2_Rect *)g_visibleTiles)))
+                       (const RECT *)&g_visibleTiles))
         return;
 
     /* Tile coordinates become pixels relative to the camera. The destination
      * rectangle is itself the loop state: its top and bottom step per row,
      * its left and right per column, from a saved left edge. */
-    to.top    = (clipped.top - ((const AM2_Rect *)g_visibleTiles)->top) * MAP_TILE_SIZE;
+    to.top    = (clipped.top - g_visibleTiles.top) * MAP_TILE_SIZE;
     to.bottom = to.top + MAP_TILE_SIZE;
-    left      = (clipped.left - ((const AM2_Rect *)g_visibleTiles)->left) * MAP_TILE_SIZE;
+    left      = (clipped.left - g_visibleTiles.left) * MAP_TILE_SIZE;
 
     for (row = clipped.top; row < clipped.bottom; row++) {
         const uint16_t *cell;
@@ -541,7 +541,6 @@ bad:
  *
  * Exercised by every frame, so the Boot Camp pixel budget is what checks it. */
 /* Not const: ScrollDecay shifts all four edges every frame. */
-#define g_viewRect   ((AM2_Rect *)&g_viewX)
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 
 typedef void (__cdecl *am2_void_fn)(void);
@@ -631,8 +630,8 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
         return;
 
     /* The screen position is worked out before the empty tests. */
-    x = clip.left - g_viewRect->left;
-    y = clip.top  - g_viewRect->top;
+    x = clip.left - g_viewRect.left;
+    y = clip.top  - g_viewRect.top;
 
     src.left   = clip.left   - o->rect.left;
     src.top    = clip.top    - o->rect.top;
@@ -660,7 +659,7 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
                     (unsigned)am2_host_pump_number(), o->rect.left, o->rect.top, o->rect.right, o->rect.bottom,
                     world->left, world->top, world->right, world->bottom,
                     (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
-                    (long)(clip.left - g_viewRect->left), (long)(clip.top - g_viewRect->top),
+                    (long)(clip.left - g_viewRect.left), (long)(clip.top - g_viewRect.top),
                     spr->id, spr->format, spr->flags);
     }
 #endif
@@ -1006,12 +1005,12 @@ void __cdecl ScrollDecay(void)
     amp = left > AM2_SHAKE_FADE_MS ? g_shakeAmp : (g_shakeAmp * left) >> 10;
 
     dx = ShakeAxis(&g_shakePhaseX, &g_shakeStepX, amp);
-    g_viewRect->left  += dx;
-    g_viewRect->right += dx;
+    g_viewRect.left  += dx;
+    g_viewRect.right += dx;
 
     dy = ShakeAxis(&g_shakePhaseY, &g_shakeStepY, amp);
-    g_viewRect->top    += dy;
-    g_viewRect->bottom += dy;
+    g_viewRect.top    += dy;
+    g_viewRect.bottom += dy;
 }
 
 void __cdecl ComposeFrame(void)
@@ -1022,7 +1021,7 @@ void __cdecl ComposeFrame(void)
     ScrollMapCache();
 
     if (g_fullRedraw)
-        RedrawMapRegion(g_viewRect);
+        RedrawMapRegion(&g_viewRect);
     else
         ScrollView();
 
@@ -1037,12 +1036,12 @@ void __cdecl ComposeFrame(void)
                                g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
 
     /* This frame becomes last frame. */
-    *(AM2_Point *)&g_listenerPosPrev =
-        *(const AM2_Point *)&g_listenerPos;
+    g_listenerPosPrev =
+        g_listenerPos;
     g_viewRectPrev =
-        *(const AM2_Rect *)&g_viewX;
+        g_viewRect;
     g_secondRectPrev =
-        *(const AM2_Rect *)g_secondRect;
+        g_secondRect;
 
     g_fullRedraw = 0;
 }
@@ -1082,7 +1081,6 @@ void __cdecl ComposeFrame(void)
  * Exercised by `tools/ab.sh mission`, which exists because nothing else got
  * here: while either opening dialog is up the game composes no frames at all,
  * so this ran zero times under every earlier configuration. */
-#define g_viewPrev   (&g_viewRectPrev)
 
 typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
 
@@ -1116,7 +1114,6 @@ typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
  *
  * Exercised by tools/ab.sh mission, which scrolls; nothing else moves the
  * camera. */
-#define g_camera      ((AM2_Rect *)g_visibleTiles)
 
 /* The margin, in tiles, the view may drift before the camera follows it. */
 #define CAMERA_MARGIN 2
@@ -1158,37 +1155,37 @@ void __cdecl ScrollMapCache(void)
     if (!cache)
         return;
 
-    if (g_viewRect->left < (g_camera->left << TILE_SHIFT)
-        || g_viewRect->left > ((g_camera->left + CAMERA_MARGIN) << TILE_SHIFT)) {
-        int32_t now = g_viewRect->left >> TILE_SHIFT;
-        dx = now - g_camera->left;
-        g_camera->left  = now;
-        g_camera->right = g_viewTilesW + now;
+    if (g_viewRect.left < (g_visibleTiles.left << TILE_SHIFT)
+        || g_viewRect.left > ((g_visibleTiles.left + CAMERA_MARGIN) << TILE_SHIFT)) {
+        int32_t now = g_viewRect.left >> TILE_SHIFT;
+        dx = now - g_visibleTiles.left;
+        g_visibleTiles.left  = now;
+        g_visibleTiles.right = g_viewTilesW + now;
     }
-    if (g_viewRect->top < (g_camera->top << TILE_SHIFT)
-        || g_viewRect->top > ((g_camera->top + CAMERA_MARGIN) << TILE_SHIFT)) {
-        int32_t now = g_viewRect->top >> TILE_SHIFT;
-        dy = now - g_camera->top;
-        g_camera->top    = now;
-        g_camera->bottom = g_viewTilesH + now;
+    if (g_viewRect.top < (g_visibleTiles.top << TILE_SHIFT)
+        || g_viewRect.top > ((g_visibleTiles.top + CAMERA_MARGIN) << TILE_SHIFT)) {
+        int32_t now = g_viewRect.top >> TILE_SHIFT;
+        dy = now - g_visibleTiles.top;
+        g_visibleTiles.top    = now;
+        g_visibleTiles.bottom = g_viewTilesH + now;
     }
 
-    g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
-    g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
-    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
-    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
+    g_visibleTiles.left   = Clamp(g_visibleTiles.left,   0, g_mapTilesW - 1);
+    g_visibleTiles.right  = Clamp(g_visibleTiles.right,  0, g_mapTilesW - 1);
+    g_visibleTiles.top    = Clamp(g_visibleTiles.top,    0, g_mapTilesH - 1);
+    g_visibleTiles.bottom = Clamp(g_visibleTiles.bottom, 0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
-        PaintMapTiles(g_camera);
+        PaintMapTiles(&g_visibleTiles);
         return;
     }
     if (dx == 0 && dy == 0) {
-        orig_log((const char *)g_camera);   /* stubbed to `ret` */
+        orig_log((const char *)&g_visibleTiles);   /* stubbed to `ret` */
         return;
     }
 
     if ((adx = abs(dx)) >= g_viewTilesW || (ady = abs(dy)) >= g_viewTilesH) {
-        PaintMapTiles(g_camera);
+        PaintMapTiles(&g_visibleTiles);
         return;
     }
 
@@ -1205,8 +1202,8 @@ void __cdecl ScrollMapCache(void)
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
         tiles.left   = sx;
-        tiles.bottom = g_camera->bottom - ady - g_camera->top + ((dy > 0) ? dy : 0);
-        tiles.right  = g_camera->right - adx - g_camera->left + sx;
+        tiles.bottom = g_visibleTiles.bottom - ady - g_visibleTiles.top + ((dy > 0) ? dy : 0);
+        tiles.right  = g_visibleTiles.right - adx - g_visibleTiles.left + sx;
         tiles.top    = (0 < dy) ? dy : 0;   /* spelled as the image compares it */
 
         src.left   = sx << TILE_SHIFT;
@@ -1221,32 +1218,32 @@ void __cdecl ScrollMapCache(void)
                                    cache, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
-    wide.left  = g_camera->left;
-    wide.right = g_camera->right;
+    wide.left  = g_visibleTiles.left;
+    wide.right = g_visibleTiles.right;
 
     if (dx != 0) {
         if (dx > 0) {
-            tall.left  = g_camera->right - dx;
+            tall.left  = g_visibleTiles.right - dx;
             tall.right = tall.left + dx;
             wide.right = tall.left;
         } else {
-            tall.left  = g_camera->left;
-            tall.right = g_camera->left - dx;
+            tall.left  = g_visibleTiles.left;
+            tall.right = g_visibleTiles.left - dx;
             wide.left  = tall.right;
         }
-        tall.top    = g_camera->top;
-        tall.bottom = g_camera->bottom;
+        tall.top    = g_visibleTiles.top;
+        tall.bottom = g_visibleTiles.bottom;
         PaintMapTiles(&tall);
     }
 
     if (dy == 0)
         return;
     if (dy > 0) {
-        wide.top    = g_camera->bottom - dy;
-        wide.bottom = g_camera->bottom;
+        wide.top    = g_visibleTiles.bottom - dy;
+        wide.bottom = g_visibleTiles.bottom;
     } else {
-        wide.bottom = g_camera->top - dy;
-        wide.top    = g_camera->top;
+        wide.bottom = g_visibleTiles.top - dy;
+        wide.top    = g_visibleTiles.top;
     }
     PaintMapTiles(&wide);
 }
@@ -1256,10 +1253,10 @@ void __cdecl ScrollView(void)
     AM2_Rect now, was, common, strip;
     int32_t  toX, toY;
 
-    IntersectRect((LPRECT)&now, (const RECT *)g_viewRect,
-                  (const RECT *)((const AM2_Rect *)g_mapBounds));
-    IntersectRect((LPRECT)&was, (const RECT *)g_viewPrev,
-                  (const RECT *)((const AM2_Rect *)g_mapBounds));
+    IntersectRect((LPRECT)&now, (const RECT *)&g_viewRect,
+                  (const RECT *)&g_mapBounds);
+    IntersectRect((LPRECT)&was, (const RECT *)&g_viewRectPrev,
+                  (const RECT *)&g_mapBounds);
 
     if (!IntersectRect((LPRECT)&common, (const RECT *)&now,
                        (const RECT *)&was)) {
@@ -1795,11 +1792,6 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
 #undef INNER
 }
 
-/* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
- * g_listenerPos and a second name would be an alias, while a non-const twin of
- * the same name would be a drift. It is written through a cast here, and the
- * one-address-two-readings note lives in orig.h. */
-#define VIEW_EYE ((AM2_Point *)&g_listenerPos)
 
 /* 0x0042B5A0, one caller -- the per-frame path. The CAMERA.
  *
@@ -1844,10 +1836,10 @@ void __cdecl ViewUpdate(void)
     AM2_Point vpt;
     void   *obj;
 
-    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, (w >> 1) + g_mapBoundsLeft,
-                                    g_mapBoundsRight - halfW - 1);
-    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + g_mapBoundsTop,
-                                    g_mapBoundsBottom - (h >> 1) - 1);
+    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, (w >> 1) + g_mapInset.left,
+                                    g_mapInset.right - halfW - 1);
+    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + g_mapInset.top,
+                                    g_mapInset.bottom - (h >> 1) - 1);
 
     obj = g_objCtxObj;
     if (obj) {
@@ -1868,12 +1860,12 @@ void __cdecl ViewUpdate(void)
         }
     }
 
-    dist = ApproxDist(VIEW_EYE, &g_viewTarget);
+    dist = ApproxDist(&g_listenerPos, &g_viewTarget);
     step = (int32_t)(g_viewSpeed
                      * g_frameDeltaSec);
 
-    dx = g_viewTarget.x - VIEW_EYE->x;
-    dy = g_viewTarget.y - VIEW_EYE->y;
+    dx = g_viewTarget.x - g_listenerPos.x;
+    dy = g_viewTarget.y - g_listenerPos.y;
 
     /* THE TARGET IS NOT WRITTEN BACK. The step lands in two locals -- x in a
      * register, y in the word at frame +0x16 -- and only the eye moves, so a
@@ -1891,37 +1883,34 @@ void __cdecl ViewUpdate(void)
     } else {
         g_viewHold = 0;
     }
-    vpt.y = (int16_t)(dy + VIEW_EYE->y);
-    tx = (int16_t)(dx + VIEW_EYE->x);
+    vpt.y = (int16_t)(dy + g_listenerPos.y);
+    tx = (int16_t)(dx + g_listenerPos.x);
 
 clamp_eye:
-    vpt.x = (int16_t)Clamp(tx, halfW + g_mapBoundsLeft, g_mapBoundsRight - halfW - 1);
-    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapBoundsTop, g_mapBoundsBottom - (h >> 1) - 1);
+    vpt.x = (int16_t)Clamp(tx, halfW + g_mapInset.left, g_mapInset.right - halfW - 1);
+    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapInset.top, g_mapInset.bottom - (h >> 1) - 1);
 
     {
-        int32_t *world  = g_secondRect;
-#define origin (&g_viewX)
         int32_t  vl = vpt.x - halfW;
         int32_t  vt = vpt.y - (h >> 1);
 
-        world[0] = vl;
-        world[1] = vt;
-        world[3] = vt + h;
-        world[2] = vl + w;
+        g_secondRect.left   = vl;
+        g_secondRect.top    = vt;
+        g_secondRect.bottom = vt + h;
+        g_secondRect.right  = vl + w;
 
-        origin[1] = vt - g_blitRect->top;
-        origin[0] = vl - g_blitRect->left;
-        origin[2] = g_screenW + origin[0];
-        origin[3] = g_screenH + origin[1];
+        g_viewRect.top    = vt - g_blitRect->top;
+        g_viewRect.left   = vl - g_blitRect->left;
+        g_viewRect.right  = g_screenW + g_viewRect.left;
+        g_viewRect.bottom = g_screenH + g_viewRect.top;
 
-        VIEW_EYE->y = (int16_t)vpt.y;
-        VIEW_EYE->x = (int16_t)vpt.x;
+        g_listenerPos.y = (int16_t)vpt.y;
+        g_listenerPos.x = (int16_t)vpt.x;
 
         IntersectRect(g_viewClipped,
-                      (const RECT *)origin,
-                      (const RECT *)g_mapBounds);
+                      (const RECT *)&g_viewRect,
+                      (const RECT *)&g_mapBounds);
     }
-#undef origin
 }
 
 /* 0x00413610. Outline a rectangle held in view space.
@@ -1942,16 +1931,16 @@ void __cdecl DrawViewRect(void)
 {
     AM2_Rect on_screen;
 
-    if (g_viewRectOn == 0)
+    if (g_dragRectOn == 0)
         return;
 
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    on_screen.left   = ((const AM2_Rect *)g_viewRect_)->left   - g_viewX;
-    on_screen.top    = ((const AM2_Rect *)g_viewRect_)->top    - g_viewY;
-    on_screen.right  = ((const AM2_Rect *)g_viewRect_)->right  - g_viewX;
-    on_screen.bottom = ((const AM2_Rect *)g_viewRect_)->bottom - g_viewY;
+    on_screen.left   = g_dragRect.left   - g_viewRect.left;
+    on_screen.top    = g_dragRect.top    - g_viewRect.top;
+    on_screen.right  = g_dragRect.right  - g_viewRect.left;
+    on_screen.bottom = g_dragRect.bottom - g_viewRect.top;
 
     DrawRect(&on_screen, g_hiliteColour);
     UnlockSurface();
@@ -2032,9 +2021,9 @@ void __cdecl DrawSelection(void)
 
         DrawSprite(spr,
                    leader->pos.x
-                       - g_viewX,
+                       - g_viewRect.left,
                    leader->pos.y
-                       - g_viewY
+                       - g_viewRect.top
                        + AM2_LEADER_MARK_DY,
                    0);
     }
@@ -2065,8 +2054,8 @@ void __cdecl DrawSelection(void)
             continue;
         }
 
-        x = obj->pos.x - g_viewX;
-        y = obj->pos.y - g_viewY;
+        x = obj->pos.x - g_viewRect.left;
+        y = obj->pos.y - g_viewRect.top;
 
         if (ObjIsType2(obj)) {
             drop = AM2_MARK_TROOPER_DY;
@@ -2480,7 +2469,7 @@ void __cdecl DrawEffectLayer(void)
 
         if ((g_aimLiveB)[army]) {
             const int16_t *ptB = (const int16_t *)(g_aimPointB + army * 4);
-            int32_t *held = &(g_aimFrameB)[army];
+            int32_t *held = &g_aimFrameB[army];
             int32_t  frameB;
 
             frameB = (int32_t)((uint32_t)(g_gameClockMs - (g_aimStampB)[army])
@@ -2615,12 +2604,12 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
         strength = AM2_SHAKE_STRENGTH_MAX;
 
     /* The middle of the view, halved with a shift. */
-    centre.x = (int16_t)(((g_viewFarX
-                           - g_viewX) >> 1)
-                         + g_viewX);
-    centre.y = (int16_t)(((g_viewFarY
-                           - g_viewY) >> 1)
-                         + g_viewY);
+    centre.x = (int16_t)(((g_viewRect.right
+                           - g_viewRect.left) >> 1)
+                         + g_viewRect.left);
+    centre.y = (int16_t)(((g_viewRect.bottom
+                           - g_viewRect.top) >> 1)
+                         + g_viewRect.top);
 
     dist = ApproxDist(at, &centre);
     if (dist >= AM2_SHAKE_FAR)
@@ -2884,7 +2873,7 @@ int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out)
     box.bottom = y + AM2_BOAT_EXIT_RANGE;
 
     IntersectRect((LPRECT)&clipped,
-                  (const RECT *)g_mapBounds,
+                  (const RECT *)&g_mapBounds,
                   (const RECT *)&box);
 
     /* Each corner is packed from the LOW words of the clipped rectangle into

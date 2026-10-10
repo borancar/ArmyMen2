@@ -2334,18 +2334,6 @@ void __cdecl ItemTeardown(AM2_Object *obj)
     o->flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 }
 
-/* The row shift read as the whole dword it is stored in, where ObjAfterMove
- * shifts by it straight from memory (`mov ecx, dword [0x00514DE4]`) rather
- * than through g_mapRowShift's byte. A symbol of its own in the relink build,
- * as g_pillboxTrooperHealth's: relink.py maps am2_rl_* by the address in the
- * comment. */
-#if defined(AM2_RELINK)
-extern "C" const int32_t am2_rl_map_row_shift32;  /* 0x00514DE4 */
-#define g_mapRowShift32          am2_rl_map_row_shift32
-#else
-#define g_mapRowShift32          (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)  /* 0x00514DE4 */
-#endif
-
 /* ObjAfterMove -- original 0x00439000, four callers. ItemTeardown's MIRROR,
  * one function earlier in the image: same gate, same three-way type switch,
  * same mask walk, ADDING the height where that one subtracts it, and SETTING
@@ -2457,7 +2445,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
          * agree only for a power-of-two width, which ShiftTileCover's own
          * comment already records as the reason that shift is stored beside
          * the width. Each is written as its own function has it. */
-        int32_t cell = (row << g_mapRowShift32)
+        int32_t cell = (row << *(const int32_t *)&g_mapRowShift)
                        + mask.box.left;
 
         for (x = mask.box.left; x <= mask.box.right; idx++, cell++, x++) {
@@ -8725,7 +8713,6 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
  * a `grep -E 'error'` had been discarding all session. */
 #define AM2_CHEAT_ABS(v)  abs(v)
 
-#define g_viewRect   ((AM2_Rect *)&g_viewX)
 
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
@@ -8815,9 +8802,9 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     /* The image adds the packed dwords and keeps the low half for x, then the
      * two high words for y -- the same idiom the cheat console's jumpjets arm
      * uses, and written as halves here for the same reason. */
-    at.x  = (int16_t)(*(const int16_t *)&g_cursorPoint + g_viewRect->left);
+    at.x  = (int16_t)(*(const int16_t *)&g_cursorPoint + g_viewRect.left);
     at.y  = (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                      + *(const int16_t *)&g_viewRect->top);
+                      + *(const int16_t *)&g_viewRect.top);
     dist  = ApproxDist(&o->pos, &at);
     /* THE WHOLE POINT IS COPIED AND ONLY ITS Y IS THEN REPLACED. 0x0044A4F2
      * loads slot +0x10 as a DWORD and 0x0044A4FB stores it into slot +0x0C,
@@ -8941,8 +8928,8 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         {
             int32_t k = weapon->typeRec->kind;
             if (k >= 0x27 && k <= 0x28) {
-                out->spot.at.x = (uint16_t)(g_viewRect->left + g_cursorX);
-                out->spot.at.y = (uint16_t)(g_viewRect->top + g_cursorY);
+                out->spot.at.x = (uint16_t)(g_viewRect.left + g_cursorX);
+                out->spot.at.y = (uint16_t)(g_viewRect.top + g_cursorY);
             }
         }
     }
@@ -8957,8 +8944,8 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         k = weapon->typeRec->kind;
         if (k != 0xB) {
             if (k > 0x17 && k <= 0x1A) {
-                out->spot.at.x = (uint16_t)(g_viewRect->left + g_cursorX);
-                out->spot.at.y = (uint16_t)(g_viewRect->top + g_cursorY);
+                out->spot.at.x = (uint16_t)(g_viewRect.left + g_cursorX);
+                out->spot.at.y = (uint16_t)(g_viewRect.top + g_cursorY);
             }
         } else {
             out->spot.at.x = (uint16_t)o->pos.x;
@@ -9075,9 +9062,9 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                 switch (weapon->typeRec->kind) {
                 case 0x18: case 0x19: case 0x1A: case 0x27: case 0x28:
                     out->spot.at.x =
-                        (uint16_t)(g_viewRect->left + g_cursorX);
+                        (uint16_t)(g_viewRect.left + g_cursorX);
                     out->spot.at.y =
-                        (uint16_t)(g_viewRect->top + g_cursorY);
+                        (uint16_t)(g_viewRect.top + g_cursorY);
                     break;
                 }
             }
@@ -10235,11 +10222,11 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             uint8_t aim;
 
             cursorWorld.x = (int16_t)(
-                g_viewX
+                g_viewRect.left
                 + g_cursorPoint);
             cursorWorld.y = (int16_t)(
                 *(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                + *(const int16_t *)&g_viewY);
+                + *(const int16_t *)&g_viewRect.top);
 
             dist = ApproxDist(&o->pos,
                               &cursorWorld);

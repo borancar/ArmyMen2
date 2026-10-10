@@ -145,8 +145,6 @@ struct AM2_Edit;
 #define g_buildMenu              ((struct AM2_BuildMenuRec *)(uintptr_t)ADDR_BUILD_MENU)  /* 0x004762D0 */
 #define g_buildMenuEnd           ((struct AM2_BuildMenuRec *)(uintptr_t)ADDR_BUILD_MENU_END)  /* 0x004766C0 */
 #define g_buildMenuRects         ((struct AM2_BuildButtonRec *)(uintptr_t)ADDR_BUILD_MENU_RECTS)  /* 0x004762C0 */
-#define g_cameraX                (*(int32_t *)(uintptr_t)ADDR_CAMERA_X)  /* 0x00514EA8 */
-#define g_cameraY                (*(int32_t *)(uintptr_t)ADDR_CAMERA_Y)  /* 0x00514EAC */
 #define g_cdFoundFlag            (*(int32_t *)(uintptr_t)ADDR_CD_FOUND_FLAG)  /* 0x00512594 */
 #define g_cdPath                 ((char *)(uintptr_t)ADDR_CD_PATH)  /* 0x00512464 */
 #define g_cdPresent              (*(int32_t *)(uintptr_t)ADDR_CD_PRESENT)  /* 0x00512588 */
@@ -366,8 +364,8 @@ struct AM2_Edit;
 #define g_levelStrD              ((char *)(uintptr_t)ADDR_LEVEL_STR_D)  /* 0x00511CD8 */
 #define g_levelTable             (*(struct AM2_Level **)(uintptr_t)ADDR_LEVEL_TABLE)  /* 0x00656338 */
 #define g_levelTableCap          (*(int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_CAP)  /* 0x00656340 */
-#define g_listenerPos            (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  /* 0x00514E0C */
-#define g_listenerPosPrev        (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV)  /* 0x00514E10 */
+#define g_listenerPos            (*(AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)  /* 0x00514E0C */
+#define g_listenerPosPrev        (*(AM2_Point *)(uintptr_t)ADDR_LISTENER_POS_PREV)  /* 0x00514E10 */
 #define g_listInkHotSel          (*(uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL)  /* 0x00502ACC */
 #define g_liveBattleName         ((char *)(uintptr_t)ADDR_LIVE_BATTLE_NAME)  /* 0x00516035 */
 #define g_livePlayerName         ((char *)(uintptr_t)ADDR_LIVE_PLAYER_NAME)  /* 0x00515FF4 */
@@ -376,11 +374,8 @@ struct AM2_Edit;
 #define g_logpaletteEntries      ((uint8_t *)(uintptr_t)ADDR_LOGPALETTE_ENTRIES)  /* 0x00477A64 */
 #define g_looping                (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)  /* 0x004FA45C */
 #define g_mapBlock               ((char *)(uintptr_t)ADDR_MAP_BLOCK)  /* 0x00514D90 */
-#define g_mapBounds              ((uint8_t *)(uintptr_t)ADDR_MAP_BOUNDS)  /* 0x00514DE8 */
-#define g_mapBoundsBottom        (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM)  /* 0x00514E04 */
-#define g_mapBoundsLeft          (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT)  /* 0x00514DF8 */
-#define g_mapBoundsRight         (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT)  /* 0x00514E00 */
-#define g_mapBoundsTop           (*(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP)  /* 0x00514DFC */
+#define g_mapBounds              (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)  /* 0x00514DE8 */
+#define g_mapInset               (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT)  /* 0x00514DF8, 0x40 in from g_mapBounds */
 #define g_mapChecksum            (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)  /* 0x00511CCC */
 #define g_mapDesc                ((struct AM2_MapDesc *)(uintptr_t)ADDR_MAP_DESC)  /* 0x00514F20 */
 #define g_mapExtentShift         (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_SHIFT)  /* 0x00514DD8 */
@@ -401,8 +396,8 @@ struct AM2_Edit;
 #define g_markSprites            (*(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES)  /* 0x0048CBB0 */
 #define g_medicHealPct           (*(int32_t *)(uintptr_t)ADDR_MEDIC_HEAL_PCT)  /* 0x006624F8 */
 #define g_menuCursorDx           (*(AM2_Point *)(uintptr_t)ADDR_MENU_CURSOR_DX)  /* 0x004FCDBC */
-#define g_menuCursorPrev         ((uint8_t *)(uintptr_t)ADDR_MENU_CURSOR_PREV)  /* 0x004FCDC8 */
-#define g_menuCursorRect         ((uint8_t *)(uintptr_t)ADDR_MENU_CURSOR_RECT)  /* 0x004FCDD8 */
+#define g_menuCursorPrev         (*(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV)  /* 0x004FCDC8 */
+#define g_menuCursorRect         (*(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT)  /* 0x004FCDD8 */
 #define g_menuEnabled            (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)  /* 0x004FCEF8 */
 #define g_menuInk                (*(uint8_t **)(uintptr_t)ADDR_MENU_INK)  /* 0x004FCDB0 */
 #define g_menuMsgList            (*(void **)(uintptr_t)ADDR_MENU_MSG_LIST)  /* 0x0051612C */
@@ -704,7 +699,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_scriptUnknownStr       ((uint8_t *)(uintptr_t)ADDR_SCRIPT_UNKNOWN_STR)  /* 0x00488258 */
 #define g_scriptWordBuf          ((char *)(uintptr_t)ADDR_SCRIPT_WORD_BUF)  /* 0x00656354 */
 #define g_secondDeadline         (*(int32_t *)(uintptr_t)ADDR_SECOND_DEADLINE)  /* 0x005122F8 */
-#define g_secondRect             ((int32_t *)(uintptr_t)ADDR_SECOND_RECT)  /* 0x00514E34 */
+#define g_secondRect             (*(AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT)  /* 0x00514E34 */
 #define g_secondRectPrev         (*(AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT_PREV)  /* 0x00514E44 */
 #define g_selectedCount          (*(int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)  /* 0x0051230C */
 #define g_selectedItems          (*(uint32_t **)(uintptr_t)ADDR_SELECTED_ITEMS)  /* 0x00512310 */
@@ -874,20 +869,17 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_vehicleNames           ((char **)(uintptr_t)ADDR_VEHICLE_NAMES)  /* 0x0048BE50 */
 #define g_vehicleRowSpec         ((const struct AM2_RowSpec *)(uintptr_t)ADDR_VEHICLE_ROW_SPEC)  /* 0x0048BE20 */
 #define g_viewColourCopy         (*(uint8_t *)(uintptr_t)ADDR_VIEW_COLOUR_COPY)  /* 0x004FCFA8 */
-#define g_viewFarX               (*(int32_t *)(uintptr_t)ADDR_VIEW_FAR_X)  /* 0x00514E1C */
-#define g_viewFarY               (*(int32_t *)(uintptr_t)ADDR_VIEW_FAR_Y)  /* 0x00514E20 */
 #define g_viewHold               (*(int32_t *)(uintptr_t)ADDR_VIEW_HOLD)  /* 0x00511E38 */
-#define g_viewRect_              ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)  /* 0x004FCF70 */
-#define g_viewRectOn             (*(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON)  /* 0x004FCF58 */
+#define g_dragRect               (*(AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT)  /* 0x004FCF70, the rubber band */
+#define g_viewRect               (*(AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)  /* 0x00514E14 */
+#define g_dragRectOn             (*(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON)  /* 0x004FCF58 */
 #define g_viewRectPrev           (*(AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV)  /* 0x00514E24 */
 #define g_viewSnap               (*(int32_t *)(uintptr_t)ADDR_VIEW_SNAP)  /* 0x00511E34 */
 #define g_viewSpeed              (*(int32_t *)(uintptr_t)ADDR_VIEW_SPEED)  /* 0x004852E0 */
 #define g_viewTarget             (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)  /* 0x00514E08 */
 #define g_viewTilesH             (*(int32_t *)(uintptr_t)ADDR_VIEW_TILES_H)  /* 0x00514EA4 */
 #define g_viewTilesW             (*(int32_t *)(uintptr_t)ADDR_VIEW_TILES_W)  /* 0x00514EA0 */
-#define g_viewX                  (*(int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)  /* 0x00514E14 */
-#define g_viewY                  (*(int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y)  /* 0x00514E18 */
-#define g_visibleTiles           ((uint8_t *)(uintptr_t)ADDR_VISIBLE_TILES)  /* 0x00514EA8 */
+#define g_visibleTiles           (*(AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES)  /* 0x00514EA8 */
 #define g_voiceGroups            ((struct VoiceGroup *)(uintptr_t)ADDR_VOICE_GROUPS)  /* 0x00474440 */
 #define g_voiceVolume            (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)  /* 0x00512320 */
 #define g_volumeAtZero           (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)  /* 0x00512318 */

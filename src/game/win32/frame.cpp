@@ -78,11 +78,6 @@ typedef void    (__cdecl *AM2_NoArgFn)(void);
 typedef int32_t (__cdecl *AM2_ActionKeyFn)(int32_t action);
 typedef void    (__cdecl *AM2_VoidFn0b)(void);
 typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
-/* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
- * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
-/* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
-#define VIEW_TARGET (&g_viewTarget)
-#define VIEW_EYE2   ((const AM2_Point *)&g_listenerPos)
 
 
 /* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
@@ -179,20 +174,20 @@ void __cdecl MissionInput(void)
     if ((*(const int16_t *)&g_cursorPoint) > g_bitmapAreaW
               - AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
-        VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x + step);
+        g_viewTarget.x = (int16_t)(g_listenerPos.x + step);
     }
     if ((*(const int16_t *)&g_cursorPoint) < AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
-        VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x - step);
+        g_viewTarget.x = (int16_t)(g_listenerPos.x - step);
     }
     if ((*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2)) > g_bitmapAreaH
               - AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
-        VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y + step);
+        g_viewTarget.y = (int16_t)(g_listenerPos.y + step);
     }
     if ((*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2)) < AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
-        VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y - step);
+        g_viewTarget.y = (int16_t)(g_listenerPos.y - step);
     }
 }
 

@@ -1251,8 +1251,6 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
  * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
 extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #endif
-#define g_cursorRect    ((AM2_Rect *)g_menuCursorRect)
-#define g_cursorPrev    ((AM2_Rect *)g_menuCursorPrev)
 
 
 /* 0x00412D30, thirty callers -- everything that highlights a menu row goes
@@ -1425,7 +1423,7 @@ void __cdecl DrawMenuCursor(void)
 
         /* And restore last tick's area, which the redraw above may have left
          * stale. */
-        if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
+        if (IntersectRect((LPRECT)&cur, (const RECT *)&g_menuCursorRect,
                           (const RECT *)&g_screenClip)) {
             clipped = cur;
             if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
@@ -1463,7 +1461,7 @@ void __cdecl DrawMenuCursor(void)
     }
 
     /* This tick becomes last tick. */
-    *g_cursorPrev = *g_cursorRect;
+    g_menuCursorPrev = g_menuCursorRect;
 
     if (g_menuSpritesEnd) {
         const AM2_Sprite *spr = g_menuSpritesEnd;
@@ -1474,7 +1472,7 @@ void __cdecl DrawMenuCursor(void)
         r = RectMake(g_cursorX - hx, g_cursorY - hy,
                      g_cursorX + spr->bounds.right - hx,
                      g_cursorY + spr->bounds.bottom - hy);
-        *g_cursorRect = r;
+        g_menuCursorRect = r;
     }
 }
 

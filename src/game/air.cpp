@@ -607,8 +607,8 @@ void __cdecl FormationPointFar(AM2_Object *follower, AM2_Object *leader, AM2_Poi
         out->x = (int16_t)(int32_t)(Cos8(facing) * d + out->x);
         out->y = (int16_t)(int32_t)(Sin8(facing) * d + out->y);
 
-        out->x = (int16_t)Clamp(out->x, g_mapBoundsLeft, g_mapBoundsRight);
-        out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
+        out->x = (int16_t)Clamp(out->x, g_mapInset.left, g_mapInset.right);
+        out->y = (int16_t)Clamp(out->y, g_mapInset.top, g_mapInset.bottom);
     }
 
     SettlePointInRegion(TileOfPoint(*out), out);
@@ -701,8 +701,8 @@ void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point 
         out->y = (int16_t)(int32_t)(Sin8(facing) * d + out->y);
 
 
-        out->x = (int16_t)Clamp(out->x, g_mapBoundsLeft, g_mapBoundsRight);
-        out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
+        out->x = (int16_t)Clamp(out->x, g_mapInset.left, g_mapInset.right);
+        out->y = (int16_t)Clamp(out->y, g_mapInset.top, g_mapInset.bottom);
     }
 
     SettlePointInRegion(TileOfPoint(*out), out);
@@ -1426,9 +1426,9 @@ void __cdecl AirPassesDraw(void)
 
     for (i = 0; i < g_airPassCount; i++) {
         x = g_airPassWhere[i].x
-            - g_viewX;
+            - g_viewRect.left;
         y = g_airPassWhere[i].y
-            - g_viewY
+            - g_viewRect.top
             - AM2_AIR_PASS_LIFT;
 
         if (g_airPassTimer[i] < (g_airPassMs >> 1)) {

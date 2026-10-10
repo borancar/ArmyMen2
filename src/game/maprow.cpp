@@ -535,7 +535,7 @@ static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
     i = slots[0].next;
     do {
         if (!orig_intersect_rect(scratch,
-                                 (const void *)&g_viewX,
+                                 (const void *)&g_viewRect,
                                  &slots[i].row->rect)) {
             i = release(&slots[i]);
             if (--left <= 0)
@@ -1884,7 +1884,7 @@ void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
         uint8_t scratch[16];
 
         if (!orig_intersect_rect(scratch,
-                                 (const void *)&g_viewX,
+                                 (const void *)&g_viewRect,
                                  &RECB(i)->row->rect)) {
             i = SeqRetire(ctxv, RECB(i));
             if (--left <= 0)
@@ -2064,7 +2064,7 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
     int32_t        half;
     AM2_MapRow       *row;
 
-    if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
+    if (!PointInRect(&g_mapInset,
                      at))
         return;
 
