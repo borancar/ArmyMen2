@@ -2660,8 +2660,9 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     box->top = tile.top - AM2_TILEMASK_MARGIN;
     box->left = tile.left - AM2_TILEMASK_MARGIN;
 
+    memset(out->cells, 0,
+           (size_t)((box->bottom - box->top + 1) * (box->right - box->left + 1)));
     w = box->right - box->left + 1;
-    memset(out->cells, 0, (size_t)((box->bottom - box->top + 1) * w));
 
     g_tilemaskNeighbours[8]  = -2;
     g_tilemaskNeighbours[14] = w;

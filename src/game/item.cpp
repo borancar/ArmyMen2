@@ -2125,13 +2125,13 @@ static inline void ObjFootprint(AM2_Object *obj, int32_t set)
 
     /* The record is indexed afresh each pass -- the kind and the count
      * re-read -- as the image walks it. */
-    for (i = 0; i < g_vehicleMasks [o->vehicleKind * 32 + dir].count; i++) {
+    for (i = 0; i < g_vehicleMasks[o->vehicleKind * 32 + dir].count; i++) {
         AM2_Point at;
         uint16_t *mark;
         int32_t   tile;
 
-        at.x = (int16_t)(g_vehicleMasks [o->vehicleKind * 32 + dir].pts[i].x + o->pos.x);
-        at.y = (int16_t)(g_vehicleMasks [o->vehicleKind * 32 + dir].pts[i].y + o->pos.y);
+        at.x = (int16_t)(g_vehicleMasks[o->vehicleKind * 32 + dir].pts[i].x + o->pos.x);
+        at.y = (int16_t)(g_vehicleMasks[o->vehicleKind * 32 + dir].pts[i].y + o->pos.y);
 
         mark = g_objMark
                + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX)
