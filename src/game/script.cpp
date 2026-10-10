@@ -2455,10 +2455,7 @@ eos:
         if (TOK.kind == AM2_TOKEN_INTEGER) {
             act->n0 = TOKVAL;
             act->n0 = (uint8_t)act->n0;
-            if (++(*at) >= ctx->count) {
-                am2_log("Unexpected end of script.\n");
-                return 0;
-            }
+            STEP();
         } else
             act->n0 = -1;
 place:
