@@ -251,6 +251,20 @@ store (`mov edx, [esp+0x40]`) while `state` and `hit` go through `ebp`. That
 suggests two pointer variables in the original, but a local alias for
 `state`/`hit` was propagated away.
 
+## Loop and temporary shapes that show in the image
+
+- **A rotated `while (p->next) { ... }` is not `while (1) { if (!p->next) break;
+  ... }`.** The first compiles to an entry test plus a bottom test that falls
+  into the code after the loop; the second stays top-tested with a `jmp` back.
+  DepthInsert's last walk was the second and the image is the first (516 -> 514).
+  Its backward walk, rewritten the same way, got much worse (514 -> 588), so
+  read each loop's exits in the image rather than converting them all.
+- **A byte read used straight in a test chain stays in `al`.** FindPath's
+  neighbour region (`test al, al; jbe`, then `and eax, 0xff` before comparing
+  with the int32 regions) is `region[t]` read in place each time, not an
+  `int32_t` local, which gives a signed `jle` on the widened value, nor a
+  `uint8_t` local, which spills it (1368 -> 1358).
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.
