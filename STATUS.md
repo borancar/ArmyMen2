@@ -66,8 +66,13 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1570 of
-  1645 byte-identical (2026-10-10), piecewise 399.** PointerActionFollow
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1571 of
+  1645 byte-identical (2026-10-10), piecewise 399.** Step3Input matches:
+  it read g_mouseButton/g_mouseChanged through local pointers, which put the
+  load in ecx (a six-byte `mov`) where the image's eax takes the five-byte
+  short form, shifting every later jump by one. SelectionClick 46 -> 14
+  bytes: its ctrl-click deselect passes the zero point through a local
+  copy. PointerActionFollow
   matches: its leader is a ternary between the live lookup and the dead scan
   as an inline of its own, which lays the scan between the arms with its NULL
   falling into the shared test. ReceivePlayerMsg matches:
