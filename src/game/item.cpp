@@ -1915,7 +1915,9 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
     baseY = (o->pos.y >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
-    dir = RoundTo8((rows->headingBias
+    /* The bias is read through the object again, the heading and the
+     * animation through `rows`, as the image has it. */
+    dir = RoundTo8((((const AM2_MapRow *)o->rowSet.rows)->headingBias
                     + rows->heading) & 0xFF,
                    (((const AM2_Anim *)rows->animPlaying))->directionBits) & 0xFF;
 
