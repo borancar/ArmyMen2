@@ -2026,6 +2026,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->code = 0x1F;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
+        /* DROPITEM ends in this same test; one goto from there makes
+         * this the copy both use, as in the image. */
+    located:
         if (*at < ctx->count)
             return ScriptLocation(ctx, at, act, 0) != 0;
 eos:
@@ -2369,9 +2372,7 @@ eos:
             return 0;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at < ctx->count)
-            goto place;
-        goto eos;
+        goto located;
 
     case AM2_TOK_SETZOMBIE:
         STEP();
