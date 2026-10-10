@@ -11089,7 +11089,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     ct = top    >> AM2_CELL_SHIFT;
     cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
     cl = left   >> AM2_CELL_SHIFT;
-    cb = ((o->box.bottom - o->box.top) + top)  >> AM2_CELL_SHIFT;
+    cb = ((o->box.bottom - o->box.top) + y + o->box.top)  >> AM2_CELL_SHIFT;
 
     /* Off the grid in any direction is an unregister, not a clamp. The
      * grid size is read where it is compared, rows first, and the column

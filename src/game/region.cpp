@@ -4850,7 +4850,8 @@ score:
                      - (int32_t)o->pos.x;
                 dy = (int32_t)it->pos.y
                      - (int32_t)o->pos.y;
-                candRange   = ApproxDistXY(dx, dy);
+                candRange   = ApproxDistXY((int32_t)it->pos.x
+                                           - (int32_t)o->pos.x, dy);
                 candBearing = (uint8_t)AngleOfDelta(dx, dy);
 
                 delta = AngleDelta(look, candBearing);
@@ -9615,7 +9616,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
         {
             int32_t heading = gun->heading;
 
-            first  = RoundTo8((gun->headingBias + heading) & 0xFF,
+            first  = RoundTo8((o->rowSet.rows->headingBias + heading) & 0xFF,
                               (*animRec)->directionBits);
         }
         second = RoundTo8((gun->headingBias + turn
@@ -9761,10 +9762,9 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             animRec = &turret->animPlaying;
             {
-                int32_t bias    = turret->headingBias;
                 int32_t dirBits = (*animRec)->directionBits;
 
-                first  = RoundTo8((bias + turret->heading) & 0xFF,
+                first  = RoundTo8((turret->headingBias + turret->heading) & 0xFF,
                                   dirBits);
             }
             second = RoundTo8((turret->headingBias + swing
@@ -9775,7 +9775,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 AM2_MapRow *g = o->rowSet.rows;
 
                 if (g->turnStamp == g_gameClockMs) {
-                    turret->turnStamp = g_gameClockMs;
+                    o->rowSet.rows[1].turnStamp = g_gameClockMs;
                 } else {
                     uint32_t age = g_gameClockMs - turret->turnStamp;
 

@@ -960,7 +960,7 @@ subdivide:
         AM2_Rect  a;
         AM2_Rect  c;
 
-        if (dw > dh) {
+        if (right - left > dh) {
             half = left + dw / 2;
             sub  = (dw <= AM2_SUBDIVIDE_FLOOR) ? deep : 1;
 
@@ -1875,7 +1875,7 @@ void __cdecl ViewUpdate(void)
      * tail with the deltas unscaled, which lands exactly on the target. */
     if (!g_viewHold) {
         if (dist > step) {
-            dx = dx * step / dist;
+            dx = dx * (int32_t)(g_viewSpeed * g_frameDeltaSec) / dist;
             dy = dy * step / dist;
         }
     } else {
@@ -2434,7 +2434,8 @@ void __cdecl DrawEffectLayer(void)
                         else
                             d.y += (int16_t)box.top;
 
-                        block[at] = g_frameBuf[d.y * g_pitch + d.x];
+                        block[(row - box.top) * AM2_AIM_BLOCK
+                              + (col - box.left)] = g_frameBuf[d.y * g_pitch + d.x];
                     }
                 }
 

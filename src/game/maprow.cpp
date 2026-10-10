@@ -1146,13 +1146,13 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
 
     while (used < (int32_t)r->owns) {
         AM2_CellEntry *entry = &r->buffer[used];
-        int32_t       was   = entry->cell;
+        int32_t       was   = r->buffer[used].cell;
 
         if (was < 0)
             break;
 
         ListUnlink(entry, &desc->cells[was]);
-        entry->cell = -1;
+        r->buffer[used].cell = -1;
         used++;
     }
 
