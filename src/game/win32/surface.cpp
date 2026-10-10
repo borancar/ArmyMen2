@@ -1049,23 +1049,19 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
     }
 
-    /* The geometry is read back from the record at each use. */
-#define W (dest->width)
-#define H (dest->height)
-
-    /* The flags are read from the record at every use. */
+    /* The flags and the geometry are read from the record at every use. */
     if (dest->flags & BMP_FLAG_SOFTWARE) {
         dest->flags &= ~BMP_FLAG_SOFTWARE;
         dest->keyIndex = 0;
 
-        if (W * H < BMP_SOFTWARE_LIMIT) {
-            result = EncodeSmall(pixels, dest, W, H, remap);
+        if (dest->width * dest->height < BMP_SOFTWARE_LIMIT) {
+            result = EncodeSmall(pixels, dest, dest->width, dest->height, remap);
             if (!plain)
                 dest->flags |= 0x10;
             else
                 dest->flags |= 8;
         } else {
-            result = EncodeBig(pixels, dest, W, H, remap);
+            result = EncodeBig(pixels, dest, dest->width, dest->height, remap);
             dest->flags |= 4;
         }
         return result;
@@ -1087,8 +1083,8 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 #endif
         ddsd.dwSize   = sizeof ddsd;
         ddsd.dwFlags  = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
-        ddsd.dwWidth  = (DWORD)W;
-        ddsd.dwHeight = (DWORD)H;
+        ddsd.dwWidth  = (DWORD)dest->width;
+        ddsd.dwHeight = (DWORD)dest->height;
         ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
         want.dwCaps = DDSCAPS_OFFSCREENPLAIN;
 
@@ -1096,7 +1092,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
          * so by failing. */
         if (!(dest->flags & BMP_FLAG_SYSMEM)) {
             IDirectDraw2_GetAvailableVidMem(g_ddraw2, &want, &total, &freeVid);
-            if (freeVid < (DWORD)(W * H))
+            if (freeVid < (DWORD)(dest->width * dest->height))
                 dest->flags |= BMP_FLAG_SYSMEM;
         }
         if (dest->flags & BMP_FLAG_SYSMEM)
@@ -1124,8 +1120,8 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             goto lockfail;
         }
 
-        result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels, W, H,
-                              remap, &dest->key);
+        result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
+                              dest->width, dest->height, remap, &dest->key);
         if (!result) {
             IDirectDrawSurface_Release(surf);
         lockfail:
@@ -1140,8 +1136,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             SetSurfaceColorKey(surf, dest->keyIndex);
         return result;
     }
-#undef W
-#undef H
 }
 
 /* Show or dismiss the menu overlay -- 0x00425AF0.
