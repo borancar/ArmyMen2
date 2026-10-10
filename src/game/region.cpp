@@ -9731,7 +9731,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
                 if (r->field0C != 0) {
                     int32_t c = o->field55C;
-                    speed = (c <= t) ? t : c;
+                    speed = (c > t) ? c : t;
                 } else {
                     int32_t c = o->field558;
                     speed = (c < t) ? c : t;
