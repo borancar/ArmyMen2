@@ -8979,19 +8979,16 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         bearing = AngleBetweenInt(&o->pos, &aim);
         out->bearing    = (uint8_t)bearing;
 
-        /* Close in, or already facing far enough away, keep the old facing. */
-        /* The facing goes through a local for the test, as the image's
-         * register choices for the rest of the function show; the store
-         * below reads it again. */
-        {
-        int32_t facing = o->facing;
-
+        /* Close in, or already facing far enough away, keep the old facing.
+         * The facing is read inside the test, after the distance checks, as
+         * the image loads it; held in a local it was read ahead of them
+         * (closer registers, 90 bytes off against 104, but the wrong
+         * shape). */
         if (reach < 6
             || (reach < 0x18
-                && AngleDelta(bearing, facing)
+                && AngleDelta(bearing, o->facing)
                      < 0x40))
             out->bearing = o->facing;
-        }
 
         o->field574 = out->bearing;
     }
