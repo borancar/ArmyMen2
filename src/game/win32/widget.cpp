@@ -9215,8 +9215,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* FOUR PLAYER ROWS, three widgets each, into three PARALLEL arrays.  The
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
-    points = g_armyPoints;
-    for (i = 0; i < AM2_COMM_SLOTS; i++, points++) {
+    i = 0;
+    for (points = g_armyPoints; points < g_armyPoints + AM2_COMM_SLOTS; points++, i++) {
         char       *name = this->playerNames[i];
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
