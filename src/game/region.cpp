@@ -10211,15 +10211,10 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         }
 
         if (inMap) {
-            const int32_t *button =
-                &g_mouseButton;
-            const int32_t *changed =
-                &g_mouseChanged;
             uint8_t aim;
 
-            cursorWorld.x = (int16_t)(
-                g_viewRect.left
-                + g_cursorPoint);
+            cursorWorld.x = (int16_t)(((const AM2_Point *)&g_cursorPoint)->x
+                                      + g_viewRect.left);
             cursorWorld.y = (int16_t)(((const AM2_Point *)&g_cursorPoint)->y
                                       + *(const int16_t *)&g_viewRect.top);
 
@@ -10233,13 +10228,13 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             if (steered == 1)
                 OverlayPrepare(1, 1);
 
-            if (GetMenuRow() == 1 && button[AM2_MOUSE_LEFT]) {
+            if (GetMenuRow() == 1 && g_mouseButton) {
                 /* Row 1 aims the TURRET, and from where the gun is rather
                  * than from the hull. */
                 r->aim = AngleBetween(&gunPos,
                                     &cursorWorld);
                 o->field548 = 1;
-            } else if (!button[AM2_MOUSE_LEFT] && changed[AM2_MOUSE_LEFT]
+            } else if (!g_mouseButton && g_mouseChanged
                        && GetMenuRow() != 1
                        && orig_get_tick_count()
                               - g_mousePressMs
@@ -10259,7 +10254,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                     o->field10C = 1;
                     o->prevRegion = (int16_t)0xFFFF;
                 }
-            } else if (button[AM2_MOUSE_LEFT]) {
+            } else if (g_mouseButton) {
                 /* Held: steer toward the cursor continuously. */
                 r->heading = AngleBetween(&o->pos,
                                   &cursorWorld);
@@ -10313,22 +10308,15 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         if (g_weaponFnSlot3 != 0)
             return;
 
-        {
-            const int32_t *button =
-                &g_mouseButton;
-            const int32_t *changed =
-                &g_mouseChanged;
-
-            if (!button[AM2_MOUSE_LEFT]) {
-                if (changed[AM2_MOUSE_LEFT])
-                    goto cool;
-                return;
-            }
-            if (weapon->typeRec->automatic == 0)
-                return;
-cool:
-            if ((g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
-                r->hit = 1;
+        if (!g_mouseButton) {
+            if (g_mouseChanged)
+                goto cool;
+            return;
         }
+        if (weapon->typeRec->automatic == 0)
+            return;
+cool:
+        if ((g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
+            r->hit = 1;
     }
 }
