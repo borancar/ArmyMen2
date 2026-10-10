@@ -110,7 +110,18 @@ main result so far (details in `src/vc6/README.md`):
   FindPath 95 -> 93, ObjHitMaskAction 59 -> 57, ParseScenarioPart 17 -> 15,
   RowUpdate 23 -> 21, DrawMapObjects 11 -> 9, ViewUpdate 9 -> 7,
   ScrollMapCache 15 -> 14. Sweeps that flip ternaries or split `||` into
-  else-if found nothing further. The rest of the top of the list is register priority: FindPath
+  else-if found nothing further. Third round: LoadMap 15 -> 11 (height and
+  row shift stored before the width -- found by taking a step the shape
+  scored WORSE and sweeping again), Step3Drive 105 -> 98 (the headlight
+  palette as an if/else storing through a fresh row load per arm),
+  Type2PlayerInput 7 -> 2 (the facing read inside the angle test; bytes
+  90 -> 104), DrawSelection 13 -> 10, BoxAction 11 -> 10, FlowRecvMessage
+  127 -> 124 (the delivery gap as a ternary). Sweeps of comparison operand
+  order, local declaration order and ternary/if-else conversion found
+  nothing else. FlowRecvMessage's four "Can't find FlowQ" logs share one
+  block in the image; ours copies the small return-0 epilogue into each
+  site, which leaves nothing to merge. Not solved. `g_attemptCount` and
+  `g_levelAttempt` are two names for 0x512330. The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
