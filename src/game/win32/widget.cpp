@@ -5660,16 +5660,16 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         }
+        case 0x1A:
+            SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
+            break;
+
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
          * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
          * own and jumps into 0x26's. */
         case 0x23:
             if (u->field530 != 0)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
-            break;
-
-        case 0x1A:
-            SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
 
         case 0x24:
