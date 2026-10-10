@@ -9807,7 +9807,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 AM2_MapRow *g = o->rowSet.rows;
 
                 if (g->turnStamp == g_gameClockMs) {
-                    o->rowSet.rows[1].turnStamp = g_gameClockMs;
+                    turret->turnStamp = g_gameClockMs;
                 } else {
                     uint32_t age = g_gameClockMs - turret->turnStamp;
 
@@ -9892,8 +9892,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 }
 
                 r->hit = 0;
-                r->spot.at     = g_aimSpot.at;
-                r->spot.ground = g_aimSpot.ground;
+                r->spot = g_aimSpot;
                 r->uid = 0;
             }
         }
