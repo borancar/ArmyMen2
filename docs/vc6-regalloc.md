@@ -210,8 +210,26 @@ Where the image keeps copies, they usually differ in a register (ScriptPad
 divides by `edi` in one arm and `ebp` in the other; MakeBitmap's two
 `Release` calls go through `ecx` and `edx`), so in those cases it is the
 register choice that has to be fixed. HudPostUpdate's and UpdateTrooperAction's
-copies are byte-identical in the image and still kept apart. What stops VC6
-from merging those is not known.
+copies are byte-identical in the image and still kept apart.
+
+**HudPostUpdate solved (2026-10-10): the shape of the arm merged INTO decides
+it.** Our generic action call was cross-jumped into hit_ours' identical call,
+which sat inside a braced `if (CHANGED) { ...; goto tail; }`. Written as
+`if (!CHANGED) goto hold;` with the changed arm falling through, nothing merges
+(308 -> 256 bytes). Found by bisecting the real function: deleting hit_ours'
+hold arm also stopped the merge, and spellings of the generic arm itself
+(inlined, through a local, other pointer or argument types) never mattered.
+In the lab, the same rewrite only moved the merge to another identical
+candidate (the f14 call, when it also passed `obj`). So the rule is about
+which blocks qualify as cross-jump targets, and every identical candidate has
+to be ruled out.
+
+UpdateTrooperAction is still open. Its three stop copies merge in the skip
+form too (and in a lab clone). The image's copies differ from ours in one
+visible way: each one reloads `out` from its argument slot for the `bearing`
+store (`mov edx, [esp+0x40]`) while `state` and `hit` go through `ebp`. That
+suggests two pointer variables in the original, but a local alias for
+`state`/`hit` was propagated away.
 
 ## Not yet understood
 
