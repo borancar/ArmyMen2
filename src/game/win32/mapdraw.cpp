@@ -2082,9 +2082,9 @@ void __cdecl DrawSelection(void)
 
         /* The frame first, then the filled part, then the remainder -- three
          * ClearRegions over one rectangle, each narrowing it. */
-        box.left   = x - 1;
         box.right  = x + wide + 1;
         box.top    = y + drop;
+        box.left   = x - 1;
         box.bottom = y + drop + 4;
         ClearRegion(&box, g_backgroundColour);
 
