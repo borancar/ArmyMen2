@@ -4920,6 +4920,10 @@ raise_s:
             }
             break;
 
+        case 43:
+            out->state = AM2_POSE_GUN_STAND;
+            break;
+
         case 1:  case 7:  case 8:  case 9:  case 10:
         case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
             if (o->field44 > 0)
@@ -4985,10 +4989,6 @@ raise_k:
                 out->state = AM2_POSE_KNEEL_ARMED_B;
             else
                 out->state = AM2_POSE_CARRY;
-            break;
-
-        case 43:
-            out->state = AM2_POSE_GUN_STAND;
             break;
 
         case 6:  case 13: case 14: case 15: case 16: case 17: case 18:
