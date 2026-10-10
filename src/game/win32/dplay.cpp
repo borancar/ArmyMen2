@@ -1861,7 +1861,10 @@ int32_t __cdecl RecvThreadProc(void *param)
 
     (void)param;
 
-    for (;;) {
+    /* `while (1)`, not `for (;;)`: VC6 rotates the second, copying the
+     * wait to the bottom of the loop, where the image tests it at the top
+     * and jumps back. */
+    while (1) {
         int32_t got = 0;
 
         if (WaitForMultipleObjects(

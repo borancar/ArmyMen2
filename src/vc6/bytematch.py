@@ -226,6 +226,7 @@ REGISTERED_FNS = [
     ("ADDR_AUDIO_TIMER_PROC", "src/game/win32/audio.cpp", "AudioTimerProc"),
     ("ADDR_MEDKIT_HEAL_ONE", "src/game/item.cpp", "MedkitHealOne"),
     ("ADDR_MOVIE_TIMER_PROC", "src/game/win32/movie.cpp", "MovieTimerProc"),
+    ("ADDR_PACKET_THREAD_PROC", "src/game/win32/dplay.cpp", "RecvThreadProc"),
 ]
 
 # ---- compile ------------------------------------------------------------
