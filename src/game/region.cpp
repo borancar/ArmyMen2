@@ -10223,9 +10223,8 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             cursorWorld.x = (int16_t)(
                 g_viewRect.left
                 + g_cursorPoint);
-            cursorWorld.y = (int16_t)(
-                *(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
-                + *(const int16_t *)&g_viewRect.top);
+            cursorWorld.y = (int16_t)(((const AM2_Point *)&g_cursorPoint)->y
+                                      + *(const int16_t *)&g_viewRect.top);
 
             dist = ApproxDist(&o->pos,
                               &cursorWorld);
@@ -10323,13 +10322,14 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             const int32_t *changed =
                 &g_mouseChanged;
 
-            if (button[AM2_MOUSE_LEFT]) {
-                if (weapon->typeRec->automatic == 0)
-                    return;
-            } else if (!changed[AM2_MOUSE_LEFT]) {
+            if (!button[AM2_MOUSE_LEFT]) {
+                if (changed[AM2_MOUSE_LEFT])
+                    goto cool;
                 return;
             }
-
+            if (weapon->typeRec->automatic == 0)
+                return;
+cool:
             if ((g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
                 r->hit = 1;
         }

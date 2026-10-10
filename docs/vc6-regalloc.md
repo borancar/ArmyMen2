@@ -308,6 +308,15 @@ image has it last. Written as `if (!ObjsAreAllied(...)) { ... } else
 off). When the image's block order matches the source text but ours does
 not, look for a forward goto over the code in between.
 
+The same pull works FOR you when the image has a return inline with its own
+epilogue. Step3Input's mouse arm, `if (!changed) return;` inside
+`if (!button) {...} else if (!automatic) return;`, jumped to the shared
+epilogue and then jumped again to the cooldown test; the image tests
+`changed`, branches FORWARD to the cooldown and falls into a duplicated
+`pop...ret`. Written `if (changed) goto cool; return;`, with `cool:` on
+the cooldown test, it does the same (96 -> 54 bytes off, with the
+`!button` arm tested first as the image lays it out).
+
 ## Declarations ahead of a function can turn its ties
 
 A type declared earlier in the translation unit can change a function that
