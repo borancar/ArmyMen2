@@ -66,8 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1569 of
-  1645 byte-identical (2026-10-10), piecewise 399.** ReceivePlayerMsg matches:
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1570 of
+  1645 byte-identical (2026-10-10), piecewise 399.** PointerActionFollow
+  matches: its leader is a ternary between the live lookup and the dead scan
+  as an inline of its own, which lays the scan between the arms with its NULL
+  falling into the shared test. ReceivePlayerMsg matches:
   the army-points loop is `for (i = 0; i < 4; i++)` over `g_armyPoints[i]`,
   which VC6 strength-reduces into the walking pointer the image tests, and
   `msg` is read through a local copy, which moves its reload to the loop's

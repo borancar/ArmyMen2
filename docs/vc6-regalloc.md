@@ -317,6 +317,14 @@ epilogue and then jumped again to the cooldown test; the image tests
 the cooldown test, it does the same (96 -> 54 bytes off, with the
 `!button` arm tested first as the image lays it out).
 
+A two-way choice whose image lays one arm out, JUMPS over the other and
+joins on a shared test is the ternary's shape, not an if/else's. VC6 put an
+if/else's second arm at the end of PointerActionFollow in either orientation
+and threaded the scan's NULL straight to the return. Written as
+`leader = owner == g_defaultOwner ? LookupByUID(...) : DeadLeaderScan(owner);`,
+with the scan as a static inline returning NULL at its end, the function
+matched outright.
+
 ## Shape first, then registers
 
 Ranking misses by a register-masked diff (registers and stack offsets
