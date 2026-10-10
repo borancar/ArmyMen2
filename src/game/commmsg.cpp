@@ -3170,10 +3170,8 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                 sender->deliveredAt = now;
             /* A clock that went BACKWARDS reads as a gap the size of the
              * old timestamp. Reproduced. */
-            if (now < sender->deliveredAt)
-                gap = sender->deliveredAt;
-            else
-                gap = now - sender->deliveredAt;
+            gap = (now >= sender->deliveredAt) ? now - sender->deliveredAt
+                                               : sender->deliveredAt;
             sender->deliveredAt = now;
             if (gap < sender->gapMin)
                 sender->gapMin = gap;
