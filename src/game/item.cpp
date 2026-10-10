@@ -9253,17 +9253,11 @@ void __cdecl SelectionClick(void)
             }
             goto changed;
         }
-        {
-            const AM2_Point *a = &g_dragAnchor;
-            const AM2_Point *w = &world;
-            AM2_Rect *r = &g_dragRect;
-
-            r->left   = (a->x < w->x) ? a->x : w->x;
-            r->right  = (a->x > w->x) ? a->x : w->x;
-            r->top    = (a->y < w->y) ? a->y : w->y;
-            r->bottom = (a->y > w->y) ? a->y : w->y;
-            return;
-        }
+        g_dragRect.left   = (g_dragAnchor.x < world.x) ? g_dragAnchor.x : world.x;
+        g_dragRect.right  = (g_dragAnchor.x > world.x) ? g_dragAnchor.x : world.x;
+        g_dragRect.top    = (g_dragAnchor.y < world.y) ? g_dragAnchor.y : world.y;
+        g_dragRect.bottom = (g_dragAnchor.y > world.y) ? g_dragAnchor.y : world.y;
+        return;
     }
 
     /* No rubber band at all: a plain click. The three guards are in the
@@ -9306,8 +9300,13 @@ void __cdecl SelectionClick(void)
              * attached with nothing selecting it, which the A/B would show
              * only if something later walked that list. */
             ObjAttachTo(e, (AM2_Object *)0);
-            OnSelectionChanged(
-                g_zeroPoint);
+            /* Through a local: the image loads the zero point into ecx
+             * here and eax at `changed`, and a copy is what moves it. */
+            {
+                AM2_Point pt = g_zeroPoint;
+
+                OnSelectionChanged(pt);
+            }
             return;
         }
     } else {
