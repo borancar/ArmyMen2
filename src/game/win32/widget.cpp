@@ -2554,8 +2554,6 @@ static inline void GameMenuGoto(int32_t mode)
 
 
 
-typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
-typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
 
 /* Our leader, the way every pointer handler in this band gets it -- including
  * the fallback that cannot run. Promoted to item.cpp once the medkit heal
@@ -2756,7 +2754,7 @@ static inline void SpinRepaint(AM2_Widget *edit)
  * function pointer, and it defaults to -1. */
 static inline void PointerIdleOverlay(int32_t ours)
 {
-    int32_t row = *(const int32_t *)&g_weaponFnSlot2;
+    int32_t row = g_weaponFnSlot2;
 
     if (ours && row >= 0) {
         OverlayPrepare(row, 0);
@@ -4854,7 +4852,7 @@ void __cdecl HudPostUpdate(void)
     obj = ObjectsHitByPoint(&at, g_objMapDesc);
     for (; obj; obj = obj->queryNext) {
         if (ours) {
-            pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;
+            pick = g_weaponFnSlot0;
             if (pick && pick(obj))
                 goto hit_ours;
             /* A FLAG, not a function: SLOT3 set means this node is spoken for
@@ -4862,7 +4860,7 @@ void __cdecl HudPostUpdate(void)
             if (g_weaponFnSlot3)
                 continue;
         }
-        pick = *(AM2_PointerPickFn *)&g_pointerPick;
+        pick = g_pointerPick;
         if (pick && !aiming && pick(obj))
             goto hit_generic;
     }
@@ -4871,32 +4869,32 @@ void __cdecl HudPostUpdate(void)
      * themselves and handing the actions a null object. */
     if (ours && g_weaponFnSlot3) {
         if (g_mouseChanged) {
-            if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_weaponFnSlot1))
+            if (g_mouseButton || !g_weaponFnSlot1)
                 goto claim;
-            (*(AM2_PointerActionFn *)&g_weaponFnSlot1)((AM2_Object *)(void *)0, at);
+            g_weaponFnSlot1((AM2_Object *)(void *)0, at);
             goto tail;
         }
         if (!repeat)
             goto tail;
         if (!g_mouseButton)
             goto idle;
-        if (*(AM2_PointerActionFn *)&g_weaponFnSlot1)
-            (*(AM2_PointerActionFn *)&g_weaponFnSlot1)((AM2_Object *)(void *)0, at);
+        if g_weaponFnSlot1
+            g_weaponFnSlot1((AM2_Object *)(void *)0, at);
         goto tail;
     }
     if (*(void *const *)&g_pointerF14 && !aiming && g_mouseChanged) {
-        if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_pointerAction))
+        if (g_mouseButton || !g_pointerAction)
             goto claim;
-        (*(AM2_PointerActionFn *)&g_pointerAction)((AM2_Object *)(void *)0,
+        g_pointerAction((AM2_Object *)(void *)0,
                                                    at);      /* the walk ran out: no object */
     }
     goto tail;
 
 hit_ours:
     if (g_mouseChanged) {
-        if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_weaponFnSlot1))
+        if (g_mouseButton || !g_weaponFnSlot1)
             goto claim;
-        (*(AM2_PointerActionFn *)&g_weaponFnSlot1)(obj, at);
+        g_weaponFnSlot1(obj, at);
         goto tail;
     }
     /* The button did not change, so this is a hold. Only a weapon whose kind
@@ -4905,16 +4903,16 @@ hit_ours:
         goto tail;
     if (!g_mouseButton)
         goto idle;
-    if (*(AM2_PointerActionFn *)&g_weaponFnSlot1)
-        (*(AM2_PointerActionFn *)&g_weaponFnSlot1)(obj, at);
+    if g_weaponFnSlot1
+        g_weaponFnSlot1(obj, at);
     goto tail;
 
 hit_generic:
     if (!g_mouseChanged)
         goto tail;
-    if (g_mouseButton || !(*(AM2_PointerActionFn *)&g_pointerAction))
+    if (g_mouseButton || !g_pointerAction)
         goto claim;
-    (*(AM2_PointerActionFn *)&g_pointerAction)(obj, at);
+    g_pointerAction(obj, at);
     goto tail;
 
 claim:
@@ -5046,15 +5044,15 @@ void __cdecl SetPointerMode(int32_t mode)
 
     /* Straight from the record into the globals, then tested from them --
      * in the statement order that schedules into the image's stores. */
-    (*(AM2_PointerPickFn *)&g_pointerPick) = g_pointerModes[(size_t)mode].pick;
-    (*(AM2_PointerActionFn *)&g_pointerAction)  = g_pointerModes[(size_t)mode].action;
+    g_pointerPick = g_pointerModes[(size_t)mode].pick;
+    g_pointerAction  = g_pointerModes[(size_t)mode].action;
     g_pointerF10 = g_pointerModes[(size_t)mode].f10;
     g_pointerF14  = g_pointerModes[(size_t)mode].f14;
     g_pointerOverlay = g_pointerModes[(size_t)mode].overlay;
 
-    if (!(*(AM2_PointerPickFn *)&g_pointerPick) && !g_pointerF14
-        && (*(AM2_PointerActionFn *)&g_pointerAction)) {
-        (*(AM2_PointerActionFn *)&g_pointerAction)((AM2_Object *)(void *)0, g_zeroPoint);
+    if (!g_pointerPick && !g_pointerF14
+        && g_pointerAction) {
+        g_pointerAction((AM2_Object *)(void *)0, g_zeroPoint);
         g_pointerMode = 0;
     }
 }
@@ -6083,7 +6081,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (!obj || SQUAD_HP(obj) == 0)
                 continue;
 
-            pick = *(AM2_PointerPickFn *)&g_weaponFnSlot0;
+            pick = g_weaponFnSlot0;
 
             if (pick && pick(obj)) {
                 /* The slot answers to the weapon hook, so a click hands the
@@ -6095,7 +6093,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                     AM2_PointerActionFn act;
 
                     PlaySoundAt(0, 0, 0, 0, 0);
-                    act = *(AM2_PointerActionFn *)&g_weaponFnSlot1;
+                    act = g_weaponFnSlot1;
                     if (act)
                         act(obj, obj->pos);
                     break;

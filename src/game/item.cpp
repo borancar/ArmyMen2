@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "definfo.h"  /* AM2_DefFindFn -- MedkitHeal */
+#include "pointerfn.h" /* g_weaponHandlers, g_weaponFnSlot0/1 */
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
 #include "defparse.h"  /* DefFindObjRec -- reconstructed */
@@ -6052,10 +6053,10 @@ void __cdecl SelectInventorySlot(AM2_Object *unit, int32_t slot)
 
     kind = w->typeRec->kind;
 
-    g_weaponFnSlot0 = g_weaponHandlers[kind * 4 + 0];
-    g_weaponFnSlot1 = g_weaponHandlers[kind * 4 + 1];
-    *(uint32_t *)&g_weaponFnSlot3 = g_weaponHandlers[kind * 4 + 3];
-    g_weaponFnSlot2 = g_weaponHandlers[kind * 4 + 2];
+    g_weaponFnSlot0 = g_weaponHandlers[kind].pick;
+    g_weaponFnSlot1 = g_weaponHandlers[kind].action;
+    g_weaponFnSlot3 = g_weaponHandlers[kind].slot3;
+    g_weaponFnSlot2 = g_weaponHandlers[kind].slot2;
 
     g_weaponOwnerId =
         ((const AM2_Object *)unit)->uid;

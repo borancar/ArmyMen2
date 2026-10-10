@@ -589,14 +589,14 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_playerMsg              (*(AM2_PlayerMsg *)(uintptr_t)ADDR_PLAYER_MSG)  /* 0x004FC3B8 */
 #define g_playerRecords          ((AM2_Flow *)(uintptr_t)ADDR_PLAYER_RECORDS)  /* 0x004F1980 */
 #define g_playerSlotMask         (*(uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK)  /* 0x004F48DC */
-#define g_pointerAction          (*(int32_t *)(uintptr_t)ADDR_POINTER_ACTION)  /* 0x005122E4 */
+#define g_pointerAction          (*(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION)  /* 0x005122E4 */
 #define g_pointerF10             (*(int32_t *)(uintptr_t)ADDR_POINTER_F10)  /* 0x005122E8 */
 #define g_pointerF14             (*(int32_t *)(uintptr_t)ADDR_POINTER_F14)  /* 0x005122EC */
 #define g_pointerHoverUid        (*(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID)  /* 0x004854B8 */
 #define g_pointerMode            (*(int32_t *)(uintptr_t)ADDR_POINTER_MODE)  /* 0x004FCF80 */
 #define g_pointerModes           ((struct AM2_PointerModeRec *)(uintptr_t)ADDR_POINTER_MODES)  /* 0x004761B8 */
 #define g_pointerOverlay         (*(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY)  /* 0x005122F4 */
-#define g_pointerPick            (*(int32_t *)(uintptr_t)ADDR_POINTER_PICK)  /* 0x005122E0 */
+#define g_pointerPick            (*(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK)  /* 0x005122E0 */
 #define g_pointRule              (*(uint32_t *)(uintptr_t)ADDR_POINT_RULE)  /* 0x00523DDC */
 #define g_pointRuleArmy          (*(int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY)  /* 0x00523DD8 */
 #define g_poseByClass            ((int32_t *)(uintptr_t)ADDR_POSE_BY_CLASS)  /* 0x00475180 */
@@ -878,11 +878,11 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_waveDir                (*(char **)(uintptr_t)ADDR_WAVE_DIR)  /* 0x004852CC */
 #define g_waveNames              ((char **)(uintptr_t)ADDR_WAVE_NAMES)  /* 0x00474360 */
 #define g_waveNamesEnd           ((uint8_t *)(uintptr_t)ADDR_WAVE_NAMES_END)  /* 0x00474440 */
-#define g_weaponFnSlot0          (*(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT0)  /* 0x005122D4 */
-#define g_weaponFnSlot1          (*(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT1)  /* 0x005122D8 */
-#define g_weaponFnSlot2          (*(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2)  /* 0x005122F0 */
+#define g_weaponFnSlot0          (*(AM2_PointerPickFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT0)  /* 0x005122D4 */
+#define g_weaponFnSlot1          (*(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1)  /* 0x005122D8 */
+#define g_weaponFnSlot2          (*(int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2)  /* 0x005122F0 */
 #define g_weaponFnSlot3          (*(int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3)  /* 0x005122DC */
-#define g_weaponHandlers         ((uint32_t *)(uintptr_t)ADDR_WEAPON_HANDLERS)  /* 0x00489880 */
+#define g_weaponHandlers         ((const AM2_WeaponHandlers *)(uintptr_t)ADDR_WEAPON_HANDLERS)  /* 0x00489880 */
 #define g_weaponOwnerId          (*(uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID)  /* 0x00511E58 */
 #define g_weaponPoseFrames       ((int32_t *)(uintptr_t)ADDR_WEAPON_POSE_FRAMES)  /* 0x00474FE0 */
 #define g_weaponRangeHi          (*(double *)(uintptr_t)ADDR_WEAPON_RANGE_HI)  /* 0x0046F2E0 */

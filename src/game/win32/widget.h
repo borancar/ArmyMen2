@@ -420,8 +420,7 @@ struct AM2_ListRows;
 
 /* The six pointer/weapon slots hold two shapes: a PICK answers whether the
  * pointer may take an object, an ACTION acts on release. */
-typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
-typedef void (__cdecl *AM2_PointerActionFn)(AM2_Object *obj, AM2_Point at);
+#include "../pointerfn.h"
 
 /* One HUD command, 0x28 bytes, seven at ADDR_HUD_CMD_SPEC: the sprite the
  * command panel draws, and the pointer mode SetPointerMode installs. */
