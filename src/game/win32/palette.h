@@ -66,6 +66,15 @@ void __cdecl RealizeSystemPalette(const uint32_t *palette);
  * The image's only CreatePalette is in here. */
 void __cdecl SetGamePalette(uint8_t *palette);
 
+/* 0x0041AE90. A file colour (an RGBQUAD's blue, green, red, reserved) as
+ * the display's PALETTEENTRY: the low three bytes reversed and the flags
+ * byte zeroed. Sits beside the palette expander. A four-byte struct comes
+ * back in eax, as the original's dword did, in every build that links
+ * against the image's callers (VC6 and mingw); the native port's GCC
+ * returns it through memory, but all five original callers are
+ * reconstructed. */
+PALETTEENTRY __cdecl SwapColourBytes(uint32_t colour);
+
 /* 0x0041B7C0. The palette entry nearest `colour`, searching from `from` up --
  * callers use that to protect a reserved block of low entries. `from` is
  * masked to a byte, so 0x100 or more searches nothing and answers 0.

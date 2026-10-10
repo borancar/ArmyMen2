@@ -1236,9 +1236,9 @@ int32_t __cdecl SpriteSetLoad(const char *name)
              * so what the original leaves in that slot is whatever was on the
              * stack; zero is the same function. */
             for (i = 0; i < 256; i++) {
-                uint32_t c = SwapColourBytes(set->palette[i]);
+                PALETTEENTRY c = SwapColourBytes(set->palette[i]);
 
-                set->remap[i] = NearestPalIndex(g_activePalette, *(PALETTEENTRY *)&c, 0);
+                set->remap[i] = NearestPalIndex(g_activePalette, c, 0);
             }
         } else {
             for (i = 0; i < 256; i++)

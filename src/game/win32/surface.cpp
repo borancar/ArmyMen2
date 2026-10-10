@@ -1030,10 +1030,10 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
         if (g_activePalette) {
             for (i = from; i < 256; i++) {
-                uint32_t c = SwapColourBytes(src[10 + i]);
+                PALETTEENTRY c = SwapColourBytes(src[10 + i]);
 
                 table[i] = NearestPalIndex(g_activePalette,
-                                             *(PALETTEENTRY *)&c,
+                                             c,
                                              (uint32_t)from);
             }
         } else {

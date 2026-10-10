@@ -499,6 +499,18 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
     return 1;
 }
 
+PALETTEENTRY __cdecl SwapColourBytes(uint32_t colour)
+{
+    const uint8_t *in = (const uint8_t *)&colour;
+    PALETTEENTRY   out;
+
+    out.peFlags = 0;
+    out.peRed   = in[2];
+    out.peGreen = in[1];
+    out.peBlue  = in[0];
+    return out;
+}
+
 /* 0x0041AEB0 -- expand a file palette into the pair of tables the renderer
  * wants: 256 swapped colours, and 256 more 0x400 bytes behind them.
  *
@@ -517,16 +529,15 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
  * that is still a difference. */
 void __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi)
 {
-    uint32_t *p = (uint32_t *)dst;
-    int32_t   i;
+    PALETTEENTRY *p = (PALETTEENTRY *)dst;
+    int32_t       i;
 
     /* The pristine copy is read back out of the working entry a byte at a
      * time, through RGB(). */
     for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
         p[i] = SwapColourBytes(*(const uint32_t *)&bi->bmiColors[i]);
-        p[i + AM2_PALETTE_PRISTINE / 4] = RGB(((uint8_t *)&p[i])[0],
-                                              ((uint8_t *)&p[i])[1],
-                                              ((uint8_t *)&p[i])[2]);
+        ((COLORREF *)p)[i + AM2_PALETTE_PRISTINE / 4] =
+            RGB(p[i].peRed, p[i].peGreen, p[i].peBlue);
     }
 }
 
@@ -652,10 +663,10 @@ void __cdecl PaletteLoaded(void)
         /* The active palette is re-read at each use. */
         if (g_activePalette) {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
-                uint32_t c = SwapColourBytes(set->palette[i]);
+                PALETTEENTRY c = SwapColourBytes(set->palette[i]);
 
                 set->remap[i] =
-                    NearestPalIndex(g_activePalette, *(PALETTEENTRY *)&c, 0);
+                    NearestPalIndex(g_activePalette, c, 0);
             }
         } else {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
@@ -827,6 +838,8 @@ int palette_install(void)
                         "BuildRemapTables", 1);
     rc |= patch_replace(ADDR_NEAREST_PAL_RGB, (const void *)NearestPalIndexRGB,
                         "NearestPalIndexRGB", 5);
+    rc |= patch_replace(ADDR_SWAP_COLOUR_BYTES, (const void *)SwapColourBytes,
+                        "SwapColourBytes", 1);
     rc |= patch_replace(ADDR_NEAREST_PAL_INDEX, (const void *)NearestPalIndex,
                         "NearestPalIndex", 11);
 

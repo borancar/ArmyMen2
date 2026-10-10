@@ -324,12 +324,6 @@ int32_t __cdecl IsKind7(const struct AM2_Object *obj);
 
 
 
-/* 0x0041AE90. Reverses the low three bytes and zeroes the fourth: 0x00BBGGRR
- * becomes 0x00RRGGBB. Sits beside the palette expander, so it is the channel
- * order swap between the file's colours and the display's. One argument at
- * every call site. */
-uint32_t __cdecl SwapColourBytes(uint32_t colour);
-
 /* 0x0041B760. Two colours' distance: the sum of the squares of the three
  * per-channel differences, each an absolute value taken with the
  * `cdq`/`xor`/`sub` idiom rather than a branch.

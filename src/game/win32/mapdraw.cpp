@@ -474,10 +474,10 @@ void __cdecl RestoreTileSet(void)
                 from = TILESET_RESERVED;
             }
             for (i = from; i < 256; i++) {
-                uint32_t c = SwapColourBytes(header[DIB_PALETTE_INDEX + i]);
+                PALETTEENTRY c = SwapColourBytes(header[DIB_PALETTE_INDEX + i]);
 
                 remap[i] = NearestPalIndex(g_activePalette,
-                                             *(PALETTEENTRY *)&c,
+                                             c,
                                              (uint32_t)from);
             }
         } else {

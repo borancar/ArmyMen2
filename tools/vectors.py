@@ -1275,7 +1275,6 @@ def main():
         "ADDR_TITLE_CASE": "TitleCaseName",
         "ADDR_RESET_PAIR_MASK": "ResetPairMask", "ADDR_IS_KIND_7": "IsKind7",
         "ADDR_IS_BLANK": "IsBlank", "ADDR_IS_SCRIPT_DELIM": "IsScriptDelim",
-        "ADDR_SWAP_COLOUR_BYTES": "SwapColourBytes",
         "ADDR_COLOUR_DISTANCE": "ColourDistance",
         "ADDR_RETURN_ZERO": "ReturnZero", "ADDR_RETURN_ONE": "ReturnOne",
         "ADDR_REVERSE_BLOCKS": "ReverseBlocks",

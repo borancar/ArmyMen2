@@ -41,6 +41,7 @@
 #include "../game/packkey.h"
 #include "../game/objtype.h"
 #include "../game/misc.h"
+#include "../game/win32/palette.h"  /* SwapColourBytes */
 #include "../game/script.h"
 #include "../game/item.h"
 #include "../game/place.h"

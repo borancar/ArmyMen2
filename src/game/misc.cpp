@@ -153,19 +153,6 @@ int32_t __cdecl IsKind7(const AM2_Object *obj)
     return (obj->type == 7) ? 1 : 0;
 }
 
-uint32_t __cdecl SwapColourBytes(uint32_t colour)
-{
-    const uint8_t *in = (const uint8_t *)&colour;
-    uint32_t       out;
-    uint8_t       *o = (uint8_t *)&out;
-
-    o[3] = 0;
-    o[0] = in[2];
-    o[1] = in[1];
-    o[2] = in[0];
-    return out;
-}
-
 void __stdcall NullStub4(uint32_t arg) { (void)arg; }
 void __cdecl   NullStub(int32_t a, int32_t b) { (void)a; (void)b; }
 int32_t __cdecl ReturnZero(void)       { return 0; }
@@ -2685,8 +2672,6 @@ int misc_install(void)
     patch_replace(ADDR_RESET_PAIR_MASK, (const void *)ResetPairMask,
                   "ResetPairMask", 2);
     patch_replace(ADDR_IS_KIND_7, (const void *)IsKind7, "IsKind7", 1);
-    patch_replace(ADDR_SWAP_COLOUR_BYTES, (const void *)SwapColourBytes,
-                  "SwapColourBytes", 1);
     patch_replace(ADDR_NULL_STUB_4, (const void *)NullStub4, "NullStub4", 1);
     patch_replace(ADDR_NULL_STUB, (const void *)NullStub, "NullStub", 0);
     patch_replace(ADDR_RETURN_ZERO, (const void *)ReturnZero, "ReturnZero", 0);
