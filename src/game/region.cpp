@@ -7741,12 +7741,22 @@ sweep:
             turned = 1;
             out->bearing = facing;
             speed  = 0;
-        } else if (out->hit
-                   || !found
-                   || (g_mpSession
-                       && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
-                       && ObjType2Field548(o))) {
-            /* One block; VC6 copies it into each of the three tests. */
+        } else if (out->hit) {
+            /* Three arms with one body, written out three times as the
+             * image has them -- one `||` test gives one copy and moves the
+             * whole chain ahead of the sweep. */
+            out->state   = 1;
+            turned       = 1;
+            out->bearing = facing;
+            speed        = 0;
+        } else if (!found) {
+            out->state   = 1;
+            turned       = 1;
+            out->bearing = facing;
+            speed        = 0;
+        } else if (g_mpSession
+                   && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
+                   && ObjType2Field548(o)) {
             out->state   = 1;
             turned       = 1;
             out->bearing = facing;
