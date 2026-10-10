@@ -446,6 +446,19 @@ free: relink and compare every function, not just the ones the change names.
   parameter at function scope, a copy inside the inline tail, the tail's
   board branch as an inline of its own, and a `const` parameter were all
   propagated away and changed nothing (2026-10-10).
+- Which register `delete p` loads `p` into. MovieStart's image loads the
+  global into ecx, tests it and copies it to esi (`mov ecx, [g]; test ecx,
+  ecx; mov esi, ecx`) before the destructor and `operator delete`; ours, and
+  a clone that reproduces the rest of the function exactly (virtual Poll,
+  thiscall), loads esi and copies to ecx. Unchanged by `delete` through a
+  local, an explicit null test, `g->~M(); ::operator delete(g)`, an inline
+  `Destroy() { delete this; }`, a class `operator delete`, a `void *` global
+  cast at the delete, and dropping the `movie = this` alias (2026-10-10).
+- What leaves DrawMenuCursor's inlined TickMenuAnimation loading the frame's
+  sprite into ecx (the dead frame index) where ours takes edx (the dead row
+  base). That one choice moves the backbuffer load later in the function off
+  eax's short `mov`. Index spellings, a temporary, and every order of the
+  helper's locals and opening statements compile the same.
 
 ## Running decomp-permuter against VC6
 
