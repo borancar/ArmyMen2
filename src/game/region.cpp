@@ -4821,7 +4821,6 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                                            &it->pos);
                 candRange   = AM2_SIGHT_KIND7_RANGE;
                 cand        = it;
-score:
                 if (!cand)
                     continue;
                 ++*nOther;
@@ -4965,6 +4964,24 @@ in_sight:
                 bestBearing = candBearing;
             }
         }
+        continue;
+        /* The scoring every other arm jumps to. The kind-7 arm above has
+         * its own copy: written once, as a label inside that arm, VC6 laid
+         * the block out after the last arm instead. */
+score:
+        if (!cand)
+            continue;
+        ++*nOther;
+        ++o->fieldF4;
+        /* Discarded two instructions later; a call, so it counts. */
+        (void)AngleDelta(facing, candBearing);
+        if (candRange >= bestRange + slack)
+            continue;
+        best        = cand;
+        bestRange   = candRange;
+        slack       = 0;
+        bestBearing = candBearing;
+        continue;
     }
 
 finish:
