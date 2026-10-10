@@ -7311,7 +7311,7 @@ static inline void TrooperFaceTo(AM2_Object *o, const AM2_Point *to)
  * `mov ebp,[esp+0x24]` straight after a `mov byte ptr [esp+0x24],al` -- which
  * only a char parameter in scope produces. Harmless in both games: everything
  * below FireWeapon (SeqStartDirEffect, CreateMissile, TimedDirFrame) uses
- * the low byte alone. */
+ * the low byte alone. Step3Drive's three calls push the byte the same way. */
 #define FireWeaponB ((int32_t (__cdecl *)(void *, void *, int16_t, uint8_t, \
                                           AM2_FireSpot, void *))           \
                      (void (*)(void))FireWeapon)
@@ -9860,7 +9860,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     /* Asked and discarded, in both aimed arms. */
                     (void)AngleBetween(&o->pos,
                                        &aimed->pos);
-                    FireWeapon(weapon, o, height,
+                    FireWeaponB(weapon, o, height,
                                (uint8_t)(o->turretFacing
                                          + (orig_step3_rand() % 5) - 2),
                                spot, aimed);
@@ -9870,7 +9870,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                                        &r->spot.at);
                     spot.at = r->spot.at;
                     spot.ground = r->spot.ground;
-                    FireWeapon(weapon, o, height,
+                    FireWeaponB(weapon, o, height,
                                (uint8_t)(o->turretFacing
                                          + (orig_step3_rand() % 5) - 2),
                                spot, 0);
@@ -9880,7 +9880,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                      * direction count rather than a raw byte. */
                     spot.at = r->spot.at;
                     spot.ground = r->spot.ground;
-                    FireWeapon(weapon, o, height,
+                    FireWeaponB(weapon, o, height,
                                (uint8_t)(gunFacing
                                          << (8 - (*animRec)->directionBits)),
                                spot, 0);
