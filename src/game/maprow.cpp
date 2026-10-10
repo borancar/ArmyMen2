@@ -1356,13 +1356,32 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
 
     if (n->next
         && DepthCompare(n->obj, n->next->obj) > 0) {
-        for (e = n->next; e->next; ) {
+        for (e = n->next; ; ) {
+            if (!e->next) {
+                /* Ran off the end: unlink and append after `e`, the last
+                 * node. */
+                {
+                    AM2_CellEntry *pv = n->prev;
+                    AM2_CellEntry *nx = n->next;
+
+                    if (!pv)
+                        *head = nx;
+                    else
+                        pv->next = nx;
+                }
+                n->next->prev = n->prev;
+
+                n->prev = e;
+                n->next = (AM2_CellEntry *)0;
+                e->next = n;
+                return;
+            }
             e = e->next;
             if (DepthCompare(n->obj, e->obj) <= 0)
-                goto before;
+                break;
         }
 
-        /* Ran off the end: unlink and append after `e`, the last node. */
+        /* Unlink, then insert before `e`. */
         {
             AM2_CellEntry *pv = n->prev;
             AM2_CellEntry *nx = n->next;
@@ -1372,19 +1391,6 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
             else
                 pv->next = nx;
         }
-        n->next->prev = n->prev;
-
-        n->prev = e;
-        n->next = (AM2_CellEntry *)0;
-        e->next = n;
-        return;
-
-before:
-        /* Unlink, then insert before `e`. */
-        if (!n->prev)
-            *head = n->next;
-        else
-            n->prev->next = n->next;
         n->next->prev = n->prev;
 
         n->prev = e->prev;
