@@ -83,7 +83,12 @@ main result so far (details in `src/vc6/README.md`):
   AngleOfDelta getting the unread distance argument), MpPanelScreen 27 ->
   23 (the row loop on the army-points pointer, colour reset first),
   UpdateTrooperAction 99 -> 90 (one move call with the value chosen
-  first), FindPath 60 -> 56, ObjHitMaskAction 54 -> 51. PlacementAllowed
+  first), FindPath 60 -> 56, ObjHitMaskAction 54 -> 51, AiTrooperStep
+  52 -> 47, ScriptPad 110 -> 105 counting code only (each pad-centre scan
+  declares its own locals; the jump table after the code had been
+  inflating its score, and ScriptParseActionRecon's, by about a hundred),
+  SelectFirePose 34 -> 24 (`case 43` written where the image lays it out;
+  the order of a switch's case bodies follows the source). PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

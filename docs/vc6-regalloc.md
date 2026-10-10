@@ -217,6 +217,15 @@ cannot produce. Declaring the set inside each scan's block took the code shape
 of the second block scored the same). Worth trying wherever two disjoint
 blocks do the same job with the same locals.
 
+**A switch's case bodies are laid out in source order**, so a case written
+in the wrong place moves every body after it. SelectFirePose had `case 43`
+second where the image has it last (shape 34 -> 24). `casecmp.py`-style
+comparison is cheap: read both jump tables (through the byte index table
+when there is one), map every case value to its body address, and diff the
+two orders. Labels and `goto` placement INSIDE the arms, by contrast, did
+not move the shared blocks at all in that function -- VC6 placed them the
+same for all nine label positions tried.
+
 ## Which copy of a merged tail survives
 
 When two switch arms end in the same code (`case 2: return 6;` in two inner
