@@ -66,8 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1577 of
-  1646 byte-identical (2026-10-10), piecewise 399.** PlacementAllowed
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1578 of
+  1646 byte-identical (2026-10-10), piecewise 399.** ParseScenarioPart
+  matches: `took = 8` before the first count test, no separate
+  `count <= 0` return ahead of the row loop, and `rows = p->rows =
+  malloc(...)`. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

@@ -720,7 +720,9 @@ int32_t __cdecl LevelCount(void)
  * A NEGATIVE COUNT REACHES THE ALLOCATION. Zero returns before it; the
  * `count <= 0` test that guards the loop comes AFTER the malloc, so a
  * negative one asks for `count * 0x6C` bytes as a size_t and then copies
- * nothing into whatever comes back. Written in that order deliberately.
+ * nothing into whatever comes back. That test is the row loop's own entry
+ * test; a separate `if (count <= 0) return took;` moved the return out of
+ * the place the image keeps it.
  *
  * The row on the wire is four fixed dwords -- a kind, then two counts each
  * padded to a dword, then a quad of bytes -- followed by the name. Only the
@@ -764,11 +766,11 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
     cur = (const uint8_t *)at;
     n = *(const int32_t *)cur;
     cur += 8;
+    took = 8;
     if (n > 0) {
         cur  += (uint32_t)n * 4;
         took  = n * 4 + 8;
-    } else
-        took  = 8;
+    }
 
     a     = *(const int32_t *)cur;
     cur  += 4;
@@ -791,11 +793,8 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
     if (count == 0)
         goto done;      /* the one return, as the image has it */
 
-    rows = (AM2_ScenRow *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
-    p->rows = rows;
+    rows = p->rows = (AM2_ScenRow *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
     memset(rows, 0, (size_t)((uint32_t)count * SCEN_ROW_BYTES));
-    if (count <= 0)
-        return took;
 
     for (i = 0; i < count; i++, rows++) {
         AM2_ScenRow   *row = rows;
