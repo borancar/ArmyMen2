@@ -84,7 +84,7 @@ main result so far (details in `src/vc6/README.md`):
   (the image tests the position bit twice; split, it is worse until `seq`
   and `flags` swap registers), ParseScenarioPart (walking-pointer anchor
   on +6 against +0, unmoved by indexing, pointer walks or store order),
-  DepthResort, BoxAction, RowUpdate (the image re-reads rect.top after
+  BoxAction, RowUpdate (the image re-reads rect.top after
   storing it), PlacementAllowed (its final compare and `return 0` blocks
   swap places; every spelling compiles the same).
   Shape-first pass (2026-10-10, Boran: "ignore register differences if
@@ -96,7 +96,14 @@ main result so far (details in `src/vc6/README.md`):
   anchor), ScrollMapCache 252 -> 236, SightScan 1048 -> 1028,
   UpdateTrooperAction 952 -> 934; AiTrooperStep, DepthResort, Step3Drive and
   DrawMapObjects took the image's shape at a small byte cost from moved
-  registers (see docs/vc6-regalloc.md, "Shape first, then registers"). The rest of the top of the list is register priority: FindPath
+  registers (see docs/vc6-regalloc.md, "Shape first, then registers"). Second
+  round, shape (instructions off) then bytes: DepthResort 16 -> 0 and
+  DepthInsert 14 -> 6 (the forward walk's run-off arm inside the loop,
+  leaving by break), FindPath 126 -> 95 (unlink read at each use, the
+  insertion walk a for loop), DrawSelection 23 -> 13 (box stores in the
+  image's order), HudPostUpdate 12 -> 8, VehicleUpdateAppend 19 -> 13 (an
+  else-if with two copies of the or), Step3Drive 110 -> 108,
+  CollapseEqualDeltas 6 -> 4, OptionsDefaults 2 -> 0. The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
