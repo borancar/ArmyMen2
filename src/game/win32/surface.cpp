@@ -1075,17 +1075,19 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         surf = NULL;
 #endif
         ddsd.dwSize   = sizeof ddsd;
-        ddsd.dwFlags  = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
         ddsd.dwWidth  = (DWORD)dest->width;
         ddsd.dwHeight = (DWORD)dest->height;
+        ddsd.dwFlags  = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
         ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
         want.dwCaps = DDSCAPS_OFFSCREENPLAIN;
 
         /* Ask before taking: if the card has not got room, do not make it say
          * so by failing. */
         if (!(dest->flags & BMP_FLAG_SYSMEM)) {
+            DWORD need = (DWORD)(dest->width * dest->height);
+
             IDirectDraw2_GetAvailableVidMem(g_ddraw2, &want, &total, &freeVid);
-            if (freeVid < (DWORD)(dest->width * dest->height))
+            if (freeVid < need)
                 dest->flags |= BMP_FLAG_SYSMEM;
         }
         if (dest->flags & BMP_FLAG_SYSMEM)
@@ -1107,26 +1109,28 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             return 0;
         }
     made:
+        /* Laid out as the image has it: the success path with its own
+         * return, then the two Releases (blit failure, then lock failure),
+         * then the shared log and the shared return. */
         IDirectDrawSurface_Restore(surf);
-        if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
+        if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) == DD_OK) {
+            result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
+                                  dest->width, dest->height, remap, &dest->key);
+            if (result) {
+                IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+                dest->surface = surf;
+                if (dest->flags & BMP_FLAG_NO_COLORKEY)
+                    goto done;
+                SetSurfaceColorKey(surf, dest->keyIndex);
+                return result;
+            }
             IDirectDrawSurface_Release(surf);
-            goto lockfail;
+            goto log;
         }
-
-        result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
-                              dest->width, dest->height, remap, &dest->key);
-        if (!result) {
-            IDirectDrawSurface_Release(surf);
-        lockfail:
-            orig_log("Error on Lock in DDCopyBitmap()");
-            return result;
-        }
-
-        IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
-        dest->surface = surf;
-
-        if (!(dest->flags & BMP_FLAG_NO_COLORKEY))
-            SetSurfaceColorKey(surf, dest->keyIndex);
+        IDirectDrawSurface_Release(surf);
+    log:
+        orig_log("Error on Lock in DDCopyBitmap()");
+    done:
         return result;
     }
 }
