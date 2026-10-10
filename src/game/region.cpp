@@ -2650,8 +2650,8 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     box->bottom = tile.bottom + AM2_TILEMASK_MARGIN;
     box->right = tile.right + AM2_TILEMASK_MARGIN;
-    box->top = tile.top - AM2_TILEMASK_MARGIN;
     box->left = tile.left - AM2_TILEMASK_MARGIN;
+    box->top = tile.top - AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0,
            (size_t)((box->bottom - box->top + 1) * (box->right - box->left + 1)));
@@ -3402,8 +3402,8 @@ walk:
                 if ((int32_t)ob->moveAt
                     < (int32_t)ob->moveCount - 1)
                     break;
-                ob->moveCount = 0;
                 ob->routeGoal = g_zeroPoint;
+                ob->moveCount = 0;
                 break;
             }
             at++;
@@ -7694,8 +7694,8 @@ sweep:
          * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
         if (ObjKind538In10To17(o)) {
             turned = 1;
-            speed  = 0;
             out->bearing = facing;
+            speed  = 0;
         } else if (out->hit
                    || !found
                    || (g_mpSession

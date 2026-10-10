@@ -1160,8 +1160,8 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         /* A copy, because the collector intersects its argument in place. */
         AM2_Rect box;
 
-        box.top    = r->rect.top;
         box.left   = r->rect.left;
+        box.top    = r->rect.top;
         box.right  = r->rect.right;
         box.bottom = r->rect.bottom;
         DirtyCollect(&box);
