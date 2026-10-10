@@ -45,6 +45,14 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
   by pitting a value with `k` extra straight-line uses against one with a
   single use in the loop: the loop value wins up to `k = 1, 3, 7` for depth
   1, 2, 3, and loses at `k = 2, 4, 8`.
+- **Uses are counted before common subexpressions are merged.** Writing
+  `angle + sector` twice (tested, then formed in each arm) gives `sector`
+  two uses in the loop although the code computes the sum once. That was
+  enough in DiedEffectB to give `sector` ebx over `height`, which then is
+  read from its argument slot at each push as the image has it (204 -> 38
+  bytes, 2026-10-10). So a value that loses a register it should win may be
+  written fewer times in our source than in the original, even where the
+  generated arithmetic is the same.
 - **Ties go to the web that appears first in the generated instruction
   stream**, not in the source and not in declaration order. Call arguments
   are pushed right to left, so the LAST parameter of a call appears first
