@@ -2054,8 +2054,8 @@ void __cdecl DrawSelection(void)
         y = obj->pos.y - g_viewRect.top;
 
         if (ObjIsType2(obj)) {
-            drop = AM2_MARK_TROOPER_DY;
             wide = AM2_MARK_TROOPER_W;
+            drop = AM2_MARK_TROOPER_DY;
         } else {
             wide = AM2_MARK_WIDE_W;
 
@@ -2080,8 +2080,8 @@ void __cdecl DrawSelection(void)
         /* The frame first, then the filled part, then the remainder -- three
          * ClearRegions over one rectangle, each narrowing it. */
         box.left   = x - 1;
-        box.top    = y + drop;
         box.right  = x + wide + 1;
+        box.top    = y + drop;
         box.bottom = y + drop + 4;
         ClearRegion(&box, g_backgroundColour);
 

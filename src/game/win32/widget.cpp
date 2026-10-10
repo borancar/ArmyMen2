@@ -16392,6 +16392,28 @@ void __cdecl PointerInvokeFreezeSelected(void)
  * a driven Boot Camp mission reaching it exactly once, for mode 0 at mission
  * start. Verified by reading, and the two arms behind the folded compares
  * cannot run at all. */
+/* OurLeaderUnit's dead half on its own. PointerActionFollow picks between
+ * this and the live lookup with a ternary, and that is what lays the scan out
+ * between the two arms with its NULL falling into the shared test; the
+ * helper's early-return form, used by the other seven sites, moves the scan
+ * to the end of the function instead. */
+static inline AM2_Object *DeadLeaderScan(int32_t owner)
+{
+    if (owner >= 0 && owner < AM2_COMM_SLOTS) {
+        AM2_PtrList *const *slot = &g_armyObjLists[owner];
+        int32_t i;
+
+        for (i = 0; i < (*slot)->count; i++) {
+            AM2_Object *o = LookupByUID(
+                (uint32_t)(uintptr_t)(*slot)->items[i]);
+
+            if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge)
+                return o;
+        }
+    }
+    return (AM2_Object *)0;
+}
+
 void __cdecl PointerActionFollow(AM2_Object *obj, AM2_Point at)
 {
     AM2_Object *leader;
@@ -16403,31 +16425,11 @@ void __cdecl PointerActionFollow(AM2_Object *obj, AM2_Point at)
     SpeakLine(AM2_SPEAK_OVERHERE,
               *(const int32_t *)&g_defaultOwner);
 
-    /* OurLeaderUnit written out, with the dead scan FIRST: this site lays
-     * the scan out straight after the live lookup, which jumps over it,
-     * where the shared helper's order (the other seven sites') has VC6
-     * move the scan to the end of the function. */
     {
         int32_t owner = *(const int32_t *)&g_defaultOwner;
 
-        if (owner != *(const int32_t *)&g_defaultOwner) {
-            leader = (AM2_Object *)0;
-            if (owner >= 0 && owner < AM2_COMM_SLOTS) {
-                AM2_PtrList *const *slot = &g_armyObjLists[owner];
-
-                for (i = 0; i < (*slot)->count; i++) {
-                    AM2_Object *o = LookupByUID(
-                        (uint32_t)(uintptr_t)(*slot)->items[i]);
-
-                    if (o && o->type == AM2_OBJ_TYPE_TROOPER && o->sarge) {
-                        leader = o;
-                        break;
-                    }
-                }
-            }
-        } else {
-            leader = LookupByUID(g_ourLeaderUid);
-        }
+        leader = owner == *(const int32_t *)&g_defaultOwner
+                     ? LookupByUID(g_ourLeaderUid) : DeadLeaderScan(owner);
     }
     if (!leader)
         return;
