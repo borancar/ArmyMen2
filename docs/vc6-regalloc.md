@@ -317,6 +317,31 @@ epilogue and then jumped again to the cooldown test; the image tests
 the cooldown test, it does the same (96 -> 54 bytes off, with the
 `!button` arm tested first as the image lays it out).
 
+## Shape first, then registers
+
+Ranking misses by a register-masked diff (registers and stack offsets
+masked, reg-reg moves and spill loads/stores dropped) separates what the
+source decides from what the allocator decides. Fixing the shape first
+paid off on 2026-10-10, often with bytes following:
+
+- **An element pointer moves the walking-pointer anchor.** DrawEffectLayer
+  read the A marker through `const AM2_Point *ptA = &g_aimPointA[army]`;
+  VC6 anchored the per-army pointer on aimPointB.y. Indexed at each use
+  (`g_aimPointA[army].x`), it anchors on aimPointA.y as the image does
+  (616 -> 584).
+- **Store order is source order, mostly.** ViewUpdate's two rect fills and
+  the eye position, written in the order the image stores them (and the
+  eye's y stored straight from its clamp), went 186 -> 90. ScrollMapCache's
+  log rect the same way, 252 -> 236. Where the scheduler reorders anyway
+  (MissionEnded, LoadMap), changing the source order did nothing.
+- **`if (!a) goto L;` against `if (a) {...} else {L}`** again: FindPath's
+  stamp arms (claim last), AiTrooperStep's no-region arm, UpdateTrooperAction's
+  sweep limit as an if/else rather than default-then-override.
+- **A zero in a register changes stores.** `*c |= 3` through a pointer is a
+  load/or/store when a flag set beside it (`marked = 1`) lives in a
+  register, and `or byte [c], 3` when it lives in memory, as in
+  ObjHitMaskAction's image. That one is the allocator's, not the shape's.
+
 ## Declarations ahead of a function can turn its ties
 
 A type declared earlier in the translation unit can change a function that
