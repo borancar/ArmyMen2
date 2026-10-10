@@ -469,6 +469,15 @@ free: relink and compare every function, not just the ones the change names.
   base). That one choice moves the backbuffer load later in the function off
   eax's short `mov`. Index spellings, a temporary, and every order of the
   helper's locals and opening statements compile the same.
+- When VC6 splits a parameter's web at a loop head. BlockWeightTroops' image
+  reloads `from` from its argument slot at the top of every iteration
+  (`mov ebp, [esp+0x18]` is the back edge's target), so its register is free
+  again after the last use and holds the first ApproxDist result across the
+  second call. Ours keeps `from` in ebx for the whole loop and spills that
+  result. Both have the same eight uses of `from`, so it is not the weight.
+  Dropping the local copy of `from`, naming the distance (which does move
+  `from` to ebp, but spills the weight instead), and four spellings of the
+  weight helper do not reproduce the split (2026-10-10).
 
 ## Running decomp-permuter against VC6
 
