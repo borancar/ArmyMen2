@@ -1765,115 +1765,111 @@ static inline void RepaintDialog(void)
 
 void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 {
-    int32_t             *slotSetting;
+    /* Read through a local copy of the parameter: the image reloads it at
+     * the bottom of the player loop, right after the strcpy's `rep movsd`
+     * clobbers esi, and only the copy puts the reload there. */
+    const AM2_PlayerMsg *m = msg;
     int32_t             *ours;
     int32_t              i;
 
     (void)dpid;
 
     /* Every use re-reads the comm object, as the original does. */
-#define comm AM2_THE_COMM
-#define SETTING_END ((int32_t)((uintptr_t)&g_scoreLimit))
 
     /* The host sends it. */
-    if (comm->isHost)
+    if (AM2_THE_COMM->isHost)
         return;
 
     /* Not gated on verbosity, alone among this function's logs. */
     am2_log("ReceivePlayerMsg for %d Players. I reckoned there were %d "
             "Players \n",
-            msg->count, comm->playerCount);
+            m->count, AM2_THE_COMM->playerCount);
 
-    comm->connected = msg->connected;
+    AM2_THE_COMM->connected = m->connected;
 
-    if (comm->verbose)
+    if (AM2_THE_COMM->verbose)
         am2_log("      map: %s, mapSum=%X, ruleSum=%X\n",
-                msg->mapName, msg->mapSum, msg->ruleSum);
+                m->mapName, m->mapSum, m->ruleSum);
 
-    comm->playerCount = msg->count;
-    g_scoreLimit = msg->scoreLimit;
-    *(int32_t *)&g_gameOverFlags = msg->overFlags;
-    g_gameSetting22c = msg->setting22c;
+    AM2_THE_COMM->playerCount = m->count;
+    g_scoreLimit = m->scoreLimit;
+    *(int32_t *)&g_gameOverFlags = m->overFlags;
+    g_gameSetting22c = m->setting22c;
 
-    /* Four entries, and the end is the address of the next global, compared
-     * SIGNED both times: once as the loop's own bottom test (`jl`) and once
-     * mid-body. The loop test stops after the fourth record, so the mid-body
-     * break can never fire; it is in the image all the same. (This was once
-     * written as an unbounded loop with only the break, which ran a fifth
-     * record through the log and CommSetSlotRemote.) */
-    slotSetting = g_armyPoints;
-    i = 0;
-    while ((int32_t)(uintptr_t)slotSetting < SETTING_END) {
-        if (comm->verbose)
+    /* Four entries, indexed. VC6 strength-reduces g_armyPoints[i] into a
+     * walking pointer and tests THAT against the next global's address,
+     * signed, both as the loop's bottom test (`jl`) and mid-body; written as
+     * that pointer, its initialisation lands in the wrong place. The loop
+     * test stops after the fourth record, so the mid-body break can never
+     * fire; it is in the image all the same. (This was once written as an
+     * unbounded loop with only the break, which ran a fifth record through
+     * the log and CommSetSlotRemote.) */
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        if (AM2_THE_COMM->verbose)
             am2_log("                 player: %s %x %d\n",
-                    msg->recs[i].name, msg->recs[i].id, msg->recs[i].colour);
+                    m->recs[i].name, m->recs[i].id, m->recs[i].colour);
 
         /* Done before the (dead) mid-body bound check. */
-        if (msg->recs[i].id == comm->selfId) {
+        if (m->recs[i].id == AM2_THE_COMM->selfId) {
             g_ourSlot      = i;
             g_defaultOwner = (uint32_t)i;
-            comm->CommClearSlotRemote(i);
+            AM2_THE_COMM->CommClearSlotRemote(i);
         } else {
-            comm->CommSetSlotRemote(i);
+            AM2_THE_COMM->CommSetSlotRemote(i);
         }
 
-        if ((int32_t)(uintptr_t)slotSetting >= SETTING_END)
+        if (i >= AM2_COMM_SLOTS)
             break;
 
-        comm->slots[i].id          = msg->recs[i].id;
-        comm->slots[i].colour      = msg->recs[i].colour;
-        comm->slots[i].team        = msg->recs[i].team;
-        comm->slots[i].wasHere     = msg->recs[i].wasHere;
-        comm->slots[i].readyToLoad = msg->recs[i].readyToLoad;
-        *slotSetting = msg->recs[i].setting;
+        AM2_THE_COMM->slots[i].id          = m->recs[i].id;
+        AM2_THE_COMM->slots[i].colour      = m->recs[i].colour;
+        AM2_THE_COMM->slots[i].team        = m->recs[i].team;
+        AM2_THE_COMM->slots[i].wasHere     = m->recs[i].wasHere;
+        AM2_THE_COMM->slots[i].readyToLoad = m->recs[i].readyToLoad;
+        g_armyPoints[i] = m->recs[i].setting;
 
-        if (msg->recs[i].id != comm->selfId) {
+        if (m->recs[i].id != AM2_THE_COMM->selfId) {
             /* The SECOND time for this record, and this one is bounded by the
              * count where the first is not. */
-            if (i < comm->playerCount)
-                comm->CommSetSlotRemote(i);
-            if (!FindPlayerById(comm->slots[i].id))
+            if (i < AM2_THE_COMM->playerCount)
+                AM2_THE_COMM->CommSetSlotRemote(i);
+            if (!FindPlayerById(AM2_THE_COMM->slots[i].id))
                 am2_log("PlayerMsg received before DPSYS_CREATEPLAYERORGROUP. "
                         "Unusual but should work. No flowq yet for id %x\n",
-                        comm->slots[i].id);
+                        AM2_THE_COMM->slots[i].id);
         }
 
-        strcpy(comm->slots[i].name, msg->recs[i].name);
-        /* The three steps at the bottom of the body, not in a `for` header:
-         * VC6 lays the loop out differently for the two. */
-        i++, slotSetting++;
+        strcpy(AM2_THE_COMM->slots[i].name, m->recs[i].name);
     }
-#undef SETTING_END
 
     /* Our own slot may have arrived empty; fill in the id we already know. */
-    ours = (int32_t *)&comm->slots[g_ourSlot].id;
+    ours = (int32_t *)&AM2_THE_COMM->slots[g_ourSlot].id;
     if (*ours == 0 || *ours == -1)
-        *ours = comm->selfId;
+        *ours = AM2_THE_COMM->selfId;
 
-    if (msg->hasMap) {
+    if (m->hasMap) {
         int32_t rules;
 
-        strcpy(g_mpScriptName, msg->mapName);
-        strcpy(g_mapName_, msg->levelName);
-        rules = CheckMapRules(msg->ruleArg, msg->ruleSum, msg->mapSum);
-        SendMapMsg(rules, comm->connected);
+        strcpy(g_mpScriptName, m->mapName);
+        strcpy(g_mapName_, m->levelName);
+        rules = CheckMapRules(m->ruleArg, m->ruleSum, m->mapSum);
+        SendMapMsg(rules, AM2_THE_COMM->connected);
     }
 
-    if (msg->version != g_gameVersion
-        || msg->checksum != g_dataChecksum) {
+    if (m->version != g_gameVersion
+        || m->checksum != g_dataChecksum) {
         char buf[0x40];
 
         /* OUR name, from ADDR_DEFAULT_OWNER -- the disagreeing client
          * announces itself rather than naming the host. */
         orig_sprintf(buf, "%s has a different version of the game.",
-                     comm->slots[g_defaultOwner].name);
+                     AM2_THE_COMM->slots[g_defaultOwner].name);
         MenuMessage(buf, 4, 0);
         SendChatMsg(buf, 1);
-        SendMapMsg(5, comm->connected);
+        SendMapMsg(5, AM2_THE_COMM->connected);
     }
 
     RepaintDialog();
-#undef comm
 }
 
 void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid)

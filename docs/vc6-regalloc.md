@@ -166,6 +166,12 @@ IL-override probe had shown no operand order in the IL could reach. It is the
 `AM2_Object *o = obj;` idiom already common in this codebase, and worth trying
 early on any function whose parameter is used many times.
 
+It also moves a parameter's RELOADS. ReceivePlayerMsg's `msg` lives in esi,
+which the loop's inline `strcpy` clobbers; read directly, VC6 reloads it at
+the loop head, and through `const AM2_PlayerMsg *m = msg;` it reloads at the
+bottom, right after the `rep movsd`, as the image does (2 -> 0 with the
+indexing below).
+
 ## Spill slots follow the source before merging
 
 A spilled local reuses a dead argument's home slot, and which slot it gets is
@@ -280,6 +286,16 @@ helper), and ours merges two of the three into CREATETROOPER's.
   with the int32 regions) is `region[t]` read in place each time, not an
   `int32_t` local, which gives a signed `jle` on the widened value, nor a
   `uint8_t` local, which spills it (1368 -> 1358).
+- **A walking pointer compared against an address may be VC6's, not the
+  source's.** ReceivePlayerMsg's `cmp eax, 0x515FF0; jl` over a pointer
+  starting at 0x515FE0 was written as that pointer (`slotSetting`), and its
+  initialisation always landed beside `i = 0` instead of beside the other
+  strength-reduced pointer (`lea ebx, [esi+0xAC]`). Written as
+  `for (i = 0; i < 4; i++) g_armyPoints[i] = ...`, VC6 makes the pointer
+  itself, replaces the `i < 4` test with the pointer compare, keeps the
+  signed `jl`, and puts the store where the image has it. When an image's
+  pointer is initialised together with other induction variables, try
+  the index.
 
 ## Declarations ahead of a function can turn its ties
 

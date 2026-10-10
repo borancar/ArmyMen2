@@ -66,8 +66,12 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1568 of
-  1645 byte-identical (2026-10-10), piecewise 399.** Shorthand read macros and
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1569 of
+  1645 byte-identical (2026-10-10), piecewise 399.** ReceivePlayerMsg matches:
+  the army-points loop is `for (i = 0; i < 4; i++)` over `g_armyPoints[i]`,
+  which VC6 strength-reduces into the walking pointer the image tests, and
+  `msg` is read through a local copy, which moves its reload to the loop's
+  bottom. Shorthand read macros and
   file-local global aliases are gone from `src/game` (2026-10-10, ~640 of
   them), and the globals they re-typed have their real types in
   `globals.h`; every function compiled identically. Left for later:
@@ -270,6 +274,7 @@ main result so far (details in `src/vc6/README.md`):
     message is AM2_PlayerMsg. relinkos.py gives a scalar typed member an
     address-of redirect. Closer, still off:
     - ReceivePlayerMsg 60 -> 2: index the records, set slotSetting before i.
+      (Matched 2026-10-10: see the relink entry above.)
     - AddToItemList 72 -> 41: a select for the counter, count-first grow
       test, a local n for the memmove.
     - AppendTroopState 31 -> 19: typed trooper sent-state fields, and the
