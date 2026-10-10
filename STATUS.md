@@ -88,7 +88,18 @@ main result so far (details in `src/vc6/README.md`):
   declares its own locals; the jump table after the code had been
   inflating its score, and ScriptParseActionRecon's, by about a hundred),
   SelectFirePose 34 -> 24 (`case 43` written where the image lays it out;
-  the order of a switch's case bodies follows the source). PlacementAllowed
+  the order of a switch's case bodies follows the source), ObjTileHook to
+  shape 0 (its five flags zeroed in the image's store order), DepthInsert
+  6 -> 3 (`link_after` before the cursor re-read). Counted with registers
+  AND stack slots treated alike (a spill is register allocation too, as is
+  `lea` against `add` and a zero register against an immediate 0), 18 of
+  the 68 differing functions have the image's shape and the rest total
+  832. Much of what remains follows from register choice rather than
+  source: VC6 cross-jumps two identical tails only when their registers
+  agree (PointerPickMode0, HudPostUpdate, FlowRecvMessage, ScriptPad's
+  inlined ScriptExpect copies), and block placement that four source
+  orderings of UpdateTrooperAction's stop arms all compiled identically.
+  PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and
