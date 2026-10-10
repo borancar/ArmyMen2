@@ -7668,7 +7668,7 @@ sweep:
                     uint32_t claimed = o->uid56C;
 
                     if (claimed)
-                        while (1) {
+                        for (;;) {
                             if (!at)
                                 break;
                             if (at->uid == claimed)
