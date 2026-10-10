@@ -41,7 +41,6 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused)
 {
     uint8_t       *w;
-    uint8_t       *buf;
     const uint8_t *p;
     uint32_t       written;
     uint8_t        key;
@@ -52,12 +51,11 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
     out->width  = (uint16_t)width;
     out->height = (uint16_t)height;
 
+    w       = (uint8_t *)&out->rowOffset[height];
     written = (uint32_t)(height * sizeof out->rowOffset[0] + sizeof *out);
     p       = g_frameBuf;
-    w       = (uint8_t *)&out->rowOffset[height];
 
     key = p[g_pitch * KEY_ROW];
-    buf = g_frameBuf;
 
     for (row = 0; row < height; row++) {
         const uint8_t *start = p;
@@ -92,9 +90,10 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
 
     /* Wipe the scratch square back to the background colour so the next
      * character starts clean. The original writes 6 dwords plus a byte per
-     * row -- 25 bytes -- for 25 rows. */
+     * row -- 25 bytes -- for 25 rows. The buffer is read afresh here; VC6
+     * reuses the register only on the path where the loop never ran. */
     {
-        uint8_t *dst = buf;
+        uint8_t *dst = g_frameBuf;
         int32_t  i;
 
         for (i = 0; i < SCRATCH_SIDE; i++) {
