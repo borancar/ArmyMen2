@@ -2213,14 +2213,18 @@ void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
                 /* The stored angle is a DELTA on the sector, wrapped into a
                  * byte -- and the wrap is one add or one subtract because
                  * the table's values keep the sum inside +/- one turn. */
-                angle += sector;
-                if (angle < 0) {
-                    SpawnParticle(at, rowField2C, i, 7, height, angle + 0x100);
+                /* The sum is tested before it is stored and then formed in
+                 * each arm: the extra uses of `sector` are what give it a
+                 * register over `height`, as the image has it. */
+                if (angle + sector < 0) {
+                    angle += sector;
+                    angle += 0x100;
                 } else {
+                    angle += sector;
                     if (angle >= 0x100)
                         angle -= 0x100;
-                    SpawnParticle(at, rowField2C, i, 7, height, angle);
                 }
+                SpawnParticle(at, rowField2C, i, 7, height, angle);
             } else {
                 /* Unreachable through this caller; see the header. */
                 SpawnParticle(at, rowField2C, i, 7, height, -1);
