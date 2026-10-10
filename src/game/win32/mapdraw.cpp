@@ -961,8 +961,10 @@ subdivide:
         AM2_Rect  c;
 
         if (right - left > dh) {
+            if (dw > AM2_SUBDIVIDE_FLOOR)
+                deep = 1;
+            sub  = deep;
             half = left + dw / 2;
-            sub  = (dw <= AM2_SUBDIVIDE_FLOOR) ? deep : 1;
 
             a.left = left;   a.top = top;    a.right  = half;  a.bottom = bottom;
             c.left = half + 1; c.top = top;  c.right  = right;
