@@ -2707,23 +2707,28 @@ triggers_done:
         g_pads[g_padCount].threshold = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
 
-        /* `delay <int> <int>`, optional, and only after a comparison. */
-        if (*at != ctx->count &&
-            ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_DELAY) {
-            if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
-                return 0;
-            g_pads[g_padCount].delay0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
-                return 0;
-            g_pads[g_padCount].delay1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            (*at)++;
-        }
+        /* At the end of the script the pad is finalised at once; the
+         * image has this call twice and VC6 shares its tail. */
+        if (*at == ctx->count) {
+            PadFinalise(&g_pads[g_padCount], (AM2_Object *)(void *)0);
+        } else {
+            /* `delay <int> <int>`, optional, and only after a comparison. */
+            if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
+                (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_DELAY) {
+                if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+                    return 0;
+                g_pads[g_padCount].delay0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+                if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+                    return 0;
+                g_pads[g_padCount].delay1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+                (*at)++;
+            }
 
-        /* The second argument is an OBJECT and the original passes a literal
-         * zero here, which the callee reads as "no object" -- so the notify
-         * this pad eventually sends carries a zero uid. */
-        PadFinalise(&g_pads[g_padCount], (AM2_Object *)(void *)0);
+            /* The second argument is an OBJECT and the original passes a literal
+             * zero here, which the callee reads as "no object" -- so the notify
+             * this pad eventually sends carries a zero uid. */
+            PadFinalise(&g_pads[g_padCount], (AM2_Object *)(void *)0);
+        }
     }
 
     /* The name resolves to the pad, and only now does the pad count move. */
