@@ -4925,8 +4925,11 @@ in_sight:
                     it->targetUid = 0;
                     goto score;                 /* cand is null; score refuses */
                 }
-                if (cand->health <= 0
-                    || ((int32_t)cand->flags & 0x204)) {
+                if (cand->health <= 0) {
+                    it->targetUid = 0;
+                    continue;
+                }
+                if ((int32_t)cand->flags & 0x204) {
                     it->targetUid = 0;
                     continue;
                 }
