@@ -787,8 +787,8 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
                 break;
             g_depthCursor = g_depthCursor->prev;
             if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
-                at = g_depthCursor;
             link_after:
+                at = g_depthCursor;
                 LINK_AFTER(at);
                 goto done;
             }
