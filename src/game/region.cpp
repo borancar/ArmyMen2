@@ -2659,25 +2659,25 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     w = box->right - box->left + 1;
     memset(out->cells, 0, (size_t)((box->bottom - box->top + 1) * w));
 
-    g_tilemaskNeighbours[1]  = -2 * w;
+    g_tilemaskNeighbours[8]  = -2;
+    g_tilemaskNeighbours[14] = w;
+    g_tilemaskNeighbours[9]  = -1;
+    g_tilemaskNeighbours[10] = 1;
+    g_tilemaskNeighbours[18] = 2 * w;
     g_tilemaskNeighbours[0]  = -2 * w - 1;
+    g_tilemaskNeighbours[1]  = -2 * w;
+    g_tilemaskNeighbours[11] = 2;
     g_tilemaskNeighbours[2]  = -2 * w + 1;
     g_tilemaskNeighbours[3]  = -w - 2;
     g_tilemaskNeighbours[4]  = -w - 1;
     g_tilemaskNeighbours[5]  = -w;
     g_tilemaskNeighbours[6]  = -w + 1;
     g_tilemaskNeighbours[7]  = -w + 2;
-    g_tilemaskNeighbours[9]  = -1;
-    g_tilemaskNeighbours[8]  = -2;
-    g_tilemaskNeighbours[10] = 1;
-    g_tilemaskNeighbours[11] = 2;
     g_tilemaskNeighbours[12] = w - 2;
     g_tilemaskNeighbours[13] = w - 1;
-    g_tilemaskNeighbours[14] = w;
     g_tilemaskNeighbours[15] = w + 1;
-    g_tilemaskNeighbours[17] = 2 * w - 1;
     g_tilemaskNeighbours[16] = w + 2;
-    g_tilemaskNeighbours[18] = 2 * w;
+    g_tilemaskNeighbours[17] = 2 * w - 1;
     g_tilemaskNeighbours[19] = 2 * w + 1;
 
     tilew = tile.right - tile.left + 1;
