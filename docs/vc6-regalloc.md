@@ -317,6 +317,15 @@ epilogue and then jumped again to the cooldown test; the image tests
 the cooldown test, it does the same (96 -> 54 bytes off, with the
 `!button` arm tested first as the image lays it out).
 
+A walk that leaves by `goto` has the same trouble. DepthInsert and
+DepthResort walked with `while (next) { ...; if (found) goto before; }`
+followed by the ran-off-the-end arm and then `before:`; VC6 laid the shared
+tail out after the ran-off arm, where the image keeps the ran-off arm, then
+the insert-before arm, then the tail. Written as `for (;;) { if (!next) {
+ran-off arm; return or goto done; } ...; if (found) break; }` with the
+insert-before arm after the loop, both take the image's order (DepthInsert
+shape 14 -> 6, DepthResort 16 -> 0).
+
 A two-way choice whose image lays one arm out, JUMPS over the other and
 joins on a shared test is the ternary's shape, not an if/else's. VC6 put an
 if/else's second arm at the end of PointerActionFollow in either orientation
