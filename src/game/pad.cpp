@@ -293,12 +293,19 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     const uint8_t *bitLayer;
     uint32_t tile;
     uint32_t       prev;
-    int32_t        changed = 0;
-    uint8_t        curBits = 0;
-    uint8_t        prevPad = 0;
-    uint8_t        curPad = 0;
-    uint8_t        prevBits = 0;
+    int32_t        changed;
+    uint8_t        curBits;
+    uint8_t        prevPad;
+    uint8_t        curPad;
+    uint8_t        prevBits;
     int32_t        i;
+
+    /* Zeroed in the order the image stores them. */
+    curPad = 0;
+    curBits = 0;
+    prevPad = 0;
+    prevBits = 0;
+    changed = 0;
 
     /* The damage pass, before the early exit. The original indexes the
      * pad layer here WITHOUT the null test both later passes make. */
