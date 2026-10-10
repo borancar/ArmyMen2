@@ -47,6 +47,13 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
+**No shorthand `#define`s for reads.** Where the original reads a field or a
+global at each use, write the expression at each use (`dest->width`, not a
+local `#define W (dest->width)`). Such macros are text substitution and never
+change the code VC6 generates; they only make the reader decode them. Older
+ones (`TOK`, `COUNT`, `FRESH`, ...) are converted when their function is touched,
+with the function's compiled code checked unchanged.
+
 **`make check` runs everything that does not need the game.** **71** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
