@@ -134,7 +134,17 @@ main result so far (details in `src/vc6/README.md`):
   nothing else. FlowRecvMessage's four "Can't find FlowQ" logs share one
   block in the image; ours copies the small return-0 epilogue into each
   site, which leaves nothing to merge. Not solved. `g_attemptCount` and
-  `g_levelAttempt` are two names for 0x512330. Fourth round: ParseScenarioPart
+  `g_levelAttempt` are two names for 0x512330. Copy substitution, rerun over the
+  74 (2026-10-10) and then scored on shape rather than bytes: where we held a
+  local copy, the image re-reads the expression it copied. DrawEffectLayer
+  28 -> 4, Step3Drive 101 -> 83, FindPath 93 -> 82, RowUpdate 21 -> 14,
+  ObjTileHook 5 -> 1, ObjRemap 11 -> 9, ViewUpdate 7 -> 5, and smaller.
+  Every hit is vetted for a write between the copy and the use: re-reading
+  g_regionOfCell in AiTrooperStep and FindPath and the draw target in
+  DrawEffectLayer would change behaviour (TileRegionOrBorrow and
+  SetDrawTarget write them; the image tests the saved copies) and were
+  refused. DiedEffectB 204 -> 38 bytes: `angle + sector` written twice
+  raises sector's register priority (uses are counted before CSE). Fourth round: ParseScenarioPart
   17 -> 3 (82 -> 48 bytes; the row loop advances `rows` itself, which moves
   VC6's walking-pointer anchor from pos.y to the row start), and
   Step3Drive's +0x59C clear now goes through its steering record as the
