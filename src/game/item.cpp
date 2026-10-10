@@ -9304,7 +9304,7 @@ void __cdecl SelectionClick(void)
              * only if something later walked that list. */
             ObjAttachTo(e, (AM2_Object *)0);
             /* Through a local: the image loads the zero point into ecx
-             * here and eax at `changed`, and a copy is what moves it. */
+             * here and eax at the tail's call, and a copy is what moves it. */
             {
                 AM2_Point pt = g_zeroPoint;
 
@@ -9320,7 +9320,6 @@ void __cdecl SelectionClick(void)
     ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->PtrListPush(
                 (void *)(uintptr_t)(e)->uid);
     e->flags |= OBJ_FLAG_SELECTED;
-changed:
     OnSelectionChanged(g_zeroPoint);
 
 }
