@@ -208,6 +208,15 @@ slots, try writing a shared `case` label as separate arms, or duplicating some
 other block the compiler will merge. (decomp-permuter found this as an unnatural
 `if (slot) {...} else {...}` with the same body on both sides.)
 
+**A block-scoped local is a different variable to VC6.** ScriptPad's two
+pad-centre scans used one function-level set of `i, sx, sy, n, total`; the
+image gives the two scans different slots and registers for the same roles
+(the first scan's count spilled, the second's in `ebp`), which one shared set
+cannot produce. Declaring the set inside each scan's block took the code shape
+110 -> 105. Declaration ORDER inside the block changed nothing (all 120 orders
+of the second block scored the same). Worth trying wherever two disjoint
+blocks do the same job with the same locals.
+
 ## Which copy of a merged tail survives
 
 When two switch arms end in the same code (`case 2: return 6;` in two inner
