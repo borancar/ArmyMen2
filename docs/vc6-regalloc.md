@@ -251,6 +251,22 @@ store (`mov edx, [esp+0x40]`) while `state` and `hit` go through `ebp`. That
 suggests two pointer variables in the original, but a local alias for
 `state`/`hit` was propagated away.
 
+**ScriptParseActionRecon (2026-10-10): remove the later copy and the earlier
+one survives.** The image keeps the end-of-script log and its `return 0` in
+MOVEITEM's place (its `eos:` label, falling into `default:`), and every other
+end-of-script path jumps there. Ours kept the copy in the ORDER case, which
+wrote its own `{ log; return 0; }` later in the switch. Writing that check as
+`STEP()` (`goto eos`) leaves one copy, in the image's place: 2476 -> 2316, and
+tools/actcheck.py still finds 0 diffs in 13,122 cases. The jump-table scan
+(`$T/armorder.py`: decode both tables, compare the order of the case bodies)
+is how it was found: the default's entry pointed somewhere else in each.
+
+Still open there: the image also keeps three separate, byte-identical
+`if (++*at >= count) { log; return 0; }` blocks (TRIGGERDELAY,
+CREATETROOPER and one more), each falling into its own continuation. VC6
+merges such blocks in every lab shape tried (inline, inverted test, an inline
+helper), and ours merges two of the three into CREATETROOPER's.
+
 ## Loop and temporary shapes that show in the image
 
 - **A rotated `while (p->next) { ... }` is not `while (1) { if (!p->next) break;
