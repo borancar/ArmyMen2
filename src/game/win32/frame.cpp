@@ -804,9 +804,9 @@ void __cdecl State2Enter(void)
     ClearBothSurfaces();
     g_presentEnabled = 1;
 
-    if (*(const uint8_t *)&g_gameprocBlock == 0)
+    if (*(const uint8_t *)g_gameprocBlock == 0)
         goto no_load;
-    if (*(const uint8_t *)&g_gameprocStrB == 0) {
+    if (*(const uint8_t *)g_gameprocStrB == 0) {
     no_load:
         g_loadPending = 0;
     } else if (g_loadPending != 0) {
@@ -881,7 +881,7 @@ void __cdecl State2Enter(void)
     FreeObjScripts();
 
     StartAudioStream(g_levelStrA, 1);
-    LoadMap(&g_mapName_,
+    LoadMap(g_mapName_,
             g_tilesetPath);
 
     ProgressBar(0x0A);
@@ -1596,7 +1596,7 @@ void __cdecl State4Frame(void)
     if (!g_stateEntered)
         return;
 
-    PostMessageA(*(HWND *)&g_enumContext, WM_CLOSE, 0, 0);
+    PostMessageA((HWND)g_hWnd, WM_CLOSE, 0, 0);
     g_stateEntered = 0;
 }
 
@@ -1966,7 +1966,7 @@ void __cdecl PausedFrameStep(void)
         clip.bottom = clip.top + 0x14;
         am2_sprintf(buf, "Game type: %s, Goal: %d",
                     (const char *)ScriptListFind(
-                        &g_mpScriptName) + 0x80,
+                        g_mpScriptName) + 0x80,
                     g_scoreLimit);
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;

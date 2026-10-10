@@ -151,7 +151,6 @@ typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
  * game logic, and the timer callback that drives all this is never ours. */
 
 #define MOVIE_PALETTE_OFF 0x800u
-#define g_hWnd (*(HWND *)&g_enumContext)
 
 /* Non-zero once the movie subsystem has handed Smacker a DirectSound object. */
 
@@ -251,7 +250,7 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
 
     LPDIRECTDRAWPALETTE pal = NULL;
     const uint8_t      *src;
-    LPPALETTEENTRY      dst = (LPPALETTEENTRY)((uintptr_t)g_systemPalette_);
+    LPPALETTEENTRY      dst = g_systemPalette;
     int32_t             i;
 
     src = &movie->smack->palette[MOVIE_PALETTE_FIRST * 3];
@@ -259,9 +258,9 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
     /* Indexed through the global itself, and bounded `< LAST + 1`: both are
      * what put the loop pointer and its test where the original has them. */
     for (i = MOVIE_PALETTE_FIRST; i < MOVIE_PALETTE_LAST + 1; i++) {
-        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peRed   = *src++;
-        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peGreen = *src++;
-        ((LPPALETTEENTRY)((uintptr_t)g_systemPalette_))[i].peBlue  = *src++;
+        g_systemPalette[i].peRed   = *src++;
+        g_systemPalette[i].peGreen = *src++;
+        g_systemPalette[i].peBlue  = *src++;
     }
 
     IDirectDrawSurface_GetPalette(surf, &pal);
@@ -304,7 +303,7 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
              * on. */
             delete g_movieCurrent;
             g_movieCurrent = NULL;
-            PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
+            PostMessageA((HWND)g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
             return 0;
         }
         movie->active = 1;
@@ -354,8 +353,8 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
         movie->sized = 1;
 
     /* Once per process, and only if there is a DirectSound to give. */
-    if (!g_soundReady && g_movieDSound) {
-        smack_use_dsound(g_movieDSound);
+    if (!g_soundReady && g_dsound) {
+        smack_use_dsound(g_dsound);
         g_soundReady = 1;
     }
 
@@ -417,7 +416,7 @@ void *__attribute__((thiscall)) am2_ctor_AM2_Movie(void *mem, const char *name, 
  * is the one place a finished cutscene becomes a game state change. */
 void __cdecl MovieFinished(void)
 {
-    PostMessageA(g_hWnd, WM_USER, 0, 0);
+    PostMessageA((HWND)g_hWnd, WM_USER, 0, 0);
 }
 
 /* Original: 0x004453C0, 1 call site. Decode one frame onto the surface.
@@ -632,7 +631,7 @@ void __cdecl PlayMovie(const char *name, int32_t big)
         || g_optNoMovies) {
         /* MovieFinished's body, inline here -- the image posts directly at
          * 0x0042E705 where its other two callers call 0x00445600. */
-        PostMessageA(g_hWnd, WM_USER, 0, 0);
+        PostMessageA((HWND)g_hWnd, WM_USER, 0, 0);
         return;
     }
 

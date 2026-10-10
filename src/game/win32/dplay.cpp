@@ -172,7 +172,6 @@ void __cdecl CommShutdown(void)
 
 /* The comm object lives behind a pointer; these three reach the interface the
  * same way CommCreateDirectPlay does. */
-#define g_hwnd          (*(HWND *)&g_enumContext)
 
 /* A comm member that ignores `this`: its callers load ecx with the comm
  * object and the body reads the global instead (0x0040DCF0), as AllyFlag
@@ -794,7 +793,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumSessions(void *list)
      * compared the push. */
     return IDirectPlayX_EnumSessions(*DirectPlaySlot(comm), &desc, 0,
                                      EnumSessionsCb,
-                                     g_enumContext,
+                                     (HWND)g_hWnd,
                                      DPENUMSESSIONS_ALL | DPENUMSESSIONS_ASYNC)
            == DP_OK;
 }
@@ -892,7 +891,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumConnections(void *list)
     hr = IDirectPlayX_EnumConnections(*DirectPlaySlot(comm),
                                       (const GUID *)comm->appGuid,
                                       EnumConnectionsCb,
-                                      g_enumContext, 0);
+                                      (HWND)g_hWnd, 0);
     if (hr != DP_OK)
         return 0;
 
@@ -931,7 +930,6 @@ static_assert((uint32_t)E_INVALIDARG == 0x80070057u, "E_INVALIDARG");
 typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
 typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
-#define g_hwnd           (*(HWND *)&g_enumContext)
 
 /* 0x046C -- WndProc forwards this one to the original. */
 #define AM2_WM_COMM_SEND_FAILED 0x046Cu
@@ -992,7 +990,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
         if (index == -1)
             orig_log("-- No Players Entry for player id %x\n", idTo);
 
-        PostMessageA(g_hwnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
+        PostMessageA((HWND)g_hWnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
 failed:
         return 0;
     }
@@ -1753,7 +1751,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumPlayers()
     return IDirectPlayX_EnumPlayers((LPDIRECTPLAY4A)g_commObject->dplay,
                                     *(GUID **)g_commObject,
                                     EnumPlayersCb,
-                                    (LPVOID)g_hwnd, 0) == DP_OK;
+                                    g_hWnd, 0) == DP_OK;
 }
 
 /* Bring the packet subsystem up -- 0x004021A0.
@@ -1900,7 +1898,7 @@ int32_t __cdecl RecvThreadProc(void *param)
                 CommReceive(*(void * *)&g_commObject, &from, &to,
                             1, g_recvScratch, &size);
 
-                PostMessageA(*(HWND *)&g_enumContext,
+                PostMessageA((HWND)g_hWnd,
                              AM2_WM_NO_BUFFERS, 1, 0);
                 break;
             }
@@ -1925,7 +1923,7 @@ int32_t __cdecl RecvThreadProc(void *param)
         }
 
         if (got)
-            PostMessageA(*(HWND *)&g_enumContext,
+            PostMessageA((HWND)g_hWnd,
                          AM2_WM_PACKETS_READY, 0, 0);
     }
 
@@ -2221,7 +2219,7 @@ void __cdecl CommNoBuffers(void)
 
     g_noBuffersLatch = 1;
     orig_stat_log("COMM ERROR: NO BUFFERS\n");
-    PostMessageA(*(HWND *)&g_enumContext, WM_CLOSE, 0, 0);
+    PostMessageA((HWND)g_hWnd, WM_CLOSE, 0, 0);
 }
 
 /* 0x0040F380, thiscall, three callers. Clears the traffic statistics and
@@ -2978,8 +2976,8 @@ void __cdecl SendPlayerMsg(int32_t arg)
     msg->version  = g_gameVersion;
     msg->checksum = g_dataChecksum;
 
-    strcpy(msg->levelName, &g_mapName_);
-    strcpy(msg->mapName, &g_mpScriptName);
+    strcpy(msg->levelName, g_mapName_);
+    strcpy(msg->mapName, g_mpScriptName);
 
     msg->count      = comm->playerCount;
     msg->connected  = comm->selfId;
@@ -3228,7 +3226,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         if (g_commObject->verbose)
             orig_log("DestroyPlayer Id=%x, to = %x\n",
                      m->dpId, to);
-        PostMessageA(*(HWND *)&g_enumContext, AM2_WM_PLAYER_GONE,
+        PostMessageA((HWND)g_hWnd, AM2_WM_PLAYER_GONE,
                      (WPARAM)m->dpId, (LPARAM)msg);
         return;
 
@@ -3301,7 +3299,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 
             RefreshMapSelection();
             SendPlayerMsg(1);
-            PostMessageA(*(HWND *)&g_enumContext, AM2_WM_PLAYER_JOINED,
+            PostMessageA((HWND)g_hWnd, AM2_WM_PLAYER_JOINED,
                          (WPARAM)m->dpId, (LPARAM)msg);
             return;
         }
@@ -3319,7 +3317,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 
     case DPSYS_HOST:
         orig_log("DPSYS_HOST Size=%d, from=%x, to = %x\n", size, from, to);
-        PostMessageA(*(HWND *)&g_enumContext, AM2_WM_HOST_CHANGED, 0, 0);
+        PostMessageA((HWND)g_hWnd, AM2_WM_HOST_CHANGED, 0, 0);
         return;
 
     case DPSYS_SETSESSIONDESC:
@@ -3738,7 +3736,7 @@ void __cdecl CheckPlayerTimeout(void)
             }
 
             if (g_commObject->timeoutsOn)
-                PostMessageA(g_hwnd, AM2_WM_PLAYER_GONE,
+                PostMessageA((HWND)g_hWnd, AM2_WM_PLAYER_GONE,
                              (WPARAM)g_commObject->slots[(uint32_t)i].id, 0);
         }
         return;

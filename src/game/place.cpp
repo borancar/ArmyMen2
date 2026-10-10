@@ -76,10 +76,8 @@ extern "C" const uint8_t am2_unit_types[720] = {
 };
 #endif
 
-#define g_gameSetting22C (*(uint32_t *)&g_gameSetting22c)
 /* Spelled as script.cpp spells them, which is the file already reaching
  * these two -- g_mapName is taken, on a DIFFERENT address. */
-#define kMapName      (&g_mapName_)
 
 #define kSep         (" \t\n;,")
 
@@ -130,7 +128,7 @@ void __cdecl AddPlacement(const AM2_Placement *rec)
 int32_t __cdecl CanAffordUnit(int32_t type, int32_t points)
 {
     if (!(kUnitType(type)->gameMask
-          & g_gameSetting22C))
+          & g_gameSetting22c))
         return 0;
 
     return points >= kUnitType(type)->cost;
@@ -152,7 +150,7 @@ char *__cdecl BuildPlacementPath(char *dest, int32_t slot)
     }
 
     am2_sprintf(dest, "%s_%s_place.txt",
-                kMapName, colour);
+                g_mapName_, colour);
     return dest;
 }
 
@@ -1304,7 +1302,7 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
     /* Anything else gets the menu's own first sprite, so the cursor is never
      * left holding whatever the last row put there. */
     default:
-        SET_CURSOR(g_menuSprites);
+        SET_CURSOR(g_menuSprites[0]);
         g_menuInk           = (uint8_t *)0;
         g_menuOverlayAInk = (uint8_t *)0;
         break;

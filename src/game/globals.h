@@ -222,11 +222,8 @@ struct AM2_Edit;
 #define g_depthDC                (*(int32_t *)(uintptr_t)ADDR_DEPTH_FIELD_DC)  /* 0x0050B1DC */
 #define g_depthHead              (*(int32_t *)(uintptr_t)ADDR_DEPTH_HEAD)  /* 0x0050B1D8 */
 #define g_depthNodes             ((AM2_DepthNode *)(uintptr_t)ADDR_DEPTH_NODES)  /* 0x00507350 */
-#define g_dfKeyboard             ((uint8_t *)(uintptr_t)ADDR_DF_KEYBOARD)  /* 0x0046FD68 */
-#define g_dfMouse                ((uint8_t *)(uintptr_t)ADDR_DF_MOUSE)  /* 0x0046FD80 */
 #define g_difficulty             (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)  /* 0x00512324 */
 #define g_difficultyScale        ((float *)(uintptr_t)ADDR_DIFFICULTY_SCALE)  /* 0x00489870 */
-#define g_dipropBufferSize       ((uint8_t *)(uintptr_t)ADDR_DIPROP_BUFFER_SIZE)  /* 0x004854F8 */
 #define g_dirScratch             ((char *)(uintptr_t)ADDR_DIR_SCRATCH)  /* 0x004F96B8 */
 #define g_dirTitlePtr            (*(char **)(uintptr_t)ADDR_DIR_TITLE_PTR)  /* 0x004852D0 */
 #define g_dirtyHead              (*(uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD)  /* 0x00508AD6 */
@@ -241,7 +238,7 @@ struct AM2_Edit;
 #define g_editCharsetDefault     (*(char **)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT)  /* 0x00485304 */
 #define g_endState               (*(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE)  /* 0x00515F88 */
 #define g_enemyHealthShare       (*(double *)(uintptr_t)ADDR_ENEMY_HEALTH_SHARE)  /* 0x0046FD50 */
-#define g_enumContext            (*(void **)(uintptr_t)ADDR_HWND)  /* 0x0051245C */
+#define g_hWnd                   (*(void **)(uintptr_t)ADDR_HWND)  /* 0x0051245C, the HWND */
 #define g_errorText              ((char *)(uintptr_t)ADDR_ERROR_TEXT)  /* 0x0050B5E0 */
 #define g_errorTextDD            ((char *)(uintptr_t)ADDR_ERROR_TEXT_DD)  /* 0x0050B1E0 */
 #define g_eventBlock             (*(uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK)  /* 0x0050C368 */
@@ -273,16 +270,16 @@ struct AM2_Edit;
 #define g_frameHeadingBias       ((uint8_t *)(uintptr_t)ADDR_FRAME_HEADING_BIAS)  /* 0x004740CC */
 #define g_fullRedraw             (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)  /* 0x00512460 */
 #define g_gameClockMs            (*(uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)  /* 0x00511E04 */
-#define g_gameConstants          (*(int8_t *)(uintptr_t)ADDR_GAME_CONSTANTS)  /* 0x00487BA8 */
+#define g_gameConstants          ((int32_t *)(uintptr_t)ADDR_GAME_CONSTANTS)  /* 0x00487BA8 */
 #define g_gameDir                ((char *)(uintptr_t)ADDR_GAME_DIR)  /* 0x0051235C */
 #define g_gameOverFlags          (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)  /* 0x00515FD8 */
 #define g_gameOverSaved          ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SAVED)  /* 0x00515F8C */
 #define g_gameOverSource         ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)  /* 0x00511E14 */
-#define g_gameprocBlock          (*(char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)  /* 0x00511A68 */
-#define g_gameprocStrB           (*(char *)(uintptr_t)ADDR_GAMEPROC_STR_B)  /* 0x00511B88 */
+#define g_gameprocBlock          ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)  /* 0x00511A68 */
+#define g_gameprocStrB           ((char *)(uintptr_t)ADDR_GAMEPROC_STR_B)  /* 0x00511B88 */
 #define g_gameSeed               (*(int32_t *)(uintptr_t)ADDR_GAME_SEED)  /* 0x00512314 */
 #define g_gameSeedSent           (*(int32_t *)(uintptr_t)ADDR_GAME_SEED_SENT)  /* 0x004FC780 */
-#define g_gameSetting22c         (*(int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)  /* 0x00515FDC */
+#define g_gameSetting22c         (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)  /* 0x00515FDC */
 #define g_gameState              (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)  /* 0x00511DA4 */
 #define g_gameVersion            (*(int32_t *)(uintptr_t)ADDR_GAME_VERSION)  /* 0x00475894 */
 #define g_gameWinner             (*(int32_t *)(uintptr_t)ADDR_GAME_WINNER)  /* 0x00512300 */
@@ -370,8 +367,6 @@ struct AM2_Edit;
 #define g_liveBattleName         ((char *)(uintptr_t)ADDR_LIVE_BATTLE_NAME)  /* 0x00516035 */
 #define g_livePlayerName         ((char *)(uintptr_t)ADDR_LIVE_PLAYER_NAME)  /* 0x00515FF4 */
 #define g_loadPending            (*(int32_t *)(uintptr_t)ADDR_LOAD_PENDING)  /* 0x00511DD8 */
-#define g_logpalette             ((uint8_t *)(uintptr_t)ADDR_LOGPALETTE)  /* 0x00477A60 */
-#define g_logpaletteEntries      ((uint8_t *)(uintptr_t)ADDR_LOGPALETTE_ENTRIES)  /* 0x00477A64 */
 #define g_looping                (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)  /* 0x004FA45C */
 #define g_mapBlock               ((char *)(uintptr_t)ADDR_MAP_BLOCK)  /* 0x00514D90 */
 #define g_mapBounds              (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)  /* 0x00514DE8 */
@@ -383,7 +378,7 @@ struct AM2_Edit;
 #define g_mapExtentY             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)  /* 0x00514DD4 */
 #define g_mapFieldDescs          ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)  /* 0x00485FB8 */
 #define g_mapName                ((char *)(uintptr_t)ADDR_OPT_MAP_NAME)  /* 0x004F9FEC */
-#define g_mapName_               (*(char *)(uintptr_t)ADDR_MAP_NAME)  /* 0x00511A88 */
+#define g_mapName_               ((char *)(uintptr_t)ADDR_MAP_NAME)  /* 0x00511A88 */
 #define g_mapNameDefault         (*(char **)(uintptr_t)ADDR_MAP_NAME_DEFAULT)  /* 0x00485108 */
 #define g_mapPadbitLayer         (*(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER)  /* 0x00514EC4 */
 #define g_mapPadLayer            (*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER)  /* 0x00514EC8 */
@@ -411,7 +406,7 @@ struct AM2_Edit;
 #define g_menuRequestSet         (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)  /* 0x00511DC4 */
 #define g_menuRow                (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)  /* 0x004FCAA8 */
 #define g_menuRowStamp           (*(uint32_t *)(uintptr_t)ADDR_MENU_ROW_STAMP)  /* 0x004FCDF0 */
-#define g_menuSprites            (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES)  /* 0x004FCAAC */
+#define g_menuSprites            ((struct AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES)  /* 0x004FCAAC, rows of 10 */
 #define g_menuSpritesEnd         (*(struct AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES_END)  /* 0x004FCDA4 */
 #define g_messageBmpName         ((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME)  /* 0x005122A4 */
 #define g_messageText            ((char *)(uintptr_t)ADDR_MESSAGE_TEXT)  /* 0x00511EA4 */
@@ -437,7 +432,6 @@ struct AM2_Edit;
 #define g_mousePressMs           (*(uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS)  /* 0x0048549C */
 #define g_movieCount             (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)  /* 0x00512328 */
 #define g_movieCurrent           (*(struct AM2_Movie **)(uintptr_t)ADDR_MOVIE_CURRENT)  /* 0x006568A0 */
-#define g_movieDSound            (*(void **)(uintptr_t)ADDR_DSOUND)  /* 0x004FA46C */
 #define g_movieNames             ((char **)(uintptr_t)ADDR_MOVIE_NAMES)  /* 0x0048AE98 */
 #define g_moviePage              (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)  /* 0x0065A060 */
 #define g_moviePaletteOwner      (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)  /* 0x00477A58 */
@@ -454,7 +448,7 @@ struct AM2_Edit;
 #define g_mpRowCoords            ((AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)  /* 0x0048C768 */
 #define g_mpScriptChecksum       (*(uint32_t *)(uintptr_t)ADDR_MP_SCRIPT_CHKSUM_VAL)  /* 0x00511CD0 */
 #define g_mpScriptDefault        (*(char **)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT)  /* 0x0048510C */
-#define g_mpScriptName           (*(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME)  /* 0x00511C08 */
+#define g_mpScriptName           ((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME)  /* 0x00511C08 */
 #define g_mpSession              (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)  /* 0x00511DA0 */
 #define g_mpTeamSprites          (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES)  /* 0x006645A0 */
 #define g_msgChat                ((struct AM2_ChatMsg *)(uintptr_t)ADDR_MSG_CHAT)  /* 0x004FA910 */
@@ -811,7 +805,6 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_svarTanscore           (*(int32_t *)(uintptr_t)ADDR_SVAR_TANSCORE)  /* 0x0065648C */
 #define g_sweepDamage            (*(int32_t *)(uintptr_t)ADDR_SWEEP_DAMAGE)  /* 0x00662908 */
 #define g_sweepDistance          (*(int32_t *)(uintptr_t)ADDR_SWEEP_DISTANCE)  /* 0x006628FC */
-#define g_systemPalette_         ((uint8_t *)(uintptr_t)ADDR_SYSTEM_PALETTE)  /* 0x006564A0 */
 #define g_throttleDeadline       (*(int32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE)  /* 0x00659EF8 */
 #define g_tickIntervalMs         (*(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS)  /* 0x00485104 */
 #define g_tileAttrs              (*(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS)  /* 0x00514EBC */

@@ -139,15 +139,6 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 /* Every one of these is a field of the block above -- the queue and the
  * savegame section are the same 584 bytes, which is why they are written as
  * offsets rather than as addresses of their own. */
-#define g_airActive  (g_airSaveBlock->active)
-#define g_airPending (g_airSaveBlock->pending)
-#define g_airCount   (g_airSaveBlock->count)
-#define g_airWhere   (g_airSaveBlock->where)
-#define g_airKind    (g_airSaveBlock->kind)
-#define g_airFrom    (g_airSaveBlock->from)
-#define g_airExtra   (g_airSaveBlock->extra)
-#define g_airFlagA   (g_airSaveBlock->flagA)
-#define g_airFlagB   (g_airSaveBlock->flagB)
 
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
 #define orig_get_tick_count g_iatGetTickCount
@@ -971,27 +962,27 @@ int32_t __cdecl DoAirSupport(int32_t kind, AM2_Point where, uint32_t from)
             kind = 3;
     }
 
-    if (g_airCount >= AM2_AIR_MAX)
+    if (g_airSaveBlock->count >= AM2_AIR_MAX)
         return 0;
 
     orig_log("DoAirSupport paratroopers where: %d, from %d, army %d, "
              "count: %d\n",
-             where, from, UidArmy(from), g_airCount);
+             where, from, UidArmy(from), g_airSaveBlock->count);
 
     /* One dword, where AirSupportPop moves the same field as two words. */
-    g_airWhere[g_airCount] = where;
-    g_airKind[g_airCount]  = kind;
-    g_airFrom[g_airCount]  = from;
-    g_airExtra[g_airCount] = extra;
+    g_airSaveBlock->where[g_airSaveBlock->count] = where;
+    g_airSaveBlock->kind[g_airSaveBlock->count]  = kind;
+    g_airSaveBlock->from[g_airSaveBlock->count]  = from;
+    g_airSaveBlock->extra[g_airSaveBlock->count] = extra;
 
     /* Called with the entry written and the count still zero, so Begin reads a
      * slot the count says is empty. Harmless -- Begin only looks at slot 0 --
      * and it is the original's order. */
-    if (!g_airCount)
+    if (!g_airSaveBlock->count)
         AirSupportBegin();
 
-    g_airCount += 1;
-    orig_log("EndMission  AirSupport.count increasing to: %d\n", g_airCount);
+    g_airSaveBlock->count += 1;
+    orig_log("EndMission  AirSupport.count increasing to: %d\n", g_airSaveBlock->count);
     return 1;
 }
 
@@ -999,23 +990,23 @@ void __cdecl AirSupportBegin(void)
 {
     /* The head entry's `extra` decides which of the two shapes runs, and the
      * two do NOT agree about the active flag: only the first sets it. */
-    if (!g_airExtra[0]) {
+    if (!g_airSaveBlock->extra[0]) {
         PlaySoundAt(AM2_AIR_SOUND, 0, 0, 0, 0);
-        g_airActive = 1;
-        g_airFlagA  = 0;
-        g_airFlagB  = 0;
+        g_airSaveBlock->active = 1;
+        g_airSaveBlock->flagA  = 0;
+        g_airSaveBlock->flagB  = 0;
         return;
     }
 
-    g_airFlagA = 1;
-    g_airFlagB = 1;
+    g_airSaveBlock->flagA = 1;
+    g_airSaveBlock->flagB = 1;
 }
 
 void __cdecl AirSupportClear(void)
 {
-    g_airActive = 0;
-    g_airFlagA  = 0;
-    g_airFlagB  = 0;
+    g_airSaveBlock->active = 0;
+    g_airSaveBlock->flagA  = 0;
+    g_airSaveBlock->flagB  = 0;
 }
 
 void __cdecl AirSupportPop(void)
@@ -1024,22 +1015,22 @@ void __cdecl AirSupportPop(void)
 
     /* Shift all four arrays down one. The point is copied as its two 16-bit
      * halves, which is how the packing shows through. */
-    for (i = 1; i < g_airCount; i++) {
-        g_airKind[i - 1]      = g_airKind[i];
-        g_airWhere[i - 1].x         = g_airWhere[i].x;
-        g_airWhere[i - 1].y         = g_airWhere[i].y;
-        g_airFrom[i - 1]      = g_airFrom[i];
-        g_airExtra[i - 1]     = g_airExtra[i];
+    for (i = 1; i < g_airSaveBlock->count; i++) {
+        g_airSaveBlock->kind[i - 1]      = g_airSaveBlock->kind[i];
+        g_airSaveBlock->where[i - 1].x         = g_airSaveBlock->where[i].x;
+        g_airSaveBlock->where[i - 1].y         = g_airSaveBlock->where[i].y;
+        g_airSaveBlock->from[i - 1]      = g_airSaveBlock->from[i];
+        g_airSaveBlock->extra[i - 1]     = g_airSaveBlock->extra[i];
     }
 
-    g_airCount -= 1;
+    g_airSaveBlock->count -= 1;
     /* The count is written BEFORE the log, and the log is not gated on
      * anything. "EndMission" here is a prefix, not this function's name. */
-    orig_log("EndMission  AirSupport.count decreasing to: %d\n", g_airCount);
-    g_airPending = 0;
+    orig_log("EndMission  AirSupport.count decreasing to: %d\n", g_airSaveBlock->count);
+    g_airSaveBlock->pending = 0;
 
     /* Tail calls in the original, both of them. */
-    if (g_airCount)
+    if (g_airSaveBlock->count)
         AirSupportBegin();
     else
         AirSupportClear();
@@ -1295,10 +1286,6 @@ void __cdecl ToggleFogOfWar(void)
 
 /* The pass queue: eight slots inside the same block the savegame section is,
  * so they are fields rather than globals of their own. */
-#define g_airPassCount (g_airSaveBlock->passCount)
-#define g_airPassTimer (g_airSaveBlock->passTimer)
-#define g_airPassWhere (g_airSaveBlock->passWhere)
-#define g_airPassArmy  (g_airSaveBlock->passArmy)
 
 /* The strike itself, still original -- what a pass does when its timer runs
  * out. Its second argument is an army: it compares it against
@@ -1344,18 +1331,18 @@ void __cdecl AirDeliver(void)
 {
     int32_t i;
 
-    switch (g_airKind[0]) {
+    switch (g_airSaveBlock->kind[0]) {
     case 1: {
-        int32_t n = g_airPassCount;
+        int32_t n = g_airSaveBlock->passCount;
 
         if (n >= AM2_AIR_PASS_SLOTS)
             return;
 
-        g_airPassWhere[n] = g_airWhere[0];
-        g_airPassTimer[g_airPassCount] = 1;
-        g_airPassArmy[g_airPassCount] =
-            (int16_t)UidArmy(g_airFrom[0]);
-        ++g_airPassCount;
+        g_airSaveBlock->passWhere[n] = g_airSaveBlock->where[0];
+        g_airSaveBlock->passTimer[g_airSaveBlock->passCount] = 1;
+        g_airSaveBlock->passArmy[g_airSaveBlock->passCount] =
+            (int16_t)UidArmy(g_airSaveBlock->from[0]);
+        ++g_airSaveBlock->passCount;
         break;
     }
 
@@ -1370,18 +1357,18 @@ void __cdecl AirDeliver(void)
             int32_t delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
                             + dx * AM2_AIR_STRIKE_SLIDE + AM2_AIR_STRIKE_BASE_MS;
 
-            orig_spawn_at(g_airWhere[0].x + dx,
-                          g_airWhere[0].y + dy,
+            orig_spawn_at(g_airSaveBlock->where[0].x + dx,
+                          g_airSaveBlock->where[0].y + dy,
                           (g_airStrikeKinds)
                               [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
-                          (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
+                          (int32_t)UidArmy(g_airSaveBlock->from[0]), g_airSaveBlock->from[0],
                           AM2_AIR_STRIKE_EXTRA, delay, 0, 0, 0);
         }
 
-        orig_spawn_at(g_airWhere[0].x, g_airWhere[0].y,
+        orig_spawn_at(g_airSaveBlock->where[0].x, g_airSaveBlock->where[0].y,
                       (g_airStrikeKinds)
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
-                      (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
+                      (int32_t)UidArmy(g_airSaveBlock->from[0]), g_airSaveBlock->from[0],
                       AM2_AIR_STRIKE_EXTRA, AM2_AIR_STRIKE_JITTER, 0, 0, 0);
         break;
     }
@@ -1420,46 +1407,46 @@ void __cdecl AirPassesDraw(void)
     int32_t frame;
 
     /* The pass time is re-read, and halved with a shift, at every use. */
-    if (g_airPassCount <= 0)
+    if (g_airSaveBlock->passCount <= 0)
         return;
 
-    for (i = 0; i < g_airPassCount; i++) {
-        x = g_airPassWhere[i].x
+    for (i = 0; i < g_airSaveBlock->passCount; i++) {
+        x = g_airSaveBlock->passWhere[i].x
             - g_viewRect.left;
-        y = g_airPassWhere[i].y
+        y = g_airSaveBlock->passWhere[i].y
             - g_viewRect.top
             - AM2_AIR_PASS_LIFT;
 
-        if (g_airPassTimer[i] < (g_airPassMs >> 1)) {
-            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
+        if (g_airSaveBlock->passTimer[i] < (g_airPassMs >> 1)) {
+            frame = (g_airSaveBlock->passTimer[i] * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
             y -= AM2_AIR_PASS_LIFT;
         } else {
             frame =
-                ((g_airPassTimer[i] - (g_airPassMs >> 1)) * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
+                ((g_airSaveBlock->passTimer[i] - (g_airPassMs >> 1)) * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
         }
 
         DrawSprite((g_airSprites3)[frame],
                    x, y, 0);
 
-        g_airPassTimer[i] += g_frameDeltaMs;
+        g_airSaveBlock->passTimer[i] += g_frameDeltaMs;
     }
 
-    if (g_airPassTimer[0] < g_airPassMs)
+    if (g_airSaveBlock->passTimer[0] < g_airPassMs)
         return;
 
     if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
-                             g_airPassArmy[0]))
-        AirPassStrike(g_airPassWhere[0],
-                             g_airPassArmy[0]);
+                             g_airSaveBlock->passArmy[0]))
+        AirPassStrike(g_airSaveBlock->passWhere[0],
+                             g_airSaveBlock->passArmy[0]);
 
-    for (i = 1; i < g_airPassCount; i++) {
-        g_airPassTimer[i - 1]        = g_airPassTimer[i];
-        g_airPassWhere[i - 1].x      = g_airPassWhere[i].x;
-        g_airPassWhere[i - 1].y      = g_airPassWhere[i].y;
-        g_airPassArmy[i - 1]         = g_airPassArmy[i];
+    for (i = 1; i < g_airSaveBlock->passCount; i++) {
+        g_airSaveBlock->passTimer[i - 1]        = g_airSaveBlock->passTimer[i];
+        g_airSaveBlock->passWhere[i - 1].x      = g_airSaveBlock->passWhere[i].x;
+        g_airSaveBlock->passWhere[i - 1].y      = g_airSaveBlock->passWhere[i].y;
+        g_airSaveBlock->passArmy[i - 1]         = g_airSaveBlock->passArmy[i];
     }
-    --g_airPassCount;
+    --g_airSaveBlock->passCount;
 }
 
 

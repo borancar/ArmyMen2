@@ -79,7 +79,6 @@ extern "C" const AM2_VoiceGroup am2_voice_groups[30] = {
 
 static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 
-#define g_hWnd          (*(HWND *)&g_enumContext)
 
 /* The timer resolution is stored multiplied by four. */
 #define AUDIO_PERIOD_SHIFT 2
@@ -155,8 +154,6 @@ void __cdecl StartAudioStream(void *track, int32_t which)
                              AudioTimerProc, 0, TIME_PERIODIC);
 }
 
-#define g_dsound     (*(LPDIRECTSOUND *)&g_movieDSound)
-
 /* It does not release three buffers. It releases the PRIMARY BUFFER, the 3D
  * LISTENER and the DEVICE -- one of each, in that order -- which is what
  * InitDirectSound creates and in the order that leaves the device last. The
@@ -222,7 +219,7 @@ int32_t __cdecl InitDirectSound(void)
 
     /* Priority rather than exclusive: the game wants to set the primary
      * buffer's format without stopping everyone else making noise. */
-    if (IDirectSound_SetCooperativeLevel(g_dsound, g_hWnd, DSSCL_PRIORITY) != DS_OK)
+    if (IDirectSound_SetCooperativeLevel(g_dsound, (HWND)g_hWnd, DSSCL_PRIORITY) != DS_OK)
         return SoundFailed("Unable to set direct sound cooperative level\n");
 
     if (IDirectSound_CreateSoundBuffer(g_dsound, &desc, &g_dsPrimary, NULL) != DS_OK)
@@ -667,7 +664,6 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 /* Posted to the game window when the stream runs dry. WM_USER + 0x100. */
 #define AUDIO_STREAM_DONE 0x0500u
 
-#define g_hwnd        (*(HWND *)&g_enumContext)
 
 /* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit, smeared over the region
  * by an inline memset. The original writes it out at all four sites. */
@@ -741,7 +737,7 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
     if (g_atEnd && !g_validBytes) {
         if (!g_readFailed) {
             g_readFailed = 1;
-            PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+            PostMessageA((HWND)g_hWnd, AUDIO_STREAM_DONE, 0, 0);
         }
         InterlockedExchange(&g_inCallback, 0);
         return;
@@ -794,7 +790,7 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
                     /* Only the first region reports a read failure. */
                     if (!g_readFailed) {
                         g_readFailed = 1;
-                        PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+                        PostMessageA((HWND)g_hWnd, AUDIO_STREAM_DONE, 0, 0);
                     }
                     goto done;
                 }
@@ -1837,8 +1833,6 @@ extern "C" const char *const am2_wave_names[56] = {
     "zombiehit.wav", "zombiedie.wav", "distancepickup.wav",
 };
 #endif
-
-#define g_dsound       (*(LPDIRECTSOUND *)&g_movieDSound)
 
 #define WAVE_COUNT \
     ((((uintptr_t)g_waveNamesEnd) - ((uintptr_t)g_waveNames)) / sizeof(const char *))

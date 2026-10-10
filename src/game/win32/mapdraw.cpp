@@ -289,7 +289,6 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
-#define g_tilesetName    (&g_mapName_)
 /* LoadAtlFile -- original 0x0042BEA0, 563 bytes, one caller. Read a `.atl`
  * tileset and build the map sprite from its DIB chunk.
  *
@@ -425,7 +424,7 @@ void __cdecl RestoreTileSet(void)
      * because of it. It went in as `orig_path_exists`, which made the chdir
      * look like a side effect rather than the reason it is here. */
     SetGameDir(g_tilesetPath);
-    orig_sprintf(path, "%s.atl", g_tilesetName);
+    orig_sprintf(path, "%s.atl", g_mapName_);
 
     fp = orig_fopen(path, "rb");
     if (!fp) {

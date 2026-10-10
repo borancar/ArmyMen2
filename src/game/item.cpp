@@ -2011,7 +2011,7 @@ AM2_Object *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     /* Index 0 of the block, which aai/game.aai calls ROACH_HEIGHT; read as a
      * byte out of a dword that ships 32. */
     o->heightAdj =
-        g_gameConstants;
+        *(const int8_t *)g_gameConstants;
     o->maxHealth =
         *(const int16_t *)&g_roachHealth;
     SetMaxHealth(o, g_roachHealth);

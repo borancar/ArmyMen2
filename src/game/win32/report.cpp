@@ -33,7 +33,6 @@
 
 static_assert(WM_CLOSE == 0x10, "WM_CLOSE");
 
-#define g_hWnd      (*(HWND *)&g_enumContext)
 
 /* The game's CRT, not ours -- see the note above. */
 typedef int32_t (__cdecl *am2_vsprintf_fn)(char *buf, const char *fmt, va_list ap);
@@ -58,7 +57,7 @@ int32_t __cdecl ReportError(HRESULT hr, const char *fmt, ...)
      * and out of the relink, which compares against the original's bytes. */
     am2_log("%s\n", g_errorTextDD);
 #endif
-    MessageBoxA(g_hWnd, g_errorTextDD, "ERROR", 0);
+    MessageBoxA((HWND)g_hWnd, g_errorTextDD, "ERROR", 0);
     return 0;
 }
 
@@ -70,10 +69,10 @@ int32_t __cdecl FatalError(const char *fmt, ...)
     orig_vsprintf(g_errorText, fmt, ap);
     va_end(ap);
 
-    MessageBoxA(g_hWnd, g_errorText, "ERROR", 0);
+    MessageBoxA((HWND)g_hWnd, g_errorText, "ERROR", 0);
     /* Posted rather than sent, so the box is dismissed first and the shutdown
      * runs through the ordinary message loop. */
-    PostMessageA(g_hWnd, WM_CLOSE, 0, 0);
+    PostMessageA((HWND)g_hWnd, WM_CLOSE, 0, 0);
     return 0;
 }
 

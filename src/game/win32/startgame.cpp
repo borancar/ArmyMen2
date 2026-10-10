@@ -456,7 +456,7 @@ void __cdecl OnEnterNameOk(void)
     /* widget.cpp already names this address g_currentPlayer, which is what
      * it holds: a second `g_` name here would be an alias, and the ratchet
      * caught it. Written inline instead. */
-    strcpy(&g_gameprocBlock, name);
+    strcpy(g_gameprocBlock, name);
     PlaySoundAt(2, 0, 0, 0, 0);
     SelectLevel(level);
     g_levelId    = 1;

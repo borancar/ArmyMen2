@@ -1159,7 +1159,6 @@ void __attribute__((thiscall)) am2_dtor_AM2_Rec(AM2_Rec *r)
  * is why the original reads the bit and the mask choice at +0 and +4 and the
  * widget index at -0x18; written out here from the record base instead. */
 
-#define g_gameSetting22C  (*(uint32_t *)&g_gameSetting22c)
 typedef void (__cdecl *am2_void_fn)(void);
 
 typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
@@ -2036,7 +2035,6 @@ typedef void (__cdecl *AM2_ReadCampaignFn)(void);
 /* The game's own sprintf -- the CRT inside the image, as crt.h explains. */
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
 #define orig_sprintf    ((AM2_SprintfFn)((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))
-#define g_currentPlayer (&g_gameprocBlock)
 
 
 
@@ -5247,7 +5245,7 @@ AM2_HudRadar::AM2_HudRadar()
     AM2_CTOR_VTABLE(w, VTABLE_HUD_RADAR);
 
     SetGameDir(g_tilesetPath);
-    am2_sprintf(name, "%s.bmp", &g_mapName_);
+    am2_sprintf(name, "%s.bmp", g_mapName_);
 
     bmp = LoadBitmap(name, 1);
     self->sprite0 = bmp;
@@ -9095,14 +9093,14 @@ void __cdecl RefreshMapSelection(void)
 
     SetGameDir(g_tilesetPath);
     orig_sprintf(path, "%s.amm",
-                 &g_mapName_);
+                 g_mapName_);
 
     if (FileExists(path)) {
         SetGameDir(g_tilesetPath);
 
         if (preview) {
             orig_sprintf(prev, "%s_prev.bmp",
-                         &g_mapName_);
+                         g_mapName_);
             MpPreviewSetBitmap(preview, prev);
             WidgetVPaint(preview, preview->rect);
         }
@@ -9573,14 +9571,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 continue;
             ((AM2_Rec *)rows)->ListAdd(rec->name3, rec);
             if (strcmp(rec->name,
-                       &g_mpScriptName) == 0)
+                       g_mpScriptName) == 0)
                 sel = i;
         }
 
         if (g_nameTableCount != 0) {
             AM2_NameRec *rec = &g_nameTableBase[sel];
 
-            strcpy(&g_mpScriptName,
+            strcpy(g_mpScriptName,
                    rec->name);
             am2_sprintf(path, "%s.txt",
                         rec->name2);
@@ -9672,7 +9670,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         {
             const AM2_NameRec *maps = ScriptListFind(
-                &g_mpScriptName);
+                g_mpScriptName);
 
             if (maps)
                 for (i = 0; i < maps->count; i++) {
@@ -9682,7 +9680,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                         continue;
                     ((AM2_Rec *)rows)->ListAdd(lvl->name, lvl);
                     if (strcmp(lvl->mapName,
-                               &g_mapName_) == 0)
+                               g_mapName_) == 0)
                         sel = i;
                 }
 
@@ -9730,7 +9728,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s_prev.bmp",
-                    &g_mapName_);
+                    g_mapName_);
         if (!FileExists(path)) {
             SetGameDir("bitmaps");
             strcpy(path, "bad_mp_prev.bmp");
@@ -10049,7 +10047,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
      * after it survives the null test. Reproduced. */
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    strcpy(&g_mpScriptName, rec->name);
+    strcpy(g_mpScriptName, rec->name);
     am2_sprintf(path, "%s.txt", rec->name2);
     FillListFromRules(path, panel);
 
@@ -10077,7 +10075,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         ((AM2_Rec *)maps->rows)->ListAdd(
                 lvl->name, lvl);
 
-        if (strcmp(rec->maps[i], &g_mapName_) == 0)
+        if (strcmp(rec->maps[i], g_mapName_) == 0)
             row = i;
     }
 
@@ -10245,7 +10243,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         panel = (AM2_MpPanelScreen *)g_paintObject;
 
     rec = ScriptListFind(
-              &g_mpScriptName);
+              g_mpScriptName);
     if (!rec) {
         MpComplain(panel, "%s does not have rules.", path);
         return AM2_MAPCHECK_NO_RULES;
@@ -10299,7 +10297,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
                     lvl->name, lvl);
         }
 
-        if (strcmp(rec->maps[i], &g_mapName_) == 0)
+        if (strcmp(rec->maps[i], g_mapName_) == 0)
             chosen = i;
     }
 
@@ -10320,7 +10318,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         return AM2_MAPCHECK_BAD_INSTALL;
     }
 
-    SelectLevel(FindLevelByName(&g_mapName_));
+    SelectLevel(FindLevelByName(g_mapName_));
 
     if (MpScriptChecksum() != scriptSum) {
         MpComplain(panel, "%s has a damaged rules file.", path);
@@ -10337,7 +10335,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
      * buffers are function-scope: block-scoped, amm and bmp would share. */
     SetGameDir(g_tilesetPath);
     am2_sprintf(amm, "%s.amm",
-                &g_mapName_);
+                g_mapName_);
     if (!FileExists(amm)) {
         MpComplain(panel, "%s does not have map.", path);
         return AM2_MAPCHECK_NO_MAP;
@@ -10348,7 +10346,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 
         SetGameDir(g_tilesetPath);
         am2_sprintf(bmp, "%s_prev.bmp",
-                    &g_mapName_);
+                    g_mapName_);
         MpPreviewSetBitmap(panel->preview,
                            bmp);
 
@@ -10438,7 +10436,7 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
         if (g_optionTable[record].which)
             cb->checked = (g_gameOverFlags & (uint32_t)g_optionTable[record].bit) != 0;
         else
-            cb->checked = (g_gameSetting22C & (uint32_t)g_optionTable[record].bit) != 0;
+            cb->checked = (g_gameSetting22c & (uint32_t)g_optionTable[record].bit) != 0;
 
         ::WidgetAddChild(w, cb);
         if (!g_commObject->isHost)
@@ -10552,7 +10550,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
     }
 
     g_gameOverFlags  = flags;
-    g_gameSetting22C = other;
+    g_gameSetting22c = other;
 
     PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = AM2_MENU_REQUEST_OPTIONS;
@@ -11252,8 +11250,8 @@ void __cdecl OpenTitleScreen(void)
     g_commObject->CommClose();
     CommDropDirectPlay(g_commObject);
     g_mpSession = 0;
-    g_gameprocBlock = '\0';
-    g_gameprocStrB = '\0';
+    g_gameprocBlock[0] = '\0';
+    g_gameprocStrB[0] = '\0';
 
     /* No local: the screen is reached through g_paintObject throughout,
      * as the original re-reads it. */
@@ -11839,7 +11837,7 @@ void __cdecl OnReplayOk(AM2_Widget *w)
 {
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
-    if (g_gameprocStrB) {
+    if (g_gameprocStrB[0]) {
         g_loadPending = 1;
         PlaySoundAt(2, 0, 0, 0, 0);
         RequestState(2);
@@ -12266,9 +12264,9 @@ void __cdecl OnDelGameOk(AM2_Widget *w)
 {
     char dir[0x100];
 
-    if (strlen(g_currentPlayer) != 0) {
+    if (strlen(g_gameprocBlock) != 0) {
         am2_sprintf(dir, "Save\\%s",
-                    g_currentPlayer);
+                    g_gameprocBlock);
         SetGameDir(dir);
     }
 
@@ -12395,14 +12393,14 @@ void __cdecl DlgOverwriteOk(AM2_Widget *w)
 
     (void)w;
 
-    if (strlen(&g_gameprocBlock) != 0) {
+    if (strlen(g_gameprocBlock) != 0) {
         am2_sprintf(dir, "Save\\%s",
-                    &g_gameprocBlock);
+                    g_gameprocBlock);
         SetGameDir(dir);
     }
 
-    strcpy(&g_gameprocStrB, g_pendingDelete);
-    SaveGame(&g_gameprocStrB);
+    strcpy(g_gameprocStrB, g_pendingDelete);
+    SaveGame(g_gameprocStrB);
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
     g_menuRequestSet = 1;
@@ -12513,9 +12511,9 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    if (strlen(&g_gameprocBlock) != 0) {
+    if (strlen(g_gameprocBlock) != 0) {
         am2_sprintf(dir, "Save\\%s",
-                    &g_gameprocBlock);
+                    g_gameprocBlock);
         SetGameDir(dir);
     }
 
@@ -12534,8 +12532,8 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
     }
 
     SetGameDir("save");
-    orig_rmdir(&g_gameprocBlock);
-    g_gameprocBlock = '\0';
+    orig_rmdir(g_gameprocBlock);
+    g_gameprocBlock[0] = '\0';
 
     OnDelPlayerCancel(w);
 }
@@ -12849,7 +12847,7 @@ void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
     (void)list;
     if (!rows || selected < 0 || selected >= rows->count)
         return;
-    strcpy(g_currentPlayer, rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
+    strcpy(g_gameprocBlock, rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
     PlaySoundAt(2, 0, 0, 0, 0);
 }
 
@@ -12864,7 +12862,7 @@ void __cdecl OnRecruit(AM2_Widget *w)
 void __cdecl OnDeletePlayer(AM2_Widget *w)
 {
     (void)w;
-    if (strlen(g_currentPlayer) < 1) {
+    if (strlen(g_gameprocBlock) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -12880,7 +12878,7 @@ void __cdecl OnSelectPlayer(AM2_Widget *w)
     AM2_Level *level = (AM2_Level *)0;
 
     (void)w;
-    if (strlen(g_currentPlayer) >= 1)
+    if (strlen(g_gameprocBlock) >= 1)
         level = FindLevelRecord(1);
     if (!level) {
         PlaySoundAt(3, 0, 0, 0, 0);
@@ -12909,7 +12907,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_PLAYER);
     ReadCampaignLevels();
     SetGameDir("save");
-    g_currentPlayer[0] = '\0';
+    g_gameprocBlock[0] = '\0';
 
     w->list = new AM2_Rec(1);
 
@@ -12941,7 +12939,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
         const AM2_Rec *r = w->list;
 
         if (r->count > 0)
-            strcpy(g_currentPlayer, (const char *)r->rows);
+            strcpy(g_gameprocBlock, (const char *)r->rows);
     }
 
     bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
@@ -13152,7 +13150,7 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
-    strcpy(&g_gameprocStrB, name);
+    strcpy(g_gameprocStrB, name);
     g_loadPending = 1;
     PlaySoundAt(2, 0, 0, 0, 0);
     RequestState(2);
@@ -13192,7 +13190,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     w->list = new AM2_Rec(1);
 
     orig_sprintf(path, "save\\%s",
-                 g_currentPlayer);
+                 g_gameprocBlock);
     SetGameDir(path);
 
     strcpy(pattern, "*.sav");
@@ -13639,7 +13637,7 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
         /* Nothing of that name: save it and leave. */
         /* Copied to the global, but SaveGame is handed the dialog's own
          * buffer: the same text either way. */
-        strcpy(&g_gameprocStrB, name);
+        strcpy(g_gameprocStrB, name);
         SaveGame(name);
         g_menuRequestSet = 1;
         return;
@@ -13757,7 +13755,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
 
     /* Make the player's folder if it is missing, or if the name is taken by
      * something that is not a directory. */
-    strcpy(dir, &g_gameprocBlock);
+    strcpy(dir, g_gameprocBlock);
     h = orig_findfirst(dir, &find);
     if (h == -1) {
         orig_mkdir(dir);
@@ -13768,7 +13766,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     }
 
     am2_sprintf(path, "save\\%s",
-                &g_gameprocBlock);
+                g_gameprocBlock);
     SetGameDir(path);
 
     self->list = new AM2_Rec(1);
@@ -13785,7 +13783,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
 
     w->flag44 = 1;
     strcpy(self->name,
-           &g_gameprocStrB);
+           g_gameprocStrB);
 
     edit = new AM2_Edit(self->name, 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, g_hiliteColour, g_colourBelowBg, g_backgroundColour, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);

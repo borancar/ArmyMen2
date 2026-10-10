@@ -195,7 +195,6 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
 static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
 static_assert(PM_NOREMOVE == 0, "PM_NOREMOVE");
 
-#define g_hWnd           (*(HWND *)&g_enumContext)
 
 void __cdecl PresentFrame(void)
 {
@@ -225,7 +224,7 @@ void __cdecl PresentFrame(void)
         /* Stay answerable while the previous flip finishes. Peeked without
          * removing, so this consumes nothing -- it is only here to notice a
          * WM_QUIT arriving mid-wait. */
-        if (PeekMessageA(&msg, g_hWnd, 0, 0, PM_NOREMOVE) && !PumpMessage(&msg)) {
+        if (PeekMessageA(&msg, (HWND)g_hWnd, 0, 0, PM_NOREMOVE) && !PumpMessage(&msg)) {
             PostQuitMessage(0);
             return;
         }
@@ -1159,8 +1158,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
-#define g_screenRectPtr ((LPRECT)((uintptr_t)&g_screenRect))
-
 void __cdecl DrawMenuOverlay(void)
 {
     /* The paint object is re-read at every use, as the image does. */
@@ -1185,7 +1182,7 @@ void __cdecl DrawMenuOverlay(void)
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
         IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, (*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
-                                   g_screenRectPtr, DDBLTFAST_WAIT);
+                                   (LPRECT)&g_screenRect, DDBLTFAST_WAIT);
         g_overlayDirty = 0;
     }
 
@@ -1245,7 +1242,6 @@ void __cdecl DrawMenuOverlay(void)
  */
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
-#define g_menuSprites2  (&g_menuSprites)
 #ifdef AM2_STANDALONE
 /* The fixed 32x32 corner of the menu surface the cursor save-under occupies
  * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
@@ -1287,7 +1283,7 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
         return;
 
     g_menuRow      = row;
-    g_menuSpritesEnd = g_menuSprites2[row * MENU_ANIM_FRAMES];
+    g_menuSpritesEnd = g_menuSprites[row * MENU_ANIM_FRAMES];
     g_animFrame    = 0;
     g_animNext     = Ticks();
 
@@ -1332,7 +1328,7 @@ static inline void TickMenuAnimation(void)
         g_animNext  = now + MENU_ANIM_PERIOD;
         return;
     }
-    if (!g_menuSprites2[row * MENU_ANIM_FRAMES + f]) {
+    if (!g_menuSprites[row * MENU_ANIM_FRAMES + f]) {
         /* No second frame means this row simply does not animate. */
         if (f == 1) {
             g_animFrame = -1;
@@ -1343,7 +1339,7 @@ static inline void TickMenuAnimation(void)
         g_animFrame = 0;
     }
     if (f >= 0)
-        g_menuSpritesEnd = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
+        g_menuSpritesEnd = g_menuSprites[row * MENU_ANIM_FRAMES + f];
     g_animNext = now + MENU_ANIM_PERIOD;
 }
 

@@ -422,7 +422,7 @@ void __cdecl FreeMenuSprites(void)
 {
     /* 19 rows of ten: the image's inner counter of ten inside an outer
      * bound check is this two-dimensional walk. */
-    AM2_Sprite *(*rows)[10] = (AM2_Sprite *(*)[10])((uintptr_t)&g_menuSprites);
+    AM2_Sprite *(*rows)[10] = (AM2_Sprite *(*)[10])g_menuSprites;
     int32_t     i, j;
 
     for (i = 0; i < MENU_SPRITE_COUNT / 10; i++) {
@@ -511,7 +511,7 @@ void __cdecl InitMenuScreen(void)
         rows = 0;
 
     for (row = 0; row <= rows; row++) {
-        AM2_Sprite **dst = &g_menuSprites + row * 10;
+        AM2_Sprite **dst = g_menuSprites + row * 10;
 
         for (frame = 0; frame < 10; frame++) {
             dst[frame] = PreloadSprite(0, row, frame, 0, 1);
@@ -521,7 +521,7 @@ void __cdecl InitMenuScreen(void)
     }
 
     g_animFrame = 0;
-    g_menuSpritesEnd = g_menuSprites;
+    g_menuSpritesEnd = g_menuSprites[0];
     g_animNext = Ticks() + MENU_ANIM_PERIOD;
 
     r = RectMake(0, 0, 0, 0);

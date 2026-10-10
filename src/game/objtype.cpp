@@ -134,8 +134,6 @@ AM2_Object *__cdecl LookupType3ByUID(uint32_t uid)
     return ObjIsType3(obj) ? obj : 0;
 }
 
-#define kEventComm (*(void *const *)&g_commObject)
-
 /* 0x00427D40, fifteen callers. The event MASK for an object: the top bit
  * always, one more bit for the owner's ARMY, and then a bit per type property.
  * event.h calls EventNotify's third and sixth parameters masks, and this is
@@ -163,7 +161,7 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
 {
     int32_t mask = (int32_t)0x80000000;
 
-    switch (((AM2_Comm *)kEventComm)->CommArmyOfSlot(
+    switch (((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot(
                            obj->owner)) {
     case 0:  mask = (int32_t)0xC0000000; break;
     case 1:  mask = (int32_t)0xA0000000; break;

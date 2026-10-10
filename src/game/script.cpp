@@ -3192,9 +3192,6 @@ const AM2_ScriptName *am2_script_name(int32_t i)
 }
 
 
-#define kMapName      (&g_mapName_)
-#define kMpScriptName (&g_mpScriptName)
-
 /* Change into one of the game's data directories. Everything the script loader
  * opens is relative to wherever this last left us. */
 static inline void ScriptSetDataDir(const char *dir)
@@ -3230,9 +3227,9 @@ void __cdecl LoadLevelScript(void)
 
     /* Level 0 is the map's only script and drops the number. */
     if (g_levelIndex > 0)
-        sprintf(path, "%s%d.txt", kMapName, g_levelIndex);
+        sprintf(path, "%s%d.txt", g_mapName_, g_levelIndex);
     else
-        sprintf(path, "%s.txt", kMapName);
+        sprintf(path, "%s.txt", g_mapName_);
 
     ScriptResetTokens(&g_scriptContext);
 
@@ -3276,7 +3273,7 @@ void __cdecl LoadLevelScript(void)
         int32_t     i;
 
         ScriptSetDataDir(kImageStr(((uintptr_t)g_rulesDirStr)));
-        sprintf(path, "%s.txt", kMpScriptName);
+        sprintf(path, "%s.txt", g_mpScriptName);
         ScriptReadWithLog(path);
 
         for (i = 0; i < AM2_PLAYERS_MAX; i++) {
@@ -3300,7 +3297,7 @@ void __cdecl LoadLevelScript(void)
             case 3: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_GREY);  break;
             }
 
-            sprintf(path, "%s_ai_%s.txt", kMpScriptName, colour);
+            sprintf(path, "%s_ai_%s.txt", g_mpScriptName, colour);
             ScriptReadWithLog(path);
         }
     }

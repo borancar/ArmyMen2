@@ -650,13 +650,11 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
     return 1;
 }
 
-#define kEventBlock ((void *)(uintptr_t)((void *)&g_eventBlock))
-
 int32_t __cdecl SaveEventBlock(am2_FILE *fp)
 {
     WriteSaveTag(fp, AM2_SAVETAG_EVENT_BLOCK);
     WriteSaveTag(fp, AM2_EVENT_BLOCK_SIZE);
-    orig_fwrite(kEventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
+    orig_fwrite((void *)&g_eventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
     return 1;
 }
 
@@ -671,7 +669,7 @@ int32_t __cdecl LoadEventBlock(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\event.cpp", 0xDB))
         return 0;
 
-    orig_fread(kEventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
+    orig_fread((void *)&g_eventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
     return 1;
 }
 
@@ -863,7 +861,7 @@ void __cdecl MissionStartup(void)
 
     if (g_levelId <= 0)
         return;
-    if (!*(const uint8_t *)&g_gameprocBlock)
+    if (!*(const uint8_t *)g_gameprocBlock)
         return;
     if (g_winEnabled)
         return;
@@ -872,15 +870,13 @@ void __cdecl MissionStartup(void)
             g_levelId,
             g_levelIndex);
     SaveGame(save);
-    strcpy(&g_gameprocStrB, save);
+    strcpy(g_gameprocStrB, save);
 }
 
 /* The count and the table are ONE object in the image: a store into a timer
  * is a store the compiler has to assume reaches the count, which is why the
  * image reads the count again after filling a slot. Viewed from the count. */
 typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBlock;
-#define g_timerCount   (g_timerBlock.count)
-#define g_timers       (g_timerBlock.timers)
 
 /* 0x0041E950, one caller, on the per-frame path. Fire every timer that has
  * come due, and no more often than once every 100 ms.
@@ -913,7 +909,7 @@ typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBloc
  * recomputes `start` from now is reached by nothing. */
 void __cdecl TimerTick(void)
 {
-    AM2_Timer *timers = g_timers;
+    AM2_Timer *timers = g_timerBlock.timers;
     int32_t    i;
 
     /* The clock is read again at every use. */
@@ -933,7 +929,7 @@ void __cdecl TimerTick(void)
 
         if (--t->count <= 0) {
             t->id = 0;
-            --g_timerCount;
+            --g_timerBlock.count;
         } else {
             t->start = g_gameClockMs + t->period;
         }
@@ -2322,7 +2318,7 @@ void __cdecl MissionEnded(int32_t lost)
     if (g_winEnabled) {
         SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s%d.txt",
-                    &g_mapName_,
+                    g_mapName_,
                     g_levelIndex + 1);
 
         h = orig_findfirst(path, found);
@@ -2364,7 +2360,7 @@ void __cdecl MissionEnded(int32_t lost)
     if (!lost && g_levelId > 0) {
         SetGameDir(g_tilesetPath);
         am2_sprintf(path, "%s%d.txt",
-                    &g_mapName_,
+                    g_mapName_,
                     g_levelIndex + 1);
 
         h = orig_findfirst(path, found);
@@ -2860,15 +2856,15 @@ int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
 
     /* Two different thresholds, and the order matters: a low-priority request
      * is refused first and at a lower mark than a slow one. */
-    if (lowPriority && g_timerCount > AM2_TIMER_LOWPRI_LIMIT) {
+    if (lowPriority && g_timerBlock.count > AM2_TIMER_LOWPRI_LIMIT) {
         orig_log("CreateTimer: lowpriority event ignored, count is %d\n",
-                 g_timerCount);
+                 g_timerBlock.count);
         return AM2_TIMER_REFUSED;
     }
     if (period > AM2_TIMER_SLOW_PERIOD
-        && g_timerCount > AM2_TIMER_SLOW_LIMIT) {
+        && g_timerBlock.count > AM2_TIMER_SLOW_LIMIT) {
         orig_log("CreateTimer: long delayed event ignored, count is %d\n",
-                 g_timerCount);
+                 g_timerBlock.count);
         return AM2_TIMER_REFUSED;
     }
 
@@ -2899,16 +2895,16 @@ int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
 
     /* A slot is free when its id is zero. */
     for (i = 0; i < AM2_TIMER_MAX; i++)
-        if (g_timers[i].id == 0)
+        if (g_timerBlock.timers[i].id == 0)
             break;
     if (i >= AM2_TIMER_MAX)
         return AM2_TIMER_NO_ROOM;
 
-    g_timers[i].start  = start;
-    g_timers[i].period = period;
-    g_timers[i].count  = count;
-    g_timers[i].id     = id;
-    g_timerCount++;
+    g_timerBlock.timers[i].start  = start;
+    g_timerBlock.timers[i].period = period;
+    g_timerBlock.timers[i].count  = count;
+    g_timerBlock.timers[i].id     = id;
+    g_timerBlock.count++;
     return id;
 }
 

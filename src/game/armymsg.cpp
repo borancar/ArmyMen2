@@ -32,7 +32,6 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 /* The length is the packet's own +4 field, reached through the packet so
  * VC6 sees one object: a copy into the packet may overwrite it, and the image
  * re-reads it after every memcpy. */
-#define kPacketLen  (*(int32_t *)(g_armyPacket + 4))
 
 
 /* SendGameMsg is reconstructed and lives in win32/dplay.cpp, which this flat
@@ -87,7 +86,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     if ((uint32_t)g_commObject->playerCount < 2u)
         return 1;
 
-    payload = kPacketLen - (int32_t)AM2_ARMY_PACKET_HDR;
+    payload = ((AM2_CommMsgHdr *)g_armyPacket)->size - (int32_t)AM2_ARMY_PACKET_HDR;
     elapsed = orig_get_tick_count()
               - (uint32_t)(int32_t)g_commObject->sendStamp;
 
@@ -135,7 +134,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
 
     me->sequence += 1;
     g_commObject->sendStamp = (int32_t)orig_get_tick_count();
-    kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
+    ((AM2_CommMsgHdr *)g_armyPacket)->size = (int32_t)AM2_ARMY_PACKET_HDR;
     (void)MsgField12(g_msgListPool);
     return 1;
 }
@@ -190,19 +189,19 @@ void __cdecl ArmyMessageSend(const AM2_ArmyMsgHdr *msg)
 
         /* No room: drain the buffer and go round again, re-checking the
          * session, which a failed send can have closed. */
-        if ((uint32_t)len + (uint32_t)kPacketLen
+        if ((uint32_t)len + (uint32_t)((AM2_CommMsgHdr *)g_armyPacket)->size
             >= (uint32_t)(int32_t)g_commObject->bufferMax) {
             while (!ArmyMessageFlush(0))
                 orig_log("Send Over Flow, Couldn't Empty Buffer \n");
             continue;
         }
 
-        PacketAppend(g_armyPacket + kPacketLen, msg, len);
-        kPacketLen += len;
+        PacketAppend(g_armyPacket + ((AM2_CommMsgHdr *)g_armyPacket)->size, msg, len);
+        ((AM2_CommMsgHdr *)g_armyPacket)->size += len;
 
         /* Lookahead, not a bounds check: flush when ANOTHER message this
          * size would pass the threshold. */
-        if ((uint32_t)kPacketLen + len
+        if ((uint32_t)((AM2_CommMsgHdr *)g_armyPacket)->size + len
             >= (uint32_t)(int32_t)g_commObject->bufferDefault)
             ArmyMessageFlush(0);
 

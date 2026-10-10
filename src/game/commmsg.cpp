@@ -448,7 +448,7 @@ static inline void CommEndSetupInline(void)
         am2_log("Sending EndSetupMessage\n");
 
     SendGameMsg(g_msgEndSetup, 0, 1);
-    orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
+    orig_post_message(g_hWnd, AM2_WM_SETUP_DONE, 0, 0);
 }
 
 void __cdecl CommEndSetup(void)
@@ -548,7 +548,7 @@ void __cdecl ReceiveEndSetupMsg(const AM2_CommMsgHdr *msg, int32_t from)
     if (comm->verbose)
         am2_log("ReceiveEndSetupMsg\n");
 
-    orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
+    orig_post_message(g_hWnd, AM2_WM_SETUP_DONE, 0, 0);
 }
 
 AM2_MsgNode *__cdecl MsgListRemHead(AM2_MsgList *list)
@@ -668,7 +668,7 @@ void __cdecl ExitGamePostClose(void)
     /* Three trailing zeros, as the original pushes them: `add esp, 0x10`. */
     orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n", 0, 0, 0);
 
-    orig_post_message(g_enumContext, AM2_WM_CLOSE, 0, 0);
+    orig_post_message(g_hWnd, AM2_WM_CLOSE, 0, 0);
 }
 
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
@@ -758,7 +758,7 @@ void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
      * all of them. A zero player count skips this test entirely. */
     if (ok) {
         /* Nothing in the image handles 0x0469. */
-        orig_post_message(g_enumContext, AM2_WM_START_GAME, 0, 0);
+        orig_post_message(g_hWnd, AM2_WM_START_GAME, 0, 0);
         SendGamePause(1, 0x10000);
         RequestState(2);
         g_stateEnterOnce = 1;
@@ -1853,8 +1853,8 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
     if (msg->hasMap) {
         int32_t rules;
 
-        strcpy(&g_mpScriptName, msg->mapName);
-        strcpy(&g_mapName_, msg->levelName);
+        strcpy(g_mpScriptName, msg->mapName);
+        strcpy(g_mapName_, msg->levelName);
         rules = CheckMapRules(msg->ruleArg, msg->ruleSum, msg->mapSum);
         SendMapMsg(rules, comm->connected);
     }

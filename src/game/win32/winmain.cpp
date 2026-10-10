@@ -90,7 +90,6 @@ static_assert(sizeof(MSG) == 28, "the 7 dwords WinMain zeroes on entry");
 
 /* ---- the globals this layer owns -------------------------------------- */
 
-#define g_hWnd         (*(HWND *)&g_enumContext)
 
 /* An option global, written as int32_t whatever it is declared as elsewhere. */
 #define opt(addr) (*(int32_t *)(uintptr_t)(addr))
@@ -285,11 +284,11 @@ void __cdecl ResetToTitle(void)
 {
     /* Two different globals, and it matters which way round: the command-line
      * option is the SOURCE and the level's own copy is the destination. */
-    strcpy(&g_mapName_, g_mapName);
-    if (!(&g_mapName_)[0])
-        strcpy(&g_mapName_,
+    strcpy(g_mapName_, g_mapName);
+    if (!g_mapName_[0])
+        strcpy(g_mapName_,
                g_mapNameDefault);
-    strcpy(&g_mpScriptName,
+    strcpy(g_mpScriptName,
            g_mpScriptDefault);
 
     /* The palette pointer is re-read for each call. */
@@ -622,40 +621,40 @@ void __cdecl PositionWindow(void)
         /* Turn the borderless popup into an ordinary sizeable window. WS_POPUP
          * and the three bits about to be set are the only ones cleared, so
          * WS_VISIBLE survives and the window does not blink out. */
-        SetWindowLongA(g_hWnd, GWL_STYLE,
-                       (GetWindowLongA(g_hWnd, GWL_STYLE) & 0x7F39FFFF) |
+        SetWindowLongA((HWND)g_hWnd, GWL_STYLE,
+                       (GetWindowLongA((HWND)g_hWnd, GWL_STYLE) & 0x7F39FFFF) |
                        (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX));
 
         /* Grow the requested client size by whatever the new frame costs. The
          * three queries are arguments, evaluated after the SetWindowLongA
          * above, and none of them changes what the others read. */
         SetRect(&r, 0, 0, g_screenW, g_screenH);
-        AdjustWindowRectEx(&r, GetWindowLongA(g_hWnd, GWL_STYLE),
-                           GetMenu(g_hWnd) != NULL,
-                           GetWindowLongA(g_hWnd, GWL_EXSTYLE));
-        SetWindowPos(g_hWnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
+        AdjustWindowRectEx(&r, GetWindowLongA((HWND)g_hWnd, GWL_STYLE),
+                           GetMenu((HWND)g_hWnd) != NULL,
+                           GetWindowLongA((HWND)g_hWnd, GWL_EXSTYLE));
+        SetWindowPos((HWND)g_hWnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
                      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-        SetWindowPos(g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+        SetWindowPos((HWND)g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                      SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 
         /* Drag it back onto the work area if the resize pushed the caption off
          * the top or left of the desktop. Only those two edges are checked --
          * running off the bottom right is left alone. */
         SystemParametersInfoA(SPI_GETWORKAREA, 0, &work, 0);
-        GetWindowRect(g_hWnd, &r);
+        GetWindowRect((HWND)g_hWnd, &r);
         if (r.left < work.left)
             r.left = work.left;
         if (r.top < work.top)
             r.top = work.top;
-        SetWindowPos(g_hWnd, NULL, r.left, r.top, 0, 0,
+        SetWindowPos((HWND)g_hWnd, NULL, r.left, r.top, 0, 0,
                      SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
         /* Publish where the client area ended up, in screen coordinates. Both
          * corners are converted, which is why the RECT is punned to two POINTs
          * -- as the original does, and as the identical layout allows. */
-        GetClientRect(g_hWnd, &r);
-        ClientToScreen(g_hWnd, (LPPOINT)&r.left);
-        ClientToScreen(g_hWnd, (LPPOINT)&r.right);
+        GetClientRect((HWND)g_hWnd, &r);
+        ClientToScreen((HWND)g_hWnd, (LPPOINT)&r.left);
+        ClientToScreen((HWND)g_hWnd, (LPPOINT)&r.right);
 
         g_screenRect.left   = r.left;
         g_screenRect.top    = r.top;
@@ -707,13 +706,13 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
         return 0;
 
     if (g_windowed)
-        UpdateWindow(g_hWnd);
-    SetFocus(g_hWnd);
+        UpdateWindow((HWND)g_hWnd);
+    SetFocus((HWND)g_hWnd);
 
     InitTimer();
-    if (!InitInput(g_hWnd)) {
+    if (!InitInput((HWND)g_hWnd)) {
         ShutdownSubsystems();
-        DestroyWindow(g_hWnd);
+        DestroyWindow((HWND)g_hWnd);
         return 0;
     }
 
@@ -721,11 +720,11 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
      * asks for depend on the window being the shape it means to keep. */
     PositionWindow();
 
-    err = InitDirectDraw(g_hWnd);
+    err = InitDirectDraw((HWND)g_hWnd);
     if (err) {
         ReportError(err, "InitDirectDraw");
         ShutdownSubsystems();
-        DestroyWindow(g_hWnd);
+        DestroyWindow((HWND)g_hWnd);
         return 0;
     }
 

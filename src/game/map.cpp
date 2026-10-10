@@ -43,12 +43,10 @@ extern "C" uint32_t am2_map_field_descs[14] = {   /* NOT const: LoadMap freads t
  * this at 181, outside it. */
 int32_t __cdecl LoadAtlFile(const char *path);
 
-#define kMapSaveBlock ((void *)(uintptr_t)((void *)g_mapBlock))
-
 int32_t __cdecl SaveMapSection(am2_FILE *fp)
 {
     WriteSaveTag(fp, AM2_SAVETAG_MAP);
-    orig_fwrite(kMapSaveBlock, AM2_MAP_SAVE_SIZE, 1, fp);
+    orig_fwrite(g_mapBlock, AM2_MAP_SAVE_SIZE, 1, fp);
     return 1;
 }
 
@@ -58,7 +56,7 @@ int32_t __cdecl LoadMapSection(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\map.cpp", 0x906))
         return 0;
 
-    orig_fread(kMapSaveBlock, AM2_MAP_SAVE_SIZE, 1, fp);
+    orig_fread(g_mapBlock, AM2_MAP_SAVE_SIZE, 1, fp);
     return 1;
 }
 
@@ -193,12 +191,12 @@ uint32_t __cdecl MpScriptChecksum(void)
 {
     char path[0x100];
 
-    if (!ScriptListFind(&g_mpScriptName))
+    if (!ScriptListFind(g_mpScriptName))
         return 0;
 
     SetGameDir("rules");
     sprintf(path, "%s.txt",
-            &g_mpScriptName);
+            g_mpScriptName);
     return Checksum(path);
 }
 
@@ -207,7 +205,7 @@ uint32_t __cdecl MpScriptChecksum(void)
  * object table the map was authored against. */
 uint32_t __cdecl MapChecksum(void)
 {
-    uint32_t sum = AmmChecksum(&g_mapName_,
+    uint32_t sum = AmmChecksum(g_mapName_,
                                g_tilesetPath);
 
     SetGameDir(g_tilesetPath);
@@ -238,7 +236,7 @@ void __cdecl SelectLevel(const AM2_Level *record)
     if (!r)
         return;
 
-    strcpy(&g_mapName_,          r->mapName);
+    strcpy(g_mapName_,          r->mapName);
     strcpy(g_tilesetPath,        r->folder);
     strcpy(g_levelStrB,       r->loadScreen);
     strcpy(g_levelStrA,       r->loadMusic);

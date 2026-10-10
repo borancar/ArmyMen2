@@ -92,7 +92,6 @@ static_assert((RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN |
 static_assert(WA_INACTIVE == 0, "WA_INACTIVE");
 static_assert(sizeof(PAINTSTRUCT) == 64, "the 0x40 bytes of frame it reserves");
 
-#define g_hWnd        (*(HWND *)&g_enumContext)
 
 /* 0x0065A058, the screen object: its vtable's slot 1 paints a rectangle
  * (thiscall, the RECT by value) and slot 2 updates. Both are called through
@@ -319,9 +318,9 @@ static inline void RemeasureScreenRect(HWND hWnd)
 {
     if (g_hWnd) {
         /* Answer discarded -- see the fidelity note. */
-        IsIconic(g_hWnd);
+        IsIconic((HWND)g_hWnd);
         if (g_hWnd && g_windowed) {
-            GetClientRect(g_hWnd, (LPRECT)&g_screenRect);
+            GetClientRect((HWND)g_hWnd, (LPRECT)&g_screenRect);
             ClientToScreen(hWnd, (LPPOINT)&g_screenRect.left);
             ClientToScreen(hWnd, (LPPOINT)&g_screenRect.right);
             return;
@@ -350,15 +349,15 @@ static inline LRESULT OnPaint(void)
         return 1;
     SetDrawTarget(gdi);
 
-    if (!GetUpdateRect(g_hWnd, &damage, TRUE))
+    if (!GetUpdateRect((HWND)g_hWnd, &damage, TRUE))
         return 1;
     RedrawWindow(NULL, NULL, NULL,
                  RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
-    BeginPaint(g_hWnd, &ps);
+    BeginPaint((HWND)g_hWnd, &ps);
     /* thiscall on the screen object (`mov ecx, [0x0065A058]` at 0x0040A86B). */
     ObjVPaint((*(AM2_PaintObject * *)&g_paintObject), *(const AM2_Rect *)&damage);
-    EndPaint(g_hWnd, &ps);
+    EndPaint((HWND)g_hWnd, &ps);
     return 0;
 }
 

@@ -31,13 +31,11 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 };
 #endif
 
-#define kPadCount    (*(int32_t *)(uintptr_t)((void *)&g_padCount))
-
 void __cdecl ResetPads(void)
 {
     memset(g_padNumbers, 0, AM2_PAD_NUMBERS_BYTES);
     memset(g_pads, 0, AM2_PADS_BYTES);
-    kPadCount = 0;
+    g_padCount = 0;
 }
 
 int32_t __cdecl SavePadSection(am2_FILE *fp)
@@ -45,7 +43,7 @@ int32_t __cdecl SavePadSection(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVETAG_PAD);
 
     /* Not a tag: the count, as data. The loader reads it with fread. */
-    WriteSaveTag(fp, (uint32_t)kPadCount);
+    WriteSaveTag(fp, (uint32_t)g_padCount);
 
     /* Higher address first, which is the order the file wants. */
     orig_fwrite(g_padNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
@@ -65,7 +63,7 @@ int32_t __cdecl LoadPadSection(am2_FILE *fp)
         return 0;
 
     orig_fread(&count, 4, 1, fp);
-    kPadCount = count;
+    g_padCount = count;
 
     orig_fread(g_padNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
     orig_fread(g_pads, AM2_PADS_BYTES, 1, fp);

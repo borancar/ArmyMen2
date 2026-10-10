@@ -62,11 +62,6 @@ uint8_t am2_key_bindings[42] = {
 };
 #endif
 
-#define kBlock  ((char *)(uintptr_t)((void *)&g_gameprocBlock))
-#define kStrB   ((char *)(uintptr_t)((void *)&g_gameprocStrB))
-#define kVolZero   (*(int32_t *)(uintptr_t)((void *)&g_volumeAtZero))
-#define kVolStream (*(int32_t *)(uintptr_t)((void *)&g_streamVolume))
-#define kVolVoice  (*(int32_t *)(uintptr_t)((void *)&g_voiceVolume))
 /* SaveDefaultCof's three. The first two are spelled as army.cpp spells them,
  * so checkglobals sees one name per address and not two. */
 
@@ -80,7 +75,7 @@ int32_t __cdecl SaveGameProcSection(am2_FILE *fp)
 {
     /* The LENGTH, not a tag. SaveGame has already written 0x06660666. */
     WriteSaveTag(fp, AM2_GAMEPROC_SAVE_SIZE);
-    orig_fwrite(kBlock, AM2_GAMEPROC_SAVE_SIZE, 1, fp);
+    orig_fwrite(g_gameprocBlock, AM2_GAMEPROC_SAVE_SIZE, 1, fp);
     return 1;
 }
 
@@ -92,23 +87,23 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
 
     /* Everything that must outlive the read is copied out first, before the
      * tag is even checked -- which costs nothing when the check fails. */
-    strcpy(stashA, kStrB);
-    strcpy(stashB, kBlock);
-    volZero   = kVolZero;
-    volStream = kVolStream;
-    volVoice  = kVolVoice;
+    strcpy(stashA, g_gameprocStrB);
+    strcpy(stashB, g_gameprocBlock);
+    volZero   = g_volumeAtZero;
+    volStream = g_streamVolume;
+    volVoice  = g_voiceVolume;
 
     if (!CheckSaveTag(fp, AM2_GAMEPROC_SAVE_SIZE,
                       "C:\\ArmyMen2\\source\\gameproc.cpp", 0x8CD))
         return 0;
 
-    orig_fread(kBlock, AM2_GAMEPROC_SAVE_SIZE, 1, fp);
+    orig_fread(g_gameprocBlock, AM2_GAMEPROC_SAVE_SIZE, 1, fp);
 
-    kVolStream = volStream;
-    kVolZero   = volZero;
-    kVolVoice  = volVoice;
-    strcpy(kStrB, stashA);
-    strcpy(kBlock, stashB);
+    g_streamVolume = volStream;
+    g_volumeAtZero   = volZero;
+    g_voiceVolume  = volVoice;
+    strcpy(g_gameprocStrB, stashA);
+    strcpy(g_gameprocBlock, stashB);
 
     /* THE READ CLOBBERS THE LOAD FLAG AND THE ORIGINAL PUTS IT BACK. The
      * 0x438-byte block starts at ADDR_GAMEPROC_BLOCK and ADDR_LOAD_PENDING is
@@ -127,8 +122,8 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
     /* Spelled through the block they live in: both flags are inside it, and
      * that is what keeps VC6 from hoisting the stores above the strcpy
      * that could overwrite them. */
-    ((AM2_SelList *)kBlock)->haveDefaultCof = 0;
-    ((AM2_SelList *)kBlock)->loadPending    = 1;
+    ((AM2_SelList *)g_gameprocBlock)->haveDefaultCof = 0;
+    ((AM2_SelList *)g_gameprocBlock)->loadPending    = 1;
     return 1;
 }
 
@@ -608,14 +603,14 @@ int32_t __cdecl SaveGame(const char *name)
     am2_FILE  *fp;
     int32_t    h;
 
-    if (!*(const char *)(uintptr_t)((void *)&g_gameprocBlock))
+    if (!g_gameprocBlock[0])
         return 0;
     if (!*name)
         return 0;
 
     SetGameDir("save");
 
-    strcpy(lvl, &g_gameprocBlock);
+    strcpy(lvl, g_gameprocBlock);
 
     h = orig_findfirst(lvl, fd);
     if (h == -1) {
@@ -627,7 +622,7 @@ int32_t __cdecl SaveGame(const char *name)
     }
 
     orig_sprintf(path, "save\\%s",
-                 &g_gameprocBlock);
+                 g_gameprocBlock);
     SetGameDir(path);
 
     fp = orig_fopen(name, "wb");
@@ -689,7 +684,6 @@ fail:
 typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 #define orig_strtok (*(AM2_StrtokFn)((void *)(uintptr_t)(ADDR_CRT_STRTOK)))
 #define kSep        (" \t\n;,")
-#define kGameConst  ((int32_t *)&g_gameConstants)
 
 /* 0x00424780. The .aai handler for twenty game-constant keywords.
  *
@@ -731,14 +725,14 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
     case 0x44: break;
     case 0x45: break;
     case 0x46: break;
-    case 0x47: kGameConst[0] = value; break;
-    case 0x48: kGameConst[1] = value; break;
-    case 0x49: kGameConst[2] = value; break;
-    case 0x4A: kGameConst[3] = value; break;
-    case 0x4B: kGameConst[4] = value; break;
-    case 0x4C: kGameConst[5] = value; break;
-    case 0x4D: kGameConst[6] = value; break;
-    case 0x4E: kGameConst[7] = value; break;
+    case 0x47: g_gameConstants[0] = value; break;
+    case 0x48: g_gameConstants[1] = value; break;
+    case 0x49: g_gameConstants[2] = value; break;
+    case 0x4A: g_gameConstants[3] = value; break;
+    case 0x4B: g_gameConstants[4] = value; break;
+    case 0x4C: g_gameConstants[5] = value; break;
+    case 0x4D: g_gameConstants[6] = value; break;
+    case 0x4E: g_gameConstants[7] = value; break;
     default:
         orig_log("DefGameParse: Bad Game Constant Type\n");
         return 3;
@@ -2814,16 +2808,16 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
     char      path[AM2_SAVE_PATH_BYTES];
     am2_FILE *fp;
 
-    if (!g_gameprocStrB)
+    if (!g_gameprocStrB[0])
         return (am2_FILE *)0;
-    if (!g_gameprocBlock)
+    if (!g_gameprocBlock[0])
         return (am2_FILE *)0;
 
     am2_sprintf(path, "save\\%s",
-                 &g_gameprocBlock);
+                 g_gameprocBlock);
     SetGameDir(path);
 
-    fp = orig_fopen(&g_gameprocStrB,
+    fp = orig_fopen(g_gameprocStrB,
                     "rb");
     if (fp) {
         if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
@@ -2873,12 +2867,12 @@ void __attribute__((thiscall)) AM2_SelList::SelListDestruct()
  * mentioned. */
 void *__cdecl SelListConstructThunk(void)
 {
-    return SelListConstruct((void *)&g_gameprocBlock);
+    return SelListConstruct((void *)g_gameprocBlock);
 }
 
 void __cdecl SelListDestructThunk(void)
 {
-    SelListDestruct((void *)&g_gameprocBlock);
+    SelListDestruct((void *)g_gameprocBlock);
 }
 
 /* 0x004248B0. Hands the destructor thunk to the CRT's atexit and returns its

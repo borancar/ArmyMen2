@@ -1236,7 +1236,7 @@ void __cdecl ApplyGameSettings(void)
         g_hostValue3e8;
     g_gameOverFlags =
         g_hostMaskA;
-    *(uint32_t *)&g_gameSetting22c =
+    g_gameSetting22c =
         g_hostMaskB;
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
@@ -1248,8 +1248,8 @@ void __cdecl ApplyGameSettings(void)
     if (g_nameTableCount != 0) {
         const AM2_NameRec *rec = g_nameTableBase;
 
-        strcpy(&g_mpScriptName, rec->name);
-        strcpy(&g_mapName_,
+        strcpy(g_mpScriptName, rec->name);
+        strcpy(g_mapName_,
                    rec->maps[0]);
     } else {
         /* THE ELSE ARM WAS MISSING. `mov byte [0x511c08], bl` and
@@ -1260,8 +1260,8 @@ void __cdecl ApplyGameSettings(void)
          * Without it our two buffers went out of step: ADDR_MP_SCRIPT_NAME
          * kept a stale "death.txt" while ADDR_MAP_NAME was empty, and the
          * multiplayer panel looks its map list up by the first of them. */
-        g_mpScriptName = '\0';
-        g_mapName_       = '\0';
+        g_mpScriptName[0] = '\0';
+        g_mapName_[0]       = '\0';
     }
 }
 

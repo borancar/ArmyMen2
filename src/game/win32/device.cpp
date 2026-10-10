@@ -129,10 +129,9 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 #define kFormatMouse      (&c_dfDIMouse)
 #define kFormatKeyboard   (&c_dfDIKeyboard)
 #else
-#define kFormatMouse      ((LPCDIDATAFORMAT)((uintptr_t)g_dfMouse))
-#define kFormatKeyboard   ((LPCDIDATAFORMAT)((uintptr_t)g_dfKeyboard))
+#define kFormatMouse      (&g_dfMouse)
+#define kFormatKeyboard   (&g_dfKeyboard)
 #endif
-#define kBufferSizeProp   ((LPCDIPROPHEADER)((uintptr_t)g_dipropBufferSize))
 
 /* The game's import thunks, not ours -- see the note at the top. */
 typedef HRESULT (WINAPI *am2_ddraw_create_fn)(GUID *, LPDIRECTDRAW *, IUnknown *);
@@ -286,7 +285,7 @@ int32_t __cdecl InitInput(HWND hWnd)
     if (hr)
         return ReportError(hr, "SetCooperativeLevel (mouse)");
     hr = IDirectInputDevice_SetProperty(g_diMouse, DIPROP_BUFFERSIZE,
-                                        kBufferSizeProp);
+                                        &g_dipropBufferSize.diph);
     if (hr)
         return ReportError(hr, "Set buffer size (mouse)");
 
