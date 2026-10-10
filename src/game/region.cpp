@@ -3394,8 +3394,8 @@ after_region:
         ob->moveFrom  = *(&ob->pos);
     }
 set_move_to:
-    ob->moveTo = pt;
     ob->moveEnd = 0;
+    ob->moveTo = pt;
 two_waypoints:
     ob->moveAt    = 1;
     ob->moveCount = 2;
