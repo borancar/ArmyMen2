@@ -336,6 +336,18 @@ epilogue in the original is not known.
   signed `jl`, and puts the store where the image has it. When an image's
   pointer is initialised together with other induction variables, try
   the index.
+- **An array slot indexed twice is not a pointer to it kept across calls.**
+  The footprint family (ObjSetFootprint and its three siblings) tested a
+  16 x 16 stamp window as `*mark == stamp` and later stored `*mark = stamp`
+  through one `uint16_t *mark`. VC6 then reassociates the index into one
+  sum, loads the slot into a register and compares it with the stamp in
+  memory. The image keeps the two window coordinates apart (`cx`, `cy`),
+  loads the stamp first, compares it with the slot in memory and forms the
+  `lea` for the store only afterwards. That is `g_mark[cx * 16 + cy] ==
+  stamp` at the test and `g_mark[cx * 16 + cy] = stamp` at the store, with
+  `cx` and `cy` as locals. With these, three of the four functions match
+  outright (40 -> 0 bytes each) and the fourth comes to 2. Locals alone, or
+  the indexing alone, changed nothing.
 
 ## `for (;;)` and `while (1)` are different loops to VC6
 

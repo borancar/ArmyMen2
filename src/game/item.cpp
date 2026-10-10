@@ -1922,17 +1922,16 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
      * at every pass. */
     for (i = 0; i < g_roachMasks[dir].count; i++) {
         AM2_Point        at;
-        uint16_t *mark;
+        int32_t   cx, cy;
         int32_t   tile;
 
         at.x = g_roachMasks[dir].pts[i].x + o->pos.x;
         at.y = g_roachMasks[dir].pts[i].y + o->pos.y;
 
-        mark = g_roachMark
-               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
-               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
+        cx = ((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX;
+        cy = ((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY;
 
-        if (g_roachMarkStamp == *mark)
+        if (g_roachMark[cx * AM2_MASK_WINDOW + cy] == g_roachMarkStamp)
             continue;
 
         tile = TileOfPoint(at);
@@ -1940,7 +1939,7 @@ void __cdecl ObjSetRoachFootprint(AM2_Object *obj)
             += AM2_TILE_COVER_STEP;
         TileCoverAdd((uint16_t)tile);
 
-        *mark = g_roachMarkStamp;
+        g_roachMark[cx * AM2_MASK_WINDOW + cy] = g_roachMarkStamp;
     }
 
     o->flags |= OBJ_FLAG_FOOTPRINT_ON;
@@ -2128,18 +2127,19 @@ static inline void ObjFootprint(AM2_Object *obj, int32_t set)
      * re-read -- as the image walks it. */
     for (i = 0; i < g_vehicleMasks[o->vehicleKind * 32 + dir].count; i++) {
         AM2_Point at;
-        uint16_t *mark;
+        int32_t   cx, cy;
         int32_t   tile;
 
         at.x = (int16_t)(g_vehicleMasks[o->vehicleKind * 32 + dir].pts[i].x + o->pos.x);
         at.y = (int16_t)(g_vehicleMasks[o->vehicleKind * 32 + dir].pts[i].y + o->pos.y);
 
-        mark = g_objMark
-               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX)
-                 * AM2_MASK_WINDOW
-               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
+        /* The window cell as two values, the slot indexed from them at
+         * the test and again at the store: one pointer kept across the
+         * calls reassociates the index and loads the slot first. */
+        cx = ((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX;
+        cy = ((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY;
 
-        if (*mark == g_objMarkStamp)
+        if (g_objMark[cx * AM2_MASK_WINDOW + cy] == g_objMarkStamp)
             continue;
 
         tile = TileOfPoint(at);
@@ -2153,7 +2153,7 @@ static inline void ObjFootprint(AM2_Object *obj, int32_t set)
             TileCoverSub((uint16_t)tile);
         }
 
-        *mark = g_objMarkStamp;
+        g_objMark[cx * AM2_MASK_WINDOW + cy] = g_objMarkStamp;
     }
 
     if (set)
@@ -2748,17 +2748,16 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
      * at every pass. */
     for (i = 0; i < g_roachMasks[dir].count; i++) {
         AM2_Point        at;
-        uint16_t *mark;
+        int32_t   cx, cy;
         int32_t   tile;
 
         at.x = g_roachMasks[dir].pts[i].x + o->pos.x;
         at.y = g_roachMasks[dir].pts[i].y + o->pos.y;
 
-        mark = g_roachMark
-               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
-               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
+        cx = ((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX;
+        cy = ((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY;
 
-        if (g_roachMarkStamp == *mark)
+        if (g_roachMark[cx * AM2_MASK_WINDOW + cy] == g_roachMarkStamp)
             continue;
 
         tile = TileOfPoint(at);
@@ -2766,7 +2765,7 @@ void __cdecl ObjClearRoachFootprint(AM2_Object *obj)
             -= AM2_TILE_COVER_STEP;
         TileCoverSub((uint16_t)tile);
 
-        *mark = g_roachMarkStamp;
+        g_roachMark[cx * AM2_MASK_WINDOW + cy] = g_roachMarkStamp;
     }
 
     o->flags &= ~OBJ_FLAG_FOOTPRINT_ON;

@@ -66,8 +66,14 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1573 of
-  1646 byte-identical (2026-10-10), piecewise 399.** RecvThreadProc
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1576 of
+  1646 byte-identical (2026-10-10), piecewise 399.** ObjSetFootprint,
+  ObjClearFootprint and ObjClearRoachFootprint match, and
+  ObjSetRoachFootprint is down to 6 bytes: each indexes its stamp window
+  from two coordinate locals at the test and again at the store, where we
+  had kept one pointer to the slot (docs/vc6-regalloc.md). SelectionClick
+  14 -> 8: its drag arm calls OnSelectionChanged and returns rather than
+  jumping to the shared tail. RecvThreadProc
   (0x00401F00) is in the manifest now, beside the other OS callbacks
   (bytematch.REGISTERED_FNS): it was reconstructed but never patched, so the
   relink did not know it and FlowRecvMessage's span ran on through it
