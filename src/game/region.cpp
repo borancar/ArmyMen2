@@ -7648,11 +7648,12 @@ sweep:
          * CLAUDE.md records) AND OBJ_OFF_FIELD_10C is clear. This compared
          * Field548's VALUE against the owner, which matched only sometimes, so
          * Sarge alternately swept three headings and six. */
-        tries = AM2_STEP_SWEEP_OTHER;
         if (ObjType2Field548(o)
             && (int32_t)o->owner == (int32_t)g_defaultOwner
             && !o->field10C)
             tries = AM2_STEP_SWEEP_PLAYER;
+        else
+            tries = AM2_STEP_SWEEP_OTHER;
         {
             const int32_t *step = g_stepFacingSweep;
             /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
