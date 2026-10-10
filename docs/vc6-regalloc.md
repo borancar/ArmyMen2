@@ -218,8 +218,18 @@ WeaponPoseIndex clone). WeaponPoseIndex, SelectWeapon, ShotHitsObj and
 CommSend all have the image keeping the EARLIER copy while arms are still laid
 out in source order. Changing the order of arms inside one switch moves
 nothing. A fall-through from one arm into the next does put the shared block
-where the image has it, but it also moves the arm. The source that gives the
-image's result has not been found.
+where the image has it, but it also moves the arm.
+
+**A single `goto` into the earlier copy makes it the survivor (2026-10-10).**
+ScriptParseActionRecon has six arms ending in the same `return
+ScriptResolveName(...) != 0;`. Written as six returns, VC6 kept a later copy.
+A label on the first copy and ONE `goto` to it from any other arm, with the
+remaining arms still written as plain returns, makes the first copy the one
+the others jump to, as in the image. Which arm holds the `goto` does not
+matter, and the other arms do not need one. The same fix applies to its two
+`ScriptObjectUid` tails (shape 295 -> 243). `tmp/retmerge.py` in the
+session tried this for every repeated `return X;` in the mismatching
+functions, and these were the only hits.
 
 Writing the tail out once per arm does not keep the copies apart either
 (2026-10-10). VC6 cross-jumps code that is identical AFTER register
