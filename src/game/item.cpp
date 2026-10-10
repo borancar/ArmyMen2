@@ -5029,7 +5029,10 @@ raise_k:
             break;
 
         case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */
-            STATE = (cls > 0 && cls <= 2) ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_CARRY;
+            if (cls > 0 && cls <= 2)
+                STATE = AM2_POSE_KNEEL_ARMED_B;
+            else
+                STATE = AM2_POSE_CARRY;
             break;
 
         case 43:
