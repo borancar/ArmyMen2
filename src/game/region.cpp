@@ -4069,11 +4069,10 @@ done:
 static inline void AiSightTrace(const AM2_Object *const &o,
                                 const AM2_Object *const &seen,
                                 const uint32_t &dir, const int32_t &viewerAttr,
-                                const int32_t &gen)
+                                const int32_t &gen, int32_t &highest)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_BUF];   /* SightScan's 0x84C frame holds 1024 */
     const uint8_t *attrs = g_tileAttrs;
-    int32_t        highest = AM2_AI_SIGHT_FLOOR;
     int32_t        n = 0, i = 0, reach;
 
     g_sightBlockByDir[dir].trace_stamp = gen;
@@ -4853,11 +4852,15 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 continue;
             }
 
-            /* The sight test, inline. Same shape as AM2_AI_SIGHT_TEST and NOT the same
-             * code -- a normalised diff finds no shared run of ten. */
+            /* The sight test, inline. It opens exactly as AM2_AI_SIGHT_TEST does:
+             * the trace's height floor set first, the distance from the two
+             * deltas, AngleOfDelta handed that distance as its unread third
+             * argument, and one abs(AngleDelta(...)) compared with the rank's
+             * arc. The rest differs (the trace is AiSightTrace, the arms
+             * `continue`). */
             {
                 uint8_t  look = o->facing;
-                int32_t  viewerAttr, dx, dy, delta;
+                int32_t  viewerAttr, dx, dy, highest;
                 uint32_t dir;
 
                 if (ObjIsType3(o)
@@ -4865,17 +4868,15 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                     look = o->turretFacing;
 
                 viewerAttr = ObjTileAttr(o);
-                dx = (int32_t)it->pos.x
-                     - (int32_t)o->pos.x;
                 dy = (int32_t)it->pos.y
                      - (int32_t)o->pos.y;
-                candRange   = ApproxDistXY((int32_t)it->pos.x
-                                           - (int32_t)o->pos.x, dy);
-                candBearing = (uint8_t)AngleOfDelta(dx, dy);
+                dx = (int32_t)it->pos.x
+                     - (int32_t)o->pos.x;
+                highest     = AM2_AI_SIGHT_FLOOR;
+                candRange   = ApproxDistXY(dx, dy);
+                candBearing = AI_ANGLE3(dx, dy, candRange);
 
-                delta = AngleDelta(look, candBearing);
-                delta = abs(delta);
-                if (delta > g_rankRecords[o->rank].field_04) {
+                if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
                     if (candRange < g_rankRecords[o->rank].field_08)
                         goto in_sight;
                     continue;
@@ -4884,7 +4885,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 /* Keyed on the BEARING, not the facing -- see orig.h. */
                 dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
                 if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
-                    AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration);
+                    AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration, highest);
 
                 if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
                     int32_t mine = ObjHeight(o);
