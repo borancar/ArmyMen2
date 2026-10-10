@@ -1470,8 +1470,9 @@ void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
     rows->pos     = o->pos;
     rows->yAdjust = o->row0YAdjust;
 
-    /* Re-read for the loop (17 -> 11 bytes off the image). */
-    rows = o->rowSet.rows;
+    /* `rows` is not re-read for the loop: the image keeps `&rows->sprite`
+     * in a register across it. A re-read here was 12 bytes closer but one
+     * instruction further from the image's shape. */
     for (i = 1; i < o->rowSet.count; i++) {
         AM2_MapRow *r = &o->rowSet.rows[i];
 
