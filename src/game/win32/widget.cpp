@@ -16655,8 +16655,13 @@ void __cdecl PointerActionMode5(AM2_Object *tgt, AM2_Point at)
      * slot is computed from the clicked point -- as in mode 6 -- while `at`
      * is only the slot FormationSlotPoint writes. Copied per pass, each unit
      * was placed relative to the slot of the one before it. */
+    /* An empty selection leaves before the anchor is read: the image loads
+     * `at` only after the count test (0x00458757). */
+    i = 0;
+    if (i >= g_selectedCount)
+        return;
     home = at;
-    for (i = 0; i < g_selectedCount; ) {
+    for (; i < g_selectedCount; ) {
         AM2_Object *o = LookupByUID(
             g_selectedItems[i]);
         int32_t  ot;
