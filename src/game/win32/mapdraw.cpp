@@ -1887,24 +1887,25 @@ void __cdecl ViewUpdate(void)
 
 clamp_eye:
     vpt.x = (int16_t)Clamp(tx, halfW + g_mapInset.left, g_mapInset.right - halfW - 1);
-    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapInset.top, g_mapInset.bottom - (h >> 1) - 1);
+    /* The clamped y goes straight into the eye; x is held until the stores
+     * below, in the order the image makes them. */
+    g_listenerPos.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapInset.top,
+                                     g_mapInset.bottom - (h >> 1) - 1);
 
     {
         int32_t  vl = vpt.x - halfW;
-        int32_t  vt = vpt.y - (h >> 1);
+        int32_t  vt = g_listenerPos.y - (h >> 1);
 
-        g_secondRect.left   = vl;
-        g_secondRect.top    = vt;
-        g_secondRect.bottom = vt + h;
         g_secondRect.right  = vl + w;
+        g_secondRect.left   = vl;
+        g_secondRect.bottom = vt + h;
+        g_secondRect.top    = vt;
 
-        g_viewRect.top    = vt - g_blitRect->top;
         g_viewRect.left   = vl - g_blitRect->left;
+        g_listenerPos.x   = (int16_t)vpt.x;
+        g_viewRect.top    = vt - g_blitRect->top;
         g_viewRect.right  = g_screenW + g_viewRect.left;
         g_viewRect.bottom = g_screenH + g_viewRect.top;
-
-        g_listenerPos.y = (int16_t)vpt.y;
-        g_listenerPos.x = (int16_t)vpt.x;
 
         IntersectRect(g_viewClipped,
                       (const RECT *)&g_viewRect,
