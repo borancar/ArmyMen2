@@ -76,7 +76,14 @@ main result so far (details in `src/vc6/README.md`):
   (allied arm as an else), PointerActionFollow 226 -> 112 (its leader scan
   written out, scan first), Step3Input 96 -> 54 (mouse arm reordered, its
   cooldown by goto), ListMaskAction 682 -> 670 (neighbour stores in image
-  order). The rest of the top of the list is register priority: FindPath
+  order), SelectFirePose 320 -> 268 (case 43 before the machine-gun arm).
+  Tried without effect, all register or scheduling: VehicleUpdateAppend
+  (the image tests the position bit twice; split, it is worse until `seq`
+  and `flags` swap registers), ParseScenarioPart (walking-pointer anchor
+  on +6 against +0, unmoved by indexing, pointer walks or store order),
+  DepthResort, BoxAction, RowUpdate (the image re-reads rect.top after
+  storing it), PlacementAllowed (its final compare and `return 0` blocks
+  swap places; every spelling compiles the same). The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
