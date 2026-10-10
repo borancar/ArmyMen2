@@ -116,6 +116,17 @@ Two layers, and most stuck byte-matches are a disagreement in one of them:
   `for (i = 0; i < count; i++, rows++) { row = rows; ... }` it anchors on
   the row's start as the image does (82 -> 48 bytes).
 
+- **A memory-operand OR means register pressure (lab, 2026-10-10).** VC6
+  compiles `*c |= 3` as load, `or`, store for `char`, `signed char`,
+  `unsigned char`, a bitfield and `int` alike, through a pointer or an
+  index. It emits `or byte ptr [mem], 3` only when no register is free (a
+  loop with seven live values does it). So where the image has the
+  memory form and we have the three-instruction one, as in ObjHitMaskAction
+  and ListMaskAction (both with `marked` spilled to the stack in the image,
+  and a frame four bytes larger), the original keeps one more value alive
+  across the loop than ours does. Look for a variable we folded away, not
+  for another spelling of the store.
+
 ### Evaluation order
 
 - **Commutative chains are evaluated right to left**: `p[0] + p[1] + p[2]`
