@@ -9251,7 +9251,10 @@ void __cdecl SelectionClick(void)
                             (void *)(uintptr_t)(e)->uid);
                 e->flags |= OBJ_FLAG_SELECTED;
             }
-            goto changed;
+            /* The drag arm's own copy of the tail: the image calls and
+             * returns here rather than jumping to `changed`. */
+            OnSelectionChanged(g_zeroPoint);
+            return;
         }
         g_dragRect.left   = (g_dragAnchor.x < world.x) ? g_dragAnchor.x : world.x;
         g_dragRect.right  = (g_dragAnchor.x > world.x) ? g_dragAnchor.x : world.x;
