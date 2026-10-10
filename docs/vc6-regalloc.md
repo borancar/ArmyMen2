@@ -273,6 +273,22 @@ CREATETROOPER and one more), each falling into its own continuation. VC6
 merges such blocks in every lab shape tried (inline, inverted test, an inline
 helper), and ours merges two of the three into CREATETROOPER's.
 
+**Epilogue copies block cross-jumping (lab, 2026-10-10).** Under /O2 VC6
+copies a small constant `return` epilogue (`xor eax, eax; pop...; ret`)
+into an inline predecessor that would otherwise jump to it, and a block
+ending in `ret` is never a cross-jump candidate. So two byte-identical
+`{ log(...); break; }` blocks that each sit inline after their test stay
+apart, while the ones reached by a jump merge and fall into the shared
+epilogue. A clone of FlowRecvMessage reproduces our three copies of the
+"Can't find FlowQ" log; the image has one, with all four sites pushing
+their argument and jumping in, and only one `return 0` epilogue in the
+whole function. In the clone, `return g_v` (a non-constant result) or
+/O1 stops the copying and all four merge. But commmsg.cpp is /O2
+(compiled /O1, every matched function in it breaks), and a result
+variable, `return 0` at the sites, nested tests, an if-chain and `goto` to
+a label before the return all keep the copies. What stopped VC6 copying the
+epilogue in the original is not known.
+
 ## Loop and temporary shapes that show in the image
 
 - **A rotated `while (p->next) { ... }` is not `while (1) { if (!p->next) break;
