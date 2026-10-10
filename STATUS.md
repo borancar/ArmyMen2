@@ -140,8 +140,10 @@ main result so far (details in `src/vc6/README.md`):
   127 -> 124 (the delivery gap as a ternary). Sweeps of comparison operand
   order, local declaration order and ternary/if-else conversion found
   nothing else. FlowRecvMessage's four "Can't find FlowQ" logs share one
-  block in the image; ours copies the small return-0 epilogue into each
-  site, which leaves nothing to merge. Not solved. `g_attemptCount` and
+  block in the image; ours copied the small return-0 epilogue into each
+  site, which left nothing to merge. Writing the last site's `break` as
+  `return 0` makes its log the survivor for two of the other three
+  (shape 25 -> 19); the first still keeps its own copy. `g_attemptCount` and
   `g_levelAttempt` are two names for 0x512330. Copy substitution, rerun over the
   74 (2026-10-10) and then scored on shape rather than bytes: where we held a
   local copy, the image re-reads the expression it copied. DrawEffectLayer

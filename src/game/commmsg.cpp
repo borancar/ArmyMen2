@@ -2889,7 +2889,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         }
         if (!me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
-            break;
+            /* The same `return 0` as the breaks above reach; written here
+             * it makes this log the copy the earlier three jump into, as
+             * in the image. */
+            return 0;
         }
         if (g_commObject->verbose)
             am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
