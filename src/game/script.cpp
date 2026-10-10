@@ -2893,8 +2893,10 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, na, nb, nc);
-            if (*at >= ctx->count)
-                goto end_of_script;
+            if (ctx->count <= *at) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
         }
 
     } else if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
