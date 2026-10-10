@@ -5938,7 +5938,7 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
  * compile), and the image has none. */
 #define RegionSpan(a, b)                                                     \
     ApproxDistXY((int32_t)((RS_TILE(b) & ((uint32_t)(g_mapTilesW - 1))) - (RS_TILE(a) & ((uint32_t)(g_mapTilesW - 1)))), \
-                 (int32_t)((RS_TILE(b) >> ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu)) - (RS_TILE(a) >> ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu))))
+                 (int32_t)((RS_TILE(b) >> (uint16_t)*(const uint32_t *)&g_mapRowShift) - (RS_TILE(a) >> (uint16_t)*(const uint32_t *)&g_mapRowShift)))
 
 static inline AM2_Region *RegionAt(int32_t id)
 {
