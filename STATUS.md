@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1571 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1572 of
   1646 byte-identical (2026-10-10), piecewise 399.** RecvThreadProc
   (0x00401F00) is in the manifest now, beside the other OS callbacks
   (bytematch.REGISTERED_FNS): it was reconstructed but never patched, so the
@@ -80,7 +80,10 @@ main result so far (details in `src/vc6/README.md`):
   copy. PointerActionFollow
   matches: its leader is a ternary between the live lookup and the dead scan
   as an inline of its own, which lays the scan between the arms with its NULL
-  falling into the shared test. ReceivePlayerMsg matches:
+  falling into the shared test. RecvThreadProc matches: `while (1)`, the
+  receive called on the comm object directly rather than through dplay.h's
+  inline wrapper, and `got` set on both arms of the flow test, which is what
+  puts the store between the call and the test. ReceivePlayerMsg matches:
   the army-points loop is `for (i = 0; i < 4; i++)` over `g_armyPoints[i]`,
   which VC6 strength-reduces into the walking pointer the image tests, and
   `msg` is read through a local copy, which moves its reload to the loop's

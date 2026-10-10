@@ -1909,19 +1909,22 @@ int32_t __cdecl RecvThreadProc(void *param)
             node = msg;
             node->bodyLen = PACKET_BUFFER_BYTES;
 
-            if (!CommReceive(*(void * *)&g_commObject,
-                             (DPID *)&node->from,
-                             (DPID *)&node->to,
-                             1,
-                             node->body,
-                             (DWORD *)&node->bodyLen))
+            if (!g_commObject->CommReceive((uint32_t *)&node->from,
+                                           (uint32_t *)&node->to,
+                                           1,
+                                           node->body,
+                                           (uint32_t *)&node->bodyLen))
                 break;   /* nothing left -- the node is kept for next time */
 
-            /* 0 means the flow layer did not consume it. */
-            if (!FlowRecvMessage(msg))
+            /* 0 means the flow layer did not consume it. `got` is set on
+             * both arms: VC6 hoists the common store between the call and
+             * the test, where the image has it; set once after the `if`, it
+             * lands at the join. */
+            if (!FlowRecvMessage(msg)) {
+                got = 1;
                 MsgListAdd(g_msgListB, msg);
-
-            got = 1;
+            } else
+                got = 1;
             msg = (AM2_MsgNode *)0;
         }
 
