@@ -1408,12 +1408,15 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 budget:
     /* Out of budget. Keep what was found if it got closer than the start
      * was -- `jbe` on the two heuristics as WORDS (`cmp di, ax`), so equal
-     * counts as progress. Otherwise it shares the exhausted list's zero. */
+     * counts as progress. The refusal is written out here and merges with
+     * the exhausted list's copy below, which the image lays out inline. */
     if ((uint16_t)PathHeuristic(cur & 0xFFFF, toTile)
-        <= (uint16_t)PathHeuristic(fromTile, toTile)) {
-        PathUnwind(cur, out, n);
-        goto ok;
+        > (uint16_t)PathHeuristic(fromTile, toTile)) {
+        PathChargeFrame(startTicks, considered);
+        return 0;
     }
+    PathUnwind(cur, out, n);
+    goto ok;
 fail:
     PathChargeFrame(startTicks, considered);
     return 0;
