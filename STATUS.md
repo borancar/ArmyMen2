@@ -99,7 +99,15 @@ main result so far (details in `src/vc6/README.md`):
   agree (PointerPickMode0, HudPostUpdate, FlowRecvMessage, ScriptPad's
   inlined ScriptExpect copies), and block placement that four source
   orderings of UpdateTrooperAction's stop arms all compiled identically.
-  PlacementAllowed
+  Then registers on the ones already at the image's shape: DepthResort
+  matches (its unlinks written straight through `n`, without the `pv`/`nx`
+  copies, and the backward walk's ran-off-front arm inside the loop),
+  PointerActionMode5 matches (an empty selection returns before the anchor
+  is read), ObjTileHook 22 -> 18 bytes; the relink is at 1580. The rest of
+  that set resisted every spelling tried: WndProc's PAINTSTRUCT slot,
+  MovieStart's `delete`, LoadOptions' epilogue copy, ShotHitsObj's refusal
+  survivor, OptionsDefaults, SelectionClick and TrooperFire one scratch
+  register out, PointerPickMode6's split of `o`. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and
