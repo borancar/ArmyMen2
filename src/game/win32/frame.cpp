@@ -1964,10 +1964,11 @@ void __cdecl PausedFrameStep(void)
         clip.left   = row[0];
         clip.right  = clip.left + 0x190;
         clip.bottom = clip.top + 0x14;
-        am2_sprintf(buf, "Game type: %s, Goal: %d",
-                    (const char *)ScriptListFind(
-                        g_mpScriptName) + 0x80,
-                    g_scoreLimit);
+        {
+            const char *rec = (const char *)ScriptListFind(g_mpScriptName);
+
+            am2_sprintf(buf, "Game type: %s, Goal: %d", rec + 0x80, g_scoreLimit);
+        }
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
             return;
         DrawTextClipped(clip.left + 2, clip.top + 2, buf, 1, clip,
