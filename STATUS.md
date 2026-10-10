@@ -71,7 +71,16 @@ main result so far (details in `src/vc6/README.md`):
   the army-points loop is `for (i = 0; i < 4; i++)` over `g_armyPoints[i]`,
   which VC6 strength-reduces into the walking pointer the image tests, and
   `msg` is read through a local copy, which moves its reload to the loop's
-  bottom. Shorthand read macros and
+  bottom.
+  Biggest-first pass (2026-10-10), by block layout: SightScan 1324 -> 1048
+  (allied arm as an else), PointerActionFollow 226 -> 112 (its leader scan
+  written out, scan first), Step3Input 96 -> 54 (mouse arm reordered, its
+  cooldown by goto), ListMaskAction 682 -> 670 (neighbour stores in image
+  order). The rest of the top of the list is register priority: FindPath
+  (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
+  (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
+  value the image keeps in memory). FlowRecvMessage's size is mostly the
+  unreconstructed PacketThreadProc inside its scored span. Shorthand read macros and
   file-local global aliases are gone from `src/game` (2026-10-10, ~640 of
   them), and the globals they re-typed have their real types in
   `globals.h`; every function compiled identically. Left for later:
