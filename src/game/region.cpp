@@ -9792,8 +9792,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             int32_t  swing;
 
             r->aim = (uint8_t)(r->aim + turn);
-            swing = Clamp(AngleDelta(o->turretFacing, r->aim),
-                          turn - 0x0F, turn + 0x0F);
+            swing = AngleDelta(o->turretFacing, r->aim);
+            swing = Clamp(swing, turn - 0x0F, turn + 0x0F);
 
             animRec = &turret->animPlaying;
             {
