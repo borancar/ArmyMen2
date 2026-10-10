@@ -191,6 +191,28 @@ nothing. A fall-through from one arm into the next does put the shared block
 where the image has it, but it also moves the arm. The source that gives the
 image's result has not been found.
 
+Writing the tail out once per arm does not keep the copies apart either
+(2026-10-10). VC6 cross-jumps code that is identical AFTER register
+allocation, whatever the source looked like:
+
+- UpdateTrooperAction's stop block, written under each of its three tests
+  (as else-if arms, or as separate `if`s each ending in its own `goto`):
+  two of the three copies still merge, because our copies use the same zero
+  register. 952 -> 980 bytes.
+- HudPostUpdate's generic action call, inlined at its `goto`, called through
+  a local, an int-returning pointer type, or a split test: identical output,
+  still jumps into the "ours" arm's call.
+- ScriptPad's two averaging blocks, given block-local counters per arm: the
+  `cx` halves separate but the `cy` halves still merge, and the rest of the
+  function's registers move (302 -> 365 instructions off).
+
+Where the image keeps copies, they usually differ in a register (ScriptPad
+divides by `edi` in one arm and `ebp` in the other; MakeBitmap's two
+`Release` calls go through `ecx` and `edx`), so in those cases it is the
+register choice that has to be fixed. HudPostUpdate's and UpdateTrooperAction's
+copies are byte-identical in the image and still kept apart. What stops VC6
+from merging those is not known.
+
 ## Not yet understood
 
 - Exactly how the field a walking pointer is anchored on is chosen.
