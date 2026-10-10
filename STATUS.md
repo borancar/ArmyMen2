@@ -66,7 +66,7 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1567 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1568 of
   1645 byte-identical (2026-10-10), piecewise 399.** MpOptionsScreen fell to a
   record pointer, which moves the loop's walking-pointer anchor (see
   docs/vc6-regalloc.md), and to RectMake by value. AddSightBlocker fell to a

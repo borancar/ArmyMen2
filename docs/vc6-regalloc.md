@@ -224,7 +224,27 @@ candidate (the f14 call, when it also passed `obj`). So the rule is about
 which blocks qualify as cross-jump targets, and every identical candidate has
 to be ruled out.
 
-UpdateTrooperAction is still open. Its three stop copies merge in the skip
+**SelectWeapon matched the same day by ARM ORDER.** Its case 0x1A, written
+after 0x23, was cross-jumped into 0x26's identical call. The image lays 0x1A
+out between 0x17 and 0x23, so it comes first in the source too; moved there,
+it keeps its own block and the function byte-matches. Read the image's block
+order before changing anything else: an arm out of place can be swallowed by
+a merge it would never take in its own place.
+
+**CommSend: which copy survives follows layout, not case order.** Swapping
+the two `case`s changes nothing; VC6 lays out the switch the same way and keeps
+the copy that falls into the common code (E_INVALIDARG). An if-chain testing
+E_INVALIDARG first makes the image's survivor (DPERR_INVALIDPLAYER) keep the
+call, but the losing arm's push-push-jmp stub stays inline, where the image
+moves it into the gap after the player-lookup loop. Not solved.
+
+UpdateTrooperAction is still open. A lab clone of its control flow
+(have_facing through settle_facing) keeps all copies apart until three things
+are present together: `speed` reassigned in the item loop, `turned` read
+after it, and `speed` read after it. With all three, VC6 keeps `speed` in
+memory and makes `eax` a zero register for the `hit` test, the `found` test
+and the `speed = 0` stores, and two copies merge. The image tests with
+`test eax, eax` and stores immediates there instead. Its three stop copies merge in the skip
 form too (and in a lab clone). The image's copies differ from ours in one
 visible way: each one reloads `out` from its argument slot for the `bearing`
 store (`mov edx, [esp+0x40]`) while `state` and `hit` go through `ebp`. That
