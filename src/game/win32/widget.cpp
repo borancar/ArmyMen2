@@ -4938,12 +4938,14 @@ void __cdecl HudPostUpdate(void)
     goto tail;
 
 hit_ours:
-    if (CHANGED) {
-        if (BUTTON || !SLOT1)
-            goto claim;
-        SLOT1(obj, at);
-        goto tail;
-    }
+    if (!CHANGED)
+        goto hold;
+    if (BUTTON || !SLOT1)
+        goto claim;
+    SLOT1(obj, at);
+    goto tail;
+
+hold:
     /* The button did not change, so this is a hold. Only a weapon whose kind
      * record allows repeating gets to act again. */
     if (!repeat)
