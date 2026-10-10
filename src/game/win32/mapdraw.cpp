@@ -2390,7 +2390,6 @@ void __cdecl DrawEffectLayer(void)
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
         if (g_aimLiveA[army]) {
-            const AM2_Point *ptA = &g_aimPointA[army];
             int32_t frame;
             RECT    box, hit;
 
@@ -2399,10 +2398,10 @@ void __cdecl DrawEffectLayer(void)
             if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
                 frame = AM2_AIM_FRAMES_A;
 
-            box.left   = ptA->x + AM2_AIM_BOX_LEFT;
-            box.right  = ptA->x + AM2_AIM_BOX_RIGHT;
-            box.top    = ptA->y + AM2_AIM_BOX_TOP;
-            box.bottom = ptA->y + AM2_AIM_BOX_BOTTOM;
+            box.left   = g_aimPointA[army].x + AM2_AIM_BOX_LEFT;
+            box.right  = g_aimPointA[army].x + AM2_AIM_BOX_RIGHT;
+            box.top    = g_aimPointA[army].y + AM2_AIM_BOX_TOP;
+            box.bottom = g_aimPointA[army].y + AM2_AIM_BOX_BOTTOM;
 
             if (IntersectRect(&hit, &box, (const RECT *)&g_screenClip)) {
                 int32_t row, col;
@@ -2459,9 +2458,9 @@ void __cdecl DrawEffectLayer(void)
             if (!LockSurface(target))
                 return;
 
-            DrawSprite(g_aimSpritesA[frame], ptA->x, ptA->y, 0);
+            DrawSprite(g_aimSpritesA[frame], g_aimPointA[army].x, g_aimPointA[army].y, 0);
             DrawSprite(g_aimSpritesA[0],
-                       ptA->x + AM2_AIM_BOX_LEFT, ptA->y + AM2_AIM_BOX_TOP, 0);
+                       g_aimPointA[army].x + AM2_AIM_BOX_LEFT, g_aimPointA[army].y + AM2_AIM_BOX_TOP, 0);
 
             UnlockSurface();
         }
