@@ -107,7 +107,16 @@ main result so far (details in `src/vc6/README.md`):
   that set resisted every spelling tried: WndProc's PAINTSTRUCT slot,
   MovieStart's `delete`, LoadOptions' epilogue copy, ShotHitsObj's refusal
   survivor, OptionsDefaults, SelectionClick and TrooperFire one scratch
-  register out, PointerPickMode6's split of `o`. PlacementAllowed
+  register out, PointerPickMode6's split of `o`. Later rounds, by scanning
+  the listings for one tell at a time: UpdateTrooperAction 86 -> 30 (three
+  stop arms, each with its own copy of the body), ScriptPad 96 -> 87
+  (PadFinalise written twice), Step3Drive 42 -> 30 (the turret stamp
+  through `turret`, the aim spot reset as one struct, FireWeapon with the
+  byte heading), SightScan 32 -> 26 (a null test the image repeats),
+  AiTrooperStep 37 -> 32 (a uint16 waypoint index), ObjHitMaskAction
+  48 -> 45 (a cell index beside the pointer), DrawMapObjects 190 -> 92
+  bytes. The register-normalised total over the 50 still off in shape is
+  737. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

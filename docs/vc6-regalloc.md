@@ -231,6 +231,17 @@ cannot produce. Declaring the set inside each scan's block took the code shape
 of the second block scored the same). Worth trying wherever two disjoint
 blocks do the same job with the same locals.
 
+**Several copies of one body in the image are several arms in the source.**
+UpdateTrooperAction's stop tests were one `if (a || b || c) { body }`; the
+image has the body three times, once per test, and the chain laid out after
+the sweep. Written as three `else if` arms with the body in each, VC6 keeps
+the three copies and the layout follows (v3 shape 86 -> 30, 1182 -> 900
+bytes). The same goes for a CALL the image reaches by `push args; jmp` into
+another call site: ScriptPad's PadFinalise is written twice, once for a
+script that ends after the comparison (96 -> 87). A cheap scan for both:
+count identical straight-line blocks (four or more instructions) in each
+listing and list those the image has more copies of.
+
 **A switch's case bodies are laid out in source order**, so a case written
 in the wrong place moves every body after it. SelectFirePose had `case 43`
 second where the image has it last (shape 34 -> 24). `casecmp.py`-style
