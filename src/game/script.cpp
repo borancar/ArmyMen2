@@ -1570,6 +1570,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_SETCAMERAFOCUS:
         STEP();
         act->code = 0x1D;
+        /* Six arms end in this call and VC6 keeps one copy of it. A goto
+         * from SUSPENDAI makes this first copy the one that survives, as
+         * in the image; with none it keeps a later one. */
+    resolve_subject:
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_RESTORECAMERAFOCUS:
@@ -1585,7 +1589,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             act->subject = g_svarId15;
             return 1;
         }
-        return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
+        goto resolve_subject;
 
     case AM2_TOK_REVIVEAI:
         STEP();
@@ -1710,8 +1714,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_TRIGGER:
         STEP();
         /* The uid lands at +0x00 and the zero at +0x04 -- the call pushes
-         * the record and then the record plus four. */
-        return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
+         * the record and then the record plus four. TRIGGERDELAY ends in
+         * the same call, and the image has one copy of it, in that arm. */
+        goto trigger_uid;
 
     case AM2_TOK_TRIGGERDELAY:
         STEP();
@@ -1735,6 +1740,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             am2_log("Unexpected end of script.\n");
             return 0;
         }
+    trigger_uid:
         return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
 
     case AM2_TOK_CREATETROOPER:
