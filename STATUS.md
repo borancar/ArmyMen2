@@ -70,7 +70,10 @@ main result so far (details in `src/vc6/README.md`):
   1646 byte-identical (2026-10-10), piecewise 399.** ParseScenarioPart
   matches: `took = 8` before the first count test, no separate
   `count <= 0` return ahead of the row loop, and `rows = p->rows =
-  malloc(...)`. PlacementAllowed
+  malloc(...)`. Also: FindPath 82 -> 60 (the budget test's refusal
+  written in its own arm), SightScan 78 -> 66 (the kind-7 arm scores in
+  place, `score:` at the loop end), ScriptParseActionRecon 243 -> 234
+  (DROPITEM jumps into 0x1F's count test). PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

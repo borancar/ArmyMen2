@@ -425,6 +425,21 @@ the arms the other way round (shape 110 -> 108).
   returns into the block after the radar arm, with the setcc tail last
   as the image has it (36 -> 0 bytes).
 
+- **A shared block reached by `goto` can be the image's inline copy plus a
+  second one.** Where the image keeps a shared block in the arm the source
+  writes it in and every other arm jumps back to it, writing it once as a
+  label inside that arm lets VC6 move it after the last `goto`. Writing an
+  unlabelled copy in the arm and the labelled one elsewhere restores the
+  layout: SightScan's scoring (the kind-7 arm's copy in place, `score:` at
+  the end of the loop body, shape 78 -> 66) and FindPath's out-of-budget
+  refusal (its own `PathChargeFrame; return 0;` in the budget test, the
+  shared `fail:` still below, 82 -> 60). Sweeps that did this mechanically
+  for every return-ending label found nothing else.
+- **A combination can match where each half is worse.** ParseScenarioPart
+  matched only with three changes together (`took = 8` before an
+  overwriting `if`, no separate `count <= 0` return ahead of the loop, and
+  `rows = p->rows = malloc(...)`); the first alone went 3 -> 12.
+
 ## Shape first, then registers
 
 Ranking misses by a register-masked diff (registers and stack offsets
