@@ -289,6 +289,12 @@ helper), and ours merges two of the three into CREATETROOPER's.
   statements, both signednesses and three spellings of the test were tried
   in a clone (`checked` stays 26 lines off the image at best).
 - Whether the hidden C2 switches change any of this.
+- How VC6 picks a dead argument slot for a local. RunScriptAction's image
+  (frame 0x60) keeps several values in its parameters' slots: `v1` and the
+  `moveto` point `p1` in `act`'s (act lives in `esi`), and a later variable
+  read in `owner`'s. `p1` is never address-taken. Making `v1` or `p1`
+  block-scoped moves them within our frame (to 0x5c, or to another frame
+  slot), never into an argument slot (2026-10-10).
 - What makes VC6 split a pointer's live range around a loop. In
   PointerPickMode0/4/5/6 the image keeps the object in `esi` up to the
   shared friend tail, then copies it to `ebp` (`mov ebp, esi`) so the
