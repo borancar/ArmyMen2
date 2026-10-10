@@ -106,8 +106,8 @@ main result so far (details in `src/vc6/README.md`):
   and `flags` swap registers), ParseScenarioPart (walking-pointer anchor
   on +6 against +0, unmoved by indexing, pointer walks or store order),
   BoxAction, RowUpdate (the image re-reads rect.top after
-  storing it), PlacementAllowed (its final compare and `return 0` blocks
-  swap places; every spelling compiles the same).
+  storing it). PlacementAllowed, listed here once as compiling the same
+  every way, matches since the fifth round below.
   Shape-first pass (2026-10-10, Boran: "ignore register differences if
   the shape is the same"): ranked by a register-masked diff
   ($T/shape.py, reg-reg moves and spills dropped), total 1884 -> about
@@ -167,8 +167,16 @@ main result so far (details in `src/vc6/README.md`):
   `ret` are never cross-jumped (docs/vc6-regalloc.md). The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
-  value the image keeps in memory). FlowRecvMessage's size is mostly the
-  unreconstructed PacketThreadProc inside its scored span. Shorthand read macros and
+  value the image keeps in memory). Fifth round (shape total 1349 -> 1225
+  over 73 -> 69 mismatches): the footprint quartet's stamp window indexed
+  from two coordinate locals at the test and the store (three match, one
+  at 6 bytes); PlacementAllowed's refusals each their own `return 0`
+  (matches); DrawMapObjects 9 -> 0 (the wide arm settles `deep` as the tall
+  arm does); ScriptParseActionRecon 295 -> 243 (one `goto` into the first
+  copy of a repeated return makes it the merge survivor); EncodeGlyph 13 ->
+  10; SelectionClick 14 -> 8 bytes (the drag arm's own tail). Sweeps of
+  goto-to-return, return-to-shared-label (one and two statements), loop and
+  operand forms found nothing else. Shorthand read macros and
   file-local global aliases are gone from `src/game` (2026-10-10, ~640 of
   them), and the globals they re-typed have their real types in
   `globals.h`; every function compiled identically. Left for later:
