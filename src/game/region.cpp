@@ -3273,8 +3273,8 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         pt            = *dest;
         ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
         ob->moveFrom  = *pos;
-        ob->routeGoal = pt;
         ob->moveTo    = pt;
+        ob->routeGoal = pt;
         ob->moveEnd   = 0;
         goto two_waypoints;
     }
