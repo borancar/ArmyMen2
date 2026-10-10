@@ -1407,8 +1407,8 @@ before:
                 n->next->prev = n->prev;
 
             n->prev = e;
-            e->next->prev = n;
             n->next = e->next;
+            e->next->prev = n;
             e->next = n;
             return;
         }
