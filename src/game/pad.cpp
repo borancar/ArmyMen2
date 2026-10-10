@@ -301,10 +301,10 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     int32_t        i;
 
     /* Zeroed in the order the image stores them. */
-    curPad = 0;
+    prevBits = 0;
     curBits = 0;
     prevPad = 0;
-    prevBits = 0;
+    curPad = 0;
     changed = 0;
 
     /* The damage pass, before the early exit. The original indexes the
