@@ -121,7 +121,19 @@ main result so far (details in `src/vc6/README.md`):
   nothing else. FlowRecvMessage's four "Can't find FlowQ" logs share one
   block in the image; ours copies the small return-0 epilogue into each
   site, which leaves nothing to merge. Not solved. `g_attemptCount` and
-  `g_levelAttempt` are two names for 0x512330. The rest of the top of the list is register priority: FindPath
+  `g_levelAttempt` are two names for 0x512330. Fourth round: ParseScenarioPart
+  17 -> 3 (82 -> 48 bytes; the row loop advances `rows` itself, which moves
+  VC6's walking-pointer anchor from pos.y to the row start), and
+  Step3Drive's +0x59C clear now goes through its steering record as the
+  image's does: `AM2_SteerOut` gained `gate` at +0x24 (0x28 bytes) and the
+  object's separate `gate` became `ctl.gate`. Found by scanning every
+  mismatch for the same instruction at a different displacement. The pointer
+  handler globals (`g_pointerPick`, `g_pointerAction`, `g_weaponFnSlot0/1`)
+  and ADDR_WEAPON_HANDLERS are typed as function pointers and records
+  (pointerfn.h), removing 19 casts at use; relink unchanged. A lab clone of
+  FlowRecvMessage shows why its log blocks stay apart: under /O2 VC6 copies
+  a constant-return epilogue into inline predecessors, and blocks that end in
+  `ret` are never cross-jumped (docs/vc6-regalloc.md). The rest of the top of the list is register priority: FindPath
   (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
   (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
   value the image keeps in memory). FlowRecvMessage's size is mostly the
