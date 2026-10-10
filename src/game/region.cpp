@@ -4863,9 +4863,9 @@ score:
                 delta = AngleDelta(look, candBearing);
                 delta = abs(delta);
                 if (delta > g_rankRecords[o->rank].field_04) {
-                    if (g_rankRecords[o->rank].field_08 <= candRange)
-                        continue;
-                    goto in_sight;
+                    if (candRange < g_rankRecords[o->rank].field_08)
+                        goto in_sight;
+                    continue;
                 }
 
                 /* Keyed on the BEARING, not the facing -- see orig.h. */
@@ -4880,10 +4880,10 @@ score:
                     if (his >= mine) {
                         if (candRange > g_sightBlockByDir[dir].low)
                             continue;
-                    } else if (his + AM2_SIGHT_BAND_STEP < mine) {
-                        if (candRange > g_sightBlockByDir[dir].high)
+                    } else if (his + AM2_SIGHT_BAND_STEP >= mine) {
+                        if (candRange > g_sightBlockByDir[dir].mid)
                             continue;
-                    } else if (candRange > g_sightBlockByDir[dir].mid) {
+                    } else if (candRange > g_sightBlockByDir[dir].high) {
                         continue;
                     }
                 } else {
