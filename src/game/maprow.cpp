@@ -115,37 +115,31 @@ static int32_t DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
     int32_t p;
 
     /* Every field is read where it is used, as the image does. */
-#define LA (pa->depthLayer)
-#define LB (pb->depthLayer)
-#define SA (pa->depthSlope)
-#define SB (pb->depthSlope)
-#define AX ((int32_t)pa->pos.x)
-#define AY ((int32_t)pa->pos.y)
-#define BX ((int32_t)pb->pos.x)
-#define BY ((int32_t)pb->pos.y)
     if (!pa || !pb)
         return 0;
 
-    if (LA > 0 && LB > 0) {
-        if (LA > LB)
+    if (pa->depthLayer > 0 && pb->depthLayer > 0) {
+        if (pa->depthLayer > pb->depthLayer)
             return 1;
-        if (LA < LB)
+        if (pa->depthLayer < pb->depthLayer)
             return -1;
     }
 
     /* Each arm answers 1 itself and falls into one shared tail for the rest:
      * less is -1, and a tie goes to the pointers. */
-    if (SA != 0.0f) {
-        if (SB != 0.0f) {
+    if (pa->depthSlope != 0.0f) {
+        if (pb->depthSlope != 0.0f) {
             /* b's y read where it is used, twice, and VC6 keeps it across
              * both projections itself (spilled to the frame). A `by` local
              * instead makes it re-read the field after the first call. */
-            int32_t front = DepthProject(BX - AX, SA, AY) > BY;
+            int32_t front = DepthProject((int32_t)pb->pos.x - (int32_t)pa->pos.x,
+                                         pa->depthSlope, (int32_t)pa->pos.y) > (int32_t)pb->pos.y;
 
-            p = DepthProject(AX - BX, SB, BY);
-            if (AY > p && front)
+            p = DepthProject((int32_t)pa->pos.x - (int32_t)pb->pos.x, pb->depthSlope,
+                             (int32_t)pb->pos.y);
+            if ((int32_t)pa->pos.y > p && front)
                 return 1;
-            if (AY < p && !front)
+            if ((int32_t)pa->pos.y < p && !front)
                 return -1;
             if (pa->pos.y > pb->pos.y)
                 return 1;
@@ -153,17 +147,19 @@ static int32_t DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
                 return -1;
         } else {
             /* Only A has a slope, so only A's projection is available. */
-            p = DepthProject(BX - AX, SA, AY);
-            if (p > BY)
+            p = DepthProject((int32_t)pb->pos.x - (int32_t)pa->pos.x, pa->depthSlope,
+                             (int32_t)pa->pos.y);
+            if (p > (int32_t)pb->pos.y)
                 return 1;
-            if (p < BY)
+            if (p < (int32_t)pb->pos.y)
                 return -1;
         }
-    } else if (SB != 0.0f) {
-        p = DepthProject(AX - BX, SB, BY);
-        if (AY > p)
+    } else if (pb->depthSlope != 0.0f) {
+        p = DepthProject((int32_t)pa->pos.x - (int32_t)pb->pos.x, pb->depthSlope,
+                         (int32_t)pb->pos.y);
+        if ((int32_t)pa->pos.y > p)
             return 1;
-        if (AY < p)
+        if ((int32_t)pa->pos.y < p)
             return -1;
     } else {
         if (pa->pos.y > pb->pos.y)
@@ -173,14 +169,6 @@ static int32_t DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
     }
 
     return (pb < pa) ? 1 : -1;
-#undef LA
-#undef LB
-#undef SA
-#undef SB
-#undef AX
-#undef AY
-#undef BX
-#undef BY
 }
 
 
@@ -1146,15 +1134,13 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         for (x = cl; x <= cr; x++, cell++, used++) {
             /* Re-indexed at each use, the entry and its cell alike, and
              * tested in ObjRemap's order: unlinked, or linked elsewhere. */
-#define entry (&r->buffer[used])
-            if (entry->cell < 0 || entry->cell != cell) {
-                if (entry->cell >= 0)
-                    ListUnlink(entry, &desc->cells[entry->cell]);
-                entry->cell = cell;
-                DepthLink(entry, &desc->cells[cell]);
+            if (r->buffer[used].cell < 0 || r->buffer[used].cell != cell) {
+                if (r->buffer[used].cell >= 0)
+                    ListUnlink((&r->buffer[used]), &desc->cells[r->buffer[used].cell]);
+                r->buffer[used].cell = cell;
+                DepthLink((&r->buffer[used]), &desc->cells[cell]);
             } else
-                DepthResort(entry, &desc->cells[cell]);
-#undef entry
+                DepthResort((&r->buffer[used]), &desc->cells[cell]);
         }
     }
 
@@ -1747,20 +1733,16 @@ void __cdecl SeqCtxInit(AM2_SeqCtx *ctxv, int32_t capacity, int32_t margin,
         am2_malloc((size_t)(capacity * AM2_SEQ_RECORD_SIZE));
 
     /* The record is re-indexed and its row re-read at every use. */
-#define REC (&ctx->records[i])
-#define ROW (REC->row)
     for (i = 0; i < capacity; i++) {
-        REC->id = (int16_t)i;
-        REC->next = -1;
-        REC->prev = -1;
+        ctx->records[i].id = (int16_t)i;
+        ctx->records[i].next = -1;
+        ctx->records[i].prev = -1;
 
-        ROW = (AM2_MapRow *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
-        row = ROW;
+        (ctx->records[i].row) = (AM2_MapRow *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        row = ctx->records[i].row;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
         RowAlloc(w, h, row, g_mapDesc);
     }
-#undef REC
-#undef ROW
 }
 
 /* 0x00460E30. Free every record's row AND the records array itself, then wipe
@@ -1831,8 +1813,6 @@ int32_t __cdecl SeqRetire(AM2_SeqCtx *ctxv, AM2_Seq *recv)
 #define ID(p)   ((p)->id)
 #define NEXT(p) ((p)->next)
 #define PREV(p) ((p)->prev)
-#define TAIL    (ctx->tail)
-#define COUNT   (ctx->count)
     if ((row->flags & 1) != 0) {
         row->flags &= ~1u;
         RowUpdate(row, 0, g_mapDesc);
@@ -1842,11 +1822,11 @@ int32_t __cdecl SeqRetire(AM2_SeqCtx *ctxv, AM2_Seq *recv)
     NEXT(REC(PREV(rec))) = (int16_t)next;
     if (NEXT(rec) > 0)
         PREV(REC(NEXT(rec))) = PREV(rec);
-    if (TAIL == ID(rec))
-        TAIL = PREV(rec);
+    if (ctx->tail == ID(rec))
+        ctx->tail = PREV(rec);
 
-    last = REC(COUNT);
-    if (ID(rec) != COUNT) {
+    last = REC(ctx->count);
+    if (ID(rec) != ctx->count) {
         int32_t freed;
 
         NEXT(REC(PREV(last))) = ID(rec);
@@ -1859,29 +1839,26 @@ int32_t __cdecl SeqRetire(AM2_SeqCtx *ctxv, AM2_Seq *recv)
         memcpy(rec, last, AM2_SEQ_RECORD_SIZE);
         last->row = row;
         ID(rec) = (int16_t)freed;
-        if (TAIL == COUNT)
-            TAIL = freed;
+        if (ctx->tail == ctx->count)
+            ctx->tail = freed;
     }
 
     NEXT(last) = -1;
     PREV(last) = -1;
-    COUNT--;
+    ctx->count--;
 
     return next;
 #undef REC
 #undef ID
 #undef NEXT
 #undef PREV
-#undef TAIL
-#undef COUNT
 }
 
 /* 0x00460FD0. Same two loops as the hardcoded evictor -- drop what the view
  * no longer meets, then drop from the head regardless if that freed too few. */
 void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
 {
-#define ctx (ctxv)
-    int32_t  left = ctx->margin;
+    int32_t  left = ctxv->margin;
     int32_t  i;
 
     /* IT RE-TESTS THE THRESHOLD SeqAlloc ALREADY TESTED, and that is the only
@@ -1893,15 +1870,15 @@ void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
      * It was written from the hardcoded evictor's shape from memory, two
      * commits after recording that these five are a REWRITE and that nothing
      * carries over but the outline. Verified against 0x00460FD3 now. */
-    if (ctx->count
-        <= ctx->capacity
-           - ctx->margin)
+    if (ctxv->count
+        <= ctxv->capacity
+           - ctxv->margin)
         return;
 
     /* The record is addressed afresh at each use, and the walk is a
      * do-while: the head's first link is taken without a test. */
-#define RECB(n) (&ctx->records[n])
-#define RECO(n) (&ctx->records[n])
+#define RECB(n) (&ctxv->records[n])
+#define RECO(n) (&ctxv->records[n])
     i = RECB(0)->next;
     do {
         uint8_t scratch[16];
@@ -1909,7 +1886,7 @@ void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
         if (!orig_intersect_rect(scratch,
                                  (const void *)&g_viewX,
                                  &RECB(i)->row->rect)) {
-            i = SeqRetire(ctx, RECB(i));
+            i = SeqRetire(ctxv, RECB(i));
             if (--left <= 0)
                 break;
         } else {
@@ -1919,12 +1896,11 @@ void __cdecl SeqEvict(AM2_SeqCtx *ctxv)
 
     i = RECB(0)->next;
     while (left > 0) {
-        i = SeqRetire(ctx, RECO(i));
+        i = SeqRetire(ctxv, RECO(i));
         left--;
     }
 #undef RECB
 #undef RECO
-#undef ctx
 }
 
 /* 0x00461070. THE THRESHOLD IS `count > capacity - margin`, not
@@ -2013,8 +1989,6 @@ void __cdecl FreeSeqContexts(void)
 void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 {
     /* The tile flags and the decal sprites are read at each use. */
-#define FLAGS (g_tileFlags)
-#define DECAL ((g_decalSprites)[variant])
     const int32_t *step = g_tileStep8;
     AM2_Point      point;
     const uint8_t *flags;
@@ -2029,7 +2003,7 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     tile = (uint16_t)TileOfPoint(point);
 
     /* The flags pointer is read once for the whole neighbourhood. */
-    flags = FLAGS;
+    flags = g_tileFlags;
     if (flags[tile] & 1)
         return;
     for (n = 0; n < 8; n++) {
@@ -2040,15 +2014,13 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     row = (AM2_MapRow *)*(uint8_t **)RowPoolAAlloc();
 
     row->flags = 1;
-    row->sprite = DECAL;
+    row->sprite = g_decalSprites[variant];
     row->pos.x      = (int16_t)x;
     row->pos.y  = (int16_t)z;
-    row->lut = DECAL->lut;
+    row->lut = g_decalSprites[variant]->lut;
     row->depthLayer = 2;
 
     RowUpdate(row, 0, g_mapDesc);
-#undef FLAGS
-#undef DECAL
 }
 
 /* SpawnParticle -- original 0x004619F0, four callers. Put one particle at a
@@ -2089,7 +2061,6 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
 {
     AM2_Seq       *ctx;
     /* The kind's record, indexed in place. */
-#define KIND ((g_particleKinds)[kind])
     int32_t        half;
     AM2_MapRow       *row;
 
@@ -2100,11 +2071,10 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
     ctx = SeqAlloc(g_seqCtxA);
 
     /* The row is read through the record at every use. */
-#define ROW (ctx->row)
     ctx->kind       = 0;
     ctx->param = kind;
-    ROW->cell = 0;
-    ROW->stamp54 = 0;
+    ctx->row->cell = 0;
+    ctx->row->stamp54 = 0;
 
     half = speed >> 1;
     if (angle < 0) {
@@ -2129,20 +2099,18 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
 
 
     /* The row read once more, for the rest. */
-    row = ROW;
+    row = ctx->row;
     row->flags = 1;
     row->sprite =
-        *KIND.sprites;
+        *g_particleKinds[kind].sprites;
     row->pos.x =
-        (int16_t)(KIND.x + at->x);
+        (int16_t)(g_particleKinds[kind].x + at->x);
     row->pos.y =
-        (int16_t)(KIND.y
+        (int16_t)(g_particleKinds[kind].y
                   + at->y);
-    row->yAdjust             = *(const int16_t *)&KIND.z;
+    row->yAdjust             = *(const int16_t *)&g_particleKinds[kind].z;
     row->depthLayer = 0;
     row->lut = (const void *)(uintptr_t)rowField2C;
-#undef ROW
-#undef KIND
 }
 
 /* DiedEffectA -- original 0x00461B20, one caller. The death spray: six
@@ -2326,7 +2294,6 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
                                int32_t field26)
 {
     /* The group's record, indexed afresh at each use as the image does. */
-#define GRP (g_spriteGroupsC[group])
     AM2_Seq *ctx = SeqAlloc(g_seqCtxB);
     int32_t  step;
     int32_t  frame;
@@ -2338,25 +2305,24 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
     ctx->field0C  = 0;
     ctx->field10  = 0;
 
-    step  = 0x100 / GRP.count;
+    step  = 0x100 / g_spriteGroupsC[group].count;
     frame = ((step >> 1) + angle) / step;
-    if (frame >= GRP.count)
-        frame -= GRP.count;
+    if (frame >= g_spriteGroupsC[group].count)
+        frame -= g_spriteGroupsC[group].count;
     ctx->life = frame;
-    ctx->gate    = GRP.field8;
+    ctx->gate    = g_spriteGroupsC[group].field8;
 
     row = ctx->row;
     row->cell  = 0;
     row->stamp54 = 0;
     row->flags           = 1;
     row->sprite =
-        GRP.sprites[frame];
+        g_spriteGroupsC[group].sprites[frame];
     row->pos.x        = (int16_t)x;
     row->pos.y    = (int16_t)(z + 1);
     row->yAdjust             = 0;
     row->lut = 0;
     row->depthLayer = (int16_t)field26;
-#undef GRP
 }
 
 /* TimedDirFrame -- original 0x00461F90, two callers, both in the missile
@@ -2386,7 +2352,6 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
 int32_t __cdecl TimedDirFrame(AM2_MapRow *rows, uint8_t dir)
 {
     /* The grid's width is re-read at each use, as the image does. */
-#define COLS (g_spriteGridCols)
     AM2_MapRow *r = rows;
     int32_t  elapsed;
     int32_t  col;
@@ -2394,16 +2359,15 @@ int32_t __cdecl TimedDirFrame(AM2_MapRow *rows, uint8_t dir)
     elapsed = (int32_t)((g_gameClockMs
                          - r->stamp54) / 200u);
 
-    col = COLS - 1;
+    col = g_spriteGridCols - 1;
     if (elapsed < col)
         col = elapsed;
 
     r->sprite =
         (g_spriteGrid)
-            [(RoundTo8(dir, 3) & 0xFF) * COLS + col];
+            [(RoundTo8(dir, 3) & 0xFF) * g_spriteGridCols + col];
 
-    return col < COLS - 1;
-#undef COLS
+    return col < g_spriteGridCols - 1;
 }
 
 /* GameSrand -- original 0x00464416, two callers, three instructions. MSVC's

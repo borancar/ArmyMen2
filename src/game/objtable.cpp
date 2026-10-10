@@ -300,20 +300,18 @@ void __cdecl SelectUnit(AM2_Object *obj)
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
-#define REC (g_selectedUids)
     if (!o)
         return;
-    if (REC->count > AM2_MAX_SELECTED)
+    if (g_selectedUids->count > AM2_MAX_SELECTED)
         return;
 
-    for (i = 0; i < REC->count; i++)
-        if (REC->uids[i] == o->uid)
+    for (i = 0; i < g_selectedUids->count; i++)
+        if (g_selectedUids->uids[i] == o->uid)
             return;
 
-    ((AM2_Rec *)REC)->PtrListPush((void *)(uintptr_t)o->uid);
+    ((AM2_Rec *)g_selectedUids)->PtrListPush((void *)(uintptr_t)o->uid);
     o->flags |= OBJ_FLAG_SELECTED;
     OnSelectionChanged(g_zeroPoint);
-#undef REC
 }
 
 /* 0x00427C80, four callers, and the exact counterpart of SelectUnit above --
@@ -335,14 +333,13 @@ void __cdecl DeselectUnit(AM2_Object *obj)
     int32_t  i;
 
     /* The list's count, items and the uid are read again at every use. */
-#define REC (g_selectedUids)
     if (!o)
         return;
 
     i = 0;
-    while (i < REC->count) {
-        if (REC->uids[i] == o->uid) {
-            ((AM2_Rec *)REC)->ListRemoveAt(i);
+    while (i < g_selectedUids->count) {
+        if (g_selectedUids->uids[i] == o->uid) {
+            ((AM2_Rec *)g_selectedUids)->ListRemoveAt(i);
             o->flags &= ~(uint32_t)OBJ_FLAG_SELECTED;
         } else {
             i++;
@@ -351,7 +348,6 @@ void __cdecl DeselectUnit(AM2_Object *obj)
 
     o->flags &= ~(uint32_t)OBJ_FLAG_SELECTED;
     OnSelectionChanged(g_zeroPoint);
-#undef REC
 }
 
 int objtable_install(void)

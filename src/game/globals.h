@@ -687,7 +687,7 @@ const int16_t am2_rl_pillbox_trooper_health;  /* 0x00473E44 */
 #define g_scenarios              (*(AM2_Scenario **)(uintptr_t)ADDR_SCENARIOS)  /* 0x00656334 */
 #define g_scenarioUnread         (*(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD)  /* 0x00656330 */
 #define g_scoreLimit             (*(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT)  /* 0x00515FF0 */
-#define g_screenClip             ((uint8_t *)(uintptr_t)ADDR_SCREEN_CLIP)  /* 0x00485310 */
+#define g_screenClip             (*(AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)  /* 0x00485310 */
 #define g_screenH                (*(int32_t *)(uintptr_t)ADDR_SCREEN_H)  /* 0x004852DC */
 #define g_screenRect             (*(AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)  /* 0x00485330 */
 #define g_screenW                (*(int32_t *)(uintptr_t)ADDR_SCREEN_W)  /* 0x004852D8 */

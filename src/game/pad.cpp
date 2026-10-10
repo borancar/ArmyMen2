@@ -31,14 +31,12 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 };
 #endif
 
-#define kPads        (g_pads)
-#define kPadNumbers  (g_padNumbers)
 #define kPadCount    (*(int32_t *)(uintptr_t)((void *)&g_padCount))
 
 void __cdecl ResetPads(void)
 {
-    memset(kPadNumbers, 0, AM2_PAD_NUMBERS_BYTES);
-    memset(kPads, 0, AM2_PADS_BYTES);
+    memset(g_padNumbers, 0, AM2_PAD_NUMBERS_BYTES);
+    memset(g_pads, 0, AM2_PADS_BYTES);
     kPadCount = 0;
 }
 
@@ -50,8 +48,8 @@ int32_t __cdecl SavePadSection(am2_FILE *fp)
     WriteSaveTag(fp, (uint32_t)kPadCount);
 
     /* Higher address first, which is the order the file wants. */
-    orig_fwrite(kPadNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
-    orig_fwrite(kPads, AM2_PADS_BYTES, 1, fp);
+    orig_fwrite(g_padNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
+    orig_fwrite(g_pads, AM2_PADS_BYTES, 1, fp);
     return 1;
 }
 
@@ -69,8 +67,8 @@ int32_t __cdecl LoadPadSection(am2_FILE *fp)
     orig_fread(&count, 4, 1, fp);
     kPadCount = count;
 
-    orig_fread(kPadNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
-    orig_fread(kPads, AM2_PADS_BYTES, 1, fp);
+    orig_fread(g_padNumbers, AM2_PAD_NUMBERS_BYTES, 1, fp);
+    orig_fread(g_pads, AM2_PADS_BYTES, 1, fp);
     return 1;
 }
 
@@ -115,7 +113,7 @@ void __cdecl ResetPadsAlias(void)
 void __cdecl PadNumberEnter(AM2_Object *obj, AM2_PadNumber *padNumber)
 {
     const AM2_PadNumber *pn = padNumber;
-    AM2_Pad *pads = kPads;
+    AM2_Pad *pads = g_pads;
     int32_t  i    = 0;
 
     if (pn->count <= 0)
@@ -145,7 +143,7 @@ void __cdecl PadNumberEnter(AM2_Object *obj, AM2_PadNumber *padNumber)
 void __cdecl PadNumberLeave(AM2_Object *obj, AM2_PadNumber *padNumber)
 {
     const AM2_PadNumber *pn = padNumber;
-    AM2_Pad *pads = kPads;
+    AM2_Pad *pads = g_pads;
     int32_t  i    = 0;
 
     if (pn->count <= 0)
@@ -164,7 +162,7 @@ void __cdecl PadNumberLeave(AM2_Object *obj, AM2_PadNumber *padNumber)
                              * imul by 76's magic. Element subtraction compiles
                              * to VC6's unsigned exact divide instead. */
                             (int32_t)(((const uint8_t *)pn
-                                       - (const uint8_t *)kPadNumbers)
+                                       - (const uint8_t *)g_padNumbers)
                                       / AM2_PAD_NUMBER_STRIDE));
                     pad->itemCount = 0;
                 }
@@ -294,7 +292,6 @@ void __cdecl PadFinalise(AM2_Pad *pad, AM2_Object *obj)
 int32_t __cdecl ObjTileHook(AM2_Object *obj)
 {
     AM2_Object       *o = (AM2_Object *)obj;
-#define padLayer (g_mapPadLayer)
     const uint8_t *bitLayer;
     uint32_t tile;
     uint32_t       prev;
@@ -306,8 +303,8 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     /* The damage pass, before the early exit. The original indexes the
      * pad layer here WITHOUT the null test both later passes make. */
     tile = o->tile;
-    if (padLayer[tile] > 0) {
-        const AM2_PadNumber *num = &g_padNumbers[padLayer[tile]];
+    if (g_mapPadLayer[tile] > 0) {
+        const AM2_PadNumber *num = &g_padNumbers[g_mapPadLayer[tile]];
 
         if (num->live != 0
             && num->count > 0) {
@@ -358,9 +355,9 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     }
 
     /* And the pad-number layer, which is a separate mechanism. */
-    if (padLayer != 0) {
-        if (tile != 0) curPad  = padLayer[tile];
-        if (prev != 0) prevPad = padLayer[prev];
+    if (g_mapPadLayer != 0) {
+        if (tile != 0) curPad  = g_mapPadLayer[tile];
+        if (prev != 0) prevPad = g_mapPadLayer[prev];
 
         if (curPad != prevPad) {
             if (curPad != 0)
@@ -372,7 +369,6 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
     }
 
     return changed;
-#undef padLayer
 }
 
 

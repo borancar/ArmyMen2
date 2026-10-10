@@ -372,16 +372,15 @@ int32_t __cdecl LoadAtlFile(const char *path)
         MakeBitmap(header, pixels, &rec, (const uint8_t *)0);
         am2_free(pixels);
 
-#define spr (g_mapSprite)
-        spr->image.surface = rec.surface;
-        spr->keyIndex = rec.keyIndex;
-        spr->bounds.top = 0;
-        spr->bounds.left = 0;
-        spr->bounds.right = rec.width;
-        spr->bounds.bottom = rec.height;
-        spr->flags |= 1;
+        g_mapSprite->image.surface = rec.surface;
+        g_mapSprite->keyIndex = rec.keyIndex;
+        g_mapSprite->bounds.top = 0;
+        g_mapSprite->bounds.left = 0;
+        g_mapSprite->bounds.right = rec.width;
+        g_mapSprite->bounds.bottom = rec.height;
+        g_mapSprite->flags |= 1;
 
-        shift = Log2Mask((uint32_t)spr->bounds.right) & 0xFF;
+        shift = Log2Mask((uint32_t)g_mapSprite->bounds.right) & 0xFF;
         g_tileShiftLog = shift;
         if (shift < 1) {
             FreeMapSurfaces();
@@ -395,7 +394,6 @@ int32_t __cdecl LoadAtlFile(const char *path)
         g_mapCache =
             CreateOffscreenSurface(tw << AM2_TILE_SHIFT,
                                    th << AM2_TILE_SHIFT, 0x40, -1);
-#undef spr
     } while (offset < (int32_t)formSize);
 
     orig_fclose(fp);
@@ -622,13 +620,12 @@ typedef struct AM2_DepthNode {
 void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
 {
     AM2_MapRow     *o      = obj;
-#define bounds (&o->rect)
     RECT            clip;
     AM2_Rect        src;
     AM2_Sprite     *spr;
     int32_t         x, y;
 
-    if (!IntersectRect(&clip, (const RECT *)bounds, (const RECT *)world))
+    if (!IntersectRect(&clip, (const RECT *)(&o->rect), (const RECT *)world))
         return;
     if (!(o->flags & MAPOBJ_FLAG_VISIBLE))
         return;
@@ -637,10 +634,10 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
     x = clip.left - g_viewRect->left;
     y = clip.top  - g_viewRect->top;
 
-    src.left   = clip.left   - bounds->left;
-    src.top    = clip.top    - bounds->top;
-    src.right  = clip.right  - bounds->left;
-    src.bottom = clip.bottom - bounds->top;
+    src.left   = clip.left   - o->rect.left;
+    src.top    = clip.top    - o->rect.top;
+    src.right  = clip.right  - o->rect.left;
+    src.bottom = clip.bottom - o->rect.top;
 
     if (src.top == src.bottom)
         return;
@@ -660,7 +657,7 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
             trace = getenv("AM2_TRACE_MAPOBJ") != 0;
         if (trace && AM2_TRACE_ON())
             fprintf(stderr, "MAPOBJ pump %u bounds=%d,%d-%d,%d world=%d,%d-%d,%d clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
-                    (unsigned)am2_host_pump_number(), bounds->left, bounds->top, bounds->right, bounds->bottom,
+                    (unsigned)am2_host_pump_number(), o->rect.left, o->rect.top, o->rect.right, o->rect.bottom,
                     world->left, world->top, world->right, world->bottom,
                     (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
                     (long)(clip.left - g_viewRect->left), (long)(clip.top - g_viewRect->top),
@@ -669,7 +666,6 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
 #endif
 
     DrawSpriteClipped(spr, x, y, &src, 0);
-#undef bounds
 }
 
 /* 0x0041E160 -- insert one object into the depth list, sorted.
@@ -721,10 +717,9 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
      * global and the count re-read, as the original has them. Each exists
      * ONCE in the image: the flag paths jump into the compare paths' copies
      * past their loads, so they are labels here that both reach. */
-#define FRESH (&g_depthNodes[g_depthCount])
 #define LINK_AFTER(at)                                                      \
     do {                                                                    \
-        g_depthCursor = FRESH;                                              \
+        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
         g_depthCursor->prev = (at);                                         \
         g_depthCursor->next = (at)->next;                                   \
         (at)->next = g_depthCursor;                                         \
@@ -732,14 +727,14 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     } while (0)
 #define APPEND(at)                                                          \
     do {                                                                    \
-        g_depthCursor = FRESH;                                              \
+        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
         (at)->next = g_depthCursor;                                         \
         g_depthCursor->prev = (at);                                         \
         g_depthCursor->next = (AM2_DepthNode *)0;                           \
     } while (0)
 #define LINK_BEFORE(at)                                                     \
     do {                                                                    \
-        g_depthCursor = FRESH;                                              \
+        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
         g_depthCursor->prev = (at)->prev;                                   \
         g_depthCursor->next = (at);                                         \
         (at)->prev = g_depthCursor;                                         \
@@ -750,7 +745,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     } while (0)
 #define AT_FRONT(at)                                                        \
     do {                                                                    \
-        g_depthCursor = FRESH;                                              \
+        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
         (at)->prev = g_depthCursor;                                         \
         g_depthCursor->prev = (AM2_DepthNode *)0;                           \
         g_depthCursor->next = (at);                                         \
@@ -779,10 +774,10 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     cmp = DepthCompare(obj, g_depthCursor->obj);
 
     if (cmp == 0) {
-        FRESH->prev = g_depthCursor;
-        FRESH->next = g_depthCursor->next;
-        g_depthCursor->next = FRESH;
-        g_depthCursor = FRESH;
+        g_depthNodes[g_depthCount].prev = g_depthCursor;
+        g_depthNodes[g_depthCount].next = g_depthCursor->next;
+        g_depthCursor->next = &g_depthNodes[g_depthCount];
+        g_depthCursor = &g_depthNodes[g_depthCount];
         if (g_depthCursor->next)
             g_depthCursor->next->prev = g_depthCursor;
         goto done;
@@ -826,7 +821,6 @@ done:
 #undef LINK_BEFORE
 #undef APPEND
 #undef LINK_AFTER
-#undef FRESH
 }
 
 /* 0x0041E440 -- the map's OBJECT painter: collect, sort, draw, and split the
@@ -1206,18 +1200,17 @@ void __cdecl ScrollMapCache(void)
         int32_t  sx = (dx > 0) ? dx : 0;
         AM2_Rect tiles;
         /* The positive part of dy is recomputed at each use. */
-#define sy ((dy > 0) ? dy : 0)
         int32_t  dstX, dstY;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
         tiles.left   = sx;
-        tiles.bottom = g_camera->bottom - ady - g_camera->top + sy;
+        tiles.bottom = g_camera->bottom - ady - g_camera->top + ((dy > 0) ? dy : 0);
         tiles.right  = g_camera->right - adx - g_camera->left + sx;
         tiles.top    = (0 < dy) ? dy : 0;   /* spelled as the image compares it */
 
         src.left   = sx << TILE_SHIFT;
-        src.top    = sy << TILE_SHIFT;
+        src.top    = ((dy > 0) ? dy : 0) << TILE_SHIFT;
         dstX       = ((dx > 0) ? 0 : -dx) << TILE_SHIFT;
         dstY       = ((dy > 0) ? 0 : -dy) << TILE_SHIFT;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
@@ -1226,7 +1219,6 @@ void __cdecl ScrollMapCache(void)
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
                                    cache, (LPRECT)&src, DDBLTFAST_WAIT);
-#undef sy
     }
 
     wide.left  = g_camera->left;
@@ -1360,17 +1352,17 @@ static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
     if (y0 > y1)
         NullStub(y0, y1);
 
-    if (x < (*(const AM2_Rect *)g_screenClip).left || x >= (*(const AM2_Rect *)g_screenClip).right)
+    if (x < g_screenClip.left || x >= g_screenClip.right)
         return;
 
-    if (y0 >= (*(const AM2_Rect *)g_screenClip).bottom || y1 < (*(const AM2_Rect *)g_screenClip).top)
+    if (y0 >= g_screenClip.bottom || y1 < g_screenClip.top)
         return;
 
-    if (y0 < (*(const AM2_Rect *)g_screenClip).top)
-        y0 = (*(const AM2_Rect *)g_screenClip).top;
+    if (y0 < g_screenClip.top)
+        y0 = g_screenClip.top;
 
-    if (y1 >= (*(const AM2_Rect *)g_screenClip).bottom)
-        y1 = (*(const AM2_Rect *)g_screenClip).bottom - 1;
+    if (y1 >= g_screenClip.bottom)
+        y1 = g_screenClip.bottom - 1;
 
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
@@ -1413,17 +1405,17 @@ static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
     if (x0 > x1)
         NullStub(x0, x1);
 
-    if (y < (*(const AM2_Rect *)g_screenClip).top || y >= (*(const AM2_Rect *)g_screenClip).bottom)
+    if (y < g_screenClip.top || y >= g_screenClip.bottom)
         return;
 
-    if (x0 >= (*(const AM2_Rect *)g_screenClip).right || x1 < (*(const AM2_Rect *)g_screenClip).left)
+    if (x0 >= g_screenClip.right || x1 < g_screenClip.left)
         return;
 
-    if (x0 < (*(const AM2_Rect *)g_screenClip).left)
-        x0 = (*(const AM2_Rect *)g_screenClip).left;
+    if (x0 < g_screenClip.left)
+        x0 = g_screenClip.left;
 
-    if (x1 >= (*(const AM2_Rect *)g_screenClip).right)
-        x1 = (*(const AM2_Rect *)g_screenClip).right - 1;
+    if (x1 >= g_screenClip.right)
+        x1 = g_screenClip.right - 1;
 
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
@@ -1493,7 +1485,7 @@ void __cdecl DrawRectFast(const AM2_Rect *r, uint8_t colour)
         return;
 
     if (!IntersectRect((RECT *)&vis, (const RECT *)r,
-                       (const RECT *)g_screenClip))
+                       (const RECT *)&g_screenClip))
         return;
 
     width  = vis.right - vis.left + 1;
@@ -1596,7 +1588,6 @@ int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
                             self->owner);
 
     /* Two four-way switches, and the key read again for the second test. */
-#define KEY (self->aai->key)
     if (ObjIsType4(obj)) {
         switch (self->typeRec->kind) {
         case AM2_RADAR_KIND_FIRST + 0: colour = 0; break;
@@ -1605,8 +1596,8 @@ int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
         case AM2_RADAR_KIND_FIRST + 3: colour = 3; break;
         }
     } else if (ObjIsItem(obj)) {
-        if (KeyFieldA(KEY) == AM2_RADAR_KEY_TAG) {
-            switch (KeyFieldB(KEY)) {
+        if (KeyFieldA(self->aai->key) == AM2_RADAR_KEY_TAG) {
+            switch (KeyFieldB(self->aai->key)) {
             case AM2_RADAR_KEY_FIRST + 0: colour = 0; break;
             case AM2_RADAR_KEY_FIRST + 1: colour = 1; break;
             case AM2_RADAR_KEY_FIRST + 2: colour = 2; break;
@@ -1614,7 +1605,6 @@ int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
             }
         }
     }
-#undef KEY
 
     *blink = 0;
 
@@ -1849,19 +1839,15 @@ void __cdecl ViewUpdate(void)
     int32_t h     = g_blitRect->bottom - g_blitRect->top;
     int32_t halfW = w >> 1;
     /* The map bounds are read from their globals at each clamp. */
-#define BOUND_L (g_mapBoundsLeft)
-#define BOUND_T (g_mapBoundsTop)
-#define BOUND_R (g_mapBoundsRight)
-#define BOUND_B (g_mapBoundsBottom)
     int32_t dist, step, dx, dy;
     int16_t tx;                     /* where the eye goes this frame */
     AM2_Point vpt;
     void   *obj;
 
-    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, (w >> 1) + BOUND_L,
-                                    BOUND_R - halfW - 1);
-    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + BOUND_T,
-                                    BOUND_B - (h >> 1) - 1);
+    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, (w >> 1) + g_mapBoundsLeft,
+                                    g_mapBoundsRight - halfW - 1);
+    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, (h >> 1) + g_mapBoundsTop,
+                                    g_mapBoundsBottom - (h >> 1) - 1);
 
     obj = g_objCtxObj;
     if (obj) {
@@ -1909,8 +1895,8 @@ void __cdecl ViewUpdate(void)
     tx = (int16_t)(dx + VIEW_EYE->x);
 
 clamp_eye:
-    vpt.x = (int16_t)Clamp(tx, halfW + BOUND_L, BOUND_R - halfW - 1);
-    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + BOUND_T, BOUND_B - (h >> 1) - 1);
+    vpt.x = (int16_t)Clamp(tx, halfW + g_mapBoundsLeft, g_mapBoundsRight - halfW - 1);
+    vpt.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapBoundsTop, g_mapBoundsBottom - (h >> 1) - 1);
 
     {
         int32_t *world  = g_secondRect;
@@ -1935,10 +1921,6 @@ clamp_eye:
                       (const RECT *)origin,
                       (const RECT *)g_mapBounds);
     }
-#undef BOUND_B
-#undef BOUND_R
-#undef BOUND_T
-#undef BOUND_L
 #undef origin
 }
 
@@ -1958,9 +1940,6 @@ clamp_eye:
  * The colour is a byte read from its own global rather than passed in. */
 void __cdecl DrawViewRect(void)
 {
-#define BOX ((const AM2_Rect *)g_viewRect_)
-#define OX  (g_viewX)
-#define OY  (g_viewY)
     AM2_Rect on_screen;
 
     if (g_viewRectOn == 0)
@@ -1969,16 +1948,13 @@ void __cdecl DrawViewRect(void)
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
         return;
 
-    on_screen.left   = BOX->left   - OX;
-    on_screen.top    = BOX->top    - OY;
-    on_screen.right  = BOX->right  - OX;
-    on_screen.bottom = BOX->bottom - OY;
+    on_screen.left   = ((const AM2_Rect *)g_viewRect_)->left   - g_viewX;
+    on_screen.top    = ((const AM2_Rect *)g_viewRect_)->top    - g_viewY;
+    on_screen.right  = ((const AM2_Rect *)g_viewRect_)->right  - g_viewX;
+    on_screen.bottom = ((const AM2_Rect *)g_viewRect_)->bottom - g_viewY;
 
     DrawRect(&on_screen, g_hiliteColour);
     UnlockSurface();
-#undef BOX
-#undef OX
-#undef OY
 }
 
 /* DrawSelection -- original 0x00462120, one caller.
@@ -2109,13 +2085,10 @@ void __cdecl DrawSelection(void)
             }
         }
 
-#define max (obj->maxHealth)
-#define hp  (obj->health)
+        if (obj->maxHealth / 2 < wide)
+            wide = obj->maxHealth / 2;
 
-        if (max / 2 < wide)
-            wide = max / 2;
-
-        fill = hp > 0 ? hp * wide / max : wide;
+        fill = obj->health > 0 ? obj->health * wide / obj->maxHealth : wide;
 
         x -= wide / 2;
 
@@ -2132,9 +2105,9 @@ void __cdecl DrawSelection(void)
         box.right  = x + fill;
         box.bottom = y + drop + 3;
 
-        if (hp <= (int16_t)(max >> 2))
+        if (obj->health <= (int16_t)(obj->maxHealth >> 2))
             ink = g_hudColour;
-        else if (hp <= (int16_t)(max >> 1))
+        else if (obj->health <= (int16_t)(obj->maxHealth >> 1))
             ink = g_colourLagMid;
         else
             ink = g_hiliteColour;
@@ -2145,8 +2118,6 @@ void __cdecl DrawSelection(void)
         ClearRegion(&box, g_listInkHotSel);
 
         i++;
-#undef max
-#undef hp
     }
 
     UnlockSurface();
@@ -2201,13 +2172,10 @@ void __cdecl DrawSelection(void)
  */
 void __cdecl AirFrameDraw(void)
 {
-#define air (g_airSaveBlock)
-#define gauge (g_airSprites2)
-#define step (g_frameDeltaMs)
 
     /* Nothing to draw the gauge with means nothing to draw at all -- the
      * original gives up before it even takes the lock. */
-    if (!gauge || (!gauge->image.rle16 && !gauge->overlay))
+    if (!g_airSprites2 || (!g_airSprites2->image.rle16 && !g_airSprites2->overlay))
         return;
 
     if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
@@ -2216,9 +2184,9 @@ void __cdecl AirFrameDraw(void)
     AirPassesDraw();
 
     /* --- the caller's own animation, on AIR_OFF_FLAG_B ------------------ */
-    if (air->flagB > 0) {
+    if (g_airSaveBlock->flagB > 0) {
         AM2_Object *obj = LookupByUID(
-            (uint32_t)air->extra[0]);
+            (uint32_t)g_airSaveBlock->extra[0]);
 
         if (obj->health > 0) {
             if (g_gameClockMs
@@ -2241,67 +2209,60 @@ void __cdecl AirFrameDraw(void)
                                 obj->pos.y);
             }
 
-            air->flagB += step;
+            g_airSaveBlock->flagB += g_frameDeltaMs;
 
-            if (air->flagB
+            if (g_airSaveBlock->flagB
                     >= g_airCycleMs) {
-                air->flagB = 0;
+                g_airSaveBlock->flagB = 0;
                 ChangeObjectFrame(obj, 0, 1);
             }
         }
     }
 
     /* --- the gauge, on AIR_OFF_ACTIVE ----------------------------------- */
-    if (air->active > 0) {
-#define t     (air->active)
-#define track (g_airSpritesEdge)
-#define span  (g_airGaugeMs)
+    if (g_airSaveBlock->active > 0) {
         int32_t x, y;
 
         y = (int32_t)((double)g_airGaugeY0
-                      - (double)track * (double)t
+                      - (double)g_airSpritesEdge * (double)g_airSaveBlock->active
                         * g_airGaugeSlope
-                        / (double)span);
-        x = track * t / span
+                        / (double)g_airGaugeMs);
+        x = g_airSpritesEdge * g_airSaveBlock->active / g_airGaugeMs
             + g_airGaugeX0;
 
-        DrawSprite(gauge, x, y, 0);
+        DrawSprite(g_airSprites2, x, y, 0);
 
-        air->active += step;
+        g_airSaveBlock->active += g_frameDeltaMs;
 
         /* The reveal happens ONCE, halfway along, and only for the army that
          * asked -- AIR_OFF_PENDING is what says it has been done. Reading it
          * as "one is queued" survived because nothing else writes it here. */
-        if (UidArmy(air->from[0])
+        if (UidArmy(g_airSaveBlock->from[0])
                 == g_defaultOwner
-            && air->extra[0] == 0
-            && air->pending == 0
-            && air->active >= (span >> 1)) {
+            && g_airSaveBlock->extra[0] == 0
+            && g_airSaveBlock->pending == 0
+            && g_airSaveBlock->active >= (g_airGaugeMs >> 1)) {
 
-            if (air->kind[0] == 2)
-                RevealNearby(air->where[0],
+            if (g_airSaveBlock->kind[0] == 2)
+                RevealNearby(g_airSaveBlock->where[0],
                              AM2_AIR_REVEAL_NEAR_2, AM2_AIR_REVEAL_FAR_2);
             else
-                RevealNearby(air->where[0],
+                RevealNearby(g_airSaveBlock->where[0],
                              AM2_AIR_REVEAL_NEAR_3, AM2_AIR_REVEAL_FAR_3);
 
-            air->pending = 1;
+            g_airSaveBlock->pending = 1;
         }
 
-        if (air->active >= span) {
+        if (g_airSaveBlock->active >= g_airGaugeMs) {
             AirDeliver();
             AirSupportPop();
         }
     }
-#undef t
-#undef track
-#undef span
 
     /* --- the aircraft, on AIR_OFF_FLAG_A -------------------------------- */
-    if (air->flagA > 0) {
-        int32_t t     = air->flagA;
+    if (g_airSaveBlock->flagA > 0) {
+        int32_t t     = g_airSaveBlock->flagA;
         int32_t leg1  = g_airLeg1Ms;
-#define leg2 (g_airLeg2Ms)
         int32_t frame = 0;
         int32_t x, y;
 
@@ -2310,7 +2271,7 @@ void __cdecl AirFrameDraw(void)
                 + g_airLeg1X0;
             y = g_airPathInY
                 - g_airLeg1Dy * t / leg1;
-        } else if (t < leg2) {
+        } else if (t < g_airLeg2Ms) {
             int32_t into = t - leg1;
             int32_t half = g_airLeg2MsSpan;
             double  off;
@@ -2335,15 +2296,13 @@ void __cdecl AirFrameDraw(void)
             orig_log("Air frame %d, pt %d,%d\n",
                      frame, x, y);
         } else {
-#define into (t - leg2)
-            int32_t span = g_airRunMs - leg2;
+            int32_t span = g_airRunMs - g_airLeg2Ms;
 
             x = g_airPathAwayX
-                - g_airLeg3Dx * into / span;
+                - g_airLeg3Dx * (t - g_airLeg2Ms) / span;
             y = g_airPathTurnYOut
-                - g_airLeg3Dy * into / span;
+                - g_airLeg3Dy * (t - g_airLeg2Ms) / span;
             frame = AM2_AIR_FRAMES - 1;
-#undef into
         }
 
         {
@@ -2357,18 +2316,14 @@ void __cdecl AirFrameDraw(void)
                        0);
         }
 
-        air->flagA += step;
+        g_airSaveBlock->flagA += g_frameDeltaMs;
 
-        if (air->flagA
+        if (g_airSaveBlock->flagA
                 >= g_airRunMs)
             AirSupportPop();
     }
 
     UnlockSurface();
-#undef step
-#undef gauge
-#undef leg2
-#undef air
 }
 
 /* DrawEffectLayer -- original 0x004123D0, one caller.
@@ -2461,7 +2416,7 @@ void __cdecl DrawEffectLayer(void)
             box.top    = ptA->y + AM2_AIM_BOX_TOP;
             box.bottom = ptA->y + AM2_AIM_BOX_BOTTOM;
 
-            if (IntersectRect(&hit, &box, (const RECT *)g_screenClip)) {
+            if (IntersectRect(&hit, &box, (const RECT *)&g_screenClip)) {
                 int32_t row, col;
 
                 /* Read: every pixel of the visible part of the block, taken from
@@ -2944,16 +2899,14 @@ int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out)
     /* The rows and columns come from the low words; the row advance below
      * uses the tiles as TileOfPoint returned them. The row shift and the map
      * width are read again at every use. */
-#define SHIFT (*(const uint32_t *)&g_mapRowShift & 0xFFFF)
-#define MAP_W (g_mapTilesW)
     best  = AM2_BOAT_EXIT_MAX;
     first = (uint32_t)startTile & 0xFFFF;
     last  = (uint32_t)endTile & 0xFFFF;
-    row   = (int32_t)(first >> SHIFT);
-    if (row <= (int32_t)(last >> SHIFT)) {
+    row   = (int32_t)(first >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF));
+    if (row <= (int32_t)(last >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))) {
     tile = startTile;
     do {
-        for (col = (MAP_W - 1) & first; col <= (int32_t)((MAP_W - 1) & last);
+        for (col = (g_mapTilesW - 1) & first; col <= (int32_t)((g_mapTilesW - 1) & last);
              col++) {
             /* Signed, as the image's `jge`. */
             if ((g_cellWeights)
@@ -2968,14 +2921,12 @@ int32_t __cdecl BoatExitPoint(AM2_Object *vehicle, AM2_Point *out)
             tile++;
         }
 
-        tile += ((MAP_W - 1) & startTile) - ((MAP_W - 1) & endTile) + MAP_W - 1;
+        tile += ((g_mapTilesW - 1) & startTile) - ((g_mapTilesW - 1) & endTile) + g_mapTilesW - 1;
         row++;
-    } while (row <= (int32_t)(last >> SHIFT));
+    } while (row <= (int32_t)(last >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF)));
     if (best < AM2_BOAT_EXIT_MAX)
         return 1;
     }
-#undef SHIFT
-#undef MAP_W
 
     return 0;
 }

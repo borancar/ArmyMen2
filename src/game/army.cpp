@@ -521,24 +521,22 @@ void __cdecl ObjAttachTo(AM2_Object *s, AM2_Object *t)
 
     if (old && (h = LookupByUID(old)) != (AM2_Object *)0
         && ObjIsTypeIn238Inline(h)) {
-#define LIST (&h->followers)
         i = 0;
-        while (i < LIST->count) {
-            if (LIST->uids[i] == s->uid) {
-                ((AM2_Rec *)LIST)->ListRemoveAt(i);
+        while (i < h->followers.count) {
+            if (h->followers.uids[i] == s->uid) {
+                ((AM2_Rec *)(&h->followers))->ListRemoveAt(i);
                 continue;               /* the next one shifted into i */
             }
             other = LookupByUID(
-                        LIST->uids[i]);
+                        h->followers.uids[i]);
             if (!other) {
-                ((AM2_Rec *)LIST)->ListRemoveAt(i);
+                ((AM2_Rec *)(&h->followers))->ListRemoveAt(i);
                 continue;
             }
             if (ObjIsTypeIn238Inline(other))
                 other->formationSlot = i;
             i++;
         }
-#undef LIST
     }
 
     if (t) {

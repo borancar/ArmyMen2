@@ -398,18 +398,17 @@ int32_t __cdecl SaveDefaultCof(void)
     WriteSaveTag(fp, AM2_SAVETAG_COF);
 
     /* The army's list is re-read through its slot at each use. */
-#define LIST (g_armyObjLists[g_defaultOwner])
     i = 0;
     for (;;) {
         AM2_Object *obj;
 
-        if (i >= LIST->count)
+        if (i >= g_armyObjLists[g_defaultOwner]->count)
             break;
 
         obj = LookupByUID(
-                  LIST->uids[i]);
+                  g_armyObjLists[g_defaultOwner]->uids[i]);
         if (!obj) {
-            ((AM2_Rec *)LIST)->ListRemoveAt(i);
+            ((AM2_Rec *)g_armyObjLists[g_defaultOwner])->ListRemoveAt(i);
             continue;
         }
 
@@ -460,7 +459,6 @@ int32_t __cdecl SaveDefaultCof(void)
 
         i++;
     }
-#undef LIST
 
 
     WriteSaveTag(fp, AM2_SAVE_TAG_END);
@@ -828,8 +826,6 @@ void __cdecl ShowInfoMp(void)
     *on = (*on == 0) ? 1 : 0;
 }
 
-#define kItemHeaderSize (g_itemHeaderSize)
-
 typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
 
 /* 0x00428730 and 0x004289B0 -- the two halves of the object HEADER, and the
@@ -851,13 +847,13 @@ typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveItemHeader(am2_FILE *fp, AM2_Object *obj)
 {
     WriteSaveTag(fp, AM2_ITEM_HEADER_TAG);
-    orig_fwrite(obj, (size_t)kItemHeaderSize, 1, fp);
+    orig_fwrite(obj, (size_t)g_itemHeaderSize, 1, fp);
     return 1;
 }
 
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, AM2_Object *hdr)
 {
-    orig_fread(hdr, (size_t)kItemHeaderSize, 1, fp);
+    orig_fread(hdr, (size_t)g_itemHeaderSize, 1, fp);
     return 1;
 }
 
@@ -976,24 +972,21 @@ int32_t __cdecl PlaceScenario(void)
         return 0;
 
     /* The comm object is read afresh at each use. */
-#define comm (*(void * *)&g_commObject)
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
         AM2_ScenPart *part = &scen->parts[slot];
         AM2_ScenRow  *row;
-#define n (part->count)
         int32_t  army;
         int32_t  i;
 
         if (g_mpSession != 0
-            && !CommWasHereForArmy(comm, slot))
+            && !CommWasHereForArmy((*(void * *)&g_commObject), slot))
             continue;
 
-        army = ((AM2_Comm *)comm)->CommSlotForArmy(slot);
+        army = ((AM2_Comm *)(*(void * *)&g_commObject))->CommSlotForArmy(slot);
 
         row = part->rows;
-        for (i = 0; i < n; row++, i++) {
+        for (i = 0; i < part->count; row++, i++) {
             AM2_Object *unit;
-#define KIND (row->kind)
             int32_t  amount;
             int32_t  flags;
 
@@ -1021,7 +1014,7 @@ int32_t __cdecl PlaceScenario(void)
                 flags = 4;
             if (g_haveDefaultCof
                 && (uint32_t)army == g_defaultOwner) {
-                if (KIND == AM2_SCEN_KIND_LEADER) {
+                if (row->kind == AM2_SCEN_KIND_LEADER) {
                     uint8_t amt;
 
                     (void)LookupOwnerObj(g_defaultOwner);
@@ -1052,7 +1045,7 @@ int32_t __cdecl PlaceScenario(void)
                        row->name,
                        row->pos.x,
                        row->pos.y,
-                       ((AM2_Comm *)comm)->CommArmyOfSlot(army), army,
+                       ((AM2_Comm *)(*(void * *)&g_commObject))->CommArmyOfSlot(army), army,
                        flags,
                        1, 0, 1, 0);
 
@@ -1067,7 +1060,7 @@ int32_t __cdecl PlaceScenario(void)
                          ? 1 : row->amount;
             unit->facingCopy = (uint8_t)amount;
 
-            if (KIND == AM2_SCEN_KIND_LEADER) {
+            if (row->kind == AM2_SCEN_KIND_LEADER) {
                 AM2_Object *w = CreateWeapon(g_dirScratch,
                                        army,
                                        KeyLookupTriple(0x2D, 9, 0),
@@ -1097,7 +1090,7 @@ int32_t __cdecl PlaceScenario(void)
             } else {
                 AM2_Object *w = CreateWeapon(g_dirScratch,
                                        army,
-                                       KeyLookupTriple(0x2D, ScenRowWeapon(KIND), 0),
+                                       KeyLookupTriple(0x2D, ScenRowWeapon(row->kind), 0),
                                        g_zeroPoint,
                                        4, -1, 1, 0);
 
@@ -1133,18 +1126,17 @@ int32_t __cdecl PlaceScenario(void)
         SelectUnit(lead);
 
         /* Our army's list, re-read from the table at every use. */
-#define list (g_armyObjLists[g_defaultOwner])
         while (1) {         /* not `for (;;)`, which VC6 rotates */
             AM2_Object  *obj;
 
-            if (i >= list->count)
+            if (i >= g_armyObjLists[g_defaultOwner]->count)
                 break;
 
             obj = LookupByUID(
-                      list->uids[i]);
+                      g_armyObjLists[g_defaultOwner]->uids[i]);
             if (!obj) {
                 /* A stale uid is REMOVED and the index does not advance. */
-                ((AM2_Rec *)list)->ListRemoveAt(i);
+                ((AM2_Rec *)g_armyObjLists[g_defaultOwner])->ListRemoveAt(i);
                 continue;
             }
             /* The script state is reset for every unit the first three tests
@@ -1177,13 +1169,9 @@ int32_t __cdecl PlaceScenario(void)
             }
             i++;
         }
-#undef list
     }
 done:
     return 1;
-#undef n
-#undef comm
-#undef KIND
 }
 
 void __cdecl ResetLevelState(void)
@@ -1374,16 +1362,14 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
         }
     }
 
-#define orows (o->rowSet.rows)
-
     if (o->def->kind == 3) {
-        orows->animCur = (AM2_AnimTable *)0;
-        orows->depthLayer =
+        o->rowSet.rows->animCur = (AM2_AnimTable *)0;
+        o->rowSet.rows->depthLayer =
             (int16_t)(ScaleBy32Blocks(o->row0YAdjust) + AM2_MISSILE_ROW26_BIAS);
-        orows->heading = (uint8_t)heading;
-        orows->stamp54 =
+        o->rowSet.rows->heading = (uint8_t)heading;
+        o->rowSet.rows->stamp54 =
             g_gameClockMs;
-        TimedDirFrame(orows, heading);
+        TimedDirFrame(o->rowSet.rows, heading);
 
         if (w->deadlineD0) {
             AM2_Object *prev = LookupByUID(w->deadlineD0);
@@ -1398,15 +1384,14 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
         w->deadlineD0 =
             (o)->uid;
     } else {
-        orows->animCur =
+        o->rowSet.rows->animCur =
             g_missileAnims;
-        orows->depthLayer =
+        o->rowSet.rows->depthLayer =
             (int16_t)(ScaleBy32Blocks(o->row0YAdjust) + AM2_MISSILE_ROW26_BIAS);
-        orows->heading = (uint8_t)heading;
-        SetAnimFrame(orows, (int16_t)frame, 1);
+        o->rowSet.rows->heading = (uint8_t)heading;
+        SetAnimFrame(o->rowSet.rows, (int16_t)frame, 1);
     }
     return o;
-#undef orows
 }
 
 /* LoadType5 -- original 0x0043B870, one caller, and the MISSILE member of the
@@ -1482,14 +1467,12 @@ AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
                 g_zeroRect);
 
     /* The row pointer is re-read at every use. */
-#define ROWS (o->rowSet.rows)
-    ROWS->animCur =
+    o->rowSet.rows->animCur =
         g_missileAnims;
-    ROWS->depthLayer = AM2_ROW_FIELD26_INIT;
-    ROWS->heading = o->facing;
+    o->rowSet.rows->depthLayer = AM2_ROW_FIELD26_INIT;
+    o->rowSet.rows->heading = o->facing;
 
-    SetAnimFrame(ROWS, (int16_t)frame, 1);
-#undef ROWS
+    SetAnimFrame(o->rowSet.rows, (int16_t)frame, 1);
     return o;
 }
 
@@ -2030,7 +2013,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
     memcpy(blockA, &obj->box, sizeof blockA);
     memcpy(blockB, &obj->hit, sizeof blockB);
 
-    memcpy(obj, hdr, (size_t)kItemHeaderSize);
+    memcpy(obj, hdr, (size_t)g_itemHeaderSize);
     memcpy(&obj->field94, whole.rec, AM2_TYPE1_RECORD_SIZE);
     obj->field94 = ownRec;
 
@@ -2254,7 +2237,7 @@ AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
                obj.rec.damage,
                0, 1, (int32_t)h->uid, 0);
 
-    memcpy(made, h, (size_t)kItemHeaderSize);
+    memcpy(made, h, (size_t)g_itemHeaderSize);
     CopyTypeRecord(&made->field94, &obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
@@ -2289,7 +2272,7 @@ AM2_Object *__cdecl LoadType7(am2_FILE *fp, const AM2_Object *hdr)
     if (!made)
         return (AM2_Object *)0;
 
-    memcpy(made, h, (size_t)kItemHeaderSize);
+    memcpy(made, h, (size_t)g_itemHeaderSize);
     return (AM2_Object *)made;
 }
 

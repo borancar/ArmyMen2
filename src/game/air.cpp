@@ -112,12 +112,10 @@ extern "C" const int16_t am2_air_path_away_x     = 300; /* 0x00473F70 */
  * stay at their writable .origdat placement rather than a read-only C const. */
 #endif
 
-#define kAirSaveBlock (g_airSaveBlock)
-
 int32_t __cdecl SaveAirSection(am2_FILE *fp)
 {
     WriteSaveTag(fp, AM2_SAVETAG_AIR);
-    orig_fwrite(kAirSaveBlock, AM2_AIR_SAVE_SIZE, 1, fp);
+    orig_fwrite(g_airSaveBlock, AM2_AIR_SAVE_SIZE, 1, fp);
     return 1;
 }
 
@@ -127,7 +125,7 @@ int32_t __cdecl LoadAirSection(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\air.cpp", 0x28B))
         return 0;
 
-    orig_fread(kAirSaveBlock, AM2_AIR_SAVE_SIZE, 1, fp);
+    orig_fread(g_airSaveBlock, AM2_AIR_SAVE_SIZE, 1, fp);
     return 1;
 }
 
@@ -141,15 +139,15 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 /* Every one of these is a field of the block above -- the queue and the
  * savegame section are the same 584 bytes, which is why they are written as
  * offsets rather than as addresses of their own. */
-#define g_airActive  (kAirSaveBlock->active)
-#define g_airPending (kAirSaveBlock->pending)
-#define g_airCount   (kAirSaveBlock->count)
-#define g_airWhere   (kAirSaveBlock->where)
-#define g_airKind    (kAirSaveBlock->kind)
-#define g_airFrom    (kAirSaveBlock->from)
-#define g_airExtra   (kAirSaveBlock->extra)
-#define g_airFlagA   (kAirSaveBlock->flagA)
-#define g_airFlagB   (kAirSaveBlock->flagB)
+#define g_airActive  (g_airSaveBlock->active)
+#define g_airPending (g_airSaveBlock->pending)
+#define g_airCount   (g_airSaveBlock->count)
+#define g_airWhere   (g_airSaveBlock->where)
+#define g_airKind    (g_airSaveBlock->kind)
+#define g_airFrom    (g_airSaveBlock->from)
+#define g_airExtra   (g_airSaveBlock->extra)
+#define g_airFlagA   (g_airSaveBlock->flagA)
+#define g_airFlagB   (g_airSaveBlock->flagB)
 
 typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
 #define orig_get_tick_count \
@@ -212,9 +210,8 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq)
     /* The records are addressed through the live count at every use; the
      * match is handled out of line, after the append, as the image lays it
      * out. */
-#define NCOUNT (p->nackCount)
 #define NREC(k) (&p->nacks[(uint32_t)(k)])
-    count = NCOUNT;
+    count = p->nackCount;
     if (count) {
         for (i = 0; i < count; i++)
             if (NREC(i)->seq == seq)
@@ -225,14 +222,14 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq)
         int32_t first = p->duplicates
                         < (p->nacksSent >> 1);
 
-        NREC(NCOUNT)->seq   = seq;
-        NREC(NCOUNT)->time  = now;
-        NREC(NCOUNT)->count = first ? 1 : 0;
+        NREC(p->nackCount)->seq   = seq;
+        NREC(p->nackCount)->time  = now;
+        NREC(p->nackCount)->count = first ? 1 : 0;
 
-        if (++NCOUNT >= AM2_NACK_RECS_MAX) {
-            NCOUNT--;
+        if (++p->nackCount >= AM2_NACK_RECS_MAX) {
+            p->nackCount--;
             am2_log(" Nack Rec Array full for ID %x, %d\n",
-                    p->id, NCOUNT);
+                    p->id, p->nackCount);
         }
         return first;
     }
@@ -256,7 +253,6 @@ found:
         return 0;
     }
 #undef NREC
-#undef NCOUNT
 }
 
 /* Forward-declared rather than included: ObjectsInRect lives in
@@ -645,7 +641,6 @@ void __cdecl FormationPointFar(AM2_Object *follower, AM2_Object *leader, AM2_Poi
 void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point *out,
                             int32_t slot)
 {
-#define l (leader)
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
@@ -659,22 +654,22 @@ void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point 
         return;
     }
 
-    out->x = l->pos.x;
-    out->y = l->pos.y;
+    out->x = leader->pos.x;
+    out->y = leader->pos.y;
 
     /* One arm per type, 2 and 8 written out twice: the code is merged, but
      * the extra assignment decides which argument slots the spills reuse. */
-    switch (*(const int32_t *)l) {
+    switch (*(const int32_t *)leader) {
     case 3:
-        leaderFacing = l->facing;
+        leaderFacing = leader->facing;
         shift        = 1;
         break;
     case 2:
-        leaderFacing = l->facing;
+        leaderFacing = leader->facing;
         shift        = 0;
         break;
     case 8:
-        leaderFacing = l->facing;
+        leaderFacing = leader->facing;
         shift        = 0;
         break;
     default:
@@ -711,7 +706,6 @@ void __cdecl FormationPoint(AM2_Object *follower, AM2_Object *leader, AM2_Point 
     }
 
     SettlePointInRegion(TileOfPoint(*out), out);
-#undef l
 }
 
 typedef int32_t (__cdecl *AM2_AirRandFn)(void);
@@ -1302,10 +1296,10 @@ void __cdecl ToggleFogOfWar(void)
 
 /* The pass queue: eight slots inside the same block the savegame section is,
  * so they are fields rather than globals of their own. */
-#define g_airPassCount (kAirSaveBlock->passCount)
-#define g_airPassTimer (kAirSaveBlock->passTimer)
-#define g_airPassWhere (kAirSaveBlock->passWhere)
-#define g_airPassArmy  (kAirSaveBlock->passArmy)
+#define g_airPassCount (g_airSaveBlock->passCount)
+#define g_airPassTimer (g_airSaveBlock->passTimer)
+#define g_airPassWhere (g_airSaveBlock->passWhere)
+#define g_airPassArmy  (g_airSaveBlock->passArmy)
 
 /* The strike itself, still original -- what a pass does when its timer runs
  * out. Its second argument is an army: it compares it against
@@ -1427,7 +1421,6 @@ void __cdecl AirPassesDraw(void)
     int32_t frame;
 
     /* The pass time is re-read, and halved with a shift, at every use. */
-#define MS (g_airPassMs)
     if (g_airPassCount <= 0)
         return;
 
@@ -1438,11 +1431,12 @@ void __cdecl AirPassesDraw(void)
             - g_viewY
             - AM2_AIR_PASS_LIFT;
 
-        if (g_airPassTimer[i] < (MS >> 1)) {
-            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / (MS >> 1);
+        if (g_airPassTimer[i] < (g_airPassMs >> 1)) {
+            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
             y -= AM2_AIR_PASS_LIFT;
         } else {
-            frame = ((g_airPassTimer[i] - (MS >> 1)) * AM2_AIR_PASS_FRAMES) / (MS >> 1);
+            frame =
+                ((g_airPassTimer[i] - (g_airPassMs >> 1)) * AM2_AIR_PASS_FRAMES) / (g_airPassMs >> 1);
         }
 
         DrawSprite((g_airSprites3)[frame],
@@ -1451,9 +1445,8 @@ void __cdecl AirPassesDraw(void)
         g_airPassTimer[i] += g_frameDeltaMs;
     }
 
-    if (g_airPassTimer[0] < MS)
+    if (g_airPassTimer[0] < g_airPassMs)
         return;
-#undef MS
 
     if (!g_mpSession
         || AM2_THE_COMM->CommMustBroadcast(
@@ -1733,44 +1726,39 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
     do {
         uint32_t idx = (uint32_t)(a0 & 0xFF) >> 2;
 
-#define REC   (g_sightBlockByDir[idx])
-#define range (g_rankRecords[v->rank].sight_range)
-
-        if (REC.stamp != gen) {
-            REC.stamp = gen;
+        if (g_sightBlockByDir[idx].stamp != gen) {
+            g_sightBlockByDir[idx].stamp = gen;
 
             if (hb > hv) {
-                REC.low = d;
-                REC.mid = d;
+                g_sightBlockByDir[idx].low = d;
+                g_sightBlockByDir[idx].mid = d;
             } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-                REC.low = (int16_t)range;
-                REC.mid = d;
+                g_sightBlockByDir[idx].low = (int16_t)g_rankRecords[v->rank].sight_range;
+                g_sightBlockByDir[idx].mid = d;
             } else {
-                REC.low = (int16_t)range;
-                REC.mid = (int16_t)range;
+                g_sightBlockByDir[idx].low = (int16_t)g_rankRecords[v->rank].sight_range;
+                g_sightBlockByDir[idx].mid = (int16_t)g_rankRecords[v->rank].sight_range;
             }
-            REC.high = d;
+            g_sightBlockByDir[idx].high = d;
         } else if (hb > hv) {
             /* Already stamped this generation: keep the nearest per band. */
-            if (REC.low > d)
-                REC.low = d;
-            if (REC.mid > d)
-                REC.mid = d;
-            if (REC.high > d)
-                REC.high = d;
+            if (g_sightBlockByDir[idx].low > d)
+                g_sightBlockByDir[idx].low = d;
+            if (g_sightBlockByDir[idx].mid > d)
+                g_sightBlockByDir[idx].mid = d;
+            if (g_sightBlockByDir[idx].high > d)
+                g_sightBlockByDir[idx].high = d;
         } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-            if (REC.mid > d)
-                REC.mid = d;
-            if (REC.high > d)
-                REC.high = d;
+            if (g_sightBlockByDir[idx].mid > d)
+                g_sightBlockByDir[idx].mid = d;
+            if (g_sightBlockByDir[idx].high > d)
+                g_sightBlockByDir[idx].high = d;
         } else {
-            if (REC.high > d)
-                REC.high = d;
+            if (g_sightBlockByDir[idx].high > d)
+                g_sightBlockByDir[idx].high = d;
         }
         a0 = (uint8_t)(a0 + AM2_SIGHT_DIR_STEP);
     } while (--steps);
-#undef range
-#undef REC
 }
 #undef AngleOfDelta3
 
@@ -1802,8 +1790,6 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
  * -- the guard is around the four calls, not around the creation. */
 void __cdecl AirPassStrike(AM2_Point at, int32_t army)
 {
-#define OFF  (g_airDropOffsets)
-#define FACE (g_airDropFacings)
     int32_t flags = 0;
     int32_t i;
 
@@ -1816,8 +1802,8 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
         AM2_Object *weapon;
 
         trooper = CreateTrooper(g_dirScratch,
-                                at.x + OFF[i * 2],
-                                at.y + OFF[i * 2 + 1],
+                                at.x + g_airDropOffsets[i * 2],
+                                at.y + g_airDropOffsets[i * 2 + 1],
                                 AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
@@ -1830,15 +1816,13 @@ void __cdecl AirPassStrike(AM2_Point at, int32_t army)
 
         trooper->inventory[0] =
             weapon->uid;
-        trooper->facing = FACE[i];
+        trooper->facing = g_airDropFacings[i];
 
         SoldierKindForWeapon(trooper,
             (uint32_t)weapon->typeRec->kind);
         SendTrooperSetWeapon(trooper,
             weapon->uid, 0);
     }
-#undef FACE
-#undef OFF
 }
 
 

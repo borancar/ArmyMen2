@@ -17,21 +17,11 @@
 
 #define kSep (" \t\n;,")
 
-#define kDefObjRecCap  (g_defObjRecCap)
-
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 #define orig_qsort (*(AM2_QsortFn)((void *)(uintptr_t)(ADDR_CRT_QSORT)))
 #define orig_bsearch (*(AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))
-#define kDefLinkCap    (g_defLinkCap)
-#define kDefObjRecs      (g_defObjRecs)
-#define kDefTrooperRecs  (g_defTrooperRecs)
-#define kDefTrooperCount (g_defTrooperCount)
-#define kDefTrooperCap   (g_defTrooperCap)
-#define kDefObjRecCount  (g_defObjRecCount)
 
-#define kDefLinks      (g_defLinks)
-#define kDefLinkCount  (g_defLinkCount)
 
 /* Read the next whitespace-delimited field. Only the first call passes the
  * line; the rest continue from strtok's own state. */
@@ -120,33 +110,31 @@ void __cdecl DefAddObjRec(const int32_t *rec)
     /* The globals are read in place, the table and count again after each
      * compare, and the record goes in as one 56-byte struct copy. */
     typedef struct { int32_t d[AM2_DEF_OBJ_REC_DWORDS]; } AM2_DefObjRec;
-#define TAB ((int32_t *)kDefObjRecs)
     int32_t i;
 
-    if (!kDefObjRecs) {
-        kDefObjRecs   = (int32_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+    if (!g_defObjRecs) {
+        g_defObjRecs   = (int32_t *)am2_malloc(AM2_DEF_LINK_INITIAL
                                               * AM2_DEF_OBJ_REC_SIZE);
-        kDefObjRecCap = AM2_DEF_LINK_INITIAL;
+        g_defObjRecCap = AM2_DEF_LINK_INITIAL;
     }
 
-    if (kDefObjRecCount >= kDefObjRecCap) {
-        kDefObjRecCap += AM2_DEF_LINK_GROW;
-        kDefObjRecs = (int32_t *)am2_realloc(
-            kDefObjRecs, (size_t)kDefObjRecCap * AM2_DEF_OBJ_REC_SIZE);
+    if (g_defObjRecCount >= g_defObjRecCap) {
+        g_defObjRecCap += AM2_DEF_LINK_GROW;
+        g_defObjRecs = (int32_t *)am2_realloc(
+            g_defObjRecs, (size_t)g_defObjRecCap * AM2_DEF_OBJ_REC_SIZE);
     }
 
-    for (i = 0; i < kDefObjRecCount; i++) {
-        if (CompareTriple(&TAB[i * AM2_DEF_OBJ_REC_DWORDS], rec) == 0) {
+    for (i = 0; i < g_defObjRecCount; i++) {
+        if (CompareTriple(&((int32_t *)g_defObjRecs)[i * AM2_DEF_OBJ_REC_DWORDS], rec) == 0) {
             orig_log("duplicate record in object.aai file %d-%d\n",
                      rec[0], rec[1]);
             return;
         }
     }
 
-    *(AM2_DefObjRec *)&TAB[kDefObjRecCount * AM2_DEF_OBJ_REC_DWORDS] =
+    *(AM2_DefObjRec *)&((int32_t *)g_defObjRecs)[g_defObjRecCount * AM2_DEF_OBJ_REC_DWORDS] =
         *(const AM2_DefObjRec *)rec;
-    kDefObjRecCount++;
-#undef TAB
+    g_defObjRecCount++;
 }
 
 /* 0x0044CCC0 and 0x0044CF70, the append and the free of a THIRD def table.
@@ -195,30 +183,30 @@ void __cdecl DefAddObjRec(const int32_t *rec)
  */
 void __cdecl DefAddTrooperRec(const AM2_TrooperDefRec *rec)
 {
-    uint8_t *tab = (uint8_t *)kDefTrooperRecs;
+    uint8_t *tab = (uint8_t *)g_defTrooperRecs;
     int32_t  cap;
 
     if (tab == (uint8_t *)0) {
         tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
                                     * AM2_DEF_TROOPER_REC_SIZE);
         cap = AM2_DEF_LINK_INITIAL;
-        kDefTrooperRecs = tab;
-        kDefTrooperCap  = cap;
+        g_defTrooperRecs = tab;
+        g_defTrooperCap  = cap;
     } else {
-        cap = kDefTrooperCap;
+        cap = g_defTrooperCap;
     }
 
-    if (kDefTrooperCount >= cap) {
+    if (g_defTrooperCount >= cap) {
         cap += AM2_DEF_LINK_GROW;
-        kDefTrooperCap = cap;
+        g_defTrooperCap = cap;
         tab = (uint8_t *)am2_realloc(
                   tab, (size_t)cap * AM2_DEF_TROOPER_REC_SIZE);
-        kDefTrooperRecs = tab;
+        g_defTrooperRecs = tab;
     }
 
-    memcpy(tab + kDefTrooperCount * AM2_DEF_TROOPER_REC_SIZE, rec,
+    memcpy(tab + g_defTrooperCount * AM2_DEF_TROOPER_REC_SIZE, rec,
            AM2_DEF_TROOPER_REC_SIZE);
-    kDefTrooperCount++;
+    g_defTrooperCount++;
 }
 
 /* DefTrooperLine -- original 0x0044CDA0, 464 bytes, NINE exits.
@@ -296,14 +284,14 @@ int32_t __cdecl DefTrooperLine(int32_t cmd, char *line)
 
 void __cdecl DefFreeTrooperRecs(void)
 {
-    uint8_t *recs = (uint8_t *)kDefTrooperRecs;
+    uint8_t *recs = (uint8_t *)g_defTrooperRecs;
 
-    kDefTrooperCount = 0;
-    kDefTrooperCap   = 0;
+    g_defTrooperCount = 0;
+    g_defTrooperCap   = 0;
 
     if (recs != (uint8_t *)0)
         am2_free(recs);
-    kDefTrooperRecs = (void *)0;
+    g_defTrooperRecs = (void *)0;
 }
 
 /* 0x00435E60. Drop both def tables. Role name.
@@ -312,22 +300,22 @@ void __cdecl DefFreeTrooperRecs(void)
  * then each pointer is freed and only then cleared. Reproduced as written. */
 void __cdecl DefFreeTables(void)
 {
-    int32_t *recs  = (int32_t *)kDefObjRecs;
+    int32_t *recs  = (int32_t *)g_defObjRecs;
     AM2_DefLink *links;
 
-    kDefObjRecCount = 0;
-    kDefLinkCount   = 0;
-    kDefObjRecCap   = 0;
-    kDefLinkCap     = 0;
+    g_defObjRecCount = 0;
+    g_defLinkCount   = 0;
+    g_defObjRecCap   = 0;
+    g_defLinkCap     = 0;
 
     if (recs != (int32_t *)0)
         am2_free(recs);
-    kDefObjRecs = (void *)0;
+    g_defObjRecs = (void *)0;
 
-    links = kDefLinks;
+    links = g_defLinks;
     if (links != (AM2_DefLink *)0)
         am2_free(links);
-    kDefLinks = (AM2_DefLink *)0;
+    g_defLinks = (AM2_DefLink *)0;
 }
 
 /* 0x00435C20. Parse one OBJ line of an .aai file into a 56-byte record.
@@ -470,7 +458,7 @@ AM2_TrooperDefRec *__cdecl DefFindTrooperRec(int32_t level)
 
     key[0] = level;
 
-    return (AM2_TrooperDefRec *)orig_bsearch(key, kDefTrooperRecs, (uint32_t)kDefTrooperCount,
+    return (AM2_TrooperDefRec *)orig_bsearch(key, g_defTrooperRecs, (uint32_t)g_defTrooperCount,
                         AM2_DEF_TROOPER_REC_SIZE,
                         (const void *)CompareDword);
 }
@@ -506,7 +494,7 @@ AM2_DefObjRec *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
     key[1] = a;
     key[2] = b;
 
-    hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+    hit = orig_bsearch(key, g_defObjRecs, (uint32_t)g_defObjRecCount,
                        AM2_DEF_OBJ_REC_SIZE,
                        (const void *)CompareTriple);
     if (hit != (void *)0)
@@ -515,7 +503,7 @@ AM2_DefObjRec *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
     /* Each retry writes the fields it relies on, `b` again included. */
     key[1] = 0;
     key[2] = b;
-    hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+    hit = orig_bsearch(key, g_defObjRecs, (uint32_t)g_defObjRecCount,
                        AM2_DEF_OBJ_REC_SIZE,
                        (const void *)CompareTriple);
     if (hit != (void *)0)
@@ -523,7 +511,7 @@ AM2_DefObjRec *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
 
     key[1] = 0;
     key[2] = 0;
-    return (AM2_DefObjRec *)orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+    return (AM2_DefObjRec *)orig_bsearch(key, g_defObjRecs, (uint32_t)g_defObjRecCount,
                         AM2_DEF_OBJ_REC_SIZE,
                         (const void *)CompareTriple);
 }
@@ -533,13 +521,13 @@ AM2_DefObjRec *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
  * stamp each new link with how many siblings preceded it. */
 int32_t __cdecl DefCountLinks(int32_t parentkey)
 {
-    int32_t n    = kDefLinkCount;
+    int32_t n    = g_defLinkCount;
     int32_t hits = 0;
 
     /* One return, and the table is loaded only once the count says there is
      * one: the original's `jle` goes to the shared tail. */
     if (n > 0) {
-        const AM2_DefLink *p = kDefLinks;
+        const AM2_DefLink *p = g_defLinks;
 
         do {
             if (p->parent == parentkey)
@@ -578,15 +566,15 @@ void __cdecl DefCheckLinks(void)
     int32_t  i;
     AM2_DefObjRec *rec;
 
-    orig_qsort(kDefLinks, (uint32_t)kDefLinkCount, sizeof(AM2_DefLink),
+    orig_qsort(g_defLinks, (uint32_t)g_defLinkCount, sizeof(AM2_DefLink),
                (const void *)ComparePair);
 
     orig_log_noargs();
 
     last = 0;
-    for (i = 0; i < kDefLinkCount; i++) {
-        if ((uint32_t)kDefLinks[i].parent > last) {
-            last = (uint32_t)kDefLinks[i].parent;
+    for (i = 0; i < g_defLinkCount; i++) {
+        if ((uint32_t)g_defLinks[i].parent > last) {
+            last = (uint32_t)g_defLinks[i].parent;
             rec = DefFindObjRec((int32_t)KeyFieldA(last),
                                            (int32_t)KeyFieldB(last), 0);
             if (!rec)
@@ -617,27 +605,27 @@ void __cdecl DefAddLink(const AM2_DefLink *link)
      * compare -- DefAddObjRec's shape. */
     int32_t i;
 
-    if (!kDefLinks) {
-        kDefLinks   = (AM2_DefLink *)am2_malloc(AM2_DEF_LINK_INITIAL
+    if (!g_defLinks) {
+        g_defLinks   = (AM2_DefLink *)am2_malloc(AM2_DEF_LINK_INITIAL
                                                 * sizeof(AM2_DefLink));
-        kDefLinkCap = AM2_DEF_LINK_INITIAL;
+        g_defLinkCap = AM2_DEF_LINK_INITIAL;
     }
 
-    if (kDefLinkCount >= kDefLinkCap) {
-        kDefLinkCap += AM2_DEF_LINK_GROW;
-        kDefLinks = (AM2_DefLink *)am2_realloc(
-            kDefLinks, (size_t)kDefLinkCap * sizeof(AM2_DefLink));
+    if (g_defLinkCount >= g_defLinkCap) {
+        g_defLinkCap += AM2_DEF_LINK_GROW;
+        g_defLinks = (AM2_DefLink *)am2_realloc(
+            g_defLinks, (size_t)g_defLinkCap * sizeof(AM2_DefLink));
     }
 
-    for (i = 0; i < kDefLinkCount; i++) {
-        if (ComparePair(&kDefLinks[i], link) == 0) {
+    for (i = 0; i < g_defLinkCount; i++) {
+        if (ComparePair(&g_defLinks[i], link) == 0) {
             orig_log("duplicate link record in object.aai file\n");
             return;
         }
     }
 
-    kDefLinks[kDefLinkCount] = *link;
-    kDefLinkCount++;
+    g_defLinks[g_defLinkCount] = *link;
+    g_defLinkCount++;
 }
 
 /* 0x00436080. Find a link by (parent, siblings) -- a bsearch over the table
@@ -655,8 +643,8 @@ AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings)
     key.parent   = parent;
     key.siblings = siblings;
 
-    return (AM2_DefLink *)orig_bsearch(&key, kDefLinks,
-                                       (uint32_t)kDefLinkCount,
+    return (AM2_DefLink *)orig_bsearch(&key, g_defLinks,
+                                       (uint32_t)g_defLinkCount,
                                        sizeof(AM2_DefLink),
                                        (const void *)ComparePair);
 }

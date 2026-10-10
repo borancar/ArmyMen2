@@ -343,11 +343,7 @@ int32_t __cdecl AddRecordList(AM2_RecordList *list)
         return -1;
 
     /* Every global is re-read where it is used, as the original does. */
-#define COUNT (g_recordListCount)
-#define CAP   (g_recordListCap)
-#define LISTS (g_recordLists)
-#define INDEX (*(uint32_t * *)&g_recordListIndex)
-    hi    = COUNT;
+    hi    = g_recordListCount;
     owner = list->owner;
     lo    = 0;
 
@@ -355,37 +351,36 @@ int32_t __cdecl AddRecordList(AM2_RecordList *list)
     while (hi > lo) {
         int32_t mid = ((hi - lo) >> 1) + lo;
 
-        if (INDEX[mid * 2] == owner)
+        if ((*(uint32_t * *)&g_recordListIndex)[mid * 2] == owner)
             return -1;                      /* already registered */
-        if (INDEX[mid * 2] < owner)
+        if ((*(uint32_t * *)&g_recordListIndex)[mid * 2] < owner)
             lo = mid + 1;
         else
             hi = mid;
     }
 
-    if (COUNT + 1 > CAP) {
-        grown = COUNT + AM2_RECORD_LIST_GROW;
-        LISTS = (AM2_RecordList **)am2_realloc(LISTS, (size_t)grown * 4);
-        memset(LISTS + CAP, 0, AM2_RECORD_LIST_GROW * 4);
-        INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
-        memset(INDEX + CAP * 2, 0, AM2_RECORD_LIST_GROW * 8);
-        CAP = grown;
+    if (g_recordListCount + 1 > g_recordListCap) {
+        grown = g_recordListCount + AM2_RECORD_LIST_GROW;
+        g_recordLists = (AM2_RecordList **)am2_realloc(g_recordLists, (size_t)grown * 4);
+        memset(g_recordLists + g_recordListCap, 0, AM2_RECORD_LIST_GROW * 4);
+        (*(uint32_t * *)&g_recordListIndex) =
+            (uint32_t *)am2_realloc((*(uint32_t * *)&g_recordListIndex), (size_t)grown * 8);
+        memset((*(uint32_t * *)&g_recordListIndex) + g_recordListCap * 2, 0,
+               AM2_RECORD_LIST_GROW * 8);
+        g_recordListCap = grown;
     }
 
-    list->index = COUNT;
-    LISTS[COUNT] = list;
+    list->index = g_recordListCount;
+    g_recordLists[g_recordListCount] = list;
 
-    if (lo < COUNT)
-        orig_memmove(INDEX + (lo + 1) * 2, INDEX + lo * 2,
-                     (size_t)(COUNT - lo) * 8);
+    if (lo < g_recordListCount)
+        orig_memmove((*(uint32_t * *)&g_recordListIndex) + (lo + 1) * 2,
+                     (*(uint32_t * *)&g_recordListIndex) + lo * 2,
+                     (size_t)(g_recordListCount - lo) * 8);
 
-    INDEX[lo * 2]     = owner;
-    INDEX[lo * 2 + 1] = (uint32_t)COUNT;
-    return COUNT++;
-#undef COUNT
-#undef CAP
-#undef LISTS
-#undef INDEX
+    (*(uint32_t * *)&g_recordListIndex)[lo * 2]     = owner;
+    (*(uint32_t * *)&g_recordListIndex)[lo * 2 + 1] = (uint32_t)g_recordListCount;
+    return g_recordListCount++;
 }
 
 /* 0x00434100, one caller -- the READ half of AddRecordList above, and the
@@ -411,18 +406,16 @@ int32_t __cdecl FindRecordList(uint32_t owner)
     int32_t hi = g_recordListCount;
 
     /* {owner, list} pairs, sorted by owner; the midpoint is a shift. */
-#define IX (*(const uint32_t *const *)&g_recordListIndex)
     while (hi > lo) {
         int32_t mid = ((hi - lo) >> 1) + lo;
 
-        if (IX[mid * 2] == owner)
-            return (int32_t)IX[mid * 2 + 1];
-        if (IX[mid * 2] < owner)
+        if ((*(const uint32_t *const *)&g_recordListIndex)[mid * 2] == owner)
+            return (int32_t)(*(const uint32_t *const *)&g_recordListIndex)[mid * 2 + 1];
+        if ((*(const uint32_t *const *)&g_recordListIndex)[mid * 2] < owner)
             lo = mid + 1;
         else
             hi = mid;
     }
-#undef IX
 
     return -1;
 }
@@ -523,10 +516,6 @@ void __cdecl BuildAaiBuiltins(void)
     /* The list record is twelve bytes -- LISTREC_OFF_SPRITE and then two
      * int16 and a dword -- and the second singleton reuses the first's
      * without writing it again. */
-#define REC_SPR (rec[0].sprite)
-#define REC_A   (rec[0].dx)
-#define REC_B   (rec[0].dy)
-#define REC_C   (rec[0].depth)
 #define KEY(a)  (*(int32_t *)(uintptr_t)(a))
     AM2_ListRec rec[2];                        /* only [0] used; see above */
     AM2_RecordList *list;
@@ -536,10 +525,10 @@ void __cdecl BuildAaiBuiltins(void)
 
     FreeAaiTables();
 
-    REC_SPR = PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    REC_A = 0;
-    REC_B = 0;
-    REC_C = 1;
+    rec[0].sprite = PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    rec[0].dx = 0;
+    rec[0].dy = 0;
+    rec[0].depth = 1;
     KEY(((uintptr_t)&g_aaiKey980000)) = 0x980000;
     list = MakeRecordList(1, rec, 0x980000);
     slot = AddRecordList(list);
@@ -553,10 +542,10 @@ void __cdecl BuildAaiBuiltins(void)
     AddAaiRecord(MakeAaiRecord(-1, KEY(((uintptr_t)g_aaiKey980100)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 1, 1)));
 
-    REC_SPR = PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    REC_A = -2;
-    REC_B = -2;
-    REC_C = 0x5DC;
+    rec[0].sprite = PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    rec[0].dx = -2;
+    rec[0].dy = -2;
+    rec[0].depth = 0x5DC;
     KEY(((uintptr_t)g_aaiKey980080)) = 0x980080;
     list = MakeRecordList(1, rec, 0x980080);
     slot = AddRecordList(list);
@@ -565,21 +554,21 @@ void __cdecl BuildAaiBuiltins(void)
 
     i = 0;
     for (key = 0x01680000; key < 0x01681600; key += 0x80) {
-        REC_SPR = PreloadSprite(0x2D, i, 0,
+        rec[0].sprite = PreloadSprite(0x2D, i, 0,
                                            AM2_AIM_PRELOAD_FLAGS, 1);
-        if (!REC_SPR)
-            REC_SPR = PreloadSprite(0x2D, 0x0A, 0,
+        if (!rec[0].sprite)
+            rec[0].sprite = PreloadSprite(0x2D, 0x0A, 0,
                                                AM2_AIM_PRELOAD_FLAGS, 1);
 
         if (key < 0x01680780 || key > 0x01680980) {
             /* SPR_OFF_W and SPR_OFF_H: the bounds' right and bottom. */
-            REC_SPR->hotX = (int16_t)(REC_SPR->bounds.right / 2);
-            REC_SPR->hotY = (int16_t)(REC_SPR->bounds.bottom / 2);
+            rec[0].sprite->hotX = (int16_t)(rec[0].sprite->bounds.right / 2);
+            rec[0].sprite->hotY = (int16_t)(rec[0].sprite->bounds.bottom / 2);
         }
 
-        REC_A = 0;
-        REC_B = 0;
-        REC_C = 0x3E8;
+        rec[0].dx = 0;
+        rec[0].dy = 0;
+        rec[0].depth = 0x3E8;
         list = MakeRecordList(1, rec, key);
 
         /* The loop blocks give the LIST its own box; the singletons do not. */
@@ -591,10 +580,10 @@ void __cdecl BuildAaiBuiltins(void)
         i++;
     }
 
-    REC_SPR = PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    REC_A = 0;
-    REC_B = 0;
-    REC_C = 3;
+    rec[0].sprite = PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    rec[0].dx = 0;
+    rec[0].dy = 0;
+    rec[0].depth = 3;
     KEY(((uintptr_t)&g_createWatchedKind)) = 0xE80580;
     list = MakeRecordList(1, rec, 0xE80580);
     list->box =
@@ -603,10 +592,10 @@ void __cdecl BuildAaiBuiltins(void)
     AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_createWatchedKind)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 
-    REC_SPR = PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
-    REC_A = 0;
-    REC_B = 0;
-    REC_C = 3;
+    rec[0].sprite = PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
+    rec[0].dx = 0;
+    rec[0].dy = 0;
+    rec[0].depth = 3;
     KEY(((uintptr_t)&g_watchedTypeId)) = 0xE80609;
     list = MakeRecordList(1, rec, 0xE80609);
     list->box =
@@ -615,10 +604,6 @@ void __cdecl BuildAaiBuiltins(void)
     AddAaiRecord(MakeAaiRecord(0x1D, KEY(((uintptr_t)&g_watchedTypeId)), slot,
                                *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 #undef KEY
-#undef REC_C
-#undef REC_B
-#undef REC_A
-#undef REC_SPR
 }
 
 /* 0x004344A0, seven callers, and every one of them hands the result straight
@@ -759,48 +744,42 @@ int32_t __cdecl AddAaiRecord(AM2_AaiRec *rec)
 
     /* AddRecordList's twin, over the key table: every global re-read where
      * it is used, a shifted midpoint, a `while` on hi > lo. */
-#define COUNT (g_keyTableN)
-#define CAP   (g_aaiRecordCap)
-#define RECS  (g_aaiRecords)
-#define INDEX (*(uint32_t * *)&g_keyTable)
-    hi  = COUNT;
+    hi  = g_keyTableN;
     key = rec->key;
     lo  = 0;
 
     while (hi > lo) {
         int32_t mid = ((hi - lo) >> 1) + lo;
 
-        if (INDEX[mid * 2] == key)
+        if ((*(uint32_t * *)&g_keyTable)[mid * 2] == key)
             return -1;
-        if (INDEX[mid * 2] < key)
+        if ((*(uint32_t * *)&g_keyTable)[mid * 2] < key)
             lo = mid + 1;
         else
             hi = mid;
     }
 
-    if (COUNT + 1 > CAP) {
-        grown = COUNT + AM2_AAI_RECORD_GROW;
-        RECS = (AM2_AaiRec **)am2_realloc(RECS, (size_t)grown * 4);
-        memset(RECS + CAP, 0, AM2_AAI_RECORD_GROW * 4);
-        INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
-        memset(INDEX + CAP * 2, 0, AM2_AAI_RECORD_GROW * 8);
-        CAP = grown;
+    if (g_keyTableN + 1 > g_aaiRecordCap) {
+        grown = g_keyTableN + AM2_AAI_RECORD_GROW;
+        g_aaiRecords = (AM2_AaiRec **)am2_realloc(g_aaiRecords, (size_t)grown * 4);
+        memset(g_aaiRecords + g_aaiRecordCap, 0, AM2_AAI_RECORD_GROW * 4);
+        (*(uint32_t * *)&g_keyTable) = (uint32_t *)am2_realloc((*(uint32_t * *)&g_keyTable),
+                (size_t)grown * 8);
+        memset((*(uint32_t * *)&g_keyTable) + g_aaiRecordCap * 2, 0, AM2_AAI_RECORD_GROW * 8);
+        g_aaiRecordCap = grown;
     }
 
-    rec->slot = COUNT;
-    RECS[COUNT] = rec;
+    rec->slot = g_keyTableN;
+    g_aaiRecords[g_keyTableN] = rec;
 
-    if (lo < COUNT)
-        orig_memmove(INDEX + (lo + 1) * 2, INDEX + lo * 2,
-                     (size_t)(COUNT - lo) * 8);
+    if (lo < g_keyTableN)
+        orig_memmove((*(uint32_t * *)&g_keyTable) + (lo + 1) * 2,
+                     (*(uint32_t * *)&g_keyTable) + lo * 2,
+                     (size_t)(g_keyTableN - lo) * 8);
 
-    INDEX[lo * 2]     = key;
-    INDEX[lo * 2 + 1] = (uint32_t)COUNT;
-    return COUNT++;
-#undef COUNT
-#undef CAP
-#undef RECS
-#undef INDEX
+    (*(uint32_t * *)&g_keyTable)[lo * 2]     = key;
+    (*(uint32_t * *)&g_keyTable)[lo * 2 + 1] = (uint32_t)g_keyTableN;
+    return g_keyTableN++;
 }
 
 typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
@@ -843,7 +822,6 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
                                int32_t index, AM2_Point at, int32_t orFlags,
                                int32_t a7, int32_t a8)
 {
-#define o (obj)
     const AM2_AaiRec *rec;
     int32_t        i;
 
@@ -854,40 +832,39 @@ int32_t __cdecl InitObjFromAai(AM2_Object *obj, char *name, int32_t army,
     if (!rec)
         return 0;
 
-    o->flags |=
+    obj->flags |=
         (uint32_t)(rec->orFlags | orFlags);
-    o->owner = (uint8_t)army;
+    obj->owner = (uint8_t)army;
 
-    ObjInitCommon(o, name, 1, at,
+    ObjInitCommon(obj, name, 1, at,
                          &rec->box, a7, a8);
 
-    o->aai = rec;
+    obj->aai = rec;
 
-    o->health =
-        o->maxHealth =
+    obj->health =
+        obj->maxHealth =
         rec->health;
-    o->heightAdj =
+    obj->heightAdj =
         rec->heightAdj;
-    o->itemFlag =
+    obj->itemFlag =
         (uint8_t)rec->rank;
 
-    o->deadline58 =
+    obj->deadline58 =
         *(const int32_t *)&g_gameClockMs;
 
-    BuildRowsFromDef(&o->rowSet,
+    BuildRowsFromDef(&obj->rowSet,
                      (g_recordLists)
                          [rec->listSlot],
                      (int32_t)at.x,
                      (int32_t)at.y,
-                     o->flags);
+                     obj->flags);
 
-    for (i = 0; i < o->rowSet.count; i++)
-        o->rowSet.rows[i].depthSlope =
+    for (i = 0; i < obj->rowSet.count; i++)
+        obj->rowSet.rows[i].depthSlope =
             rec->depthSlope;
 
-    ObjAfterMove(o, 0, 0);
+    ObjAfterMove(obj, 0, 0);
     return 1;
-#undef o
 }
 
 
@@ -1103,20 +1080,16 @@ named:
         (uint16_t)TileOfPoint(o->pos);
 
     {
-#define keep (&o->box)
-#define hit  (&o->hit)
 
-        keep->left   = b->left;
-        keep->right  = b->right;
-        keep->top    = b->top;
-        keep->bottom = b->bottom;
+        o->box.left   = b->left;
+        o->box.right  = b->right;
+        o->box.top    = b->top;
+        o->box.bottom = b->bottom;
 
-        hit->left   = b->left + at.x;
-        hit->top    = b->top + at.y;
-        hit->right  = b->right + x;
-        hit->bottom = b->bottom + at.y;
-#undef hit
-#undef keep
+        o->hit.left   = b->left + at.x;
+        o->hit.top    = b->top + at.y;
+        o->hit.right  = b->right + x;
+        o->hit.bottom = b->bottom + at.y;
     }
 
     /* THE NO-CELLS EXIT IS AN EARLY RETURN, not a skipped block. `test al,1 /
@@ -1152,12 +1125,11 @@ named:
         bytes = (int32_t)o->cellCount * 0x10;
         o->cellEntries = (AM2_CellEntry *)am2_malloc((size_t)bytes);
 
-#define cells (((uint8_t *)o->cellEntries))
         for (i = 0; i < o->cellCount; i++) {
-            *(void **)(cells + i * 0x10) = obj;
-            *(int32_t *)(cells + i * 0x10 + 8) = 0;
-            *(int32_t *)(cells + i * 0x10 + 4) = 0;
-            *(int32_t *)(cells + i * 0x10 + 0xC) = -1;
+            *(void **)((((uint8_t *)o->cellEntries)) + i * 0x10) = obj;
+            *(int32_t *)((((uint8_t *)o->cellEntries)) + i * 0x10 + 8) = 0;
+            *(int32_t *)((((uint8_t *)o->cellEntries)) + i * 0x10 + 4) = 0;
+            *(int32_t *)((((uint8_t *)o->cellEntries)) + i * 0x10 + 0xC) = -1;
         }
     }
 
@@ -1165,7 +1137,6 @@ named:
         ItemLinkCells((AM2_Object *)obj, g_objMapDesc);
 
     return bytes;
-#undef cells
 }
 
 

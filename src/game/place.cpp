@@ -80,7 +80,6 @@ extern "C" const uint8_t am2_unit_types[720] = {
 /* Spelled as script.cpp spells them, which is the file already reaching
  * these two -- g_mapName is taken, on a DIFFERENT address. */
 #define kMapName      (&g_mapName_)
-#define kMapFolder    (g_tilesetPath)
 
 #define kSep         (" \t\n;,")
 
@@ -174,7 +173,7 @@ void __cdecl LoadArmyPlacement(int32_t slot)
     int32_t i;
 
     FreePlacements();
-    SetGameDir(kMapFolder);
+    SetGameDir(g_tilesetPath);
     BuildPlacementPath(path, slot);
     if (!DefParseInfoFile(path))
         am2_log("Couldn't parse %s!\n", path);
@@ -710,15 +709,13 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
-#define rec (&g_unitTypes[type])
-#define KIND (rec->kind)
     AM2_Object       *made;
     AM2_Object       *weapon;
     AM2_MapRow       *rows;
 
-    *points -= rec->cost;
+    *points -= (&g_unitTypes[type])->cost;
 
-    if (rec->trooper) {
+    if (g_unitTypes[type].trooper) {
         made = CreateTrooper(
                    (char *)name, where.x,
                    where.y,
@@ -728,7 +725,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
 
         weapon = CreateWeapon(
                      g_dirScratch, slot,
-                     KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)KIND, 0),
+                     KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)(g_unitTypes[type].kind), 0),
                      g_zeroPoint,
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
@@ -748,7 +745,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
         return;
     }
 
-    if (rec->vehicle) {
+    if (g_unitTypes[type].vehicle) {
         int32_t n;
         int32_t i;
 
@@ -756,7 +753,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
          * directory scratch the weapon calls take. The image pushes the
          * seventh argument here (0x0043AE12). */
         made = CreateVehicle(
-                   KIND, (char *)name,
+                   (g_unitTypes[type].kind), (char *)name,
                    where.x,
                    where.y,
                    AM2_THE_COMM->CommArmyOfSlot(slot), slot,
@@ -800,10 +797,11 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
     {
         int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
-        int32_t key  = SpriteKeyForKind(KIND, army);
+        int32_t key  = SpriteKeyForKind((g_unitTypes[type].kind), army);
         int32_t flag = 0;
 
-        if (KIND >= AM2_PILLBOX_KIND_FIRST && KIND <= AM2_PILLBOX_KIND_LAST)
+        if ((g_unitTypes[type].kind) >= AM2_PILLBOX_KIND_FIRST
+            && (g_unitTypes[type].kind) <= AM2_PILLBOX_KIND_LAST)
             flag = (int32_t)OBJ_FLAG_SHOT_PROOF;
 
         made = CreateItem((char *)name, slot, key,
@@ -814,8 +812,9 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             ApplyHeightItem(made,
                 (int8_t)(g_tileAttrs)[(made)->tile]);
 
-        if (KIND < AM2_PILLBOX_KIND_FIRST || KIND > AM2_PILLBOX_KIND_LAST) {
-            if (KIND == AM2_PLACE_KIND_POST_CREATE) {
+        if ((g_unitTypes[type].kind) < AM2_PILLBOX_KIND_FIRST
+            || (g_unitTypes[type].kind) > AM2_PILLBOX_KIND_LAST) {
+            if ((g_unitTypes[type].kind) == AM2_PLACE_KIND_POST_CREATE) {
                 ItemPostCreate(slot, where);
                 if (!AllyFlag(g_defaultOwner,
                               (uint32_t)slot))
@@ -831,10 +830,10 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             int32_t wkind;
             AM2_Object *occupant;
 
-            if (KIND == 0)
+            if ((g_unitTypes[type].kind) == 0)
                 wkind = AM2_PILLBOX_WEAPON_RIFLE;
             else
-                wkind = (KIND == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
+                wkind = ((g_unitTypes[type].kind) == 1) ? AM2_PILLBOX_WEAPON_BAZOOKA
                                     : AM2_PILLBOX_WEAPON_MG;
 
             occupant = CreateTrooper(
@@ -883,8 +882,6 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
                            occupant->heightSet, 1);
         }
     }
-#undef KIND
-#undef rec
 }
 
 /* RefundPlacedUnit -- original 0x0043B160, one caller: the manual placement
@@ -1182,8 +1179,6 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army)
 {
     /* The comm object and our slot are re-read for each lookup. */
-#define COMM  (g_armyTable)
-#define OWNER ((int32_t)g_defaultOwner)
     uint8_t *ink;
 
     /* The three draw offsets, zeroed from the image's own {0,0}. */
@@ -1202,13 +1197,13 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
     if (ok) {
         ink = g_objTableRecords
-              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
+              + ((uint32_t)((AM2_Comm *)g_armyTable)->CommArmyOfSlot((int32_t)g_defaultOwner) << 8);
         g_menuInk = ink;
         ink = g_objTableRecords
-              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
+              + ((uint32_t)((AM2_Comm *)g_armyTable)->CommArmyOfSlot((int32_t)g_defaultOwner) << 8);
         g_menuOverlayAInk = ink;
         ink = g_objTableRecords
-              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
+              + ((uint32_t)((AM2_Comm *)g_armyTable)->CommArmyOfSlot((int32_t)g_defaultOwner) << 8);
     } else {
         ink = (uint8_t *)g_flameRecord;
         g_menuInk           = ink;
@@ -1216,8 +1211,6 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
     }
     g_menuOverlayBInk = ink;
 
-#undef COMM
-#undef OWNER
     switch (row) {
     /* The five foot soldiers. The kind is the arm's whole content; the arms
      * are in the image's layout order, the numbering is the jump table's. */

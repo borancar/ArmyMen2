@@ -102,14 +102,13 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
     memset(table->entries, 0, (size_t)(table->count * 16));
 
     for (i = 0; i < table->count; i++) {
-#define e (&table->entries[i])
 
         orig_fread(&w, 2, 1, fp);
-        e->id = w;
+        table->entries[i].id = w;
         orig_fread(&w, 2, 1, fp);
-        e->next = w;
-        if (e->next == 0)
-            e->next = -2;
+        table->entries[i].next = w;
+        if (table->entries[i].next == 0)
+            table->entries[i].next = -2;
 
         /* The kind. Only 0 and 1 appear in any shipped file: 1 carries an
          * animation, anything else borrows one. */
@@ -118,53 +117,52 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             int16_t   cells;
 
             /* The animation is reached through the entry at every store. */
-#define a (e->anim)
-            e->borrowed = 0;
-            e->anim = (AM2_Anim *)am2_malloc(16);
+            table->entries[i].borrowed = 0;
+            table->entries[i].anim = (AM2_Anim *)am2_malloc(16);
 
             orig_fread(&w, 2, 1, fp);
-            a->frames = w;
+            table->entries[i].anim->frames = w;
             orig_fread(&w, 2, 1, fp);
-            a->directions = w;
-            a->directionBits = Log2Mask(w);
+            table->entries[i].anim->directions = w;
+            table->entries[i].anim->directionBits = Log2Mask(w);
             orig_fread(&w, 2, 1, fp);
-            a->field4 = w;
-            a->zero9 = 0;
+            table->entries[i].anim->field4 = w;
+            table->entries[i].anim->zero9 = 0;
             orig_fread(&w, 2, 1, fp);
-            a->field6 = w;
+            table->entries[i].anim->field6 = w;
 
             /* Computed 16-bit and sign-extended afterwards, exactly as the
              * original does -- so a grid big enough to overflow an int16 would
              * come out negative and skip both the allocation and the loop. */
-            cells = (int16_t)(a->directions * a->frames);  /* int16 throughout */
+            cells =
+                (int16_t)(table->entries[i].anim->directions * table->entries[i].anim->frames);  /* int16 throughout */
             if (cells > 0)
-                a->cells = (AM2_AnimCell *)am2_malloc((size_t)cells * 4);
+                table->entries[i].anim->cells = (AM2_AnimCell *)am2_malloc((size_t)cells * 4);
 
             for (k = 0; k < cells; k++) {
                 orig_fread(&w, 2, 1, fp);
-                a->cells[k].hold = w;
+                table->entries[i].anim->cells[k].hold = w;
                 orig_fread(&w, 2, 1, fp);
                 /* The original reads this scratch back as a DWORD, so the top
                  * half is stale -- it is the file pointer's own argument slot,
                  * which MSVC reused. Only the low half is stored, so the stale
                  * bits cannot reach the result and a 16-bit read is the same
                  * function. */
-                a->cells[k].sprite = (int16_t)((uint16_t)w + (uint16_t)base);
-                if (a->cells[k].sprite >= g_spriteListN)
-                    am2_log("Error!  %d\n", a->cells[k].sprite);
+                table->entries[i].anim->cells[k].sprite = (int16_t)((uint16_t)w + (uint16_t)base);
+                if (table->entries[i].anim->cells[k].sprite >= g_spriteListN)
+                    am2_log("Error!  %d\n", table->entries[i].anim->cells[k].sprite);
             }
-#undef a
         } else {
-            e->borrowed = 1;
+            table->entries[i].borrowed = 1;
             if (fallback) {
                 /* No break on a match: the last entry carrying the id wins. */
                 for (k = 0; k < fallback->count; k++)
-                    if (e->id == fallback->entries[k].id)
-                        e->anim = fallback->entries[k].anim;
+                    if (table->entries[i].id == fallback->entries[k].id)
+                        table->entries[i].anim = fallback->entries[k].anim;
                 /* Reached whether the loop ran or not, so an empty fallback
                  * reads entry 0 of a table that has none. See anim.h. */
-                if (!e->anim)
-                    e->anim = fallback->entries[0].anim;
+                if (!table->entries[i].anim)
+                    table->entries[i].anim = fallback->entries[0].anim;
             }
         }
     }
@@ -183,7 +181,6 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
     if (am2_dump_anims)
         DumpAnimTable(table);
 #endif
-#undef e
 }
 
 /* The `.ani` directory, and the flags each group is loaded with. `from` is
@@ -269,17 +266,15 @@ void __cdecl LoadVehicleAnims(void)
      * stays 0 and BuildVehicleMask runs five times rather than six. And the
      * boat is given the JEEP's turret, which reads like a mistake and is
      * reproduced as it stands. */
-#define EMPTY (g_dirScratch)   /* the shared "" */
     /* A local array, built on the stack at every call as the image does. */
     const char *kPaths[AM2_VEHICLE_ANIM_TABLES][2] = {
         { "jeep.ani",      "jeepturret.ani" },
         { "tank.ani",      "tankturret.ani" },
         { "halftrack.ani", "halfturret.ani" },
-        { "truck.ani",     EMPTY            },
-        { EMPTY,           EMPTY            },
+        { "truck.ani",     g_dirScratch            },
+        { g_dirScratch,           g_dirScratch            },
         { "boat.ani",      "jeepturret.ani" },
     };
-#undef EMPTY
     int32_t i;
 
     SetGameDir(AM2_ANI_DIR);

@@ -527,40 +527,39 @@ int32_t __cdecl LoadMaskPacked(AM2_ObjMask *out, int32_t set, int32_t index,
         return 0;
 
     /* The file is re-read from the sprite set at every call. */
-#define fp (ss->file)
 
-    if (orig_fseek_m(fp, (int32_t)ss->dir[dir].offset, 0) != 0) {
+    if (orig_fseek_m(ss->file, (int32_t)ss->dir[dir].offset, 0) != 0) {
         orig_log_m("Error seeking to location %d in data file.\n",
                  (int32_t)ss->dir[dir].offset);
         goto fail;
     }
 
-    orig_fread_m(&got, 4, 1, fp);
+    orig_fread_m(&got, 4, 1, ss->file);
     if (key != got) {
         orig_log_m("Error in validating object in data file.\n");
         goto fail;
     }
 
-    orig_fread_m(&scratch, 4, 1, fp);
+    orig_fread_m(&scratch, 4, 1, ss->file);
     rec->width = (int16_t)scratch;
-    orig_fread_m(&scratch, 4, 1, fp);
+    orig_fread_m(&scratch, 4, 1, ss->file);
     rec->height = (int16_t)scratch;
 
-    orig_fread_m(&scratch, 4, 1, fp);   /* three reads whose values are dropped */
-    orig_fread_m(&junk, 4, 1, fp);      /* and whose SIDE EFFECT on the file    */
-    orig_fread_m(&junk, 4, 1, fp);      /* position is the point of them        */
+    orig_fread_m(&scratch, 4, 1, ss->file);   /* three reads whose values are dropped */
+    orig_fread_m(&junk, 4, 1, ss->file);      /* and whose SIDE EFFECT on the file    */
+    orig_fread_m(&junk, 4, 1, ss->file);      /* position is the point of them        */
 
     /* The same variable carries the two skips and the size after them. */
-    orig_fread_m(&scratch, 4, 1, fp);
-    orig_fseek_m(fp, scratch, 1);
-    orig_fread_m(&scratch, 4, 1, fp);
-    orig_fseek_m(fp, scratch, 1);
+    orig_fread_m(&scratch, 4, 1, ss->file);
+    orig_fseek_m(ss->file, scratch, 1);
+    orig_fread_m(&scratch, 4, 1, ss->file);
+    orig_fseek_m(ss->file, scratch, 1);
 
-    orig_fread_m(&scratch, 4, 1, fp);
+    orig_fread_m(&scratch, 4, 1, ss->file);
     if (scratch > 0) {
         void *bits = am2_malloc((size_t)scratch);
         rec->bits = (uint8_t *)bits;
-        orig_fread_m(bits, (size_t)scratch, 1, fp);
+        orig_fread_m(bits, (size_t)scratch, 1, ss->file);
     }
     return 1;
 
@@ -569,7 +568,6 @@ fail:
         am2_free(rec->bits);
     rec->bits = (uint8_t *)0;
     return 0;
-#undef fp
 }
 
 void __cdecl LoadMask(AM2_ObjMask *out, int32_t set, int32_t index, int32_t frame)
@@ -1225,7 +1223,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 void __cdecl ApplyGameSettings(void)
 {
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     int32_t *pool = g_armyPoints;
     int32_t  i;
 
@@ -1244,8 +1241,8 @@ void __cdecl ApplyGameSettings(void)
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         pool[i] = AM2_DEFAULT_SCORE_LIMIT;
-        comm->slots[(size_t)i].colour = i;
-        comm->slots[(size_t)i].team = 0;
+        g_commObject->slots[(size_t)i].colour = i;
+        g_commObject->slots[(size_t)i].team = 0;
     }
 
     if (g_nameTableCount != 0) {
@@ -1266,7 +1263,6 @@ void __cdecl ApplyGameSettings(void)
         g_mpScriptName = '\0';
         g_mapName_       = '\0';
     }
-#undef comm
 }
 
 /* CommTeamScore -- original 0x0040F990, thiscall. What the `teamscore`
@@ -1819,18 +1815,16 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, AM2_Seq *rec, AM2_SeqCtx *c
  * 856 patch lines, 856 from checkpatches. */
 void __cdecl AiTakeAbandoned(void)
 {
-#define COMM (g_commObject)
     int32_t army;
 
     for (army = 0; army < AM2_COMM_ARMY_COUNT; army++) {
-        if (!COMM->slots[(uint32_t)army].wasHere)
+        if (!g_commObject->slots[(uint32_t)army].wasHere)
             continue;
-        if (((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotHasPlayer(army))
+        if (((AM2_Comm *)(void *)(uintptr_t)g_commObject)->CommSlotHasPlayer(army))
             continue;
 
         LoadArmyPlacement(army);
     }
-#undef COMM
 }
 
 /* 0x00461930, one caller -- the per-frame path. Run the seq walker over both
@@ -1924,19 +1918,15 @@ extern "C" void __cdecl ShowMpResult(int32_t result);
 void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
 {
     /* The comm object and our army are re-read at each use. */
-#define COMM  (g_commObject)
-#define MINE  (g_defaultOwner)
-#define TEAM(slot) (COMM->slots[(size_t)(slot)].team)
-    int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotForArmy(army);
+#define TEAM(slot) (g_commObject->slots[(size_t)(slot)].team)
+    int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)g_commObject)->CommSlotForArmy(army);
     int32_t won;
 
-    if (teamGame && TEAM(MINE))
-        won = TEAM(MINE) == TEAM(slot);
+    if (teamGame && TEAM(g_defaultOwner))
+        won = TEAM(g_defaultOwner) == TEAM(slot);
     else
-        won = slot == (int32_t)MINE;
+        won = slot == (int32_t)g_defaultOwner;
     ShowMpResult(!won);
-#undef COMM
-#undef MINE
 #undef TEAM
 }
 
@@ -2324,21 +2314,17 @@ int32_t __cdecl SeqStepKind4(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 
     if (row->stamp54
             > (uint32_t)r->life) {
-#define GATE (r->gate)
-#define CELL (row->cell)
-        if (++GATE > (g_seqK4Hold)[CELL]) {
-            if (++CELL >= AM2_SEQ_K4_CELLS)
+        if (++r->gate > g_seqK4Hold[row->cell]) {
+            if (++row->cell >= AM2_SEQ_K4_CELLS)
                 return SeqRetire(ctx, rec);
 
             row->sprite =
-                (g_seqSprites5)[CELL];
+                g_seqSprites5[row->cell];
             row->lut =
-                g_remapShades[CELL];
+                g_remapShades[row->cell];
 
-            GATE = 1;
+            r->gate = 1;
         }
-#undef GATE
-#undef CELL
 
         row->yAdjust +=
             g_seqK4Rise;
@@ -2895,49 +2881,41 @@ int32_t __cdecl SeqStepKind6(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
 
     /* The tail count, the stride, the advance and the frame delta are
      * globals, read afresh at every use. */
-#define TAIL    (g_seqTailFrames)
 #define STRIDE  (*(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE)
-#define ADVANCE (g_seqAdvanceMs)
-#define DELTA   (*(const uint32_t *)&g_frameDeltaMs)
-#define PHASE   (row->cell)
 
     (void)at;
 
     if (stamp > life)
         return SeqRetire(ctx, rec);
 
-    if (r->gate > ADVANCE) {
+    if (r->gate > g_seqAdvanceMs) {
         int32_t variant = r->flag4 * STRIDE;
 
         if ((int32_t)stamp > (int32_t)life - 100) {
-            int32_t per = 100 / TAIL;
+            int32_t per = 100 / g_seqTailFrames;
             int32_t idx = ((int32_t)stamp - (int32_t)life + 100) / per;
 
-            if (idx >= TAIL - 1)
-                idx = TAIL - 1;
-            variant += STRIDE - TAIL + idx;
+            if (idx >= g_seqTailFrames - 1)
+                idx = g_seqTailFrames - 1;
+            variant += STRIDE - g_seqTailFrames + idx;
         } else {
-            if (++PHASE >= STRIDE - TAIL)
-                PHASE = 0;
-            variant += PHASE;
+            if (++row->cell >= STRIDE - g_seqTailFrames)
+                row->cell = 0;
+            variant += row->cell;
         }
 
         row->sprite =
             g_seqSprites7[variant];
         RowUpdate(row, 0, g_mapDesc);
 
-        r->gate -= ADVANCE;
+        r->gate -= g_seqAdvanceMs;
     }
 
-    row->stamp54 += DELTA;
-    r->gate += DELTA;
+    row->stamp54 += (*(const uint32_t *)&g_frameDeltaMs);
+    r->gate += (*(const uint32_t *)&g_frameDeltaMs);
 
     return r->next;
-#undef TAIL
 #undef STRIDE
-#undef ADVANCE
-#undef DELTA
-#undef PHASE
 }
 
 
@@ -3076,39 +3054,33 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
     AM2_Point pt;
     /* The particle kind's record is re-indexed, and the fields re-read, at
      * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
-#define KIND  ((g_particleKinds) \
-               [r->param])
-#define LIFE  (r->life)
-#define STAMP (row->stamp54)
-#define PHASE (row->cell)
-#define Z     (row->yAdjust)
     AM2_Seq *r   = rec;
     AM2_MapRow *row = r->row;
 
     (void)at;
 
-    STAMP += *(const uint32_t *)&g_frameDeltaMs;
+    row->stamp54 += *(const uint32_t *)&g_frameDeltaMs;
 
-    if (STAMP > r->gate) {
+    if (row->stamp54 > r->gate) {
         int32_t   tile;
         char      ground;
 
-        if (LIFE != 0) {
-            if (++PHASE >= KIND.frames)
-                PHASE = 0;
-            row->sprite = KIND.sprites[PHASE];
+        if (r->life != 0) {
+            if (++row->cell >= g_particleKinds [r->param].frames)
+                row->cell = 0;
+            row->sprite = g_particleKinds [r->param].sprites[row->cell];
         }
 
         row->pos.x +=
             (int16_t)r->field0C;
         row->pos.y +=
             (int16_t)r->field10;
-        Z += (int16_t)LIFE;
+        row->yAdjust += (int16_t)r->life;
 
         /* The bounds test is on the DRAWN point -- the row's position with
          * its height subtracted from z -- not on the ground position. */
         pt = row->pos;
-        pt.y -= Z;
+        pt.y -= row->yAdjust;
         if (!PointInRect((const AM2_Rect *)&g_mapBoundsLeft,
                          &pt))
             return SeqRetire(ctx, rec);
@@ -3116,8 +3088,8 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         tile = TileOfPoint(row->pos) & 0xFFFF;
         ground = (*(const char *const *)&g_tileAttrs)[tile];
 
-        if (Z + r->height <= ground) {
-            Z = (int16_t)((int16_t)ground - (int16_t)r->height);
+        if (row->yAdjust + r->height <= ground) {
+            row->yAdjust = (int16_t)((int16_t)ground - (int16_t)r->height);
 
             if ((g_tileFlags)[tile] & 1) {
                 CreateExplosion(row->pos.x,
@@ -3126,9 +3098,9 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
                 return SeqRetire(ctx, rec);
             }
 
-            if (LIFE < -4) {
-                LIFE = abs(LIFE >> 1) - 2 >= 7 ? 7 : abs(LIFE >> 1) - 2;
-                STAMP = 0;
+            if (r->life < -4) {
+                r->life = abs(r->life >> 1) - 2 >= 7 ? 7 : abs(r->life >> 1) - 2;
+                row->stamp54 = 0;
             } else {
                 /* The row is read again for the copy. */
                 AM2_MapRow *old  = r->row;
@@ -3147,16 +3119,11 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
                 return SeqRetire(ctx, rec);
             }
         } else {
-            LIFE -= 1;                  /* gravity */
-            STAMP = 0;
+            r->life -= 1;                  /* gravity */
+            row->stamp54 = 0;
         }
     }
 
     RowUpdate(row, 0, g_mapDesc);
     return r->next;
-#undef KIND
-#undef LIFE
-#undef STAMP
-#undef PHASE
-#undef Z
 }

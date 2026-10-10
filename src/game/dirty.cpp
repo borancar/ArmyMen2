@@ -68,23 +68,21 @@ void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
      * the image reads the tail again after them. */
     struct Rec { int32_t l, t, r, b; uint16_t prev, next; };
     struct List { uint16_t tail; uint16_t pad; struct Rec recs[AM2_DEPTH_MAX]; };
-#define DL (*(struct List *)&g_dirtyTail)
-    uint16_t next = (uint16_t)(DL.tail + 1);
+    uint16_t next = (uint16_t)((*(struct List *)&g_dirtyTail).tail + 1);
 
     if (next >= AM2_DEPTH_MAX) {
         g_fullRedraw = 1;
         return;
     }
 
-    DL.recs[next].l    = left;
-    DL.recs[next].t    = top;
-    DL.recs[next].r    = right;
-    DL.recs[next].b    = bottom;
-    DL.recs[next].next = 0;
-    DL.recs[next].prev = DL.tail;
-    DL.recs[DL.tail].next = next;
-    DL.tail = next;
-#undef DL
+    (*(struct List *)&g_dirtyTail).recs[next].l    = left;
+    (*(struct List *)&g_dirtyTail).recs[next].t    = top;
+    (*(struct List *)&g_dirtyTail).recs[next].r    = right;
+    (*(struct List *)&g_dirtyTail).recs[next].b    = bottom;
+    (*(struct List *)&g_dirtyTail).recs[next].next = 0;
+    (*(struct List *)&g_dirtyTail).recs[next].prev = (*(struct List *)&g_dirtyTail).tail;
+    (*(struct List *)&g_dirtyTail).recs[(*(struct List *)&g_dirtyTail).tail].next = next;
+    (*(struct List *)&g_dirtyTail).tail = next;
 }
 
 int dirty_install(void)

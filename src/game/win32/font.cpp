@@ -128,7 +128,6 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
                              AM2_Rle16 *out, int32_t space)
 {
     /* The back buffer is read from its global at every use. */
-#define surf g_backBuffer
     HDC                 hdc;
     SIZE                size;
     char                buf[2];
@@ -136,7 +135,7 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
 
     (void)unused;                   /* every observed call passes 1 */
 
-    if (IDirectDrawSurface_GetDC(surf, &hdc) != DD_OK)
+    if (IDirectDrawSurface_GetDC(g_backBuffer, &hdc) != DD_OK)
         return 0;
 
     SelectObject(hdc, font);
@@ -151,16 +150,15 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
     GetTextExtentPoint32A(hdc, buf, lstrlenA(buf), &size);
     TextOutA(hdc, 0, 0, buf, lstrlenA(buf));
 
-    IDirectDrawSurface_ReleaseDC(surf, hdc);
+    IDirectDrawSurface_ReleaseDC(g_backBuffer, hdc);
 
-    if (!LockSurface(surf))
+    if (!LockSurface(g_backBuffer))
         return 0;
 
     written = EncodeGlyph(out, size.cx, size.cy, space);
     UnlockSurface();
 
     return written;
-#undef surf
 }
 
 /* Original: 0x00446450. Ask GDI for a font to render glyphs from.
@@ -325,17 +323,15 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
     int32_t        i;
 
     for (i = 0; text[i]; i++) {
-#define ch (text[i])
-        if (ch == '^') {                /* an escape; the character after it
+        if (text[i] == '^') {                /* an escape; the character after it
                                          * counts */
             i++;
-        } else if (ch >= 0x1F) {        /* a control, and SIGNED -- so 0x80
+        } else if (text[i] >= 0x1F) {        /* a control, and SIGNED -- so 0x80
                                          * and up are skipped too */
             /* The glyph table indexed afresh, by the signed character. */
             width += *(const uint16_t *)(base
-                         + g_fonts[font].offsets[(int32_t)ch]);
+                         + g_fonts[font].offsets[(int32_t)text[i]]);
         }
-#undef ch
     }
 
     if (out) {
@@ -388,7 +384,6 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
     penX = x;
 
     for (i = 0; i < len; i++) {
-#define ch (text[i])
         const AM2_Rle16 *glyph;
         AM2_Rect         src;
         AM2_Rect         mid;
@@ -397,13 +392,14 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
         uint16_t         width;
         uint16_t         height;
 
-        if (ch == '^' && i + 1 < len) {
+        if (text[i] == '^' && i + 1 < len) {
             colour = (int32_t)(int8_t)text[i + 1];
             i++;
             continue;
         }
 
-        glyph = (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)ch]);
+        glyph =
+            (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)text[i]]);
         width  = glyph->width;
         height = glyph->height;
 
@@ -415,7 +411,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
         dx = penX;
         dy = y;
 
-        if (ClipRect(&src, (const AM2_Rect *)g_screenClip,
+        if (ClipRect(&src, &g_screenClip,
                      &dx, &dy, &mid)
             && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
             if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
@@ -427,7 +423,6 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
 
         penX += width;
     }
-#undef ch
 }
 
 
@@ -473,7 +468,6 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
     penY = y;
 
     for (i = 0; i < len; i++) {
-#define ch (text[i])
         const AM2_Rle16 *glyph;
         AM2_Rect         src;
         AM2_Rect         mid;
@@ -482,13 +476,13 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
         uint16_t         width;
         uint16_t         height;
 
-        if (ch == '^' && i + 1 < len) {
+        if (text[i] == '^' && i + 1 < len) {
             colour = (int32_t)(int8_t)text[i + 1];
             i++;
             continue;
         }
 
-        glyph  = (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)ch]);
+        glyph  = (const AM2_Rle16 *)(g_fonts[font].base + g_fonts[font].offsets[(int32_t)(int8_t)text[i]]);
         width  = glyph->width;
         height = glyph->height;
 
@@ -500,7 +494,7 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
         dx = x - src.right / 2;
         dy = penY;
 
-        if (ClipRect(&src, (const AM2_Rect *)g_screenClip,
+        if (ClipRect(&src, &g_screenClip,
                      &dx, &dy, &mid)
             && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
             if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
@@ -512,7 +506,6 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
 
         penY += height - AM2_GLYPH_STACK_KERN;
     }
-#undef ch
 }
 
 

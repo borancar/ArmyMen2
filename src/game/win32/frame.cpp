@@ -176,29 +176,24 @@ void __cdecl MissionInput(void)
     step = (int32_t)(g_viewSpeed
                      * g_frameDeltaSec);
 
-#define cx (*(const int16_t *)&g_cursorPoint)
-#define cy (*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2))
-
-    if (cx > g_bitmapAreaW
+    if ((*(const int16_t *)&g_cursorPoint) > g_bitmapAreaW
               - AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
         VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x + step);
     }
-    if (cx < AM2_SCROLL_MARGIN) {
+    if ((*(const int16_t *)&g_cursorPoint) < AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
         VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x - step);
     }
-    if (cy > g_bitmapAreaH
+    if ((*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2)) > g_bitmapAreaH
               - AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
         VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y + step);
     }
-    if (cy < AM2_SCROLL_MARGIN) {
+    if ((*(const int16_t *)(((uintptr_t)&g_cursorPoint) + 2)) < AM2_SCROLL_MARGIN) {
         g_objCtxSet = 0;
         VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y - step);
     }
-#undef cx
-#undef cy
 }
 
 /* 0x00424B20, one caller, on the per-frame path -- and it is THE GAME CLOCK.
@@ -240,38 +235,32 @@ void __cdecl MissionInput(void)
  * once, and the mission plays normally. */
 void __cdecl FrameClockStep(void)
 {
-#define CLOCK    (g_gameClockMs)
-#define LAST     (g_lastTickMs)
-#define DELTA_MS (g_frameDeltaMs)
     uint32_t  delta;
     uint32_t  now;
 
     if (g_fixedStep) {
-        LAST  = CLOCK;
+        g_lastTickMs  = g_gameClockMs;
         delta = AM2_FIXED_STEP_MS;
         goto store;         /* one store, shared with the clamp's */
     } else {
         now = Ticks();
 
-        delta    = now - LAST;
-        LAST     = now;
-        DELTA_MS = (int32_t)delta;          /* the raw one... */
+        delta    = now - g_lastTickMs;
+        g_lastTickMs     = now;
+        g_frameDeltaMs = (int32_t)delta;          /* the raw one... */
         if (delta > AM2_FRAME_DELTA_CAP_MS) {
             delta    = AM2_FRAME_DELTA_CAP_MS;
 store:
-            DELTA_MS = (int32_t)delta;      /* ...then the clamp over it */
+            g_frameDeltaMs = (int32_t)delta;      /* ...then the clamp over it */
         }
     }
 
-    CLOCK += delta;
+    g_gameClockMs += delta;
 
     /* The original converts the delta to a 64-bit integer (it is unsigned),
      * multiplies by a float constant on the x87 stack and stores a float --
      * `fmul dword ptr [0.001f]`, which a float literal gives. */
     g_frameDeltaSec = delta * 0.001f;
-#undef CLOCK
-#undef LAST
-#undef DELTA_MS
 }
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);
@@ -364,20 +353,18 @@ uint32_t __cdecl GetPauseFlags(void)
 /* Returns the new mask -- eax holds it on both paths, reloaded after the log. */
 uint32_t __cdecl PauseGame(uint32_t bits)
 {
-#define FLAGS (g_eventFlags)
-    FLAGS |= bits;
+    g_eventFlags |= bits;
     if (g_commObject->verbose)
-        orig_log("PauseGame: %x (set: %x)\n", FLAGS, bits);
-    return FLAGS;
+        orig_log("PauseGame: %x (set: %x)\n", g_eventFlags, bits);
+    return g_eventFlags;
 }
 
 uint32_t __cdecl UnPauseGame(uint32_t bits)
 {
-    FLAGS &= ~bits;
+    g_eventFlags &= ~bits;
     if (g_commObject->verbose)
-        orig_log("UnPauseGame: %x (reset: %x)\n", FLAGS, bits);
-    return FLAGS;
-#undef FLAGS
+        orig_log("UnPauseGame: %x (reset: %x)\n", g_eventFlags, bits);
+    return g_eventFlags;
 }
 
 /* Every comm step in the pre and post is behind the same field. */
@@ -1370,18 +1357,16 @@ void __cdecl Substate22(void)
 
     if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
-#define BMP (g_currentBitmap)
         g_overlayDirty = 0;
-        if (BMP) {
+        if (g_currentBitmap) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            DrawSprite(BMP,
+            DrawSprite(g_currentBitmap,
                        (g_screenW
-                        - BMP->bounds.right) >> 1,
+                        - g_currentBitmap->bounds.right) >> 1,
                        (g_screenH
-                        - BMP->bounds.bottom) >> 1,
+                        - g_currentBitmap->bounds.bottom) >> 1,
                        0);
         }
-#undef BMP
     }
 
     if (DismissKeyReleased()
@@ -1589,18 +1574,16 @@ void __cdecl Substate34Escape(void)
 
     if (g_overlayDirty) {
         /* The bitmap global is read again after the target is set. */
-#define BMP (g_currentBitmap)
         g_overlayDirty = 0;
-        if (BMP) {
+        if (g_currentBitmap) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            DrawSprite(BMP,
+            DrawSprite(g_currentBitmap,
                        (g_bitmapAreaW
-                        - BMP->bounds.right) >> 1,
+                        - g_currentBitmap->bounds.right) >> 1,
                        (g_bitmapAreaH
-                        - BMP->bounds.bottom) >> 1,
+                        - g_currentBitmap->bounds.bottom) >> 1,
                        0);
         }
-#undef BMP
     }
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
@@ -1842,7 +1825,6 @@ void __cdecl PausedFrameStep(void)
 #define kPauseBitsC ((const uint32_t *)(uintptr_t)ADDR_MP_PAUSE_BITS_C)
 
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     const int16_t *row;
     const int16_t *xy;
     int32_t        active;
@@ -1855,7 +1837,7 @@ void __cdecl PausedFrameStep(void)
 
     active = 0;
     for (n = 0; n < 4; n++) {
-        if (comm->slots[n].wasHere != 0)
+        if (g_commObject->slots[n].wasHere != 0)
             active++;
     }
 
@@ -1865,7 +1847,6 @@ void __cdecl PausedFrameStep(void)
     xy = row;
 
     for (slot = 0; slot < 4; slot++) {
-#define rec (&comm->slots[slot])
         int32_t  team;
         int32_t  mates;
         int32_t  variant;
@@ -1874,14 +1855,14 @@ void __cdecl PausedFrameStep(void)
         char     teamText[20];
         int32_t  width;
 
-        if (rec->wasHere == 0)
+        if (g_commObject->slots[slot].wasHere == 0)
             continue;
 
-        team  = rec->team;
+        team  = g_commObject->slots[slot].team;
         mates = 0;
         if (team > 0) {
             for (n = 0; n < 4; n++) {
-                const AM2_CommSlot *o = &comm->slots[n];
+                const AM2_CommSlot *o = &g_commObject->slots[n];
                 if (o->wasHere != 0
                     && o->team == team)
                     mates++;
@@ -1894,37 +1875,36 @@ void __cdecl PausedFrameStep(void)
             variant = 3;
 
         /* The pause flags are read afresh at each test. */
-#define pause (g_eventFlags)
         if (slot == g_ourSlot) {
-            if (pause & 8u)
+            if (g_eventFlags & 8u)
                 badge = 1;
-            else if (pause & 0x10000u)
+            else if (g_eventFlags & 0x10000u)
                 variant = 0;
-            else if (rec->ready == 0
+            else if (g_commObject->slots[slot].ready == 0
                      && g_netGame != 0)
                 variant = 1;
-        } else if (pause & kPauseBitsB[slot]) {
+        } else if (g_eventFlags & kPauseBitsB[slot]) {
             badge = 1;
-        } else if (pause & kPauseBitsA[slot]) {
+        } else if (g_eventFlags & kPauseBitsA[slot]) {
             variant = 2;
-        } else if (pause & kPauseBitsC[slot]) {
+        } else if (g_eventFlags & kPauseBitsC[slot]) {
             variant = 0;
-        } else if (rec->ready == 0
+        } else if (g_commObject->slots[slot].ready == 0
                    && g_netGame != 0) {
             variant = 1;
         }
 
         DrawSprite((g_mpMarkGrid)
-                       [comm->CommArmyOfSlot(slot) * 5 + variant],
+                       [g_commObject->CommArmyOfSlot(slot) * 5 + variant],
                    xy[0], xy[1], 0);
 
-        if (rec->team != 0) {
+        if (g_commObject->slots[slot].team != 0) {
             /* The team sprite sits 0x5E right of the marker for the small
              * (team) marker and 0x3E for any other. The image's `sub 3; neg;
              * sbb; and ~0x1F; add 0x5E` is VC6's branchless form of a
              * two-constant ternary, not a rounding of x. */
             DrawSprite((g_mpTeamSprites)
-                           [rec->team],
+                           [g_commObject->slots[slot].team],
                        (variant == 3 ? 0x5E : 0x3E) + xy[0],
                        xy[1] + 3, 0);
         }
@@ -1933,7 +1913,7 @@ void __cdecl PausedFrameStep(void)
             DrawSprite(variant == 3 ? g_mpMarkA : g_mpMarkB,
                        xy[0], xy[1], 0);
 
-        if (comm->CommSlotHasPlayer(slot))
+        if (g_commObject->CommSlotHasPlayer(slot))
             DrawLatencyBar(idx, slot);
         else
             DrawSprite(g_mpMarkC,
@@ -1941,7 +1921,7 @@ void __cdecl PausedFrameStep(void)
 
         if (variant > 2) {
             am2_sprintf(scoreText, "%d",
-                        GetArmyScore(comm, slot));
+                        GetArmyScore(g_commObject, slot));
             width = TextExtent(scoreText, 1, NULL);
             if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
@@ -1951,7 +1931,7 @@ void __cdecl PausedFrameStep(void)
 
             if (mates > 1) {
                 am2_sprintf(teamText, "%d",
-                            comm->CommTeamScore(slot));
+                            g_commObject->CommTeamScore(slot));
                 width = TextExtent(teamText, 1, NULL);
                 if (!LockSurface(
                         *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
@@ -1975,7 +1955,7 @@ void __cdecl PausedFrameStep(void)
                     *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
             DrawTextClipped(clip.left + 2, clip.top + 2,
-                            rec->name, 1, clip,
+                            g_commObject->slots[slot].name, 1, clip,
                             g_whiteInk);
             UnlockSurface();
         }
@@ -2000,9 +1980,6 @@ void __cdecl PausedFrameStep(void)
                         g_whiteInk);
         UnlockSurface();
     }
-#undef comm
-#undef rec
-#undef pause
 #undef kPauseBitsA
 #undef kPauseBitsB
 #undef kPauseBitsC

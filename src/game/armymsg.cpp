@@ -29,12 +29,10 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 #define orig_get_tick_count (*(AM2_TickFn *)g_iatGetTickCount)
 #endif
 
-#define kComm       (g_commObject)
-#define kPacket     (g_armyPacket)
 /* The length is the packet's own +4 field, reached through the packet so
  * VC6 sees one object: a copy into the packet may overwrite it, and the image
  * re-reads it after every memcpy. */
-#define kPacketLen  (*(int32_t *)(kPacket + 4))
+#define kPacketLen  (*(int32_t *)(g_armyPacket + 4))
 
 
 /* SendGameMsg is reconstructed and lives in win32/dplay.cpp, which this flat
@@ -83,25 +81,25 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     int32_t  payload, seq, i;
     uint32_t elapsed;
 
-    if (kComm->active == 0)
+    if (g_commObject->active == 0)
         return 1;
 
-    if ((uint32_t)kComm->playerCount < 2u)
+    if ((uint32_t)g_commObject->playerCount < 2u)
         return 1;
 
     payload = kPacketLen - (int32_t)AM2_ARMY_PACKET_HDR;
     elapsed = orig_get_tick_count()
-              - (uint32_t)(int32_t)kComm->sendStamp;
+              - (uint32_t)(int32_t)g_commObject->sendStamp;
 
     if (!((payload >= least
-           && elapsed > (uint32_t)(int32_t)kComm->coalesceMs)
-          || elapsed > (uint32_t)(int32_t)kComm->maxHoldMs
-          || payload > (int32_t)kComm->bufferDefault))
+           && elapsed > (uint32_t)(int32_t)g_commObject->coalesceMs)
+          || elapsed > (uint32_t)(int32_t)g_commObject->maxHoldMs
+          || payload > (int32_t)g_commObject->bufferDefault))
         return 0;
 
-    me = FindPlayerById((uint32_t)(int32_t)kComm->selfId);
+    me = FindPlayerById((uint32_t)(int32_t)g_commObject->selfId);
     if (me == 0) {
-        orig_log("myflow null %d\n", (int32_t)kComm->selfId);
+        orig_log("myflow null %d\n", (int32_t)g_commObject->selfId);
         return 0;
     }
 
@@ -111,32 +109,32 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     seq = (int32_t)me->sequence;
     g_armyPacketSeq = seq;
 
-    for (i = 0; i < kComm->playerCount; i++) {
+    for (i = 0; i < g_commObject->playerCount; i++) {
         /* The slot is read afresh at every use. */
-#define id ((int32_t)kComm->slots[i].id)
-        if (id == (int32_t)kComm->selfId || id == -1)
+        if ((int32_t)g_commObject->slots[i].id == (int32_t)g_commObject->selfId
+            || (int32_t)g_commObject->slots[i].id == -1)
             continue;
 
-        if (FindPlayerById((uint32_t)id) == 0) {
-            if (kComm->verbose)
+        if (FindPlayerById((uint32_t)((int32_t)g_commObject->slots[i].id)) == 0) {
+            if (g_commObject->verbose)
                 orig_log("ArmyMessageFlush: can't send since no flowq for "
-                         "%x yet\n", id);
+                         "%x yet\n", (int32_t)g_commObject->slots[i].id);
             continue;
         }
 
-        SendGameMsg((AM2_CommMsgHdr *)kPacket, id, (int32_t)kComm->sendFlags);
+        SendGameMsg((AM2_CommMsgHdr *)g_armyPacket, (int32_t)g_commObject->slots[i].id,
+                    (int32_t)g_commObject->sendFlags);
 
         /* Re-read rather than reuse `seq`: nothing in the loop bumps it, so
          * this is the original's spelling and not a second value. */
         if ((uint32_t)(int32_t)me->sequence < 5u
-            && kComm->verbose)
+            && g_commObject->verbose)
             orig_log("Sending Flow Packet seq %d to %x \n",
-                     (int32_t)me->sequence, id);
-#undef id
+                     (int32_t)me->sequence, (int32_t)g_commObject->slots[i].id);
     }
 
     me->sequence += 1;
-    kComm->sendStamp = (int32_t)orig_get_tick_count();
+    g_commObject->sendStamp = (int32_t)orig_get_tick_count();
     kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
     (void)MsgField12(g_msgListPool);
     return 1;
@@ -171,11 +169,11 @@ void __cdecl ArmyMessageSend(const AM2_ArmyMsgHdr *msg)
     const AM2_ArmyMsgHdr *hdr = (const AM2_ArmyMsgHdr *)msg;
     uint16_t              len;
 
-    while (kComm->dplay != 0) {
-        if (kComm->active == 0)
+    while (g_commObject->dplay != 0) {
+        if (g_commObject->active == 0)
             return;
 
-        if ((uint32_t)kComm->playerCount < 2u)
+        if ((uint32_t)g_commObject->playerCount < 2u)
             return;
 
         orig_log((const char *)msg, 1, UidArmy(UidOnWire(hdr->uid)));
@@ -185,27 +183,27 @@ void __cdecl ArmyMessageSend(const AM2_ArmyMsgHdr *msg)
             orig_log("ArmyMessageSend Zero length message \n");
 
         if ((uint32_t)len + AM2_ARMY_MSG_HDR
-            >= (uint32_t)(int32_t)kComm->bufferMax)
+            >= (uint32_t)(int32_t)g_commObject->bufferMax)
             orig_log("Error msg larger (%d) than Max (%d) in "
                      "ArmyMessageSend\n", len,
-                     (int32_t)kComm->bufferMax);
+                     (int32_t)g_commObject->bufferMax);
 
         /* No room: drain the buffer and go round again, re-checking the
          * session, which a failed send can have closed. */
         if ((uint32_t)len + (uint32_t)kPacketLen
-            >= (uint32_t)(int32_t)kComm->bufferMax) {
+            >= (uint32_t)(int32_t)g_commObject->bufferMax) {
             while (!ArmyMessageFlush(0))
                 orig_log("Send Over Flow, Couldn't Empty Buffer \n");
             continue;
         }
 
-        PacketAppend(kPacket + kPacketLen, msg, len);
+        PacketAppend(g_armyPacket + kPacketLen, msg, len);
         kPacketLen += len;
 
         /* Lookahead, not a bounds check: flush when ANOTHER message this
          * size would pass the threshold. */
         if ((uint32_t)kPacketLen + len
-            >= (uint32_t)(int32_t)kComm->bufferDefault)
+            >= (uint32_t)(int32_t)g_commObject->bufferDefault)
             ArmyMessageFlush(0);
 
         return;
@@ -229,7 +227,7 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
 {
     AM2_PauseMsg *msg = g_msgGamePause;
 
-    if (kComm->active == 0)
+    if (g_commObject->active == 0)
         return;
 
     msg->pause = pause;
@@ -237,9 +235,9 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
 
     SendGameMsg(&msg->hdr, 0, 1);
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("SendGamePause from %x  Pause =%s  Flags=%x \n",
-                 (int32_t)kComm->selfId,
+                 (int32_t)g_commObject->selfId,
                  pause ? "TRUE"
                        : "FALSE",
                  flags);
@@ -273,7 +271,7 @@ void __cdecl SendTrooperSetWeapon(const AM2_Object *trooper, uint32_t weaponUid,
                                   int32_t weapon)
 {
     AM2_SetWeaponMsg         msg;
-    const AM2_Comm  *comm = kComm;
+    const AM2_Comm  *comm = g_commObject;
 
     if (!comm->dplay)
         return;
@@ -364,7 +362,7 @@ void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot
     AM2_Object *u = unit;
     AM2_Object *it = item;
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("<--Trooper Drop Item Send: Trooper: %x, item: %x,  slot: %d,"
                 " quant: %d \n",
                 UidOnWire(((const AM2_Object *)u)->uid),
@@ -387,7 +385,7 @@ void __cdecl TrooperDropItemSend(AM2_Object *unit, AM2_Object *item, int8_t slot
 
     ArmyMessageSend(&msg.hdr);
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("-->Trooper Drop Item Sent: Trooper: %x, item: %x,"
                 " request: %d, slot: %d, quant: %d \n",
                 UidOnWire(msg.hdr.uid),
@@ -429,7 +427,7 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
     AM2_Object *t = trooper;
     AM2_Object *it = item;
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("<--Trooper Want Item Send: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                  UidOnWire(((const AM2_Object *)t)->uid),
                  UidOnWire((it)->uid),
@@ -452,7 +450,7 @@ void __cdecl TrooperWantItemSend(AM2_Object *trooper, AM2_Object *item, int32_t 
 
     ArmyMessageSend(&msg.hdr);
 
-    if (!kComm->verbose)
+    if (!g_commObject->verbose)
         return;
 
     /* All four read the QUANTITY back out of the MESSAGE rather than using
@@ -606,7 +604,7 @@ void __cdecl ItemGoneMessageSend(const AM2_Object *obj)
     msg.kind = AM2_MSG_ITEM_GONE;
     msg.uid = UidOnWire(obj->uid);
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("itemGoneMessageSend uid %x item_type %d\n",
                  obj->uid,
                  *(const int32_t *)obj);
@@ -760,7 +758,7 @@ void __cdecl SendItemDeploy(const AM2_Object *item, int32_t arg)
 
     ArmyMessageSend(&msg.hdr);
 
-    comm = kComm;
+    comm = g_commObject;
     if (comm->verbose)
         orig_log("itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d\n",
                  it->uid,
@@ -811,7 +809,7 @@ void __cdecl RecvItemGone(const AM2_ArmyMsgHdr *msg)
 
     obj->flags |= OBJ_FLAG_REPLACED;
 
-    comm = kComm;
+    comm = g_commObject;
     if (comm->verbose)
         orig_log("itemGoneMessageReceive %x\n",
                  (obj)->uid);
@@ -852,7 +850,7 @@ void __cdecl RecvDeath(const AM2_ArmyMsgHdr *msg)
 void __cdecl RecvItemDeploy(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_DeployMsg *m = (const AM2_DeployMsg *)msg;
-    const AM2_Comm *comm = kComm;
+    const AM2_Comm *comm = g_commObject;
     AM2_Object          *obj;
 
     if (comm->verbose)
@@ -916,7 +914,7 @@ void __cdecl RecvDamage(const AM2_ArmyMsgHdr *msg)
     dir    = AngleBetween(&from,
                           &obj->pos);
 
-    comm = kComm;
+    comm = g_commObject;
     if (comm->verbose)
         orig_log("Recieved Damage: item->uid %x, amount: %d, army %d, dir: %d\n",
                  (obj)->uid,
@@ -1127,7 +1125,7 @@ void __cdecl SendItemCreate(AM2_Object *obj)
         return;                 /* nothing is sent for an unknown type */
     }
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("<--Send Item Create: uid:%x, item type: %d, subtype: %d\n",
                  UidOnWire(msg.hdr.uid),
                  *(const int32_t *)o,
@@ -1300,7 +1298,7 @@ void __cdecl DamageBroadcast(AM2_Object *obj, uint32_t attacker, int32_t amount,
     ArmyMessageSend(&msg.hdr);
 
     /* The amount logged is the message's word, not the argument. */
-    comm = kComm;
+    comm = g_commObject;
     if (!comm->verbose)
         return;
 
@@ -1335,7 +1333,7 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
 {
     AM2_VehicleMsg msg;
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("<--Vehicle Exit Send: Vehicle: %x, item: %x\n",
                  UidOnWire(vehicle->uid),
                  UidOnWire(((const AM2_Object *)occupant)->uid));
@@ -1350,7 +1348,7 @@ void __cdecl SendVehicleExit(AM2_Object *vehicle, AM2_Object *occupant)
 
     ArmyMessageSend(&msg.hdr);
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("-->Vehicle Exit Sent: Vehicle: %x, item: %x\n",
                  UidOnWire(msg.hdr.uid), UidOnWire(msg.occupant));
 }
@@ -1406,25 +1404,24 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The request is read from the message at every use. */
-#define request (m->request)
     AM2_Object       *t;
     AM2_Object       *w;
 
-    if (kComm->verbose)
+    if (g_commObject->verbose)
         orig_log("-->Trooper Want Item Received: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                  UidOnWire(m->hdr.uid),
                  UidOnWire(m->item),
-                 request,
+                 m->request,
                  m->slot,
                  m->quant);
 
-    if (kComm->isHost) {
-        if (request == AM2_DO_PICKUP)
+    if (g_commObject->isHost) {
+        if (m->request == AM2_DO_PICKUP)
             return;
-        if (request == AM2_DO_DROP)
+        if (m->request == AM2_DO_DROP)
             return;
     } else {
-        if (request == AM2_WANT_PICKUP || request == AM2_WANT_DROP)
+        if (m->request == AM2_WANT_PICKUP || m->request == AM2_WANT_DROP)
             return;
     }
 
@@ -1433,8 +1430,8 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
     if (!t)
         return;
 
-    if ((request == AM2_DO_PICKUP || request == AM2_DO_DROP)
-        && !((AM2_Comm *)(void *)kComm)->CommMustBroadcast(
+    if ((m->request == AM2_DO_PICKUP || m->request == AM2_DO_DROP)
+        && !((AM2_Comm *)(void *)g_commObject)->CommMustBroadcast(
                               (int16_t)t->owner))
         return;
 
@@ -1450,13 +1447,13 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
             return;
         if (!(held->flags & OBJ_FLAG_REPLACED))
             return;
-        if (request != AM2_DO_DROP)
+        if (m->request != AM2_DO_DROP)
             return;
 
         RemoveInventoryItem(t,
                             m->slot);
 
-        if (kComm->verbose)
+        if (g_commObject->verbose)
             orig_log("Weapon destroyed before dropping; but we handled it\n");
         return;
     }
@@ -1464,12 +1461,12 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
     if (!ObjIsType4(w))
         return;
 
-    if (request == AM2_DO_PICKUP) {
+    if (m->request == AM2_DO_PICKUP) {
         /* `slot` lands in the message argument's dead slot. */
         int32_t slot;
         int32_t unused;
 
-        if (kComm->verbose)
+        if (g_commObject->verbose)
             orig_log("Tell pickup item received; ammo %d\n",
                      m->quant);
 
@@ -1490,14 +1487,14 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
         return;
     }
 
-    if (request == AM2_DO_DROP) {
-        if (kComm->verbose)
+    if (m->request == AM2_DO_DROP) {
+        if (g_commObject->verbose)
             orig_log("Tell Drop item received; ammo %d\n",
                      m->quant);
 
         /* NOT the same sense as the DO gate above: here a trooper we would
          * broadcast for is one we must NOT drop for. */
-        if (((AM2_Comm *)(void *)kComm)->CommMustBroadcast(
+        if (((AM2_Comm *)(void *)g_commObject)->CommMustBroadcast(
                               (int16_t)t->owner))
             return;
 
@@ -1506,7 +1503,7 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
         return;
     }
 
-    if (request == AM2_WANT_PICKUP) {
+    if (m->request == AM2_WANT_PICKUP) {
         int32_t give;
         int32_t at;
 
@@ -1533,12 +1530,11 @@ void __cdecl RecvTrooperWantItem(const AM2_ArmyMsgHdr *msg)
         return;
     }
 
-    if (request == AM2_WANT_DROP) {
-        if (kComm->verbose)
+    if (m->request == AM2_WANT_DROP) {
+        if (g_commObject->verbose)
             orig_log("Request drop item received; ammo %d\n",
                      m->quant);
     }
-#undef request
 }
 
 int armymsg_install(void)
@@ -1638,10 +1634,9 @@ void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
     AM2_Object  *veh  = vehicle;
     AM2_Object  *unt  = (AM2_Object *)unit;
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     AM2_VehicleMsg msg;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"<--Vehicle Enter Send: Vehicle: %x, item: %x\n",
                 UidOnWire(veh->uid),
                 UidOnWire(unt->uid));
@@ -1655,10 +1650,9 @@ void __cdecl SendVehicleEnter(AM2_Object *vehicle, AM2_Object *unit)
     msg.occupant = UidOnWire(unt->uid);
     ArmyMessageSend(&msg.hdr);
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Sent: Vehicle: %x, item: %x\n",
                 UidOnWire(msg.hdr.uid), UidOnWire(msg.occupant));
-#undef comm
 }
 
 /* SendVehicleFire -- original 0x0045E220, one caller: Step3Drive, once a shot
@@ -1684,10 +1678,9 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
 {
     AM2_Object  *veh  = vehicle;
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     AM2_VehicleFireMsg msg;
 
-    if (comm->dplay == 0)
+    if (g_commObject->dplay == 0)
         return;
 
     msg.hdr.len  = 0x18;
@@ -1707,13 +1700,12 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
     veh->ctl.hit = 0;
     ArmyMessageSend(&msg.hdr);
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"Vehicle Fire Send, vehicle: %x,  gunface:%d, pos (%d,%d,%d),  globTarg %d \n",
                 veh->uid,
                 (uint32_t)veh->turretFacing,
                 (int32_t)msg.x, (int32_t)msg.y, (int32_t)msg.z,
                 msg.target);
-#undef comm
 }
 
 /* VehicleUpdateAppend -- original 0x0045DAA0, 1136 bytes, one caller. The
@@ -1751,143 +1743,127 @@ void __cdecl SendVehicleFire(AM2_Object *vehicle)
  * cursor happened to end. */
 void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
 {
-#define comm (g_commObject)
-#define o (obj)
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out, *outStart;
     uint32_t  seq, flags = 0, interval;
     int32_t   dx, dz;
     uint8_t   action;
 
-    if (o->health == 0)
+    if (obj->health == 0)
         return;
-    seq = FindPlayerById(comm->selfId)->sequence;
-#define coarse (comm->enoughChangeLimit)
+    seq = FindPlayerById(g_commObject->selfId)->sequence;
 
-    dx = o->pos.x
-         - o->vSentPos.x;
-    dz = o->pos.y
-         - o->vSentPos.y;
+    dx = obj->pos.x
+         - obj->vSentPos.x;
+    dz = obj->pos.y
+         - obj->vSentPos.y;
     if (dx < 0) dx = -dx;
     if (dz < 0) dz = -dz;
 
     /* Sarge's vehicle is sent every frame it moves, the same forcing
      * AppendTroopState applies to Sarge himself. */
-    interval = comm->sendInterval;
-    if (ListFirstField548(o) && interval > 1)
+    interval = g_commObject->sendInterval;
+    if (ListFirstField548(obj) && interval > 1)
         interval = 1;
 
     {
-        uint32_t age = seq - o->vSentPosSeq;
+        uint32_t age = seq - obj->vSentPosSeq;
 
         if ((age >= interval
-             && (o->pos.x
-                     != o->vSentPos.x
-                 || o->pos.y
-                     != o->vSentPos.y))
-            || (age >= coarse && (dx > 8 || dz > 8)))
+             && (obj->pos.x
+                     != obj->vSentPos.x
+                 || obj->pos.y
+                     != obj->vSentPos.y))
+            || (age >= g_commObject->enoughChangeLimit && (dx > 8 || dz > 8)))
             flags = 0x80000000u;
     }
 
     /* +0x544 is the vehicle KIND -- the same field Step3Drive dispatches its
      * engine sounds on -- with three state bits laid over the top. */
-    action = *(const uint8_t *)&o->deathKind;
-    if (o->ctl.field0C)
+    action = *(const uint8_t *)&obj->deathKind;
+    if (obj->ctl.field0C)
         action |= 0x80u;
-    if (o->ctl.stop)
+    if (obj->ctl.stop)
         action |= 0x40u;
-    if (o->ctl.approach)
+    if (obj->ctl.approach)
         action |= 0x20u;
 
     /* The action rides bit 31 with the position, and is tested ONLY against
      * the coarse interval -- there is no fine arm for it. */
-    if (seq - o->vSentActionSeq >= coarse
-        && action != o->vSentAction)
+    if (seq - obj->vSentActionSeq >= g_commObject->enoughChangeLimit
+        && action != obj->vSentAction)
         flags |= 0x80000000u;
 
     {
-        uint32_t age = seq - o->vSentFacingSeq;
-#define lf (o->vSentFacing)
-#define f  (o->facing)
+        uint32_t age = seq - obj->vSentFacingSeq;
 
-        if ((age >= interval && f != lf)
-            || (age >= coarse && (((uint32_t)lf ^ (uint32_t)f) & 0xFFFFFFF0u))
+        if ((age >= interval && obj->facing != obj->vSentFacing)
+            || (age >= g_commObject->enoughChangeLimit
+                && (((uint32_t)obj->vSentFacing ^ (uint32_t)obj->facing) & 0xFFFFFFF0u))
             || (age >= interval
-                && f != o->vSentIntFacing))
+                && obj->facing != obj->vSentIntFacing))
             flags |= 0x40000000u;
-#undef f
-#undef lf
     }
 
     {
-        uint32_t age = seq - o->vSentGunSeq;
-#define lg (o->vSentGun)
-#define g  (o->turretFacing)
+        uint32_t age = seq - obj->vSentGunSeq;
 
-        if ((age >= interval && g != lg)
-            || (age >= coarse && (((uint32_t)lg ^ (uint32_t)g) & 0xFFFFFFF0u))
+        if ((age >= interval && obj->turretFacing != obj->vSentGun)
+            || (age >= g_commObject->enoughChangeLimit
+                && (((uint32_t)obj->vSentGun ^ (uint32_t)obj->turretFacing) & 0xFFFFFFF0u))
             || (age >= interval
-                && g != o->vSentIntGun))
+                && obj->turretFacing != obj->vSentIntGun))
             flags |= 0x40000000u;
-#undef g
-#undef lg
     }
 
     {
-        uint32_t age = seq - o->vSentIntFacingSeq;
-#define v  (o->ctl.heading)
-#define lv (o->vSentIntFacing)
+        uint32_t age = seq - obj->vSentIntFacingSeq;
 
-        if ((age >= interval && v != lv)
-            || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
+        if ((age >= interval && obj->ctl.heading != obj->vSentIntFacing)
+            || (age >= g_commObject->enoughChangeLimit
+                && (((uint32_t)obj->vSentIntFacing ^ (uint32_t)obj->ctl.heading) & 0xFFFFFFF0u)))
             flags |= 0x20000000u;
-#undef lv
-#undef v
     }
 
     {
-        uint32_t age = seq - o->vSentIntGunSeq;
-#define lv (o->vSentIntGun)
-#define v  (o->ctl.aim)
+        uint32_t age = seq - obj->vSentIntGunSeq;
 
-        if ((age >= interval && v != lv)
-            || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
+        if ((age >= interval && obj->ctl.aim != obj->vSentIntGun)
+            || (age >= g_commObject->enoughChangeLimit
+                && (((uint32_t)obj->vSentIntGun ^ (uint32_t)obj->ctl.aim) & 0xFFFFFFF0u)))
             flags |= 0x20000000u;
-#undef v
-#undef lv
     }
-#undef coarse
 
     if (!flags)
         return;
 
     /* COMM_OFF_VERBOSE gates it, and unlike the bare call in Step3Drive this
      * one carries its format string, so it is reproduced. */
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"<--vehicleUpdateMessageAppend: id: %x, Change:%d%d%d, Pos/last (%d,%d)/(%d,%d), Facing/last:%d/%d, Gunfacing/last:%d/%d, intFacing/last:%d/%d, intGunfacing/last:%d/%d, action/last:%x/%x, seq:%d\n",
-            o->uid,
+            obj->uid,
             (flags >> 31) & 1u, (flags >> 30) & 1u, (flags >> 29) & 1u,
-            o->pos.x,
-            o->pos.y,
-            o->vSentPos.x,
-            o->vSentPos.y,
-            o->facing,
-            o->vSentFacing,
-            o->turretFacing,
-            o->vSentGun,
-            o->ctl.heading,
-            o->vSentIntFacing,
-            o->ctl.aim,
-            o->vSentIntGun,
+            obj->pos.x,
+            obj->pos.y,
+            obj->vSentPos.x,
+            obj->vSentPos.y,
+            obj->facing,
+            obj->vSentFacing,
+            obj->turretFacing,
+            obj->vSentGun,
+            obj->ctl.heading,
+            obj->vSentIntFacing,
+            obj->ctl.aim,
+            obj->vSentIntGun,
             (uint32_t)action,
-            (uint32_t)o->vSentAction,
+            (uint32_t)obj->vSentAction,
             seq);
 
     out = m + *(const uint16_t *)m;
     outStart = out;
 
     {
-        uint32_t head = (UidOnWire(o->uid)
+        uint32_t head = (UidOnWire(obj->uid)
                          & 0x1FFFFFFFu) | flags;
 
         *out++ = (uint8_t)(head >> 24);
@@ -1899,55 +1875,49 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
     if (flags & 0x80000000u) {
         /* Clamped IN THE OBJECT, not just on the wire -- the same as the
          * trooper's, and the reason twelve bits is enough below. */
-        if (o->pos.x > 0xFFF)
-            o->pos.x = 0xFFF;
-        if (o->pos.y > 0xFFF)
-            o->pos.y = 0xFFF;
+        if (obj->pos.x > 0xFFF)
+            obj->pos.x = 0xFFF;
+        if (obj->pos.y > 0xFFF)
+            obj->pos.y = 0xFFF;
 
-#define x (o->pos.x)
-#define z (o->pos.y)
-        *out++ = (uint8_t)x;
-        *out++ = (uint8_t)z;
-        *out++ = (uint8_t)(((((uint8_t)(x >> 8)) ^ ((uint8_t)(z >> 4))) & 0x0F)
-                           ^ ((uint8_t)(z >> 4)));
-#undef z
-#undef x
+        *out++ = (uint8_t)obj->pos.x;
+        *out++ = (uint8_t)obj->pos.y;
+        *out++ = (uint8_t)(((((uint8_t)(obj->pos.x >> 8)) ^ ((uint8_t)(obj->pos.y >> 4))) & 0x0F)
+                           ^ ((uint8_t)(obj->pos.y >> 4)));
 
-        o->vSentPos    = o->pos;
-        o->vSentPosSeq = seq;
+        obj->vSentPos    = obj->pos;
+        obj->vSentPosSeq = seq;
 
         *out++ = action;
-        o->vSentAction = action;
-        o->vSentActionSeq = seq;
+        obj->vSentAction = action;
+        obj->vSentActionSeq = seq;
     }
 
     if (flags & 0x40000000u) {
-        *out++ = o->facing;
-        o->vSentFacing =
-            o->facing;
-        o->vSentFacingSeq = seq;
+        *out++ = obj->facing;
+        obj->vSentFacing =
+            obj->facing;
+        obj->vSentFacingSeq = seq;
 
-        *out++ = o->turretFacing;
-        o->vSentGun =
-            o->turretFacing;
-        o->vSentGunSeq = seq;
+        *out++ = obj->turretFacing;
+        obj->vSentGun =
+            obj->turretFacing;
+        obj->vSentGunSeq = seq;
     }
 
     if (flags & 0x20000000u) {
-        *out++ = o->ctl.heading;
-        o->vSentIntFacing =
-            o->ctl.heading;
-        o->vSentIntFacingSeq = seq;
+        *out++ = obj->ctl.heading;
+        obj->vSentIntFacing =
+            obj->ctl.heading;
+        obj->vSentIntFacingSeq = seq;
 
-        *out++ = o->ctl.aim;
-        o->vSentIntGun =
-            o->ctl.aim;
-        o->vSentIntGunSeq = seq;
+        *out++ = obj->ctl.aim;
+        obj->vSentIntGun =
+            obj->ctl.aim;
+        obj->vSentIntGunSeq = seq;
     }
 
     *(uint16_t *)m += (uint16_t)(out - outStart);
-#undef comm
-#undef o
 }
 
 /* SendVehicleUpdates -- original 0x0045E480, one caller. The vehicle batch
@@ -2092,10 +2062,9 @@ void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t 
     AM2_Object  *veh  = vehicle;
     AM2_Object  *itm  = item;
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     AM2_ItemMsg msg;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"<--Vehicle Want Item Send: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(veh->uid),
                 UidOnWire(itm->uid),
@@ -2114,7 +2083,7 @@ void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t 
     msg.quant    = quant;
     ArmyMessageSend(&msg.hdr);
 
-    if (comm->verbose == 0)
+    if (g_commObject->verbose == 0)
         return;
 
     /* Four separate `cmp`s in the original, not a table -- and each arm logs
@@ -2131,7 +2100,6 @@ void __cdecl SendVehicleWantItem(AM2_Object *vehicle, AM2_Object *item, int32_t 
     else if (request == 3)
         am2_log((const char *)(uintptr_t)"Send DO_DROP item %x ammo %d\n",
                 itm->uid, msg.quant);
-#undef comm
 }
 
 /* Forward-declared rather than included: DrawSeqBar lives in win32/surface.h

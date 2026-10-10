@@ -279,7 +279,6 @@ static_assert(DDPCAPS_ALLOW256 == 0x40, "DDPCAPS_ALLOW256");
 #define REMAP_DARK_LIMIT  0x30   /* at or below this, darkening is a no-op */
 #define REMAP_LIFT_LIMIT  0xA0   /* at or below this, brighten instead */
 #define REMAP_LIFT        0x80
-#define DARK_SCALE        0.7
 
 typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
 
@@ -350,9 +349,9 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 && b <= REMAP_DARK_LIMIT)
                 v = (uint8_t)i;
             else {
-                c.peRed   = (uint8_t)(r * DARK_SCALE);
-                c.peGreen = (uint8_t)(g * DARK_SCALE);
-                c.peBlue  = (uint8_t)(b * DARK_SCALE);
+                c.peRed   = (uint8_t)(r * 0.7);
+                c.peGreen = (uint8_t)(g * 0.7);
+                c.peBlue  = (uint8_t)(b * 0.7);
                 v = MATCH_ENTRY(c);
             }
             g_remapDark[i] = v;
@@ -365,9 +364,9 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 c.peGreen = (uint8_t)(g + REMAP_LIFT < 0xFF ? g + REMAP_LIFT : 0xFF);
                 c.peBlue  = (uint8_t)(b + REMAP_LIFT < 0xFF ? b + REMAP_LIFT : 0xFF);
             } else {
-                c.peRed   = (uint8_t)(r * DARK_SCALE);
-                c.peGreen = (uint8_t)(g * DARK_SCALE);
-                c.peBlue  = (uint8_t)(b * DARK_SCALE);
+                c.peRed   = (uint8_t)(r * 0.7);
+                c.peGreen = (uint8_t)(g * 0.7);
+                c.peBlue  = (uint8_t)(b * 0.7);
             }
             g_remapBright[i] = MATCH_ENTRY(c);
 
@@ -627,11 +626,9 @@ void __cdecl CyclePalette(void)
 
     g_paletteCycleStamp = now;
 
-#define IDX (g_paletteCycleIndex)
-    if (++IDX >= g_paletteCycleCount)
-        IDX = 0;
-    i = IDX;
-#undef IDX
+    if (++g_paletteCycleIndex >= g_paletteCycleCount)
+        g_paletteCycleIndex = 0;
+    i = g_paletteCycleIndex;
 
     {
         uint32_t which = (g_paletteCycleSeq)[i];
@@ -763,8 +760,6 @@ typedef int32_t (__cdecl *AM2_PalRandFn)(void);
  */
 void __cdecl BuildRemapTables(void)
 {
-#define base (g_armyPalBase)
-#define pal ((const uint8_t *)g_paletteCopy)
     /* Both tables are an array of 256-byte rows, one per army, and are
      * indexed [army][i]: a row pointer held per army puts the index first
      * in the address, the image has the row offset first. */
@@ -779,18 +774,18 @@ void __cdecl BuildRemapTables(void)
 
     for (army = 0; army < AM2_ARMY_PAL_BASES; army++) {
         for (i = 0; i < AM2_REMAP_COLOURS; i++) {
-            uint32_t c = ((uint32_t)base[army] + (uint32_t)i) * 4;
+            uint32_t c = ((uint32_t)g_armyPalBase[army] + (uint32_t)i) * 4;
 
             obj[army][i] = NearestPalIndexRGB(
                 g_activePalette,
-                pal[c], pal[c + 1], pal[c + 2],
+                ((const uint8_t *)g_paletteCopy)[c], ((const uint8_t *)g_paletteCopy)[c + 1], ((const uint8_t *)g_paletteCopy)[c + 2],
                 AM2_PAL_REMAP_FROM);
         }
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
             obj[army][i] = (uint8_t)i;
 
         for (i = 0; i < AM2_REMAP_COLOURS; i++)
-            ramp[army][i] = (uint8_t)(base[army] + (i >> 1));
+            ramp[army][i] = (uint8_t)(g_armyPalBase[army] + (i >> 1));
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
             ramp[army][i] = (uint8_t)i;
     }
@@ -807,7 +802,7 @@ void __cdecl BuildRemapTables(void)
 
             for (i = 0; i < AM2_REMAP_COLOURS; i++)
                 (*table)[row * AM2_REMAP_COLOURS + i] =
-                    (uint8_t)(base[pick] + i);
+                    (uint8_t)(g_armyPalBase[pick] + i);
         }
 
         block += AM2_OBJ_TABLE_REC_SIZE;
@@ -825,8 +820,6 @@ void __cdecl BuildRemapTables(void)
 
     for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
         ((uint8_t *)g_rowLutDoubles)[i] = (uint8_t)i;
-#undef base
-#undef pal
 }
 
 int palette_install(void)

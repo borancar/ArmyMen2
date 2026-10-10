@@ -49,18 +49,13 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * am2_weapon_pose_frames[53]/[56] (0x004750B4/C0), handled in standalone.h. */
 #endif
 
-#define kRegionOfCell (g_regionOfCell)
-#define kRegionCost   (g_regionCost)
-#define kRegionNext   (g_regionNext)
 /* Spelled as army.cpp spells it, so checkglobals sees one name per
  * address rather than two. */
 /* 0x00514EF0 holds a POINTER to the array, not the array. Same shape as the
  * cell map above; getting this wrong took the game down on the first run. */
-#define kRegions      (g_regions)
-#define kTracePF      (g_optTracePf)
 
-#define kNLinks(r)  (kRegions[r].nlinks)
-#define kLinks(r)   (kRegions[r].links)
+#define kNLinks(r)  (g_regions[r].nlinks)
+#define kLinks(r)   (g_regions[r].links)
 
 /* 0x0042B860. Record that two cells connect their regions.
  *
@@ -83,8 +78,8 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * cells it was given. */
 void __cdecl AddRegionLink(int32_t cell, int32_t neighbour)
 {
-    int32_t a = kRegionOfCell[cell];
-    int32_t b = kRegionOfCell[neighbour];
+    int32_t a = g_regionOfCell[cell];
+    int32_t b = g_regionOfCell[neighbour];
     int32_t i;
 
     if (a == 0 || b == 0)
@@ -106,7 +101,7 @@ void __cdecl AddRegionLink(int32_t cell, int32_t neighbour)
     kLinks(a)[kNLinks(a)].into = (int16_t)neighbour;
     kNLinks(a)++;
 
-    if (kTracePF)
+    if (g_optTracePf)
         orig_log("Added Region link from %d to %d\n", a, b);
 }
 
@@ -157,9 +152,7 @@ void __cdecl BuildRegionGraph(void)
     int32_t x, y;
     int32_t tile;
 
-#define weights (g_cellWeights)
-
-    if (!kRegionOfCell || !weights)
+    if (!g_regionOfCell || !g_cellWeights)
         return;
 
     tile = g_mapTilesW * AM2_REGION_MARGIN
@@ -173,14 +166,14 @@ void __cdecl BuildRegionGraph(void)
                  - AM2_REGION_MARGIN;
              tile++, x++) {
             uint16_t at = (uint16_t)tile;
-            int32_t  region = kRegionOfCell[at];
+            int32_t  region = g_regionOfCell[at];
             int32_t  ox, oy;
 
             /* Called for nothing -- see the note above. */
             TileToXY(tile, &ox, &oy);
 
-            if (weights[at] >= AM2_BLOCK_FULL) {
-                kRegionOfCell[at] = 0;
+            if (g_cellWeights[at] >= AM2_BLOCK_FULL) {
+                g_regionOfCell[at] = 0;
                 continue;
             }
 
@@ -189,67 +182,58 @@ void __cdecl BuildRegionGraph(void)
                 continue;
 
             if (region >= g_regionStride) {
-#define old ((int32_t)g_regionStride)
-                kRegions = (AM2_Region *)am2_realloc(kRegions,
+                g_regions = (AM2_Region *)am2_realloc(g_regions,
                     (size_t)(region + 1) * AM2_REGION_SIZE);
-                memset(&kRegions[old], 0,
-                       (size_t)(region - old + 1) * AM2_REGION_SIZE);
-#undef old
+                memset(&g_regions[(int32_t)g_regionStride], 0,
+                       (size_t)(region - (int32_t)g_regionStride + 1) * AM2_REGION_SIZE);
                 g_regionStride =
                     (int16_t)(region + 1);
             }
 
-#define r (&kRegions[region])
-            if (!r->active) {
-                r->active = 1;
-                r->id     = (int16_t)region;
-                r->tile   = (int16_t)tile;
+            if (!g_regions[region].active) {
+                g_regions[region].active = 1;
+                g_regions[region].id     = (int16_t)region;
+                g_regions[region].tile   = (int16_t)tile;
 
-                if (kTracePF)
+                if (g_optTracePf)
                     orig_log((const char *)
                              ((void *)(uintptr_t)(AM2_STR_ACTIVATING_REGION)), region);
             }
 
-#undef r
             /* Up, left, right, down -- four inlined tests in the original
              * and four here, in its order. Each is linked when its region
              * differs and its weight is under AM2_BLOCK_FULL. */
-#define w ((uint32_t)g_mapTilesW)
 
-            if ((int32_t)kRegionOfCell[at - w] != region
-                && weights[at - w] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, (int32_t)(at - w));
+            if ((int32_t)g_regionOfCell[at - (uint32_t)g_mapTilesW] != region
+                && g_cellWeights[at - (uint32_t)g_mapTilesW] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at - (uint32_t)g_mapTilesW));
 
-            if ((int32_t)kRegionOfCell[at - 1] != region
-                && weights[at - 1] < AM2_BLOCK_FULL)
+            if ((int32_t)g_regionOfCell[at - 1] != region
+                && g_cellWeights[at - 1] < AM2_BLOCK_FULL)
                 AddRegionLink((int32_t)at, (int32_t)(at - 1));
 
-            if ((int32_t)kRegionOfCell[at + 1] != region
-                && weights[at + 1] < AM2_BLOCK_FULL)
+            if ((int32_t)g_regionOfCell[at + 1] != region
+                && g_cellWeights[at + 1] < AM2_BLOCK_FULL)
                 AddRegionLink((int32_t)at, (int32_t)(at + 1));
 
-            if ((int32_t)kRegionOfCell[at + w] != region
-                && weights[at + w] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, (int32_t)(at + w));
-#undef w
+            if ((int32_t)g_regionOfCell[at + (uint32_t)g_mapTilesW] != region
+                && g_cellWeights[at + (uint32_t)g_mapTilesW] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at + (uint32_t)g_mapTilesW));
         }
     }
 
     {
-#define stride ((int32_t)g_regionStride)
-#define bytes  ((size_t)(stride * stride))
 
-        kRegionNext = (uint8_t *)am2_malloc(bytes);
-        memset(kRegionNext, 0, bytes);
+        g_regionNext =
+            (uint8_t *)am2_malloc(((size_t)((int32_t)g_regionStride * (int32_t)g_regionStride)));
+        memset(g_regionNext, 0, (size_t)((int32_t)g_regionStride * (int32_t)g_regionStride));
 
-        kRegionCost = (uint8_t *)am2_malloc(bytes);
-        memset(kRegionCost, 0, bytes);
+        g_regionCost =
+            (uint8_t *)am2_malloc(((size_t)((int32_t)g_regionStride * (int32_t)g_regionStride)));
+        memset(g_regionCost, 0, (size_t)((int32_t)g_regionStride * (int32_t)g_regionStride));
 
         g_regionStamp = 1;
-#undef bytes
-#undef stride
     }
-#undef weights
 }
 
 /* BuildTileDeltas -- original 0x00437B60, one caller: the map loader. Fill the
@@ -416,12 +400,10 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
 /* 0x00437DB0 -- everything else, and a null object. */
 int32_t __cdecl PointRuleDefault(int32_t tile)
 {
-#define ARMY (g_pointRuleArmy)
-    if (ARMY < AM2_COMM_SLOTS
-        && ((const int8_t *const *)g_tileRevealGrids)[ARMY]
+    if (g_pointRuleArmy < AM2_COMM_SLOTS
+        && ((const int8_t *const *)g_tileRevealGrids)[g_pointRuleArmy]
                [(uint16_t)tile] > 0)
         return 1;
-#undef ARMY
 
     /* `setge` on the byte, not a branch -- the original's own tail. */
     return (g_cellWeights)[(uint16_t)tile]
@@ -615,12 +597,10 @@ int32_t __cdecl RegionsNear(const AM2_Object *a, const AM2_Object *b,
                             int32_t solve)
 {
     /* The region map is re-read after each call, as the image does. */
-#define CELLS (g_regionOfCell)
     int32_t rb, ra, hops;
 
-    rb = CELLS[(uint32_t)TileOfPoint(b->pos) & 0xFFFFu];
-    ra = CELLS[(uint32_t)TileOfPoint(a->pos) & 0xFFFFu];
-#undef CELLS
+    rb = g_regionOfCell[(uint32_t)TileOfPoint(b->pos) & 0xFFFFu];
+    ra = g_regionOfCell[(uint32_t)TileOfPoint(a->pos) & 0xFFFFu];
 
     hops = RegionHops(rb, ra, solve);
     if (hops != -1 && hops <= 1)
@@ -745,21 +725,16 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, AM2_Point *pt)
 
     /* As NearestAllowedTile: the rule, the map's size, its row shift and the
      * cell table are read from their globals at every use. */
-#define CELLS (g_regionOfCell)
-#define RULE  (*(AM2_PointRuleFn *)&g_pointRule)
-#define MAP_W (g_mapTilesW)
-#define MAP_H (g_mapTilesH)
-#define SHIFT (*(const int32_t *)&g_mapRowShift)
     cell   = tile & 0xFFFF;
-    region = CELLS[tile & 0xFFFF];
+    region = g_regionOfCell[tile & 0xFFFF];
 
-    if (!RULE(tile))
+    if (!(*(AM2_PointRuleFn *)&g_pointRule)(tile))
         return (uint16_t)tile;
 
     {
         int32_t x, y, dir, step, leg, tried;
 
-        x     = cell & (MAP_W - 1);
+        x     = cell & (g_mapTilesW - 1);
         y     = (int32_t)(cell >> g_mapRowShift);
         dir   = 0;
         step  = 0;
@@ -770,15 +745,15 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, AM2_Point *pt)
             x += (g_spiralDx)[dir];
             y += (g_spiralDy)[dir];
 
-            if (x > 0 && x < MAP_W && y > 0 && y < MAP_H) {
-                int32_t cand = (y << SHIFT) + x;
+            if (x > 0 && x < g_mapTilesW && y > 0 && y < g_mapTilesH) {
+                int32_t cand = (y << (*(const int32_t *)&g_mapRowShift)) + x;
 
-                if (region != 0 && CELLS[cand & 0xFFFF] != 0
-                    && CELLS[cand & 0xFFFF] != region)
+                if (region != 0 && g_regionOfCell[cand & 0xFFFF] != 0
+                    && g_regionOfCell[cand & 0xFFFF] != region)
                     goto next;          /* another region's tile */
 
                 tried = 1;
-                if (!RULE(cand)) {
+                if (!(*(AM2_PointRuleFn *)&g_pointRule)(cand)) {
                     *pt = PointOfTile(cand);
                     return (uint16_t)cand;
                 }
@@ -800,11 +775,6 @@ next:
             step = 0;
         }
     }
-#undef SHIFT
-#undef MAP_H
-#undef MAP_W
-#undef RULE
-#undef CELLS
 }
 
 /* 0x0043A0A0, six callers. The nearest tile the object's point rule will
@@ -864,17 +834,12 @@ uint16_t __cdecl NearestAllowedTile(AM2_Object *obj, uint32_t tile, AM2_Point *p
 
     SetPointRule(obj);
 
-#define CELLS (g_regionOfCell)
     cell   = tile & 0xFFFF;
-    region = CELLS[tile & 0xFFFF];
+    region = g_regionOfCell[tile & 0xFFFF];
 
     /* The rule, the map's size and its row shift are read from their globals
      * at every use. */
-#define RULE  (*(AM2_PointRuleFn *)&g_pointRule)
-#define MAP_W (g_mapTilesW)
-#define MAP_H (g_mapTilesH)
-#define SHIFT (*(const int32_t *)&g_mapRowShift)
-    if (!RULE(tile)) {
+    if (!(*(AM2_PointRuleFn *)&g_pointRule)(tile)) {
         if ((uint16_t)pt->x == 0)
             *pt = PointOfTile(tile);
         return (uint16_t)tile;
@@ -885,7 +850,7 @@ uint16_t __cdecl NearestAllowedTile(AM2_Object *obj, uint32_t tile, AM2_Point *p
          * object argument slots. */
         int32_t x, y, dir, step, leg, tried;
 
-        x     = cell & (MAP_W - 1);
+        x     = cell & (g_mapTilesW - 1);
         /* The shift count is read as a byte, `mov cl, [shift]`. */
         y     = (int32_t)(cell >> g_mapRowShift);
         dir   = 0;
@@ -897,15 +862,15 @@ uint16_t __cdecl NearestAllowedTile(AM2_Object *obj, uint32_t tile, AM2_Point *p
             x += (g_spiralDx)[dir];
             y += (g_spiralDy)[dir];
 
-            if (x > 0 && x < MAP_W && y > 0 && y < MAP_H) {
-                int32_t cand = (y << SHIFT) + x;
+            if (x > 0 && x < g_mapTilesW && y > 0 && y < g_mapTilesH) {
+                int32_t cand = (y << (*(const int32_t *)&g_mapRowShift)) + x;
 
-                if (region != 0 && CELLS[cand & 0xFFFF] != 0
-                    && CELLS[cand & 0xFFFF] != region)
+                if (region != 0 && g_regionOfCell[cand & 0xFFFF] != 0
+                    && g_regionOfCell[cand & 0xFFFF] != region)
                     goto next;          /* another region's tile */
 
                 tried = 1;
-                if (!RULE(cand)) {
+                if (!(*(AM2_PointRuleFn *)&g_pointRule)(cand)) {
                     *pt = PointOfTile(cand);
                     return (uint16_t)cand;
                 }
@@ -928,11 +893,6 @@ next:
             step = 0;
         }
     }
-#undef SHIFT
-#undef CELLS
-#undef MAP_H
-#undef MAP_W
-#undef RULE
 }
 
 /* MoveStepPoint -- original 0x00428E40, six call sites in five functions: the
@@ -1240,8 +1200,6 @@ static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused)
 {
-#define region (g_regionOfCell)
-#define step (g_tileStep8)
     uint32_t startTicks;
     int32_t  considered = 0;
     int32_t  fromTile, toTile, goal, goalTile;
@@ -1280,7 +1238,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     if (toTile >= AM2_PATH_TILES)
         return 0;
 
-    startRegion = region[fromTile];
+    startRegion = g_regionOfCell[fromTile];
     startTicks  = Ticks();
 
     if (g_pathResume == -1) {
@@ -1310,7 +1268,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     }
 
     goalTile   = goal & 0xFFFF;
-    goalRegion = region[goalTile];
+    goalRegion = g_regionOfCell[goalTile];
 
     while ((uint16_t)from) {
         cur     = from;
@@ -1330,13 +1288,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
          * region would make every tile an arrival. */
         if ((uint16_t)cur == (uint16_t)goal
             || (goalRegion > 0 && startRegion != goalRegion
-                && region[curTile] == goalRegion))
+                && g_regionOfCell[curTile] == goalRegion))
             goto found;
 
         considered += AM2_TILE_STEP8_COUNT;
 
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
-            int32_t  nb = curTile + step[i];
+            int32_t  nb = curTile + g_tileStep8[i];
             uint32_t t;
             int32_t  g, h, prev, next, fNew;
             uint16_t walk, before;
@@ -1346,8 +1304,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
             t = nb & 0xFFFF;
-            if (region[t] > 0 && region[t] != startRegion
-                && region[t] != goalRegion)
+            if (g_regionOfCell[t] > 0 && g_regionOfCell[t] != startRegion
+                && g_regionOfCell[t] != goalRegion)
                 continue;
 
             /* Twice the step, plus a penalty for each flag the tile LACKS.
@@ -1366,35 +1324,34 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             }
             h = PathHeuristic(t, goalTile);
 
-#define b g_pathNodes[t]
-            if (b.stamp != g_pathGeneration) {
+            if (g_pathNodes[t].stamp != g_pathGeneration) {
                 /* Never seen this search: claim it and fall through to the
                  * insert with the current head. */
-                b.stamp  = g_pathGeneration;
-                b.g      = (uint16_t)g;
-                b.h      = (uint16_t)h;
-                b.depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
-                b.parent = (uint16_t)cur;
-                b.state  = 1;
-            } else if (!(b.state & 1)) {
+                g_pathNodes[t].stamp  = g_pathGeneration;
+                g_pathNodes[t].g      = (uint16_t)g;
+                g_pathNodes[t].h      = (uint16_t)h;
+                g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
+                g_pathNodes[t].parent = (uint16_t)cur;
+                g_pathNodes[t].state  = 1;
+            } else if (!(g_pathNodes[t].state & 1)) {
                 /* Seen, and not open. Closed nodes are done with; anything
                  * else falls through to the insert, which cannot happen while
                  * STATE only ever holds 1 or 2. */
-                if (b.state & 2)
+                if (g_pathNodes[t].state & 2)
                     continue;
             } else {
-                if ((uint16_t)g >= b.g)
+                if ((uint16_t)g >= g_pathNodes[t].g)
                     continue;   /* already there by a cheaper route */
 
-                b.parent = (uint16_t)cur;
-                b.g      = (uint16_t)g;
-                b.depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
+                g_pathNodes[t].parent = (uint16_t)cur;
+                g_pathNodes[t].g      = (uint16_t)g;
+                g_pathNodes[t].depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
 
                 /* Unlink so the improved node can be re-inserted in order.
                  * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
                  * than the successor. Reproduced -- see the header. */
-                next = b.next;
-                prev = b.prev;
+                next = g_pathNodes[t].next;
+                prev = g_pathNodes[t].prev;
                 if (prev)
                     g_pathNodes[prev].next = (uint16_t)next;
                 else
@@ -1406,9 +1363,9 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             /* Insert, sorted by g+h ascending. */
             before = 0;
             if (!from) {
-                b.next = 0;
+                g_pathNodes[t].next = 0;
                 from = (uint16_t)t;
-                b.prev = 0;
+                g_pathNodes[t].prev = 0;
                 continue;
             }
 
@@ -1420,7 +1377,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * would be tidier and would sort a different list. */
             walk = from;
             if (walk > 0) {
-                fNew = b.h + b.g;
+                fNew = g_pathNodes[t].h + g_pathNodes[t].g;
                 do {
                     if (g_pathNodes[walk & 0xFFFF].h + g_pathNodes[walk & 0xFFFF].g
                         >= fNew)
@@ -1432,18 +1389,18 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
             if (!(before > 0)) {
                 /* Cheapest so far: in front of the head. */
-                b.next = from;
-                b.prev = 0;
-                g_pathNodes[b.next & 0xFFFF].prev = (uint16_t)t;
+                g_pathNodes[t].next = from;
+                g_pathNodes[t].prev = 0;
+                g_pathNodes[g_pathNodes[t].next & 0xFFFF].prev = (uint16_t)t;
                 from = (uint16_t)t;
             } else {
                 uint16_t after = g_pathNodes[before & 0xFFFF].next;
 
-                b.next = after;
+                g_pathNodes[t].next = after;
                 if (after > 0)
                     g_pathNodes[after & 0xFFFF].prev = (uint16_t)t;
                 g_pathNodes[before & 0xFFFF].next = (uint16_t)t;
-                b.prev = before;
+                g_pathNodes[t].prev = before;
             }
         }
     }
@@ -1468,9 +1425,6 @@ found:
 ok:
     PathChargeFrame(startTicks, considered);
     return 1;
-#undef b
-#undef region
-#undef step
 }
 
 /* PlanPathTo -- original 0x00439D60, three callers: the trooper AI's common
@@ -1670,13 +1624,11 @@ void __cdecl TileCoverAdd(uint16_t tile)
         return;
 
     /* The grid pointer is re-read for every tile it touches. */
-#define COVER (g_tileCover)
-    COVER[tile]++;
+    g_tileCover[tile]++;
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
-        COVER[(int32_t)tile
+        g_tileCover[(int32_t)tile
               + (g_tileNeighbours)[i]]++;
-#undef COVER
 }
 
 /* TileCoverSub -- original 0x00438520, two callers, and TileCoverAdd with
@@ -1700,13 +1652,11 @@ void __cdecl TileCoverSub(uint16_t tile)
         return;
 
     /* The grid pointer is re-read for every tile it touches. */
-#define COVER (g_tileCover)
-    COVER[tile]--;
+    g_tileCover[tile]--;
 
     for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
-        COVER[(int32_t)tile
+        g_tileCover[(int32_t)tile
               + (g_tileNeighbours)[i]]--;
-#undef COVER
 }
 
 /* MarkOpenTile -- original 0x0043A4F0, one caller.
@@ -1750,13 +1700,11 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
 
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
         /* The neighbour is recomputed at each use, offset first. */
-#define AT ((g_tileNeighbours)[i] + tile)
 
-        if (weights[AT] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+        if (weights[(g_tileNeighbours[i] + tile)] >= (int8_t)AM2_CELL_WEIGHT_STEP)
             weighted++;
-        if (cover[AT] >= 1)
+        if (cover[(g_tileNeighbours[i] + tile)] >= 1)
             covered++;
-#undef AT
 
     }
 
@@ -2043,8 +1991,6 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
      * out->cells follow it, the hit rect is re-read from the object and the grid
      * width from the box at every use -- the original keeps only the record
      * pointer in a register and these few on the frame. */
-#define GRIDW (out->box.right - out->box.left + 1)
-#define ring  g_tilemaskNeighbours
 #define tab   ((const uint8_t *)(uintptr_t)(g_bitFromN))
     const AM2_ObjMask *m;
     const uint8_t  *bits;
@@ -2099,31 +2045,31 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     out->box.left = tile.left - AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
-    w = GRIDW;
+    w = out->box.right - out->box.left + 1;
 
     /* The original stores these in register-scheduling order rather than in
      * index order; the values are what matters and they are written out here
      * in the order the walk reads them. */
-    ring[0]  = -2 * w - 1;
-    ring[1]  = -2 * w;
-    ring[2]  = -2 * w + 1;
-    ring[3]  = -w - 2;
-    ring[4]  = -w - 1;
-    ring[5]  = -w;
-    ring[6]  = -w + 1;
-    ring[7]  = -w + 2;
-    ring[8]  = -2;
-    ring[9]  = -1;
-    ring[10] = 1;
-    ring[11] = 2;
-    ring[12] = w - 2;
-    ring[13] = w - 1;
-    ring[14] = w;
-    ring[15] = w + 1;
-    ring[16] = w + 2;
-    ring[17] = 2 * w - 1;
-    ring[18] = 2 * w;
-    ring[19] = 2 * w + 1;
+    g_tilemaskNeighbours[0]  = -2 * w - 1;
+    g_tilemaskNeighbours[1]  = -2 * w;
+    g_tilemaskNeighbours[2]  = -2 * w + 1;
+    g_tilemaskNeighbours[3]  = -w - 2;
+    g_tilemaskNeighbours[4]  = -w - 1;
+    g_tilemaskNeighbours[5]  = -w;
+    g_tilemaskNeighbours[6]  = -w + 1;
+    g_tilemaskNeighbours[7]  = -w + 2;
+    g_tilemaskNeighbours[8]  = -2;
+    g_tilemaskNeighbours[9]  = -1;
+    g_tilemaskNeighbours[10] = 1;
+    g_tilemaskNeighbours[11] = 2;
+    g_tilemaskNeighbours[12] = w - 2;
+    g_tilemaskNeighbours[13] = w - 1;
+    g_tilemaskNeighbours[14] = w;
+    g_tilemaskNeighbours[15] = w + 1;
+    g_tilemaskNeighbours[16] = w + 2;
+    g_tilemaskNeighbours[17] = 2 * w - 1;
+    g_tilemaskNeighbours[18] = 2 * w;
+    g_tilemaskNeighbours[19] = 2 * w + 1;
 
     span = tile.right - tile.left + 1;
 
@@ -2147,7 +2093,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
         int32_t end = off + rowbytes;
         int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * GRIDW
+        uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
 
         /* No entry test: a row is never empty once rowbits is not 0. */
@@ -2156,7 +2102,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
 
                 col++;
@@ -2167,19 +2113,17 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
         } while (++off < end);
     }
 
     return marked;
-#undef GRIDW
-#undef ring
 #undef tab
 }
 
@@ -2212,13 +2156,11 @@ static inline void ShiftTileCover(uint16_t cell, int32_t centre, int32_t delta)
                  - AM2_TILEMASK_MARGIN)
         return;
 
-#define COVER (g_tileCover)
-    COVER[cell] = (uint8_t)(COVER[cell] + centre);
+    g_tileCover[cell] = (uint8_t)(g_tileCover[cell] + centre);
 
     n = g_tileNeighbours;
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
-        COVER[n[i] + cell] += (uint8_t)delta;
-#undef COVER
+        g_tileCover[n[i] + cell] += (uint8_t)delta;
 }
 
 /* The add arm as ItemTeardown inlines it: the same body with the amounts
@@ -2239,13 +2181,11 @@ static inline void ShiftTileCoverUp(uint16_t cell)
                  - AM2_TILEMASK_MARGIN)
         return;
 
-#define COVER (g_tileCover)
-    COVER[cell] = (uint8_t)(COVER[cell] + 1);
+    g_tileCover[cell] = (uint8_t)(g_tileCover[cell] + 1);
 
     n = g_tileNeighbours;
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
-        COVER[cell + n[i]]++;
-#undef COVER
+        g_tileCover[cell + n[i]]++;
 }
 
 /* ItemTeardown -- original 0x00439320, 656 bytes, six callers. Take an
@@ -2370,7 +2310,6 @@ void __cdecl ItemTeardown(AM2_Object *obj)
                        + mask.box.left;
 
         for (x = mask.box.left; x <= mask.box.right; idx++, cell++, x++) {
-#define weights (*(uint8_t *const *)&g_cellWeights)
             uint16_t tile;
             int8_t   h;
             int8_t   nh;
@@ -2380,7 +2319,7 @@ void __cdecl ItemTeardown(AM2_Object *obj)
                 continue;
 
             tile = (uint16_t)cell;
-            h  = (int8_t)weights[tile];
+            h  = (int8_t)(*(uint8_t *const *)&g_cellWeights)[tile];
             nh = (int8_t)(h - height);
 
             if (h <= 15 && nh >= 15)
@@ -2388,8 +2327,7 @@ void __cdecl ItemTeardown(AM2_Object *obj)
             else if (nh < 15 && h >= 15)
                 ShiftTileCover(tile, -1, -1);
 
-            weights[tile] = (uint8_t)nh;
-#undef weights
+            (*(uint8_t *const *)&g_cellWeights)[tile] = (uint8_t)nh;
         }
     }
 
@@ -2523,25 +2461,21 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
                        + mask.box.left;
 
         for (x = mask.box.left; x <= mask.box.right; idx++, cell++, x++) {
-#define weights (*(uint8_t *const *)&g_cellWeights)
             int8_t   h;
             int8_t   nh;
 
             if (!mask.cells[idx] || !(mask.cells[idx] & 1))
                 continue;
 
-#define tile ((uint16_t)cell)
-            h  = (int8_t)weights[tile];
+            h  = (int8_t)(*(uint8_t *const *)&g_cellWeights)[(uint16_t)cell];
             nh = (int8_t)(h + height);
 
             if (h <= 15 && nh >= 15)
-                ShiftTileCoverUp(tile);
+                ShiftTileCoverUp((uint16_t)cell);
             else if (nh < 15 && h >= 15)
-                ShiftTileCover(tile, -2, -1);   /* `add dl, 0xFE`: two off the centre */
+                ShiftTileCover((uint16_t)cell, -2, -1);   /* `add dl, 0xFE`: two off the centre */
 
-            weights[tile] = (uint8_t)nh;
-#undef tile
-#undef weights
+            (*(uint8_t *const *)&g_cellWeights)[(uint16_t)cell] = (uint8_t)nh;
 
             if (damage) {
                 int32_t   ox, oy;     /* TileToXY writes both */
@@ -2670,7 +2604,6 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 {
     const AM2_RecordList *h = hdr;
     AM2_Rect       *box   = &out->box;
-#define ring (g_tilemaskNeighbours)
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 (g_bitFromN);
     const AM2_ObjMask *m;
@@ -2737,26 +2670,26 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     w = box->right - box->left + 1;
     memset(out->cells, 0, (size_t)((box->bottom - box->top + 1) * w));
 
-    ring[1]  = -2 * w;
-    ring[0]  = -2 * w - 1;
-    ring[2]  = -2 * w + 1;
-    ring[3]  = -w - 2;
-    ring[4]  = -w - 1;
-    ring[5]  = -w;
-    ring[6]  = -w + 1;
-    ring[7]  = -w + 2;
-    ring[9]  = -1;
-    ring[8]  = -2;
-    ring[10] = 1;
-    ring[11] = 2;
-    ring[12] = w - 2;
-    ring[13] = w - 1;
-    ring[14] = w;
-    ring[15] = w + 1;
-    ring[17] = 2 * w - 1;
-    ring[16] = w + 2;
-    ring[18] = 2 * w;
-    ring[19] = 2 * w + 1;
+    g_tilemaskNeighbours[1]  = -2 * w;
+    g_tilemaskNeighbours[0]  = -2 * w - 1;
+    g_tilemaskNeighbours[2]  = -2 * w + 1;
+    g_tilemaskNeighbours[3]  = -w - 2;
+    g_tilemaskNeighbours[4]  = -w - 1;
+    g_tilemaskNeighbours[5]  = -w;
+    g_tilemaskNeighbours[6]  = -w + 1;
+    g_tilemaskNeighbours[7]  = -w + 2;
+    g_tilemaskNeighbours[9]  = -1;
+    g_tilemaskNeighbours[8]  = -2;
+    g_tilemaskNeighbours[10] = 1;
+    g_tilemaskNeighbours[11] = 2;
+    g_tilemaskNeighbours[12] = w - 2;
+    g_tilemaskNeighbours[13] = w - 1;
+    g_tilemaskNeighbours[14] = w;
+    g_tilemaskNeighbours[15] = w + 1;
+    g_tilemaskNeighbours[17] = 2 * w - 1;
+    g_tilemaskNeighbours[16] = w + 2;
+    g_tilemaskNeighbours[18] = 2 * w;
+    g_tilemaskNeighbours[19] = 2 * w + 1;
 
     tilew = tile.right - tile.left + 1;
 
@@ -2786,7 +2719,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
 
                 col++;
@@ -2797,18 +2730,17 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(out->cells, ring, (int32_t)(c - out->cells));
+                MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
         }
     }
 
     return marked;
-#undef ring
 }
 
 /* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
@@ -3004,24 +2936,18 @@ int32_t __cdecl CanPlaceAt(AM2_Point at, int32_t slot, int32_t kind)
 void __cdecl RebuildTileCover(void)
 {
     /* The map size and the weight table are read afresh at every use. */
-#define W       (g_mapTilesW)
-#define H       (g_mapTilesH)
-#define WEIGHTS (g_cellWeights)
     int32_t y;
 
-    memset(*(void * *)&g_tileCover, 0, (size_t)(W * H));
+    memset(*(void * *)&g_tileCover, 0, (size_t)(g_mapTilesW * g_mapTilesH));
 
-    for (y = 1; y < H - 1; y++) {
-        int32_t tile = W * y + 1;
+    for (y = 1; y < g_mapTilesH - 1; y++) {
+        int32_t tile = g_mapTilesW * y + 1;
         int32_t x;
 
-        for (x = 1; x < W - 1; tile++, x++)
-            if (WEIGHTS[(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+        for (x = 1; x < g_mapTilesW - 1; tile++, x++)
+            if (g_cellWeights[(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
                 TileCoverAdd((uint16_t)tile);
     }
-#undef W
-#undef H
-#undef WEIGHTS
 }
 
 typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
@@ -3064,13 +2990,12 @@ typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
  */
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 {
-#define REGIONS (g_regionOfCell)
     const int32_t *ring;
     int32_t        first;
     int32_t        delta;
 
-    if (REGIONS[tile] > 0)
-        return REGIONS[tile];
+    if (g_regionOfCell[tile] > 0)
+        return g_regionOfCell[tile];
 
     ring    = g_tileRing8 + (orig_region_rand() & 6);
 
@@ -3088,17 +3013,16 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         if (at > 0
             && at < g_mapTilesW
                     * g_mapTilesH
-            && REGIONS[at] > 0
+            && g_regionOfCell[at] > 0
             && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
-            REGIONS[tile] = REGIONS[at];
-            return REGIONS[tile];
+            g_regionOfCell[tile] = g_regionOfCell[at];
+            return g_regionOfCell[tile];
         }
 
         delta = *++ring;
         if (delta == first)
             return 0;
     }
-#undef REGIONS
 }
 
 /* AiRouteToward -- original 0x00407190, NINE callers: the step every AI arm
@@ -3182,8 +3106,8 @@ void __cdecl AiRouteToward(AM2_Object *o, AM2_SteerOut *out,
 
     pt = *dest;
 
-    from = kRegionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
-    to   = kRegionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
+    from = g_regionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
+    to   = g_regionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
 
     if (BeginMoveTo(o, &pt)) {
         o->routeGoal = pt;
@@ -3197,12 +3121,11 @@ void __cdecl AiRouteToward(AM2_Object *o, AM2_SteerOut *out,
 
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
-#define stride (g_regionStride)
         int16_t link;
 
         o->goalRegion = (int16_t)to;
 
-        if (kRegionCost[(uint32_t)(from * stride + to)]
+        if (g_regionCost[(uint32_t)(from * g_regionStride + to)]
             != g_regionStamp)
             RegionSolvePair(from, to);
 
@@ -3210,7 +3133,7 @@ void __cdecl AiRouteToward(AM2_Object *o, AM2_SteerOut *out,
             goto waypoint;
 
         {
-            int16_t hop = kRegionNext[(uint32_t)(from * stride + to)];
+            int16_t hop = g_regionNext[(uint32_t)(from * g_regionStride + to)];
 
             link = (int16_t)MiddleRegionLink(from, hop);
         }
@@ -3286,7 +3209,6 @@ heading:
             out->stop = 1;
         out->approach = 1;
     }
-#undef stride
 }
 
 /* AiTrooperStep -- original 0x004049C0, 1,168 bytes, twenty-six call sites
@@ -3386,9 +3308,9 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         goto after_region;
 
     fromTile   = TileOfPoint(*pos);
-    fromRegion = kRegionOfCell[(uint32_t)fromTile & 0xFFFFu];
+    fromRegion = g_regionOfCell[(uint32_t)fromTile & 0xFFFFu];
     toTile     = TileOfPoint(pt);
-    toRegion   = kRegionOfCell[(uint32_t)toTile & 0xFFFFu];
+    toRegion   = g_regionOfCell[(uint32_t)toTile & 0xFFFFu];
 
     /* Both answers are DISCARDED -- see the header. */
     if (!fromRegion)
@@ -3407,15 +3329,14 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         goto after_region;
 
     {
-#define stride (g_regionStride)
         int16_t link;
 
-        if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
+        if (g_regionCost[(uint32_t)(fromRegion * g_regionStride + toRegion)]
             != g_regionStamp)
             RegionSolvePair(fromRegion, toRegion);
 
         {
-            int16_t hop = kRegionNext[(uint32_t)(fromRegion * stride
+            int16_t hop = g_regionNext[(uint32_t)(fromRegion * g_regionStride
                                                  + toRegion)];
 
             link = (int16_t)MiddleRegionLink(fromRegion, hop);
@@ -3519,7 +3440,6 @@ walk:
         out->state = 3;
 
     ob->field578 = 0;
-#undef stride
 }
 
 /* RoachRouteToward -- original 0x00408210, three callers, all of them
@@ -3563,8 +3483,8 @@ void __cdecl RoachRouteToward(AM2_Object *o, AM2_RoachOut *out,
 
     pt = *dest;
 
-    from = kRegionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
-    to   = kRegionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
+    from = g_regionOfCell[(uint32_t)TileOfPoint(o->pos) & 0xFFFFu];
+    to   = g_regionOfCell[(uint32_t)TileOfPoint(pt) & 0xFFFFu];
 
     if (BeginMoveTo(o, &pt)) {
         o->routeGoal = pt;
@@ -3578,12 +3498,11 @@ void __cdecl RoachRouteToward(AM2_Object *o, AM2_RoachOut *out,
 
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
-#define stride (g_regionStride)
         int16_t link;
 
         o->goalRegion = (int16_t)to;
 
-        if (kRegionCost[(uint32_t)(from * stride + to)]
+        if (g_regionCost[(uint32_t)(from * g_regionStride + to)]
             != g_regionStamp)
             RegionSolvePair(from, to);
 
@@ -3591,7 +3510,7 @@ void __cdecl RoachRouteToward(AM2_Object *o, AM2_RoachOut *out,
             goto waypoint;
 
         {
-            int16_t hop = kRegionNext[(uint32_t)(from * stride + to)];
+            int16_t hop = g_regionNext[(uint32_t)(from * g_regionStride + to)];
 
             link = (int16_t)MiddleRegionLink(from, hop);
         }
@@ -3671,7 +3590,6 @@ heading:
 
     out->heading = AngleBetween(&o->pos, &pt);
     out->state = 2;
-#undef stride
 }
 
 /* AiStepIgnore -- original 0x00407BF0, one caller, which is the AI mode
@@ -3897,9 +3815,6 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
  * single 28: the same source around different surroundings -- in AiAttackBody
  * the bearing lands in ebx and the rank in ebp, the other way round from the
  * rest. All four match byte for byte on it. */
-#define AI_RANK (g_rankRecords[o->rank])
-#define AI_DIR  (g_sightBlockByDir[dir])
-#define AI_SIGHT_GEN (g_sightGeneration)
 /* The original hands AngleOfDelta the distance as a third argument it does
  * not read; the push is in the image, so it is reproduced. The cast goes
  * through void (*)(void) because that is GCC's sanctioned escape. */
@@ -3922,18 +3837,18 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
     dist    = ApproxDistXY(dx, dy);                                           \
     bearing = AI_ANGLE3(dx, dy, dist);                                        \
                                                                               \
-    if (abs(AngleDelta(facing, bearing)) > AI_RANK.field_04) { \
-        if (dist < AI_RANK.field_08)                           \
+    if (abs(AngleDelta(facing, bearing)) > g_rankRecords[o->rank].field_04) { \
+        if (dist < g_rankRecords[o->rank].field_08)            \
             goto SEEN_IT;                                                     \
         goto NOT_SEEN;                                                        \
     }                                                                         \
                                                                               \
     dir = (uint32_t)bearing / AM2_SIGHT_DIR_STEP;                             \
-    if (AI_DIR.trace_stamp != AI_SIGHT_GEN) {         \
+    if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration) { \
         uint16_t buf[AM2_AI_SIGHT_LINE_BUF];                                  \
         int32_t  n, i, reach;                                                 \
                                                                               \
-        AI_DIR.trace_stamp = AI_SIGHT_GEN;            \
+        g_sightBlockByDir[dir].trace_stamp = g_sightGeneration; \
         TraceTileLine(o->pos, seen->pos, buf, &n);                            \
                                                                               \
         for (i = 0; i < n; i++) {                                             \
@@ -3947,41 +3862,41 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
         }                                                                     \
                                                                               \
         reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;          \
-        if (reach >= AI_RANK.sight_range)                      \
-            reach = AI_RANK.sight_range;                       \
+        if (reach >= g_rankRecords[o->rank].sight_range)       \
+            reach = g_rankRecords[o->rank].sight_range;        \
                                                                               \
-        if (AI_DIR.stamp == AI_SIGHT_GEN) {           \
-            if (reach < AI_DIR.low)                   \
-                AI_DIR.low = (int16_t)reach;          \
-            if (reach < AI_DIR.mid)                   \
-                AI_DIR.mid = (int16_t)reach;          \
-            if (reach < AI_DIR.high)                  \
-                AI_DIR.high = (int16_t)reach;         \
+        if (g_sightBlockByDir[dir].stamp == g_sightGeneration) { \
+            if (reach < g_sightBlockByDir[dir].low)   \
+                g_sightBlockByDir[dir].low = (int16_t)reach; \
+            if (reach < g_sightBlockByDir[dir].mid)   \
+                g_sightBlockByDir[dir].mid = (int16_t)reach; \
+            if (reach < g_sightBlockByDir[dir].high)  \
+                g_sightBlockByDir[dir].high = (int16_t)reach; \
         } else {                                                              \
-            AI_DIR.stamp = AI_SIGHT_GEN;              \
-            AI_DIR.low   = (int16_t)reach;            \
-            AI_DIR.mid   = (int16_t)reach;            \
-            AI_DIR.high  = (int16_t)reach;            \
+            g_sightBlockByDir[dir].stamp = g_sightGeneration; \
+            g_sightBlockByDir[dir].low   = (int16_t)reach; \
+            g_sightBlockByDir[dir].mid   = (int16_t)reach; \
+            g_sightBlockByDir[dir].high  = (int16_t)reach; \
         }                                                                     \
     }                                                                         \
                                                                               \
-    if (AI_DIR.stamp == AI_SIGHT_GEN) {               \
+    if (g_sightBlockByDir[dir].stamp == g_sightGeneration) { \
         mine = ObjHeight(o);                                                  \
         his  = ObjHeight(seen);                                               \
         if (his >= mine) {                                                    \
-            if (dist > AI_DIR.low)                    \
+            if (dist > g_sightBlockByDir[dir].low)    \
                 goto NOT_SEEN;                                                \
             goto SEEN_IT;                                                     \
         }                                                                     \
         if (his + AM2_SIGHT_BAND_STEP >= mine) {                              \
-            if (dist > AI_DIR.mid)                    \
+            if (dist > g_sightBlockByDir[dir].mid)    \
                 goto NOT_SEEN;                                                \
             goto SEEN_IT;                                                     \
         }                                                                     \
-        if (dist > AI_DIR.high)                       \
+        if (dist > g_sightBlockByDir[dir].high)       \
             goto NOT_SEEN;                                                    \
     } else {                                                                  \
-        if (dist > AI_RANK.sight_range)                        \
+        if (dist > g_rankRecords[o->rank].sight_range)         \
             goto NOT_SEEN;                                                    \
     }                                                                         \
                                                                               \
@@ -4017,7 +3932,6 @@ void __cdecl AiAttackBody(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
     int32_t        routed = 0;
     uint8_t        hit;
     /* The leader is re-read from the context at every use after the test. */
-#define LEAD (c->leader)
 
     if (c->destDist > AM2_AI_ARRIVED_DIST) {
         o->dest = o->scriptPoint;
@@ -4029,7 +3943,7 @@ void __cdecl AiAttackBody(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
         o->scriptPoint = g_zeroPoint;
     }
 
-    seen = LEAD;
+    seen = c->leader;
     if (seen) {
         /* ONE SLOT, WRITTEN TWICE, inside the test: a type 3 with more than one
          * row aims with its turret and the hull's facing is simply overwritten.
@@ -4043,19 +3957,19 @@ engage:
          * turns toward what the context found. Writing the near arm as the far
          * one's `else` with a shared tail deletes that silently. */
         if (c->leadRange > c->wantRange) {
-            o->dest = LEAD->pos;
+            o->dest = c->leader->pos;
             if (!routed)
                 AiRouteToward(o, out, c, 0);
-            o->targetUid = LEAD->uid;
-            c->observer = LEAD;
+            o->targetUid = c->leader->uid;
+            c->observer = c->leader;
             c->range = c->leadRange;
             c->bearing = c->leadBearing;
             out->aim = c->leadBearing;
             goto done;
         }
 
-        o->targetUid = LEAD->uid;
-        c->observer = LEAD;
+        o->targetUid = c->leader->uid;
+        c->observer = c->leader;
         c->range = c->leadRange;
         c->bearing = c->leadBearing;
         out->aim = c->leadBearing;
@@ -4079,14 +3993,14 @@ engage:
                 out->aim = hit;
             o->hitDir = 0;
         }
-        if (LEAD
+        if (c->leader
             && (uint32_t)(g_gameClockMs - o->deadlineD0)
                >= AM2_AI_TURN_DELAY_MS)
             out->aim = c->leadBearing;
 
-        if (!ObjIsType2(LEAD))
+        if (!ObjIsType2(c->leader))
             goto done;
-        o->dest = LEAD->pos;
+        o->dest = c->leader->pos;
         if (routed)
             goto done;
         AiRouteToward(o, out, c, 0);
@@ -4094,7 +4008,7 @@ engage:
 
 out_of_sight:
         /* Face it and walk to it, but do not claim it as the observer. */
-        o->dest = LEAD->pos;
+        o->dest = c->leader->pos;
         if (!routed)
             AiRouteToward(o, out, c, 0);
         out->aim = c->leadBearing;
@@ -4123,7 +4037,6 @@ out_of_sight:
 
 done:
     ConsiderSighting(o, out, c);
-#undef LEAD
 }
 
 /* The tile-count-to-distance conversion, the clamp and the three-band minimum
@@ -4171,10 +4084,8 @@ static inline void AiSightTrace(const AM2_Object *const &o,
     }
 
     reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
-#define rank g_rankRecords[o->rank]
-    if (reach >= rank.sight_range)
-        reach = rank.sight_range;
-#undef rank
+    if (reach >= g_rankRecords[o->rank].sight_range)
+        reach = g_rankRecords[o->rank].sight_range;
 
     if (g_sightBlockByDir[dir].stamp == gen) {
         if (reach < g_sightBlockByDir[dir].low)
@@ -4232,13 +4143,11 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     /* The leader and the found object are re-read at every use. Each step
      * and promotion is written at its site; VC6 cross-jumps the ones whose
      * registers agree. */
-#define LEAD  (c->leader)
-#define FOUND (c->found)
 #define PROMOTE_FOUND()                                                       \
     do {                                                                      \
         o->targetUid =                               \
-            FOUND->uid;                         \
-        c->observer = FOUND;                          \
+            c->found->uid;                      \
+        c->observer = c->found;                       \
         c->range =                                  \
             c->foundRange;                   \
         c->bearing =                                           \
@@ -4247,8 +4156,8 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 #define PROMOTE_LEAD()                                                        \
     do {                                                                      \
         o->targetUid =                               \
-            LEAD->uid;                          \
-        c->observer = LEAD;                           \
+            c->leader->uid;                     \
+        c->observer = c->leader;                      \
         c->range =                                  \
             c->leadRange;                    \
         c->bearing =                                           \
@@ -4259,7 +4168,7 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         if (range > c->wantRange) {
             o->dest = c->observer->pos;
             AiTrooperStep(o, out, c);
-            if (FOUND)
+            if (c->found)
                 PROMOTE_FOUND();
             goto done;
         }
@@ -4282,7 +4191,7 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     if (c->destDistB > AM2_AI_ENGAGE_DEST_B) {
         o->dest = o->goalPoint;
         AiTrooperStep(o, out, c);
-        if (FOUND)
+        if (c->found)
             PROMOTE_FOUND();
         goto done;
     }
@@ -4291,7 +4200,7 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         o->goalPoint = g_zeroPoint;
         o->dest = o->scriptPoint;
         AiTrooperStep(o, out, c);
-        if (FOUND)
+        if (c->found)
             PROMOTE_FOUND();
         goto done;
     }
@@ -4300,7 +4209,7 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     o->goalPoint = g_zeroPoint;
     o->scriptPoint = g_zeroPoint;
 
-    if (LEAD) {
+    if (c->leader) {
         /* Out of the band the current weapon wants: pick another and rebuild
          * the weapon half of the context around it. */
         if (c->leadRange
@@ -4309,13 +4218,13 @@ void __cdecl AiEngageStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
             UnitWeaponInfo(o, c);
         }
 
-        seen = LEAD;
+        seen = c->leader;
         AM2_AI_SIGHT_TEST(in_sight, out_of_sight);
 
 in_sight:
         if (c->leadRange
             > c->wantRange) {
-            o->dest = LEAD->pos;
+            o->dest = c->leader->pos;
             AiTrooperStep(o, out, c);
             PROMOTE_LEAD();
             goto done;
@@ -4323,8 +4232,8 @@ in_sight:
 
         /* Close enough to act on. An object that is not one of types 2, 3 or
          * 8 has to carry flag 4 to be worth reacting to at all. */
-        if (!ObjIsTypeIn238(LEAD)
-            && !(LEAD->flagsLo & 4))
+        if (!ObjIsTypeIn238(c->leader)
+            && !(c->leader->flagsLo & 4))
             goto done;
 
         PROMOTE_LEAD();
@@ -4333,11 +4242,11 @@ in_sight:
         goto done;
 
 out_of_sight:
-        o->dest = LEAD->pos;
+        o->dest = c->leader->pos;
         AiTrooperStep(o, out, c);
         /* A unit that cannot see its leader still adopts it as the observer
          * when nothing was found. */
-        if (FOUND)
+        if (c->found)
             PROMOTE_FOUND();
         else
             PROMOTE_LEAD();
@@ -4345,7 +4254,7 @@ out_of_sight:
     }
 
     AiHitReact(o, out, c);
-    if (FOUND)
+    if (c->found)
         PROMOTE_FOUND();
     AiKeepRange(o, out, c);
     if (c->observer)
@@ -4356,8 +4265,6 @@ done:
     ConsiderSightingC(o, out, c);
 #undef PROMOTE_LEAD
 #undef PROMOTE_FOUND
-#undef FOUND
-#undef LEAD
 }
 
 /* AiPatrolStep -- original 0x004057D0, 1,344 bytes, three callers, one of them
@@ -4391,7 +4298,6 @@ done:
 void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
     AM2_Object *seen;
-#define LEAD (c->leader)
 
     /* Save the state point, or remember that there was none. */
     if ((uint16_t)o->scriptPoint.x)
@@ -4417,8 +4323,8 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
             goto react;
         }
 
-        if (LEAD) {
-            o->dest = LEAD->pos;
+        if (c->leader) {
+            o->dest = c->leader->pos;
             AiTrooperStep(o, out, c);
             goto tail;
         }
@@ -4465,7 +4371,7 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         goto react;
     }
 
-    seen = LEAD;
+    seen = c->leader;
     if (!seen)
         goto react;
 
@@ -4480,18 +4386,18 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 seen_it:
     if (c->leadRange
         >= c->wantRange) {
-        o->dest = LEAD->pos;
+        o->dest = c->leader->pos;
         AiTrooperStep(o, out, c);
-        o->targetUid = LEAD->uid;
-        c->observer = LEAD;
+        o->targetUid = c->leader->uid;
+        c->observer = c->leader;
         c->range = c->leadRange;
         c->bearing = c->leadBearing;
         goto tail;
     }
 
     o->dest = g_zeroPoint;
-    o->targetUid = LEAD->uid;
-    c->observer = LEAD;
+    o->targetUid = c->leader->uid;
+    c->observer = c->leader;
     c->range = c->leadRange;
     c->bearing = c->leadBearing;
 
@@ -4510,7 +4416,7 @@ react:
 
 not_seen:
     /* Out of sight: walk toward it. */
-    o->dest = LEAD->pos;
+    o->dest = c->leader->pos;
     AiTrooperStep(o, out, c);
 
 tail:
@@ -4540,7 +4446,6 @@ tail:
         o->followUid = o->targetUid;
 
     ConsiderSightingC(o, out, c);
-#undef LEAD
 }
 
 /* AiGuardStep -- original 0x00405220, 1,424 bytes, one caller. AiPatrolStep's
@@ -4571,7 +4476,6 @@ tail:
  * gets to shoot -- which is exactly what merging them would have lost. */
 void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-#define LEAD (c->leader)
     int32_t  dest;
     uint16_t state;
 
@@ -4655,7 +4559,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         goto react;
     }
 
-    if (!LEAD)
+    if (!c->leader)
         goto react;
 
     /* Forget who we were following BEFORE looking, so what is seen replaces it
@@ -4663,7 +4567,7 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     o->followUid = 0;
 
     {
-        const AM2_Object *seen = LEAD;
+        const AM2_Object *seen = c->leader;
 
         AM2_AI_SIGHT_TEST(seen_it, not_seen);
 
@@ -4672,17 +4576,17 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 seen_it:
         if (c->leadRange
             >= c->wantRange) {
-            o->dest = LEAD->pos;
+            o->dest = c->leader->pos;
             AiTrooperStep(o, out, c);
-            o->targetUid = LEAD->uid;
-            c->observer = LEAD;
+            o->targetUid = c->leader->uid;
+            c->observer = c->leader;
             c->range = c->leadRange;
             c->bearing = c->leadBearing;
             goto react;
         }
         o->dest = g_zeroPoint;
-        o->targetUid = LEAD->uid;
-        c->observer = LEAD;
+        o->targetUid = c->leader->uid;
+        c->observer = c->leader;
         c->range = c->leadRange;
         c->bearing = c->leadBearing;
         goto react;
@@ -4691,7 +4595,7 @@ seen_it:
 not_seen:
     /* Out of sight: walk toward it, and DO NOT adopt it -- straight to the
      * react block, as AiPatrolStep's out-of-sight arm skips it too. */
-    o->dest = LEAD->pos;
+    o->dest = c->leader->pos;
     AiTrooperStep(o, out, c);
 
 react:
@@ -4727,7 +4631,6 @@ tail:
         o->followUid = o->targetUid;
 
     ConsiderSightingC(o, out, c);
-#undef LEAD
 }
 
 /* ObjectsInRect is reconstructed in win32/mapdraw.cpp and is declared here
@@ -4966,19 +4869,18 @@ score:
 
             delta = AngleDelta(look, candBearing);
             delta = abs(delta);
-#define rank g_rankRecords[o->rank]
-            if (delta > rank.field_04) {
-                if (rank.field_08 <= candRange)
+            if (delta > g_rankRecords[o->rank].field_04) {
+                if (g_rankRecords[o->rank].field_08 <= candRange)
                     continue;
                 goto in_sight;
             }
 
             /* Keyed on the BEARING, not the facing -- see orig.h. */
             dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
-            if (g_sightBlockByDir[dir].trace_stamp != AI_SIGHT_GEN)
-                AiSightTrace(o, it, dir, viewerAttr, AI_SIGHT_GEN);
+            if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
+                AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration);
 
-            if (!(g_sightBlockByDir[dir].stamp != AI_SIGHT_GEN)) {
+            if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
                 int32_t mine = ObjHeight(o);
                 int32_t his  = ObjHeight(it);
 
@@ -4992,10 +4894,9 @@ score:
                     continue;
                 }
             } else {
-                if (candRange > rank.sight_range)
+                if (candRange > g_rankRecords[o->rank].sight_range)
                     continue;
             }
-#undef rank
         }
 
 in_sight:
@@ -5311,8 +5212,6 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  */
 void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
-#define LEAD (c->leader)
-#define RANGE (c->leadRange)
 #define HEAD_FOR() (o->dest = \
                     c->dest)
     int32_t  range;
@@ -5320,30 +5219,30 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 
     o->scriptPoint = g_zeroPoint;
 
-    if (!LEAD)
+    if (!c->leader)
         goto hitreact;
 
-    if (!ArmyAlliedWithObj(o->owner, LEAD, 1))
+    if (!ArmyAlliedWithObj(o->owner, c->leader, 1))
         o->field110 += 1;
 
     if (o->field110 <= 0) {
         /* ---- not provoked ---- */
-        if (ObjIsItem(LEAD)
-            && ArmyAlliedWithObj(o->owner, LEAD, 0)) {
-            if (RANGE <= AM2_AI_LEAD_NEAR)
+        if (ObjIsItem(c->leader)
+            && ArmyAlliedWithObj(o->owner, c->leader, 0)) {
+            if (c->leadRange <= AM2_AI_LEAD_NEAR)
                 goto hitreact;
             HEAD_FOR();
             AiTrooperStep(o, out, c);
-            if (RANGE <= AM2_AI_LEAD_CLOSE
+            if (c->leadRange <= AM2_AI_LEAD_CLOSE
                 && o->sight.state == 2)
                 o->sight.state = 3;
             goto promote;
         }
 
-        if (ObjsAreAllied(o, LEAD, 0)) {
+        if (ObjsAreAllied(o, c->leader, 0)) {
             d = ApproxDist(&o->pos,
-                           &LEAD->pos);
-            range = RANGE;
+                           &c->leader->pos);
+            range = c->leadRange;
             if (range > AM2_AI_LEAD_FAR)
                 goto walk;
             if ((range > d + AM2_AI_LEAD_CLOSE && range > AM2_AI_LEAD_CLOSE)
@@ -5351,8 +5250,8 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                 HEAD_FOR();
                 goto step;
             }
-            if (!PointsDiffer(LEAD->pos,
-                              LEAD->prevPos))
+            if (!PointsDiffer(c->leader->pos,
+                              c->leader->prevPos))
                 goto hitreact;
             HEAD_FOR();
             AiTrooperStep(o, out, c);
@@ -5365,7 +5264,7 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         }
 
         d = ApproxDist(&o->pos,
-                       &LEAD->pos);
+                       &c->leader->pos);
         if (d < AM2_AI_LEAD_CLOSE)
             goto hitreact;
         HEAD_FOR();
@@ -5373,22 +5272,22 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     }
 
     /* ---- provoked ---- */
-    if (ObjIsItem(LEAD)
-        && ArmyAlliedWithObj(o->owner, LEAD, 0)) {
-        range = RANGE;
+    if (ObjIsItem(c->leader)
+        && ArmyAlliedWithObj(o->owner, c->leader, 0)) {
+        range = c->leadRange;
         if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
             goto hitreact;
         HEAD_FOR();
         goto step;
     }
 
-    if (ObjsAreAllied(o, LEAD, 1)) {
-        if (RANGE > AM2_AI_LEAD_FAR) {
+    if (ObjsAreAllied(o, c->leader, 1)) {
+        if (c->leadRange > AM2_AI_LEAD_FAR) {
             HEAD_FOR();
             goto step;
         }
-        if (!PointsDiffer(LEAD->pos,
-                          LEAD->prevPos))
+        if (!PointsDiffer(c->leader->pos,
+                          c->leader->prevPos))
             goto hitreact;
         HEAD_FOR();
         AiTrooperStep(o, out, c);
@@ -5401,11 +5300,11 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     }
 
     d = ApproxDist(&o->pos,
-                   &LEAD->pos);
+                   &c->leader->pos);
     if (o->fieldEC)
         goto walk;
     if (d >= c->wantRange
-        && RANGE > AM2_AI_LEAD_CLOSE)
+        && c->leadRange > AM2_AI_LEAD_CLOSE)
         goto walk;
 
 hitreact:
@@ -5424,8 +5323,6 @@ promote:
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
     ConsiderSightingC(o, out, c);
 #undef HEAD_FOR
-#undef RANGE
-#undef LEAD
 }
 
 /* AiHitReact -- original 0x00405050, TEN call sites across the trooper AI
@@ -5480,13 +5377,12 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                && c->kind != 3) {
         int32_t limit =
             g_rankRecords[o->rank].threshold;
-#define V (c->seed)
-        if ((int32_t)V < (limit >> 1)) {
+        if ((int32_t)c->seed < (limit >> 1)) {
             int32_t slot = c->klass * 2
-                           + (V >= 0x80 ? 1 : 0);
+                           + (c->seed >= 0x80 ? 1 : 0);
 
             out->state = (g_hitPoseByClass)[slot];
-        } else if ((int32_t)V < limit) {
+        } else if ((int32_t)c->seed < limit) {
             out->state = AM2_POSE_HIT_HEAVY;
         }
     }
@@ -5495,7 +5391,6 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         out->bearing = o->hitDir;
 
     o->hitDir = 0;
-#undef V
 }
 
 /* AiKeepRange -- original 0x00405100, six call sites in five functions across
@@ -5537,9 +5432,8 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 {
     /* The clock is re-read at every use, as the image does. */
-#define now (g_gameClockMs)
 
-    if (o->deadline58 > now) {
+    if (o->deadline58 > g_gameClockMs) {
         if (ApproxDist(&o->pos,
                        &o->dest)
             < AM2_AI_REACHED_DIST) {
@@ -5557,16 +5451,16 @@ void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         && c->range
            <= c->wantRange) {
         if (o->deadline58 == 0)
-            o->deadline58 = now;
+            o->deadline58 = g_gameClockMs;
 
-        if (now - o->deadline58
+        if (g_gameClockMs - o->deadline58
             > AM2_AI_KEEP_RANGE_MS) {
             RandomPointToward(o,
                               c->observer,
                               c->wantRange,
                               &o->dest);
             AiTrooperStep(o, out, c);
-            o->deadline58 = now + AM2_AI_KEEP_RANGE_MS;
+            o->deadline58 = g_gameClockMs + AM2_AI_KEEP_RANGE_MS;
         } else if (!o->field540
                    && c->kind != 3
                    && c->seed < 0x10
@@ -5578,10 +5472,9 @@ void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         }
     }
 
-    if (now - o->deadlineD0
+    if (g_gameClockMs - o->deadlineD0
         >= AM2_AI_TURN_DELAY_MS)
         out->bearing = c->bearing;
-#undef now
 }
 
 /* AiWalkStep -- original 0x00405D30, two callers. The trooper family's minimal
@@ -5810,18 +5703,17 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
                                const AM2_SightCtx *c)
 {
     /* The range cap is read from the record at every use. */
-#define maxRange (c->maxRange)
 
     if (c->weapon
         && c->ready) {
         int32_t range = c->range;
 
-        if (range > 0 && range < maxRange) {
+        if (range > 0 && range < c->maxRange) {
             int32_t delta =
                 abs(AngleDelta(out->bearing, c->bearing));
 
             if ((uint8_t)delta < AM2_SIGHT_CONE_B
-                || maxRange == AM2_SIGHT_OMNI_RANGE) {
+                || c->maxRange == AM2_SIGHT_OMNI_RANGE) {
                 /* The observer is read from the record at every use. */
                 out->hit = 1;
 
@@ -5832,7 +5724,7 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
                     out->uid = c->observer->uid;
 
                     if (ObjIsOurs(c->observer, 1)
-                        && maxRange != AM2_SIGHT_OMNI_RANGE) {
+                        && c->maxRange != AM2_SIGHT_OMNI_RANGE) {
                         RevealObj(o);
                         o->revealedUntil = g_gameClockMs + AM2_REVEAL_MS;
                     }
@@ -5843,7 +5735,7 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
 
     if (c->kind == 3
         && c->range > 0
-        && c->range < maxRange
+        && c->range < c->maxRange
         && out->state == 2)
         out->state = 3;
 
@@ -5851,7 +5743,6 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
         out->seen = 1;
         o->field578 = 1;
     }
-#undef maxRange
 }
 
 /* SealMapEdges -- original 0x0042BCF0, one caller.
@@ -5892,40 +5783,32 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
 void __cdecl SealMapEdges(void)
 {
     /* The map size and both tables are read afresh at every use. */
-#define W       (g_mapTilesW)
-#define H       (g_mapTilesH)
-#define WEIGHTS (g_cellWeights)
-#define FLAGS   (g_tileFlags)
     int32_t x, y, i;
 
-    for (x = 0; x < W; x++) {
-        WEIGHTS[x]               = (int8_t)AM2_CELL_WEIGHT_STEP;
-        WEIGHTS[(H - 1) * W + x] = (int8_t)AM2_CELL_WEIGHT_STEP;
+    for (x = 0; x < g_mapTilesW; x++) {
+        g_cellWeights[x]               = (int8_t)AM2_CELL_WEIGHT_STEP;
+        g_cellWeights[(g_mapTilesH - 1) * g_mapTilesW + x] = (int8_t)AM2_CELL_WEIGHT_STEP;
     }
 
-    for (y = 1; y < H; y++) {
-        WEIGHTS[W * y - 1] = (int8_t)AM2_CELL_WEIGHT_STEP;
-        WEIGHTS[W * y]     = (int8_t)AM2_CELL_WEIGHT_STEP;
+    for (y = 1; y < g_mapTilesH; y++) {
+        g_cellWeights[g_mapTilesW * y - 1] = (int8_t)AM2_CELL_WEIGHT_STEP;
+        g_cellWeights[g_mapTilesW * y]     = (int8_t)AM2_CELL_WEIGHT_STEP;
     }
 
-    for (i = 0, y = 0; y < H; y++) {
-        for (x = 0; x < W; i++, x++) {
-            if (FLAGS[i] & AM2_TILE_OPEN)
-                WEIGHTS[i] = (int8_t)AM2_CELL_WEIGHT_STEP;
+    for (i = 0, y = 0; y < g_mapTilesH; y++) {
+        for (x = 0; x < g_mapTilesW; i++, x++) {
+            if (g_tileFlags[i] & AM2_TILE_OPEN)
+                g_cellWeights[i] = (int8_t)AM2_CELL_WEIGHT_STEP;
 
-            if (WEIGHTS[i] >= (int8_t)AM2_CELL_WEIGHT_STEP)
-                FLAGS[i] |= AM2_TILE_BLOCKS;
+            if (g_cellWeights[i] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+                g_tileFlags[i] |= AM2_TILE_BLOCKS;
 
             /* `h - AM2_EDGE_MARGIN` on BOTH axes -- see above. */
-            if (!(y >= AM2_EDGE_MARGIN && y <= H - AM2_EDGE_MARGIN
-                  && x >= AM2_EDGE_MARGIN && x <= H - AM2_EDGE_MARGIN))
-                FLAGS[i] |= AM2_TILE_NEAR_EDGE;
+            if (!(y >= AM2_EDGE_MARGIN && y <= g_mapTilesH - AM2_EDGE_MARGIN
+                  && x >= AM2_EDGE_MARGIN && x <= g_mapTilesH - AM2_EDGE_MARGIN))
+                g_tileFlags[i] |= AM2_TILE_NEAR_EDGE;
         }
     }
-#undef W
-#undef H
-#undef WEIGHTS
-#undef FLAGS
 }
 
 /* UnrevealArea -- original 0x0043A330, one caller.
@@ -5966,8 +5849,6 @@ void __cdecl SealMapEdges(void)
 void __cdecl UnrevealArea(int32_t army, AM2_Point at)
 {
     /* The map's size is read from its globals at every use. */
-#define MAP_W (g_mapTilesW)
-#define MAP_H (g_mapTilesH)
     uint16_t tile;
     int32_t  x, y, x0, x1, y0, y1;
 
@@ -5975,13 +5856,13 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
         return;
 
     tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
-    x    = (int32_t)(tile & (uint32_t)(MAP_W - 1));
+    x    = (int32_t)(tile & (uint32_t)(g_mapTilesW - 1));
     y    = (int32_t)(tile >> g_mapRowShift);
 
-    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, MAP_W - 1);
-    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, MAP_W - 1);
-    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0, MAP_H - 1);
-    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0, MAP_H - 1);
+    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, g_mapTilesW - 1);
+    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, g_mapTilesW - 1);
+    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0, g_mapTilesH - 1);
+    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0, g_mapTilesH - 1);
 
     {
         int32_t slot;
@@ -5993,7 +5874,7 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
             if (!ArmiesAllied(army, slot))
                 continue;
 
-            at_i = MAP_H * y0 + x0;     /* height for the corner; see above */
+            at_i = g_mapTilesH * y0 + x0;     /* height for the corner; see above */
 
             if (y0 > y1)
                 continue;
@@ -6012,12 +5893,10 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
                     } while (--cols);
                 }
 
-                at_i += MAP_W - x1 + x0 - 1;   /* width for the stride */
+                at_i += g_mapTilesW - x1 + x0 - 1;   /* width for the stride */
             } while (--rows);
         }
     }
-#undef MAP_H
-#undef MAP_W
 }
 
 /* The straight-line distance between two regions, in the units ApproxDistXY
@@ -6027,14 +5906,12 @@ void __cdecl UnrevealArea(int32_t army, AM2_Point at)
  * as one expression the way the original computes it, inline, three times
  * in RegionFindPath. */
 #define RS_TILE(r) ((uint32_t)(r)->tile)
-#define RS_SHIFT   ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu)
-#define RS_WMASK   ((uint32_t)(g_mapTilesW - 1))
 /* A macro, not an inline function: as a function its parameters are two
  * more variables to VC6 (and as references they crash its non-relink
  * compile), and the image has none. */
 #define RegionSpan(a, b)                                                     \
-    ApproxDistXY((int32_t)((RS_TILE(b) & RS_WMASK) - (RS_TILE(a) & RS_WMASK)), \
-                 (int32_t)((RS_TILE(b) >> RS_SHIFT) - (RS_TILE(a) >> RS_SHIFT)))
+    ApproxDistXY((int32_t)((RS_TILE(b) & ((uint32_t)(g_mapTilesW - 1))) - (RS_TILE(a) & ((uint32_t)(g_mapTilesW - 1)))), \
+                 (int32_t)((RS_TILE(b) >> ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu)) - (RS_TILE(a) >> ((uint32_t)*(const int32_t *)&g_mapRowShift & 0xFFFFu))))
 
 static inline AM2_Region *RegionAt(int32_t id)
 {
@@ -6130,13 +6007,6 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 /* The search's working pointers are GLOBALS and the original goes through
  * them at every use -- every field store below is a reload of the global
  * in the image. */
-#define GOAL  (g_regionGoal)
-#define HEAD  (g_regionOpenHead)
-#define CUR   (g_regionCurrent)
-#define NB    (g_regionNeighbour)
-#define WALK  (g_regionWalk)
-#define PREV  (g_regionInsertPrev)
-#define GEN   (g_regionGeneration)
     int32_t  edges = 0;
     int32_t  i;
     int32_t  g;
@@ -6149,152 +6019,144 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
         return 0;
 
     if (g_regionSearchState == -1) {
-        GEN += 1;
-        GOAL = RegionAt(to);
-        HEAD = RegionAt(from);
+        g_regionGeneration += 1;
+        g_regionGoal = RegionAt(to);
+        g_regionOpenHead = RegionAt(from);
 
-        HEAD->g = 0;
+        g_regionOpenHead->g = 0;
         /* _ftol in the original; a C cast truncates toward zero the same
          * way and the value cannot be negative here. */
-        HEAD->h = (int32_t)
-            ((double)RegionSpan(HEAD, GOAL)
+        g_regionOpenHead->h = (int32_t)
+            ((double)RegionSpan(g_regionOpenHead, g_regionGoal)
              * *(const double *)(uintptr_t)AM2_CONST_1_5);
-        HEAD->depth = 0;
-        HEAD->stamp = (uint16_t)GEN;
-        HEAD->state  = AM2_REGION_STATE_OPEN;
-        HEAD->prev   = (AM2_Region *)0;
-        HEAD->next   = (AM2_Region *)0;
-        HEAD->parent = (AM2_Region *)0;
+        g_regionOpenHead->depth = 0;
+        g_regionOpenHead->stamp = (uint16_t)g_regionGeneration;
+        g_regionOpenHead->state  = AM2_REGION_STATE_OPEN;
+        g_regionOpenHead->prev   = (AM2_Region *)0;
+        g_regionOpenHead->next   = (AM2_Region *)0;
+        g_regionOpenHead->parent = (AM2_Region *)0;
     } else {
         /* Dead -- see above. Written out because the original has it. */
-        HEAD = g_regionResumeNode;
+        g_regionOpenHead = g_regionResumeNode;
         to   = g_regionResumeGoalid;
         g_regionSearchState = -1;
     }
 
     while (1) {
-        if (!HEAD)
+        if (!g_regionOpenHead)
             return 0;
 
-        CUR  = HEAD;
-        HEAD = HEAD->next;
-        if (HEAD)
-            HEAD->prev = (AM2_Region *)0;
+        g_regionCurrent  = g_regionOpenHead;
+        g_regionOpenHead = g_regionOpenHead->next;
+        if (g_regionOpenHead)
+            g_regionOpenHead->prev = (AM2_Region *)0;
 
-        CUR->state = AM2_REGION_STATE_CLOSED;
+        g_regionCurrent->state = AM2_REGION_STATE_CLOSED;
 
-        if (CUR->id == to)
+        if (g_regionCurrent->id == to)
             break;
 
         /* The link count and table are read through the region's ID, not
          * through CUR -- the same record, reached the long way. */
         for (i = 0;
-             i < RegionAt(CUR->id)->nlinks;
+             i < RegionAt(g_regionCurrent->id)->nlinks;
              i++) {
             edges++;
 
-            if (!RegionAt(RegionAt(CUR->id)->links[i].to)->active)
+            if (!RegionAt(RegionAt(g_regionCurrent->id)->links[i].to)->active)
                 continue;
 
-            NB = RegionAt(RegionAt(CUR->id)->links[i].to);
+            g_regionNeighbour = RegionAt(RegionAt(g_regionCurrent->id)->links[i].to);
 
-            g = CUR->g
-                + RegionSpan(CUR, NB) * AM2_REGION_STEP_WEIGHT;
-            h = (int32_t)((double)RegionSpan(NB, GOAL)
+            g = g_regionCurrent->g
+                + RegionSpan(g_regionCurrent, g_regionNeighbour) * AM2_REGION_STEP_WEIGHT;
+            h = (int32_t)((double)RegionSpan(g_regionNeighbour, g_regionGoal)
                           * *(const double *)(uintptr_t)AM2_CONST_1_5);
 
             /* The stamp is widened, not GEN narrowed: past 0xFFFF searches
              * no stamp matches and every node looks fresh. */
-            if (NB->stamp == GEN) {
-                if (NB->state
+            if (g_regionNeighbour->stamp == g_regionGeneration) {
+                if (g_regionNeighbour->state
                     & AM2_REGION_STATE_OPEN) {
-                    if (g >= NB->g)
+                    if (g >= g_regionNeighbour->g)
                         continue;
 
                     /* h is NOT rewritten here -- see above. */
-                    NB->parent = CUR;
-                    NB->g      = g;
-                    NB->depth  = CUR->depth + 1;
+                    g_regionNeighbour->parent = g_regionCurrent;
+                    g_regionNeighbour->g      = g;
+                    g_regionNeighbour->depth  = g_regionCurrent->depth + 1;
 
                     /* Unlink, so the insertion below can place it again -- and
                      * at the head it drops the whole list (see above). */
-                    if (NB->prev)
-                        NB->prev->next =
-                            NB->next;
+                    if (g_regionNeighbour->prev)
+                        g_regionNeighbour->prev->next =
+                            g_regionNeighbour->next;
                     else
-                        HEAD = (AM2_Region *)0;
-                    if (NB->next)
-                        NB->next->prev =
-                            NB->prev;
-                } else if (NB->state
+                        g_regionOpenHead = (AM2_Region *)0;
+                    if (g_regionNeighbour->next)
+                        g_regionNeighbour->next->prev =
+                            g_regionNeighbour->prev;
+                } else if (g_regionNeighbour->state
                            & AM2_REGION_STATE_CLOSED) {
                     continue;
                 }
             } else {
-                NB->stamp = (uint16_t)GEN;
-                NB->g        = g;
-                NB->h        = h;
-                NB->parent   = CUR;
-                NB->depth    = CUR->depth + 1;
-                NB->state = AM2_REGION_STATE_OPEN;
+                g_regionNeighbour->stamp = (uint16_t)g_regionGeneration;
+                g_regionNeighbour->g        = g;
+                g_regionNeighbour->h        = h;
+                g_regionNeighbour->parent   = g_regionCurrent;
+                g_regionNeighbour->depth    = g_regionCurrent->depth + 1;
+                g_regionNeighbour->state = AM2_REGION_STATE_OPEN;
             }
 
             /* Insert NB into the open list, sorted by g+h ascending. */
-            if (!HEAD) {
-                HEAD = NB;
-                NB->next   = (AM2_Region *)0;
-                HEAD->prev = (AM2_Region *)0;
+            if (!g_regionOpenHead) {
+                g_regionOpenHead = g_regionNeighbour;
+                g_regionNeighbour->next   = (AM2_Region *)0;
+                g_regionOpenHead->prev = (AM2_Region *)0;
                 continue;
             }
 
-            for (WALK = HEAD, PREV = (AM2_Region *)0; WALK;
-                 WALK = WALK->next) {
-                if (WALK->h + WALK->g
-                    >= NB->h + NB->g)
+            for (g_regionWalk = g_regionOpenHead,
+                 g_regionInsertPrev = (AM2_Region *)0; g_regionWalk;
+                 g_regionWalk = g_regionWalk->next) {
+                if (g_regionWalk->h + g_regionWalk->g
+                    >= g_regionNeighbour->h + g_regionNeighbour->g)
                     break;
-                PREV = WALK;
+                g_regionInsertPrev = g_regionWalk;
             }
 
-            if (PREV) {
-                NB->next = PREV->next;
-                if (NB->next)
-                    NB->next->prev = NB;
-                PREV->next = NB;
-                NB->prev   = PREV;
+            if (g_regionInsertPrev) {
+                g_regionNeighbour->next = g_regionInsertPrev->next;
+                if (g_regionNeighbour->next)
+                    g_regionNeighbour->next->prev = g_regionNeighbour;
+                g_regionInsertPrev->next = g_regionNeighbour;
+                g_regionNeighbour->prev   = g_regionInsertPrev;
             } else {
-                NB->next   = HEAD;
-                NB->prev   = (AM2_Region *)0;
-                HEAD->prev = NB;
-                HEAD = NB;
+                g_regionNeighbour->next   = g_regionOpenHead;
+                g_regionNeighbour->prev   = (AM2_Region *)0;
+                g_regionOpenHead->prev = g_regionNeighbour;
+                g_regionOpenHead = g_regionNeighbour;
             }
         }
     }
 
     /* Found: CUR is the goal. */
-    WALK = CUR;
-    if (CUR->depth >= AM2_REGION_DEPTH_MAX)
+    g_regionWalk = g_regionCurrent;
+    if (g_regionCurrent->depth >= AM2_REGION_DEPTH_MAX)
         return 0;
 
-    *len = CUR->depth + 1;
+    *len = g_regionCurrent->depth + 1;
 
-    for (slot = path + CUR->depth; WALK;
-         WALK = WALK->parent)
-        *slot-- = WALK->id;
+    for (slot = path + g_regionCurrent->depth; g_regionWalk;
+         g_regionWalk = g_regionWalk->parent)
+        *slot-- = g_regionWalk->id;
 
     (void)edges;
     return 1;
-#undef GOAL
-#undef HEAD
-#undef CUR
-#undef NB
-#undef WALK
-#undef PREV
-#undef GEN
 }
 #undef RegionSpan
 #undef RS_TILE
-#undef RS_SHIFT
-#undef RS_WMASK
 
 
 /* RegionSolvePair -- original 0x00438300, four callers. Solve the route from
@@ -6334,40 +6196,32 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
 
     /* Every table and the stride are read from their globals at each
      * store. */
-#define NEXT   (g_regionNext)
-#define COST   (g_regionCost)
-#define STRIDE (g_regionStride)
-#define STAMP  (g_regionStamp)
     if (!g_regions[to].active)
         return;
 
     if (!RegionFindPath(from, to, path, &len)) {
-        (NEXT + from * STRIDE)[to] = 0;
-        (NEXT + to * STRIDE)[from] = 0;
+        (g_regionNext + from * g_regionStride)[to] = 0;
+        (g_regionNext + to * g_regionStride)[from] = 0;
 
         /* Both of these are cost[from][to]; the original writes it twice. */
-        (COST + from * STRIDE)[to] = STAMP;
-        (COST + from * STRIDE)[to] = STAMP;
+        (g_regionCost + from * g_regionStride)[to] = g_regionStamp;
+        (g_regionCost + from * g_regionStride)[to] = g_regionStamp;
         return;
     }
 
     for (i = 0; i < len - 1; i++)
         for (j = i + 1; j < len; j++) {
-            (NEXT + path[i] * STRIDE)[path[j]] = (uint8_t)path[i + 1];
-            (COST + path[i] * STRIDE)[path[j]] = STAMP;
+            (g_regionNext + path[i] * g_regionStride)[path[j]] = (uint8_t)path[i + 1];
+            (g_regionCost + path[i] * g_regionStride)[path[j]] = g_regionStamp;
         }
 
     /* Walked from the hop below i downwards; the same cells as an upward
      * walk and the same values in each. */
     for (i = len - 1; i > 0; i--)
         for (j = i - 1; j >= 0; j--) {
-            (NEXT + path[i] * STRIDE)[path[j]] = (uint8_t)path[i - 1];
-            (COST + path[i] * STRIDE)[path[j]] = STAMP;
+            (g_regionNext + path[i] * g_regionStride)[path[j]] = (uint8_t)path[i - 1];
+            (g_regionCost + path[i] * g_regionStride)[path[j]] = g_regionStamp;
         }
-#undef STAMP
-#undef STRIDE
-#undef COST
-#undef NEXT
 }
 
 
@@ -6458,7 +6312,7 @@ static inline void AiStepReactAndDispatch(AM2_Object *o, AM2_SightOut *out,
  * it -- so the region is updated even on the frame the AI decides nothing. */
 static inline void AiStepRecordRegion(AM2_Object *o)
 {
-    o->region = kRegionOfCell[o->tile];
+    o->region = g_regionOfCell[o->tile];
 }
 
 /* SargeAiStep -- original 0x00407020, one caller, and that caller is what
@@ -6623,8 +6477,6 @@ void __cdecl TrooperAiStep(AM2_Object *o, AM2_SightOut *out)
 
 typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
                                        void *a, void *b, int32_t z);
-#define kRangeWant (g_sightRangeWant)
-#define kRangeHi   (g_weaponRangeHi)
 
 /* One of the two reference blocks both builders share: resolve a uid to an
  * object and drop it if it has gone, been destroyed, been concealed, or is at
@@ -6750,8 +6602,8 @@ void __cdecl AiBuildContext(AM2_Object *o, AM2_AiCtx *s)
         /* The weapon's type record is re-read at every use, and so is the
          * range: no local holds either. */
         s->kind      = w->typeRec->kind;
-        s->wantRange = (int32_t)((double)w->typeRec->range * kRangeWant);
-        s->maxRange  = (int32_t)((double)w->typeRec->range * kRangeHi);
+        s->wantRange = (int32_t)((double)w->typeRec->range * g_sightRangeWant);
+        s->maxRange  = (int32_t)((double)w->typeRec->range * g_weaponRangeHi);
         s->ready     = (g_gameClockMs - w->lastUse) > w->typeRec->cooldown;
     }
 
@@ -6927,12 +6779,11 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
             int32_t army = (r & 1) ? (int32_t)o->owner
                                    : (r >> 1) % 4;
             /* The list is re-read from the table after the rand() call. */
-#define list (g_armyObjLists[army])
-            if (list->count > 0) {
+            if (g_armyObjLists[army]->count > 0) {
                 /* The modulus is taken from `army`'s count and the array from
                  * the object's OWN army. See the header: reproduced. */
                 int32_t     idx = orig_region_rand()
-                                  % list->count;
+                                  % g_armyObjLists[army]->count;
                 AM2_Object *t   = LookupByUID(
                     g_armyObjLists
                         [o->owner]->uids[idx]);
@@ -6940,7 +6791,6 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
                 if (t && ApproxDist(&o->pos, &t->pos) < AM2_AI_ATTACH_RANGE)
                     ObjAttachTo(o, t);
             }
-#undef list
         }
     }
 
@@ -6970,7 +6820,7 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
             out->state = AM2_AI_STATE_RECENT;
     }
 
-    o->region = kRegionOfCell[o->tile];
+    o->region = g_regionOfCell[o->tile];
 }
 
 
@@ -7192,7 +7042,7 @@ void __cdecl RoachAliveStepA(AM2_Object *o, AM2_RoachOut *out)
     RoachBuildContext(o, &ctx);
     RoachBehaviour(o, out, &ctx);
 
-    o->region = kRegionOfCell[o->tile];
+    o->region = g_regionOfCell[o->tile];
 }
 
 
@@ -8108,14 +7958,12 @@ pose:
      * current one, and only when the two differ and it does not already hold
      * the new one. */
     {
-#define reg (g_regionOfCell)
-        uint16_t now  = reg[o->tile];
-        uint16_t was  = reg[(int32_t)o->prevTile];
+        uint16_t now  = g_regionOfCell[o->tile];
+        uint16_t was  = g_regionOfCell[(int32_t)o->prevTile];
 
         if (now != was && now != (uint16_t)o->prevRegion)
             o->prevRegion = (int16_t)was;
     }
-#undef reg
 }
 
 /* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
@@ -8156,7 +8004,6 @@ pose:
 void __cdecl StepType2(AM2_Object *o)
 {
     /* The sight record is addressed from the object at each use. */
-#define out (&o->sight)
     AM2_Object *w;
 
     /* The held weapon's uid is read TWICE in the original, once inside each
@@ -8164,7 +8011,6 @@ void __cdecl StepType2(AM2_Object *o)
      * is not Sarge. Hoisting it above the branch is obviously equivalent -- a
      * plain read of an in-range slot with no side effects -- and it is still
      * not what the program does, so it is written as the program has it. */
-#define AM2_STEP2_HELD_UID (o->inventory[o->inventorySel])
 
     if (o->flags & OBJ_FLAG_DESTROYED) {
         if (!o->sarge)
@@ -8173,10 +8019,10 @@ void __cdecl StepType2(AM2_Object *o)
             return;
         if (!o->riding)
             return;
-        w = WeaponByUid(AM2_STEP2_HELD_UID);
+        w = WeaponByUid(o->inventory[o->inventorySel]);
         if (!w)
             return;
-        TrooperFire(o, w, out);
+        TrooperFire(o, w, &o->sight);
         return;
     }
 
@@ -8185,14 +8031,14 @@ void __cdecl StepType2(AM2_Object *o)
     else if (Type2Field5A4Set(o))
         PlaySoundAt(AM2_SND_FIELD5A4, 1, 0, o->pos.x, o->pos.y);
 
-    w = WeaponByUid(AM2_STEP2_HELD_UID);
+    w = WeaponByUid(o->inventory[o->inventorySel]);
 
-    if (out->field00 == 0) {
-        out->field00 = 0;
-        out->state   = WeaponPoseIndex(o, w);
-        out->bearing = o->facing;
-        out->hit     = 0;
-        out->uid     = 0;
+    if (o->sight.field00 == 0) {
+        o->sight.field00 = 0;
+        o->sight.state   = WeaponPoseIndex(o, w);
+        o->sight.bearing = o->facing;
+        o->sight.hit     = 0;
+        o->sight.uid     = 0;
     }
 
     if (o->revealedUntil > 0 && g_gameClockMs > o->revealedUntil) {
@@ -8214,11 +8060,11 @@ void __cdecl StepType2(AM2_Object *o)
                               * still playing its death animation reaches the
                               * tail too, so its weapon keeps being placed */
             RowFaceSprite(row);
-            out->field00 = 0;
+            o->sight.field00 = 0;
             LeaveRemainsRow(row);
             DestroyByType(o);
         } else {
-            out->field00 = 0;
+            o->sight.field00 = 0;
             DestroyByType(o);
         }
         /* DestroyByType is written in each arm, as the image has it (one
@@ -8243,11 +8089,11 @@ void __cdecl StepType2(AM2_Object *o)
      * "decode the first instruction at every jump target" only works if it is
      * applied to every jump, including the ones already believed understood;
      * an unread address cannot fail a test that was never run on it. */
-    if (out->field00 != 0)
+    if (o->sight.field00 != 0)
         goto tail;
 
     if (o->field5A4) {
-        AiStepAttach(o, out);
+        AiStepAttach(o, &o->sight);
         goto tail;
     }
 
@@ -8261,8 +8107,8 @@ void __cdecl StepType2(AM2_Object *o)
          * -- and every A/B was silent, because both sides are driven with
          * the same input and agreed about ignoring it. */
         if (g_objCtxObjA == o && !o->riding)
-            Type2PlayerInput(o, w, out);
-        Type2PlayerStep(o, out);
+            Type2PlayerInput(o, w, &o->sight);
+        Type2PlayerStep(o, &o->sight);
         goto tail;                     /* 0x0044B9D4 is `jmp 0x0044BA3F` --
                                         * this converges too, and Boot Camp's
                                         * Sarge takes exactly this path */
@@ -8275,20 +8121,18 @@ void __cdecl StepType2(AM2_Object *o)
         goto tail;
 
     if (o->sarge) {
-        SargeAiStep(o, out);
+        SargeAiStep(o, &o->sight);
         /* AND SARGE RE-READS THE WEAPON. His step is the one that picks items
          * up, so the tail must see what he is holding NOW; the trooper arm
          * falls through with the uid stashed before the step. */
-        w = WeaponByUid(AM2_STEP2_HELD_UID);
+        w = WeaponByUid(o->inventory[o->inventorySel]);
     } else {
-        TrooperAiStep(o, out);
+        TrooperAiStep(o, &o->sight);
     }
 
 tail:
-    UpdateTrooperAction(o, w, out);
+    UpdateTrooperAction(o, w, &o->sight);
 
-#undef AM2_STEP2_HELD_UID
-#undef out
 }
 
 
@@ -8323,7 +8167,6 @@ tail:
 void __cdecl StepType3(AM2_Object *o)
 {
     /* The steering record is addressed from the object at each use. */
-#define out (&o->ctl)
 
     /* 0x0045D66B is `jne 0x0045D94D` -- the bare epilogue, PAST both tails.
      * A destroyed vehicle runs neither, and in particular never re-sets its
@@ -8343,21 +8186,21 @@ void __cdecl StepType3(AM2_Object *o)
     }
 
     if (o->gate == 0) {
-        out->heading  = o->facing;
-        out->aim      = o->turretFacing;
-        out->field0C  = 0;
-        out->state    = 1;
-        out->approach = 0;
-        out->stop     = 0;
+        o->ctl.heading  = o->facing;
+        o->ctl.aim      = o->turretFacing;
+        o->ctl.field0C  = 0;
+        o->ctl.state    = 1;
+        o->ctl.approach = 0;
+        o->ctl.stop     = 0;
     }
 
     /* 0x0045D6E6: while the record's second word is clear, the vehicle's
      * fire point follows the global aim point every frame, and its local
      * target is cleared. This block was missing. */
-    if (out->hit == 0) {
+    if (o->ctl.hit == 0) {
         /* One six-byte x/y/z assignment, as the image copies it. */
-        out->spot = g_aimSpot;
-        out->uid  = 0;
+        o->ctl.spot = g_aimSpot;
+        o->ctl.uid  = 0;
     }
 
     if (o->health == 0) {
@@ -8448,19 +8291,19 @@ void __cdecl StepType3(AM2_Object *o)
              * copies into each arm ahead of the shared call at 0x0045D8D6. */
             if (!first)
                 ((AM2_Rec *)&o->riders)->ListRemoveAt(0);
-            else if (out->hit == 0) {
+            else if (o->ctl.hit == 0) {
                 /* The player's vehicle reads the keys and the mouse and
                  * routes; anyone else's runs the AI. */
                 if (ObjType2Field548(first)) {
-                    Step3Input(o, out);
-                    Step3RouteAndBoard(o, out);
+                    Step3Input(o, &o->ctl);
+                    Step3RouteAndBoard(o, &o->ctl);
                 } else
-                    AiStep(o, out);
+                    AiStep(o, &o->ctl);
             }
-            Step3ChooseFacing(o, out);
+            Step3ChooseFacing(o, &o->ctl);
         } else if (o->field94) {
-            AiStep(o, out);
-            Step3ChooseFacing(o, out);
+            AiStep(o, &o->ctl);
+            Step3ChooseFacing(o, &o->ctl);
         } else {
             ObjAttachTo(o, (AM2_Object *)0);
             o->fieldC0 = 0;
@@ -8470,7 +8313,7 @@ void __cdecl StepType3(AM2_Object *o)
         /* 0x0045D8CF: the gate set, or a remote vehicle -- the chooser
          * alone. Laid out last, so it falls into the second tail and the
          * arms above share its call. */
-        Step3ChooseFacing(o, out);
+        Step3ChooseFacing(o, &o->ctl);
     }
 
 post:
@@ -8482,21 +8325,21 @@ post:
 
     if (o->health < 0)
         goto emit;
-    if (out->state != 1)
+    if (o->ctl.state != 1)
         goto emit;
 
     if (o->field44 > AM2_VEH_TURN_LIMIT) {
-        out->field0C = 1;
-        out->state   = AM2_VEH_STATE_TURNING;
+        o->ctl.field0C = 1;
+        o->ctl.state   = AM2_VEH_STATE_TURNING;
     } else if (o->field44 < -AM2_VEH_TURN_LIMIT) {
-        out->state = AM2_VEH_STATE_TURNING;
+        o->ctl.state = AM2_VEH_STATE_TURNING;
     }
 
 emit:
     /* Called by NAME, so Step3Drive's own counter cannot move: its only
      * caller is this one and it no longer crosses the patched entry. The
      * blind-counter case, not a cold one. */
-    Step3Drive(o, out);
+    Step3Drive(o, &o->ctl);
 
     /* THE THIRD TAIL, and the footprint is why it matters. The entry clears
      * this vehicle's footprint and this puts it back, so a reconstruction that
@@ -8505,7 +8348,6 @@ emit:
      * `0x821` on two vehicles in the object dump. */
     if (o->health != 0)
         ObjSetFootprint(o);
-#undef out
 }
 
 
@@ -8613,16 +8455,15 @@ void __cdecl RoachBehaviour(AM2_Object *o, AM2_RoachOut *out, AM2_RoachCtx *c)
     /* Arrived. */
     o->scriptPoint = g_zeroPoint;
 
-#define LEADER (c->leader)
     /* The leader triple into the observer slot, re-reading the leader. */
 #define PROMOTE_LEADER()                                                      \
     do {                                                                      \
-        o->targetUid = LEADER->uid;                                           \
-        c->observer  = LEADER;                                                \
+        o->targetUid = c->leader->uid;                                        \
+        c->observer  = c->leader;                                             \
         c->range     = c->leadRange;                                          \
         c->bearing   = c->leadBearing;                                        \
     } while (0)
-    seen = LEADER;
+    seen = c->leader;
     if (seen) {
         /* HAS-LEADER (0x004086FF): the line-of-sight test the AI steps
          * share, with the leader as the target. Out of sight, route toward
@@ -8634,7 +8475,7 @@ void __cdecl RoachBehaviour(AM2_Object *o, AM2_RoachOut *out, AM2_RoachCtx *c)
 leader_seen:
         if (c->leadRange
             > c->wantRange) {
-            o->dest = LEADER->pos;
+            o->dest = c->leader->pos;
             RoachRouteToward(o, out, c);
             PROMOTE_LEADER();
             goto tail;
@@ -8645,7 +8486,7 @@ leader_seen:
         goto tail;
 
 leader_unseen:
-        o->dest = LEADER->pos;
+        o->dest = c->leader->pos;
         RoachRouteToward(o, out, c);
         if (c->found)
             AM2_ROACH_PROMOTE_FOUND(o, c);
@@ -8655,7 +8496,6 @@ leader_unseen:
         return;
     }
 #undef PROMOTE_LEADER
-#undef LEADER
 
     /* No leader (0x004089F3): take whatever is pending, promote what the scan
      * found, commit it, then persist the FOLLOW_UID -- this arm alone writes
@@ -8886,16 +8726,10 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define AM2_CHEAT_ABS(v)  abs(v)
 
 #define g_viewRect   ((AM2_Rect *)&g_viewX)
-#define g_defaultPos    (g_zeroPoint)
 
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
  * is why no single base is introduced over the run. */
-#define kActionCrouch (g_actionCrouch)
-#define kActionProne  (g_actionProne)
-#define kActionKey1   (g_actionKey1)
-#define kActionKey4   (g_actionKey4)
-#define kActionKey5   (g_actionKey5)
 /* The weapon-code filter for the aim-cursor write in Type2PlayerInput, from
  * the byte table the original's jump table indexes at 0x0044AD24. It is the
  * dispatch selector for `jmp [ecx*4 + 0x0044AD1C]`: 0 selects the cursor-write
@@ -9004,7 +8838,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
      * a key steps the facing at a fixed rate rather than once per frame. The
      * two arms are the same but for the sign of the 0x10 step. */
     if (ActionKeyDown(3)) {
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         moved = 1;
         OverlayPrepare(1, 1);
         if (g_turnRepeatMs <= 0) {
@@ -9017,7 +8851,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         }
     }
     if (ActionKeyDown(2)) {
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         moved = 1;
         OverlayPrepare(1, 1);
         if (g_turnRepeatMs <= 0) {
@@ -9038,18 +8872,18 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
             out->state = 2;
         else
             out->state = 0x26;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         moved = 1;
         OverlayPrepare(1, 1);
     }
 
     if (ActionKeyPressed(6)) {
-        out->state = kActionCrouch[cls];
+        out->state = g_actionCrouch[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
     }
     if (ActionKeyDown(6)) {
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         moved = 1;
         OverlayPrepare(1, 1);
     }
@@ -9057,44 +8891,44 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     /* The wheel: down takes the same action key 6 does, up is a two-case
      * remap that leaves class 0 alone. */
     if (g_mouseDZ < 0) {
-        out->state = kActionCrouch[cls];
+        out->state = g_actionCrouch[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
     }
     if (g_mouseDZ > 0) {
         if (cls == 2)
             out->state = 4;
         else if (cls == 1)
             out->state = cls;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         moved = 1;
     }
 
     if (ActionKeyPressed(7)) {
-        out->state = kActionProne[cls];
+        out->state = g_actionProne[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
     }
     if (ActionKeyPressed(4)) {
-        out->state = kActionKey4[cls];
+        out->state = g_actionKey4[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
     }
     if (ActionKeyPressed(5)) {
-        out->state = kActionKey5[cls];
+        out->state = g_actionKey5[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
     }
     if (ActionKeyDown(1)) {
-        out->state = kActionKey1[cls];
+        out->state = g_actionKey1[cls];
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         OverlayPrepare(1, 1);
     }
     if (ActionKeyDown(0xA)) {
         out->state = WeaponPoseIndex(o, weapon);
         moved = 1;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         OverlayPrepare(1, 1);
     }
 
@@ -9183,7 +9017,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                 out->seen = 1;
             out->spot.at.x = (uint16_t)aim.x;
             out->spot.at.y = (uint16_t)aim.y;
-            o->dest = g_defaultPos;
+            o->dest = g_zeroPoint;
 
             if (ApproxDist(&o->pos, &aim) < 0x18) {
                 out->bearing = o->facing;
@@ -9192,20 +9026,19 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
             } else {
                 int32_t b = AngleBetweenInt(&o->pos,
                                          &aim);
-#define face (o->facing)
 
                 out->bearing = (uint8_t)b;
-                if (AM2_CHEAT_ABS((b & 0xFF) - face) < 0x10) {
+                if (AM2_CHEAT_ABS((b & 0xFF) - o->facing) < 0x10) {
 
                     /* Both roundings use the SAME directions count; only the
                      * angle differs, so a difference means the click would
                      * change the drawn facing. */
                     /* The directions count is read afresh for each call,
                      * as the image has it. */
-#define dirs (o->rowSet.rows->animPlaying->directionBits)
-                    if (RoundTo8(face, dirs) != RoundTo8(out->bearing, dirs)) {
-#undef dirs
-                        out->bearing = (uint8_t)(face + AngleDelta(face, out->bearing) / 2);
+                    if (RoundTo8(o->facing,
+                                 o->rowSet.rows->animPlaying->directionBits) != RoundTo8(out->bearing, o->rowSet.rows->animPlaying->directionBits)) {
+                        out->bearing = (uint8_t)(o->facing + AngleDelta(o->facing,
+                                out->bearing) / 2);
                         out->spot.at.x = 0;
                         out->spot.at.y = 0;
                     }
@@ -9258,7 +9091,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         out->spot.at.x = (uint16_t)aim.x;
         out->seen = 1;
         out->spot.at.y = (uint16_t)aim.y;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         out->bearing = (uint8_t)AngleBetween(&o->pos, &aim);
         o->deadlineD0 = 0;
         o->field574 = out->bearing;
@@ -9321,7 +9154,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     if (dist <= 0x20 && orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS) {
         out->bearing = (uint8_t)AngleBetween(&o->pos, &at);
         o->field574 = out->bearing;
-        o->dest = g_defaultPos;
+        o->dest = g_zeroPoint;
         o->deadlineD0 = 0;
         goto tail;
     }
@@ -9342,7 +9175,6 @@ tail:
     } else {
         o->moveStateAlt = 0;
     }
-#undef face
 }
 
 /* 0x0045C6E0, four callers, all in ADDR_STEP3_45C8D0. Choose the vehicle's
@@ -10156,17 +9988,16 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     g_gameClockMs + 0x7D0u;
 
                 /* The comm object is read afresh at each use. */
-#define comm (g_commObject)
 
                 /* Two broadcast questions, not one: the first refuses
                  * outright when the host flag at +0x3D8 is set AND we would
                  * broadcast, and only the second decides whether a WANT is
                  * actually sent. */
                 if (g_mpSession != 0
-                    && !(comm->isHost != 0
-                         && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)o->owner))) {
-                    if (((AM2_Comm *)comm)->CommMustBroadcast((int16_t)o->owner)
-                        && comm->isHost == 0)
+                    && !(g_commObject->isHost != 0
+                         && ((AM2_Comm *)g_commObject)->CommMustBroadcast((int16_t)o->owner))) {
+                    if (((AM2_Comm *)g_commObject)->CommMustBroadcast((int16_t)o->owner)
+                        && g_commObject->isHost == 0)
                         SendVehicleWantItem(o, p, 0, 0, 0);
                 } else {
                     /* The refusal's log, two arguments and no format, to the
@@ -10176,7 +10007,6 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     ((void (__cdecl *)(void *, void *))(uintptr_t)ADDR_LOG)(o, p);
 #endif
                 }
-#undef comm
             }
 
             /* A repair pad under the vehicle heals it, at most every 500 ms. */
@@ -10269,17 +10099,16 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             *(const int32_t *)&g_defaultOwner);
 
         if (unit != 0) {
-#define sel (unit->inventorySel)
 
             /* `[unit + sel*4 + 0x550]` in the image, which is NOT a second
              * array: UNIT_OFF_INVENTORY is 0x54C, so the compiler folded the
              * +1 into the displacement and this is inventory[sel + 1] --
              * exactly what NextInventorySlot writes out longhand. Reading it
              * as a different base is the mistake CLAUDE.md opens with. */
-            if (sel < AM2_INVENTORY_SLOTS - 1
-                && unit->inventory[sel + 1] != 0) {
+            if (unit->inventorySel < AM2_INVENTORY_SLOTS - 1
+                && unit->inventory[unit->inventorySel + 1] != 0) {
                 PlaySoundAt(0, 0, 0, 0, 0);
-                SelectInventorySlot(unit, sel + 1);
+                SelectInventorySlot(unit, unit->inventorySel + 1);
             } else {
                 PlaySoundAt(0, 0, 0, 0, 0);
                 SelectInventorySlot(unit, 0);
@@ -10483,19 +10312,17 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
      * its definition's interval, and the same test is written three times
      * for the three ways to ask for a shot. --- */
     {
-#define def (weapon->typeRec)
         /* The time since the last shot is worked out at each test. */
-#define since (g_gameClockMs - weapon->lastUse)
 
         if (ActionKeyDown(AM2_ACTION_09)) {
             /* Held: only an automatic weapon repeats, which is what the
              * definition's +0x24 gates. */
-            if (def->automatic != 0
-                && since > def->cooldown)
+            if (weapon->typeRec->automatic != 0
+                && (g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
                 r->hit = 1;
         } else if (ActionKeyReleased(AM2_ACTION_09)) {
             /* Released: no automatic gate, just the cooldown. */
-            if (since > def->cooldown)
+            if ((g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
                 r->hit = 1;
         }
 
@@ -10511,17 +10338,14 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                 &g_mouseChanged;
 
             if (button[AM2_MOUSE_LEFT]) {
-                if (def->automatic == 0)
+                if (weapon->typeRec->automatic == 0)
                     return;
             } else if (!changed[AM2_MOUSE_LEFT]) {
                 return;
             }
 
-            if (since > def->cooldown)
+            if ((g_gameClockMs - weapon->lastUse) > weapon->typeRec->cooldown)
                 r->hit = 1;
         }
     }
-#undef since
-#undef def
-#undef sel
 }

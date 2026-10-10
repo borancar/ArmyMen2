@@ -211,7 +211,7 @@ void __cdecl PresentFrame(void)
         IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
                                    (DWORD)g_screenRect.left,
                                    (DWORD)g_screenRect.top,
-                                   g_backBuffer, ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
+                                   g_backBuffer, (LPRECT)&g_screenClip, DDBLTFAST_WAIT);
         return;
     }
 
@@ -345,7 +345,7 @@ void __cdecl RefreshScreen(void)
     IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
                                (DWORD)g_screenRect.left,
                                (DWORD)g_screenRect.top,
-                               g_backBuffer, ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
+                               g_backBuffer, (LPRECT)&g_screenClip, DDBLTFAST_WAIT);
 
     RefreshGate(1);
     g_presentEnabled = wasEnabled;
@@ -527,7 +527,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
     /* A locked surface cannot be Blt'd to. Silently nothing, as the original. */
     if (g_surfaceLocked)
         return;
-    if (!IntersectRect(&dest, r, ((LPRECT)((uintptr_t)g_screenClip))))
+    if (!IntersectRect(&dest, r, (LPRECT)&g_screenClip))
         return;
 
     if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
@@ -661,46 +661,40 @@ static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
 
 void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 {
-#define self this
     RECT  to, from;
 
     /* The descriptor's width and height are read afresh at every use, and
      * the centring halves an UNSIGNED difference. */
-#define MOVIE  ((AM2_Movie *)self)
-#define WIDTH  ((int32_t)MOVIE->smack->width)
-#define HEIGHT ((int32_t)MOVIE->smack->height)
     if (dest == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
-        to.left = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->right - ((LPRECT)((uintptr_t)g_screenClip))->left - WIDTH) / 2
-                  + g_originDX;
-        to.top  = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->bottom - ((LPRECT)((uintptr_t)g_screenClip))->top - HEIGHT) / 2
-                  + g_originDY;
+        to.left = (uint32_t)(g_screenClip.right - g_screenClip.left
+                             - (int32_t)((AM2_Movie *)this)->smack->width) / 2 + g_originDX;
+        to.top  = (uint32_t)(g_screenClip.bottom - g_screenClip.top
+                             - (int32_t)((AM2_Movie *)this)->smack->height) / 2 + g_originDY;
     } else {
-        to.left = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->right - ((LPRECT)((uintptr_t)g_screenClip))->left - WIDTH) / 2;
-        to.top  = (uint32_t)(((LPRECT)((uintptr_t)g_screenClip))->bottom - ((LPRECT)((uintptr_t)g_screenClip))->top - HEIGHT) / 2;
+        to.left = (uint32_t)(g_screenClip.right - g_screenClip.left
+                             - (int32_t)((AM2_Movie *)this)->smack->width) / 2;
+        to.top  = (uint32_t)(g_screenClip.bottom - g_screenClip.top
+                             - (int32_t)((AM2_Movie *)this)->smack->height) / 2;
     }
-    to.right  = WIDTH + to.left;
-    to.bottom = HEIGHT + to.top;
+    to.right  = (int32_t)((AM2_Movie *)this)->smack->width + to.left;
+    to.bottom = (int32_t)((AM2_Movie *)this)->smack->height + to.top;
 
     from.left   = 0;
     from.top    = 0;
-    from.right  = WIDTH;
-    from.bottom = HEIGHT;
+    from.right  = (int32_t)((AM2_Movie *)this)->smack->width;
+    from.bottom = (int32_t)((AM2_Movie *)this)->smack->height;
 
     /* Two arms on the current movie's field at +0x10, and both make the
      * same call: VC6 merges them and leaves the test in the image with
      * nothing reading it. */
     if (g_movieCurrent->sized)
         IDirectDrawSurface_Blt(dest, &to,
-                               MOVIE->surface,
+                               ((AM2_Movie *)this)->surface,
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
     else
         IDirectDrawSurface_Blt(dest, &to,
-                               MOVIE->surface,
+                               ((AM2_Movie *)this)->surface,
                                &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
-#undef MOVIE
-#undef WIDTH
-#undef HEIGHT
-#undef self
 }
 
 /* Turn a loaded bitmap into something drawable -- 0x0041BE80.
@@ -1165,7 +1159,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
-#define g_paintObj      (g_paintObject)
 #define g_screenRectPtr ((LPRECT)((uintptr_t)&g_screenRect))
 
 void __cdecl DrawMenuOverlay(void)
@@ -1173,9 +1166,9 @@ void __cdecl DrawMenuOverlay(void)
     /* The paint object is re-read at every use, as the image does. */
     if (g_menuRequestSet) {
         /* Going back to the game: drop the overlay and let frames through. */
-        if (g_paintObj) {
-            ObjVDelete(g_paintObj, 1);
-            g_paintObj = NULL;
+        if (g_paintObject) {
+            ObjVDelete(g_paintObject, 1);
+            g_paintObject = NULL;
         }
         g_subState     = MENU_MODE_PLAYING;
         g_menuRequestSet  = 0;
@@ -1186,9 +1179,9 @@ void __cdecl DrawMenuOverlay(void)
 
     if (g_overlayDirty) {
         g_presentEnabled = 0;
-        if (g_paintObj) {
+        if (g_paintObject) {
             SetDrawTarget((*(LPDIRECTDRAWSURFACE *)&g_primarySurface));
-            ObjVPaint(g_paintObj, *(const AM2_Rect *)&g_paintObj->rect);
+            ObjVPaint(g_paintObject, *(const AM2_Rect *)&g_paintObject->rect);
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
         IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, (*(LPDIRECTDRAWSURFACE *)&g_primarySurface),
@@ -1197,8 +1190,8 @@ void __cdecl DrawMenuOverlay(void)
     }
 
     SetDrawTarget(g_backBuffer);
-    if (g_paintObj)
-        ObjVUpdate(g_paintObj);
+    if (g_paintObject)
+        ObjVUpdate(g_paintObject);
     SetDrawTarget(g_backBuffer);
 
     OverlayPrepare(0, 1);
@@ -1206,7 +1199,7 @@ void __cdecl DrawMenuOverlay(void)
 
     IDirectDrawSurface_BltFast((*(LPDIRECTDRAWSURFACE *)&g_primarySurface), (DWORD)g_originDX,
                                (DWORD)g_originDY, g_backBuffer,
-                               ((LPRECT)((uintptr_t)g_screenClip)), DDBLTFAST_WAIT);
+                               (LPRECT)&g_screenClip, DDBLTFAST_WAIT);
 }
 
 /* The animated menu cursor -- 0x00412FE0.
@@ -1253,7 +1246,6 @@ void __cdecl DrawMenuOverlay(void)
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
 #define g_menuSprites2  (&g_menuSprites)
-#define g_cursorSprite  (g_menuSpritesEnd)
 #ifdef AM2_STANDALONE
 /* The fixed 32x32 corner of the menu surface the cursor save-under occupies
  * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
@@ -1261,13 +1253,6 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #endif
 #define g_cursorRect    ((AM2_Rect *)g_menuCursorRect)
 #define g_cursorPrev    ((AM2_Rect *)g_menuCursorPrev)
-#define g_paintObj      (g_paintObject)
-#define g_clipRect      ((const RECT *)g_screenClip)
-#define g_overlayA      (g_menuOverlayA)
-#define g_overlayB      (g_menuOverlayB)
-#define g_cursorInk    (g_menuInk)
-#define g_overlayAInk   (g_menuOverlayAInk)
-#define g_overlayBInk   (g_menuOverlayBInk)
 
 
 /* 0x00412D30, thirty callers -- everything that highlights a menu row goes
@@ -1304,17 +1289,17 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
         return;
 
     g_menuRow      = row;
-    g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES];
+    g_menuSpritesEnd = g_menuSprites2[row * MENU_ANIM_FRAMES];
     g_animFrame    = 0;
     g_animNext     = Ticks();
 
     origin = g_zeroPoint;
 
-    g_overlayA    = (AM2_Sprite *)0;
-    g_overlayB    = (AM2_Sprite *)0;
-    g_cursorInk  = 0;
-    g_overlayAInk = 0;
-    g_overlayBInk = 0;
+    g_menuOverlayA    = (AM2_Sprite *)0;
+    g_menuOverlayB    = (AM2_Sprite *)0;
+    g_menuInk  = 0;
+    g_menuOverlayAInk = 0;
+    g_menuOverlayBInk = 0;
     g_menuCursorDx   = origin;
     g_menuOverlayADx = origin;
     g_menuOverlayBDx = origin;
@@ -1360,7 +1345,7 @@ static inline void TickMenuAnimation(void)
         g_animFrame = 0;
     }
     if (f >= 0)
-        g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
+        g_menuSpritesEnd = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
     g_animNext = now + MENU_ANIM_PERIOD;
 }
 
@@ -1372,12 +1357,12 @@ static inline void DrawMenuOverlaySprite(AM2_Sprite *const &spr, const AM2_Point
 
     if (!spr)
         return;
-    x = g_cursorX + g_cursorSprite->attachX
+    x = g_cursorX + g_menuSpritesEnd->attachX
       + d->x;
-    y = g_cursorY + g_cursorSprite->attachY
+    y = g_cursorY + g_menuSpritesEnd->attachY
       + d->y;
     spr->lut = ink;
-    DrawSprite(spr, x, y, g_cursorInk != 0);
+    DrawSprite(spr, x, y, g_menuInk != 0);
 }
 
 void __cdecl DrawMenuCursor(void)
@@ -1390,7 +1375,7 @@ void __cdecl DrawMenuCursor(void)
     TickMenuAnimation();
     row = g_menuRow;
 
-    if (g_paintObj && !g_presentEnabled) {
+    if (g_paintObject && !g_presentEnabled) {
         LPDIRECTDRAWSURFACE target = (*(LPDIRECTDRAWSURFACE *)&g_drawTarget);
         AM2_Rect            cur, clipped;   /* `clipped` doubles as the shifted rect */
 
@@ -1415,33 +1400,33 @@ void __cdecl DrawMenuCursor(void)
                                    DDBLT_WAIT, NULL);
 
         {
-            ObjVPaint(g_paintObj, *(AM2_Rect *)&g_paintObj->rect);
+            ObjVPaint(g_paintObject, *(AM2_Rect *)&g_paintObject->rect);
         }
 
         /* The sprite pointer is read again for each field. */
-        cur.left   = g_cursorX - g_cursorSprite->hotX;
-        cur.top    = g_cursorY - g_cursorSprite->hotY;
-        cur.right  = cur.left + g_cursorSprite->bounds.right;
-        cur.bottom = cur.top  + g_cursorSprite->bounds.bottom;
+        cur.left   = g_cursorX - g_menuSpritesEnd->hotX;
+        cur.top    = g_cursorY - g_menuSpritesEnd->hotY;
+        cur.right  = cur.left + g_menuSpritesEnd->bounds.right;
+        cur.bottom = cur.top  + g_menuSpritesEnd->bounds.bottom;
 
         /* Save what is about to be covered -- the original's call (0x00413172):
          * the clipped cursor rect stretched UP into the whole 32x32 slot, the
          * other half of the round trip the restore above stretches back down.
          * Exact under centre-sampled nearest neighbour; see the restore. */
-        if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
+        if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, (const RECT *)&g_screenClip)) {
             IDirectDrawSurface_Blt(g_menuSurface, g_saveSlot, g_backBuffer,
                                    (LPRECT)&clipped, DDBLT_WAIT, NULL);
             *g_savedRect = clipped;
             g_savedValid = 1;
         }
 
-        DrawSprite((AM2_Sprite *)g_cursorSprite, g_cursorX, g_cursorY, 0);
+        DrawSprite((AM2_Sprite *)g_menuSpritesEnd, g_cursorX, g_cursorY, 0);
         SetDrawTarget(target);
 
         /* And restore last tick's area, which the redraw above may have left
          * stale. */
         if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
-                          g_clipRect)) {
+                          (const RECT *)&g_screenClip)) {
             clipped = cur;
             if ((*(LPDIRECTDRAWSURFACE *)&g_drawTarget) == (*(LPDIRECTDRAWSURFACE *)&g_primarySurface)) {
                 /* The primary is the whole desktop when windowed, so only the
@@ -1460,28 +1445,28 @@ void __cdecl DrawMenuCursor(void)
         if (row >= MENU_ROW_DIRECT) {
             if (!LockSurface((*(LPDIRECTDRAWSURFACE *)&g_drawTarget)))
                 return;
-            if (g_cursorSprite) {
+            if (g_menuSpritesEnd) {
                 int32_t x = g_cursorX + g_menuCursorDx.x;
                 int32_t y = g_cursorY + g_menuCursorDx.y;
 
-                g_cursorSprite->lut = g_cursorInk;
-                DrawSprite(g_cursorSprite, x, y, g_cursorInk != 0);
-                DrawMenuOverlaySprite(g_overlayA, &g_menuOverlayADx,
-                                      g_overlayAInk);
-                DrawMenuOverlaySprite(g_overlayB, &g_menuOverlayBDx,
-                                      g_overlayBInk);
+                g_menuSpritesEnd->lut = g_menuInk;
+                DrawSprite(g_menuSpritesEnd, x, y, g_menuInk != 0);
+                DrawMenuOverlaySprite(g_menuOverlayA, &g_menuOverlayADx,
+                                      g_menuOverlayAInk);
+                DrawMenuOverlaySprite(g_menuOverlayB, &g_menuOverlayBDx,
+                                      g_menuOverlayBInk);
             }
             UnlockSurface();
         } else {
-            DrawSprite(g_cursorSprite, g_cursorX, g_cursorY, 0);
+            DrawSprite(g_menuSpritesEnd, g_cursorX, g_cursorY, 0);
         }
     }
 
     /* This tick becomes last tick. */
     *g_cursorPrev = *g_cursorRect;
 
-    if (g_cursorSprite) {
-        const AM2_Sprite *spr = g_cursorSprite;
+    if (g_menuSpritesEnd) {
+        const AM2_Sprite *spr = g_menuSpritesEnd;
         AM2_Rect       r;
         int32_t        hy = spr->hotY;
         int32_t        hx = spr->hotX;

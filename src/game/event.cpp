@@ -37,8 +37,6 @@ typedef void    (__cdecl *am2_event_notify_fn)(int32_t, int32_t, int32_t,
                                                int32_t);
 
 
-#define kScriptConditions (g_scriptConditions)
-
 /* ---- the registration table -------------------------------------------
  *
  * Nine buckets, and the count is read out of the teardown's loop bound rather
@@ -62,7 +60,6 @@ typedef struct AM2_EventEntry {
     struct AM2_EventEntry   *next;
 } AM2_EventEntry;
 
-#define kEventTable (g_eventTable)
 #define kImageFn(a)       ((const void *)((void *)(uintptr_t)(a)))
 
 
@@ -81,7 +78,7 @@ void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
     if (key0 == AM2_EVENT_NO_KEY)
         return;
 
-    AM2_EventEntry *e = kEventTable[bucket];
+    AM2_EventEntry *e = g_eventTable[bucket];
 
     while (e && !(e->key0 == key0 && e->key1 == key1))
         e = e->next;
@@ -89,11 +86,11 @@ void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
     if (!e) {
         e = (AM2_EventEntry *)am2_malloc(sizeof(AM2_EventEntry));
         memset(e, 0, sizeof *e);
-        e->next     = kEventTable[bucket];
+        e->next     = g_eventTable[bucket];
         e->handlers = 0;
         e->key0     = key0;
         e->key1     = key1;
-        kEventTable[bucket] = e;
+        g_eventTable[bucket] = e;
     }
 
     AM2_EventHandler *h = (AM2_EventHandler *)am2_malloc(sizeof(AM2_EventHandler));
@@ -114,7 +111,7 @@ void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
 void __cdecl EventClearAll(void)
 {
     for (int32_t b = 0; b < AM2_EVENT_BUCKETS; b++) {
-        AM2_EventEntry *e = kEventTable[b];
+        AM2_EventEntry *e = g_eventTable[b];
 
         while (e) {
             AM2_EventEntry   *nexte = e->next;
@@ -131,7 +128,7 @@ void __cdecl EventClearAll(void)
             am2_free(e);
             e = nexte;
         }
-        kEventTable[b] = 0;
+        g_eventTable[b] = 0;
     }
 }
 
@@ -141,7 +138,7 @@ void __cdecl DeclareRuleVars(void)
      * uses. The teardown walks the registration table and not this list, so
      * nothing observable turns on it -- but the two globals are one line apart
      * and getting the order from the disassembly costs nothing. */
-    AM2_ScriptCond *cond = kScriptConditions;
+    AM2_ScriptCond *cond = g_scriptConditions;
 
     EventClearAll();
 
@@ -370,20 +367,20 @@ void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
 void __cdecl FreeScriptConditions(void)
 {
     /* Walked through the list head itself, re-read after every free. */
-    while (kScriptConditions) {
-        AM2_ScriptCond *next = (AM2_ScriptCond *)kScriptConditions->next;
+    while (g_scriptConditions) {
+        AM2_ScriptCond *next = (AM2_ScriptCond *)g_scriptConditions->next;
 
-        if (kScriptConditions->events)
-            am2_free(kScriptConditions->events);
-        if (kScriptConditions->tests)
-            am2_free(kScriptConditions->tests);
-        if (kScriptConditions->actions)
-            am2_free(kScriptConditions->actions);
-        am2_free(kScriptConditions);
+        if (g_scriptConditions->events)
+            am2_free(g_scriptConditions->events);
+        if (g_scriptConditions->tests)
+            am2_free(g_scriptConditions->tests);
+        if (g_scriptConditions->actions)
+            am2_free(g_scriptConditions->actions);
+        am2_free(g_scriptConditions);
 
-        kScriptConditions = next;
+        g_scriptConditions = next;
     }
-    kScriptConditions = NULL;
+    g_scriptConditions = NULL;
 }
 
 void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
@@ -512,8 +509,6 @@ int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
     return 1;
 }
 
-#define kPads (g_pads)
-
 int32_t __cdecl LoadEventSection(am2_FILE *fp)
 {
     int32_t tag, unused, key, kind, idx;
@@ -540,12 +535,12 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
          * Not fixed. */
         if (kind == (int32_t)AM2_EVTSAVE_PAD_A) {
             orig_fread(&idx, 4, 1, fp);
-            pad = &kPads[idx];
+            pad = &g_pads[idx];
             pad->uidEnter = key;                      /* +0x28 */
             EventRegister(0, key, 0, (const void *)EvtPadOn, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_PAD_B) {
             orig_fread(&idx, 4, 1, fp);
-            pad = &kPads[idx];
+            pad = &g_pads[idx];
             pad->uidEnter = key;                      /* +0x28 */
             EventRegister(0, key, 0, (const void *)EvtPadOff, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
@@ -569,7 +564,7 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVETAG_EVENT);
 
     for (int32_t b = 0; b < AM2_EVENT_BUCKETS; b++) {
-        for (AM2_EventEntry *e = kEventTable[b]; e; e = e->next) {
+        for (AM2_EventEntry *e = g_eventTable[b]; e; e = e->next) {
             for (AM2_EventHandler *h = e->handlers; h; h = h->next) {
                 /* Tested in this order, and the two pad arms want an argument
                  * while the owned one does not. A pad handler with a null
@@ -584,7 +579,7 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
                     WriteSaveTag(fp, (uint32_t)e->key0);
                     WriteSaveTag(fp, AM2_EVTSAVE_PAD_A);
                     WriteSaveTag(fp, (uint32_t)((uint8_t *)h->arg
-                                                - (uint8_t *)kPads)
+                                                - (uint8_t *)g_pads)
                                      / (uint32_t)sizeof(AM2_Pad));
                 } else if (h->fn == (const void *)EvtPadOff && h->arg) {
                     WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
@@ -592,7 +587,7 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
                     WriteSaveTag(fp, (uint32_t)e->key0);
                     WriteSaveTag(fp, AM2_EVTSAVE_PAD_B);
                     WriteSaveTag(fp, (uint32_t)((uint8_t *)h->arg
-                                                - (uint8_t *)kPads)
+                                                - (uint8_t *)g_pads)
                                      / (uint32_t)sizeof(AM2_Pad));
                 } else if (h->fn == (const void *)EvtRecordHandler) {
                     WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
@@ -626,8 +621,8 @@ int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
         memset(cond, 0, sizeof *cond);
         LoadScriptCond(fp, cond);
         /* Prepended, so the list ends up in reverse file order. */
-        cond->next = kScriptConditions;
-        kScriptConditions = cond;
+        cond->next = g_scriptConditions;
+        g_scriptConditions = cond;
 
         orig_fread(&tag, 4, 1, fp);
     }
@@ -646,7 +641,7 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
 
     /* `next` is a void * in the struct -- see script.h, where the field is
      * typed from its offset rather than from a declaration. */
-    for (cond = kScriptConditions; cond;
+    for (cond = g_scriptConditions; cond;
          cond = (const AM2_ScriptCond *)cond->next) {
         WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
         SaveScriptCond(fp, cond);
@@ -919,22 +914,20 @@ typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBloc
  * recomputes `start` from now is reached by nothing. */
 void __cdecl TimerTick(void)
 {
-#define NOW  (g_gameClockMs)
-#define LAST (g_eventBlock)
     AM2_Timer *timers = g_timers;
     int32_t    i;
 
     /* The clock is read again at every use. */
-    if (NOW - LAST < AM2_TIMER_TICK_MS)
+    if (g_gameClockMs - g_eventBlock < AM2_TIMER_TICK_MS)
         return;
-    LAST = NOW;
+    g_eventBlock = g_gameClockMs;
 
     for (i = 0; i < AM2_TIMER_MAX; i++) {
         AM2_Timer *t = &timers[i];
 
         if (!t->id)
             continue;
-        if (t->start > NOW)
+        if (t->start > g_gameClockMs)
             continue;
 
         EventNotify(1, t->id, 0, 0, 0, 0, 0, 0, t->count == 1, 0);
@@ -943,11 +936,9 @@ void __cdecl TimerTick(void)
             t->id = 0;
             --g_timerCount;
         } else {
-            t->start = NOW + t->period;
+            t->start = g_gameClockMs + t->period;
         }
     }
-#undef NOW
-#undef LAST
 }
 
 /* --------------------------------------------- object shims ---- */
@@ -1128,14 +1119,13 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
     i = 0;
 
     /* The slot's list is re-indexed at every use. */
-#define list (g_armyObjLists[army])
 
-    while (i < list->count) {
+    while (i < g_armyObjLists[army]->count) {
         AM2_Object *obj = LookupByUID(
-            list->uids[i]);
+            g_armyObjLists[army]->uids[i]);
 
         if (obj == 0) {
-            ((AM2_Rec *)list)->ListRemoveAt(i);
+            ((AM2_Rec *)g_armyObjLists[army])->ListRemoveAt(i);
             continue;                       /* the list shifted; do not ++ */
         }
 
@@ -1159,7 +1149,6 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
         PointActionA(obj, point);
         i++;
     }
-#undef list
 }
 
 /* 0x0041F820 and 0x0041F780. The "At" halves, and they are not the plain
@@ -1218,22 +1207,20 @@ void __cdecl EvtAtPointC(uint32_t uid, AM2_Point point, int32_t relative)
 
     /* The point's halves read as words out of its argument slot; the
      * relative sum built as a struct (the image puts it in uid's slot). */
-#define PT point
     if (relative) {
         AM2_Point at;
 
-        at.x = (int16_t)(obj->pos.x + PT.x);
-        at.y = (int16_t)(obj->pos.y + PT.y);
+        at.x = (int16_t)(obj->pos.x + point.x);
+        at.y = (int16_t)(obj->pos.y + point.y);
         PointActionC(obj, at);
         return;
     }
 
-    if (obj->pos.x == PT.x
-        && obj->pos.y == PT.y)
+    if (obj->pos.x == point.x
+        && obj->pos.y == point.y)
         return;
 
-    PointActionC(obj, PT);
-#undef PT
+    PointActionC(obj, point);
 }
 
 /* 0x0041F7F0. The "On" wrapper for EvtAtPointC, and the third of that shape:
@@ -1513,20 +1500,18 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
 
         for (int32_t i = 0; i < c->nactions; i++) {
             /* The entry is indexed afresh at each use, as the image does. */
-#define E (kScriptNames[c->actions[i].extra])
-            if (E.type != AM2_NAME_TYPE_REF)
+            if ((kScriptNames[c->actions[i].extra]).type != AM2_NAME_TYPE_REF)
                 continue;
 
-            if (E.value >= scr->statecount) {
+            if ((kScriptNames[c->actions[i].extra]).value >= scr->statecount) {
                 orig_log("Tried to switch on invalid state.\n");
                 continue;
             }
 
-            if (obj->scriptState == E.value) {
+            if (obj->scriptState == (kScriptNames[c->actions[i].extra]).value) {
                 CondRunAction(c, i, arg);
                 return;
             }
-#undef E
         }
         return;
     }
@@ -1946,7 +1931,7 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
                  type, num1, uid1, removeevent, remote);
 
     sent = 0;
-    e = kEventTable[type];
+    e = g_eventTable[type];
     prev = (AM2_EventEntry *)0;
 
     while (e != (AM2_EventEntry *)0) {
@@ -1975,13 +1960,13 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
             continue;
         }
 
-        if (e == kEventTable[type]) {
-            kEventTable[type] = e->next;
+        if (e == g_eventTable[type]) {
+            g_eventTable[type] = e->next;
             FreeEventEntry(e);
-            e = kEventTable[type];
+            e = g_eventTable[type];
         } else {
             if (prev == (AM2_EventEntry *)0) {
-                prev = kEventTable[type];
+                prev = g_eventTable[type];
                 while (prev->next != e)
                     prev = prev->next;
             }
@@ -2255,24 +2240,21 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
     if (obj == 0)
         return;
 
-#define REC (g_objTableRecords \
-             + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE)
     switch ((int32_t)obj->type) {
     default:
         orig_log("Warning: check if this script command works with this "
                  "object type!\n");
         return;
     case 3:
-        obj->tableRec3 = REC;
-        SetFieldInAll(&obj->rowSet, REC);
+        obj->tableRec3 = g_objTableRecords + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE;
+        SetFieldInAll(&obj->rowSet, g_objTableRecords + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE);
         return;
     case 2:
-        obj->tableRec2 = REC;
-        SetFieldInAll(&obj->rowSet, REC);
+        obj->tableRec2 = g_objTableRecords + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE;
+        SetFieldInAll(&obj->rowSet, g_objTableRecords + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE);
         return;
 
     }
-#undef REC
 }
 
 /* ------------------------------------------------ cond tests ---- */
@@ -3055,14 +3037,13 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     slot = AM2_THE_COMM->CommSlotForArmy(army);
 
     /* The army's list is re-read from the table at every use. */
-#define LIST (g_armyObjLists[slot])
     i = 0;
-    while (i < LIST->count) {
+    while (i < g_armyObjLists[slot]->count) {
         AM2_Object *obj = LookupByUID(
-            LIST->uids[i]);
+            g_armyObjLists[slot]->uids[i]);
 
         if (!obj) {
-            ((AM2_Rec *)LIST)->ListRemoveAt(i);
+            ((AM2_Rec *)g_armyObjLists[slot])->ListRemoveAt(i);
             continue;           /* no step: the shifted-down entry is next */
         }
 
@@ -3072,7 +3053,6 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
             ObjAttachTo(obj, (AM2_Object *)target);
         i++;
     }
-#undef LIST
 }
 
 /* The comm object's team score, still original. */
@@ -3502,25 +3482,24 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * script wrote is used.  The middle test is fireweapon's guard used
          * to SELECT rather than to refuse. */
         /* The subject is resolved afresh at each call, as the image does. */
-#define UID ResolveUid(act->subject, (uint32_t)(uintptr_t)owner)
         if (act->xvar > 0) {
 
             GetVarValue(act->xvar, &v3);
             p1.x = (int16_t)v3;
             GetVarValue(act->yvar, &v3);
             p1.y = (int16_t)v3;
-            EvtAtPointC(UID, p1, act->relative);
+            EvtAtPointC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), p1, act->relative);
             return;
         }
         if (act->relative == 0 && act->u.pos.x == 0) {
-            EvtAtObjPosC(UID,
+            EvtAtObjPosC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                          ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
                          0);
             return;
         }
-        EvtAtPointC(UID, act->u.pos, act->relative);
+        EvtAtPointC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), act->u.pos,
+                    act->relative);
         return;
-#undef UID
     }
 
     case 0x1D:                                  /* setcamerafocus */
@@ -3962,23 +3941,21 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
     case 0x3A: {                                /* setdamagepad */
         /* The pad is indexed afresh at every store, as the image does. */
-#define pad (&g_pads[act->subject])
         if (act->subject < 0 || act->subject >= g_padCount)
             return;
-        pad->damage      = act->n1;
-        pad->period                             = act->n0;
-        pad->damageKind = act->extra;
+        g_pads[act->subject].damage      = act->n1;
+        g_pads[act->subject].period                             = act->n0;
+        g_pads[act->subject].damageKind = act->extra;
 
         /* Only a positive damage marks the pad's NUMBER as live, and the
          * number is reached through the pad's own +0x04 rather than by the
          * pad index -- two different arrays with two different strides. */
         if (act->n1 > 0) {
-            AM2_PadNumber *num = &g_padNumbers[pad->number];
+            AM2_PadNumber *num = &g_padNumbers[g_pads[act->subject].number];
 
             num->live = 1;
         }
         return;
-#undef pad
     }
 
     case 0x1A:                                  /* the empty action */

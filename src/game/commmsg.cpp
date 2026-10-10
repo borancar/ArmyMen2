@@ -105,11 +105,9 @@ extern "C" int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t 
 #define AM2_MSG_VALUE        8
 
 
-#define kCommObj (g_commObject)
-
 static inline void SendValueMsg(AM2_ValueMsg *record, int32_t value, const char *fmt)
 {
-    const AM2_Comm *comm = kCommObj;
+    const AM2_Comm *comm = g_commObject;
 
     record->value = value;
 
@@ -119,7 +117,7 @@ static inline void SendValueMsg(AM2_ValueMsg *record, int32_t value, const char 
     SendGameMsg(&record->hdr, 0, 1);
 
     /* Re-read: the original does not reuse the register it had. */
-    comm = kCommObj;
+    comm = g_commObject;
     if (!comm->verbose)
         return;
 
@@ -270,25 +268,23 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 {
     /* The comm object is read at every use. */
-#define COMM (kCommObj)
     void *dlg;
 
     /* Clients only -- the exact mirror of the host-only receive. */
-    if (COMM->isHost)
+    if (g_commObject->isHost)
         return;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("SendGameReadyToLoadMsg\n %s", ready ? "TRUE" : "FALSE");
 
-    COMM->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(
-                            (int32_t)COMM->selfId)].readyToLoad = ready;
+    g_commObject->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(
+                            (int32_t)g_commObject->selfId)].readyToLoad = ready;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
                 AM2_THE_COMM->CommSlotOfId(
-                    (int32_t)COMM->selfId),
+                    (int32_t)g_commObject->selfId),
                 ready ? "TRUE" : "FALSE");
-#undef COMM
 
     g_msgReadyToLoad->value
         = ready;
@@ -319,7 +315,7 @@ extern "C" void     __cdecl UnPauseGame(uint32_t bits);
 
 int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 {
-    const AM2_Comm *comm = kCommObj;
+    const AM2_Comm *comm = g_commObject;
     int32_t        rc   = 0;
 
     (void)unused;   /* pushed by every call site, read by none. */
@@ -331,7 +327,7 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 
     if (comm->connected) {
         rc   = SendGameMsg(&g_msgMap->hdr, 0, 1);
-        comm = kCommObj;
+        comm = g_commObject;
         if (comm->verbose) {
             /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is
              * not printed at all. The original's. */
@@ -345,34 +341,30 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 void __cdecl ReceivedMapMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
-#define COMM  (kCommObj)
-#define VALUE (((const AM2_ValueMsg *)msg)->value)
     int32_t slot;
 
-    if (!COMM->isHost)
+    if (!g_commObject->isHost)
         return;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("ReceivedMapMsg from %x  Result = %d (4 is nominal) \n",
-                dpid, VALUE);
+                dpid, ((const AM2_ValueMsg *)msg)->value);
 
     slot = AM2_THE_COMM->CommSlotOfId(dpid);
 
     /* From the table at 0x00411998, in table order. 5 and 7 fall through to
      * the same nothing as anything above 8. */
-    switch (VALUE) {
+    switch (((const AM2_ValueMsg *)msg)->value) {
     case 0:
-        COMM->slots[(uint32_t)slot].mapOk = 1;
+        g_commObject->slots[(uint32_t)slot].mapOk = 1;
         break;
     case 1: case 2: case 3: case 4: case 6: case 8:
-        COMM->slots[(uint32_t)slot].mapOk = 0;
+        g_commObject->slots[(uint32_t)slot].mapOk = 0;
         PlaySoundAt(3, 0, 0, 0, 0);
         break;
     default:
         break;
     }
-#undef COMM
-#undef VALUE
 }
 
 /* The tail both receivers share: repaint the current dialog, then tell
@@ -393,42 +385,38 @@ static inline void RepaintDialogAndSendPlayers(void)
 
 void __cdecl ReceivedColorMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
-#define COMM (kCommObj)
-    if (COMM->isHost) {
+    if (g_commObject->isHost) {
         int32_t slot;
 
-        if (COMM->verbose)
+        if (g_commObject->verbose)
             am2_log("ReceivedColorMsg from %x  Color =%d \n",
                     dpid, ((const AM2_ValueMsg *)msg)->value);
 
-        slot = ((AM2_Comm *)COMM)->CommSlotOfId(dpid);
-        if (((AM2_Comm *)COMM)->CommSetArmyColour(slot,
+        slot = ((AM2_Comm *)g_commObject)->CommSlotOfId(dpid);
+        if (((AM2_Comm *)g_commObject)->CommSetArmyColour(slot,
                 ((const AM2_ValueMsg *)msg)->value) != -1)
             RepaintDialogAndSendPlayers();
     }
-#undef COMM
 }
 
 void __cdecl ReceivedTeamMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
-#define COMM (kCommObj)
     /* comm is re-read at each use; the body sits inside the host test, so
      * the registers are saved before it. */
-    if (COMM->isHost) {
+    if (g_commObject->isHost) {
         int32_t slot;
 
-        if (COMM->verbose)
+        if (g_commObject->verbose)
             am2_log("ReceivedTeamMsg from %x  Team =%d \n",
                     dpid, ((const AM2_ValueMsg *)msg)->value);
 
-        slot = ((AM2_Comm *)COMM)->CommSlotOfId(dpid);
+        slot = ((AM2_Comm *)g_commObject)->CommSlotOfId(dpid);
         /* Written straight in, with none of the colour half's checking. */
-        COMM->slots[(uint32_t)slot].team
+        g_commObject->slots[(uint32_t)slot].team
             = ((const AM2_ValueMsg *)msg)->value;
 
         RepaintDialogAndSendPlayers();
     }
-#undef COMM
 }
 
 /* The body of CommEndSetup, which its two callers in this file have written
@@ -439,27 +427,25 @@ static inline void CommEndSetupInline(void)
     int32_t i;
 
     /* The comm object is re-read from its global at every use. */
-#define comm kCommObj
     /* Only the host decides that setup is over. */
-    if (!comm->isHost)
+    if (!g_commObject->isHost)
         return;
 
     /* The count is re-read each time round rather than hoisted. */
-    for (i = 0; i < comm->playerCount; i++) {
-        if (comm->verbose)
+    for (i = 0; i < g_commObject->playerCount; i++) {
+        if (g_commObject->verbose)
             am2_log("m_ArmyReady[%d] = %d \n", i,
-                    comm->slots[(uint32_t)i].ready);
+                    g_commObject->slots[(uint32_t)i].ready);
 
         /* -1 is the only id treated as empty, though 0 is documented as one
          * too -- so a slot holding 0 must be ready. The original's test. */
-        if ((int32_t)comm->slots[(uint32_t)i].id != -1
-            && !comm->slots[(uint32_t)i].ready)
+        if ((int32_t)g_commObject->slots[(uint32_t)i].id != -1
+            && !g_commObject->slots[(uint32_t)i].ready)
             return;
     }
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log("Sending EndSetupMessage\n");
-#undef comm
 
     SendGameMsg(g_msgEndSetup, 0, 1);
     orig_post_message(g_enumContext, AM2_WM_SETUP_DONE, 0, 0);
@@ -473,24 +459,23 @@ void __cdecl CommEndSetup(void)
 void __cdecl SendGameReadyMsg(int32_t ready)
 {
     /* The comm object is re-read at every use, as the image does. */
-#define comm (kCommObj)
 
     /* Gated on the verbosity field like the rest of the group -- unlike
      * SendGameStartMsg, whose opening line is not. */
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log("SendGameReadyMsg\n %s", ready ? "TRUE" : "FALSE");
 
     /* Our own slot: the id comes from the comm object, where the receive half
      * takes it from the message. */
-    comm->slots[(uint32_t)((AM2_Comm *)comm)->CommSlotOfId(
-                                (int32_t)comm->selfId)].ready = ready;
+    g_commObject->slots[(uint32_t)((AM2_Comm *)g_commObject)->CommSlotOfId(
+                                (int32_t)g_commObject->selfId)].ready = ready;
 
-    if (comm->verbose) {
+    if (g_commObject->verbose) {
         /* The lookup runs a second time inside the `if`, as in both
          * ready-to-load halves. */
         am2_log("Setting m_ArmyReady[%d] to %s\n",
-                ((AM2_Comm *)comm)->CommSlotOfId(
-                                     (int32_t)comm->selfId),
+                ((AM2_Comm *)g_commObject)->CommSlotOfId(
+                                     (int32_t)g_commObject->selfId),
                 ready ? "TRUE" : "FALSE");
     }
 
@@ -500,52 +485,46 @@ void __cdecl SendGameReadyMsg(int32_t ready)
         = ready;
     SendGameMsg(&g_msgGameReady->hdr, 0, 1);
 
-#undef comm
     CommEndSetupInline();
 }
 
 void __cdecl ReceiveGameReadyMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object is re-read at every use, as the image does. */
-#define COMM (kCommObj)
-#define VALUE (((const AM2_ValueMsg *)msg)->value)
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("ReceiveGameReadyMsg\n");
 
-    COMM->slots[(uint32_t)((AM2_Comm *)COMM)->CommSlotOfId(dpid)].ready = VALUE;
+    g_commObject->slots[(uint32_t)((AM2_Comm *)g_commObject)->CommSlotOfId(dpid)].ready = ((const AM2_ValueMsg *)msg)->value;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("Setting m_ArmyReady[%d] to %s\n",
-                ((AM2_Comm *)COMM)->CommSlotOfId(dpid),
-                VALUE ? "TRUE" : "FALSE");
+                ((AM2_Comm *)g_commObject)->CommSlotOfId(dpid),
+                (((const AM2_ValueMsg *)msg)->value) ? "TRUE" : "FALSE");
 
     CommEndSetupInline();
-#undef COMM
-#undef VALUE
 }
 
 void __cdecl ReceiveGameReadyToLoadMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and the message's value are read at every use. */
-#define COMM  (kCommObj)
-#define VALUE (((const AM2_ValueMsg *)msg)->value)
     void *dlg;
 
     /* Host only. */
-    if (!COMM->isHost)
+    if (!g_commObject->isHost)
         return;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         am2_log("ReceiveGameReadyToLoadMsg\n");
 
-    COMM->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(dpid)].readyToLoad = VALUE;
+    g_commObject->slots[(uint32_t)AM2_THE_COMM->CommSlotOfId(dpid)].readyToLoad =
+        ((const AM2_ValueMsg *)msg)->value;
 
-    if (COMM->verbose) {
+    if (g_commObject->verbose) {
         /* The lookup runs a SECOND time here; the original does not reuse the
          * slot it just computed. */
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
                 AM2_THE_COMM->CommSlotOfId(dpid),
-                VALUE ? "TRUE" : "FALSE");
+                (((const AM2_ValueMsg *)msg)->value) ? "TRUE" : "FALSE");
     }
 
     /* Repaint the lobby through the widget layer's update-then-paint pair. */
@@ -557,13 +536,11 @@ void __cdecl ReceiveGameReadyToLoadMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
     }
 
     SendPlayerMsg(0);
-#undef COMM
-#undef VALUE
 }
 
 void __cdecl ReceiveEndSetupMsg(const AM2_CommMsgHdr *msg, int32_t from)
 {
-    const AM2_Comm *comm = kCommObj;
+    const AM2_Comm *comm = g_commObject;
 
     (void)msg;
     (void)from;
@@ -665,9 +642,8 @@ void __cdecl MsgListRemove(AM2_MsgList *list, AM2_MsgNode *node)
         }
     }
 
-#define COUNT (l->count)
-    if (--COUNT < 0 || COUNT > AM2_MSGLIST_SANE_MAX)
-        orig_log("RemMsg: Impossible List Size %d \n", COUNT);
+    if (--l->count < 0 || l->count > AM2_MSGLIST_SANE_MAX)
+        orig_log("RemMsg: Impossible List Size %d \n", l->count);
 
     if (l == g_msgListPool) {
         /* The pool still has buffers: neither remaining complaint applies,
@@ -675,15 +651,14 @@ void __cdecl MsgListRemove(AM2_MsgList *list, AM2_MsgNode *node)
         if (l->head)
             goto unlock;
         orig_log("RemMsg has set freelist to EMPTY!! l->numItems = %d\n",
-                 COUNT);
+                 l->count);
     }
 
-    if (!l->head && COUNT > 0)
-        orig_log("Why is list %x empty?  List Size %d \n", l, COUNT);
+    if (!l->head && l->count > 0)
+        orig_log("Why is list %x empty?  List Size %d \n", l, l->count);
 
 unlock:
     orig_release_mutex(l->mutex);
-#undef COUNT
 }
 
 void __cdecl ExitGamePostClose(void)
@@ -742,18 +717,16 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     /* The comm object and each record's id are read at every use. */
-#define COMM (kCommObj)
-#define ID   (COMM->slots[(uint32_t)i].id)
     int32_t ok = 1;
     int32_t i;
 
     (void)dpid;   /* the dispatcher passes it; this one never reads it. */
 
     /* The host sent this; it does not receive it. */
-    if (COMM->isHost)
+    if (g_commObject->isHost)
         return;
 
-    if (COMM->verbose) {
+    if (g_commObject->verbose) {
         /* "Seed is %d" pushes a literal 0 here as well as in the send half, so
          * the seed this function is about is never in either log. */
         am2_log("ReceiveStartGameMsg for %d Players.  Seed is %d \n",
@@ -761,22 +734,23 @@ void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
     }
 
     /* The count is re-read every iteration, as everywhere else in this file. */
-    for (i = 0; i < COMM->playerCount; i++) {
-        if ((int32_t)ID == (int32_t)COMM->selfId)
+    for (i = 0; i < g_commObject->playerCount; i++) {
+        if ((int32_t)g_commObject->slots[(uint32_t)i].id == (int32_t)g_commObject->selfId)
             continue;
 
         /* 7 is a result code, not a map. The second argument is the id, which
          * SendMapMsg does not read. */
-        if (!SendMapMsg(7, (int32_t)ID)) {
+        if (!SendMapMsg(7, (int32_t)g_commObject->slots[(uint32_t)i].id)) {
             ok = 0;
-            am2_log("DPLAY ERROR SENDING TO %x\n", ID);
+            am2_log("DPLAY ERROR SENDING TO %x\n", g_commObject->slots[(uint32_t)i].id);
         }
 
         /* Only if this player has no queue yet. Both tests re-read the id from
          * the record rather than reusing the one above. */
-        if (!FindPlayerById(ID) && !CommRegisterSelf(ID)) {
+        if (!FindPlayerById(g_commObject->slots[(uint32_t)i].id)
+            && !CommRegisterSelf(g_commObject->slots[(uint32_t)i].id)) {
             ok = 0;
-            am2_log("FlowQ creation Failure %x\n", ID);
+            am2_log("FlowQ creation Failure %x\n", g_commObject->slots[(uint32_t)i].id);
         }
     }
 
@@ -795,8 +769,6 @@ void __cdecl ReceiveStartGameMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
         AM2_THE_COMM->CommGetSessionDesc();
         am2_log("Error in start\n");
     }
-#undef COMM
-#undef ID
 }
 
 
@@ -835,7 +807,7 @@ void __cdecl RemoteGamePause(const AM2_CommMsgHdr *msg, int32_t dpid)
         PAUSE_BLOCK(PAUSE_BIT_B_SLOT0)
     }
 
-    if (kCommObj->verbose && mask)
+    if (g_commObject->verbose && mask)
         am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
                 "pauseflags = %x (%x) (msg Pause=%x)\n",
                 dpid, slot, m->pause,
@@ -1170,20 +1142,18 @@ void __cdecl RecvTrooperFire(const AM2_ArmyMsgHdr *msg)
 
     /* Six tests written out, an else-if chain, not a loop. */
 #define INV(n) (unit->inventory[n])
-#define SEL    (unit->inventorySel)
-    if (INV(0) == weaponUid)      SEL = 0;
-    else if (INV(1) == weaponUid) SEL = 1;
-    else if (INV(2) == weaponUid) SEL = 2;
-    else if (INV(3) == weaponUid) SEL = 3;
-    else if (INV(4) == weaponUid) SEL = 4;
-    else if (INV(5) == weaponUid) SEL = 5;
+    if (INV(0) == weaponUid)      unit->inventorySel = 0;
+    else if (INV(1) == weaponUid) unit->inventorySel = 1;
+    else if (INV(2) == weaponUid) unit->inventorySel = 2;
+    else if (INV(3) == weaponUid) unit->inventorySel = 3;
+    else if (INV(4) == weaponUid) unit->inventorySel = 4;
+    else if (INV(5) == weaponUid) unit->inventorySel = 5;
 #undef INV
-#undef SEL
 
     unit->fireFlag =
         m->flag;
 
-    if (kCommObj->verbose)
+    if (g_commObject->verbose)
         am2_log("Trooper Fire Rec, trooper: %x,  face:%d, pos (%d,%d,%d),"
                 " loctarg %x, globTarg %x, weapidx %d\n",
                 troopUid,
@@ -1234,7 +1204,7 @@ void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
     AM2_Object *trooper;
     AM2_Object *item;
 
-    if (kCommObj->verbose)
+    if (g_commObject->verbose)
         am2_log("-->Trooper Drop Item Received: Trooper: %x, item: %x,"
                 " request: %d, slot: %d, quant: %d \n",
                 UidOnWire(m->hdr.uid),
@@ -1262,7 +1232,7 @@ void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
             return;
 
         RemoveInventoryItem(trooper, m->slot);
-        if (kCommObj->verbose)
+        if (g_commObject->verbose)
             am2_log("Weapon destroyed before dropping; but we handled it\n");
         return;
     }
@@ -1270,13 +1240,13 @@ void __cdecl RecvTrooperDropItem(const AM2_ArmyMsgHdr *msg)
     if (!ObjIsType4(item))
         return;
 
-    if (kCommObj->verbose)
+    if (g_commObject->verbose)
         am2_log("Drop item received & performed; ammo %d\n",
                 m->quant);
 
-    if (kCommObj->CommMustBroadcast(
+    if (g_commObject->CommMustBroadcast(
             (int16_t)trooper->owner)) {
-        if (kCommObj->verbose)
+        if (g_commObject->verbose)
             am2_log("\tDrop Item already handled (it's my unit)\n");
         return;
     }
@@ -1466,13 +1436,13 @@ void __cdecl TroopMessageRecv(const AM2_ArmyMsgHdr *msg, int32_t army)
         return;
 
     case AM2_MSG_TROOPER_DROP_ITEM:
-        if (kCommObj->verbose)
+        if (g_commObject->verbose)
             orig_log("troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE\n");
         RecvTrooperDropItem(msg);
         return;
 
     case AM2_MSG_TROOPER_WEAPON:
-        if (kCommObj->verbose)
+        if (g_commObject->verbose)
             orig_log("troopMessageReceive: got eTROOPER_SET_WEAPON_MESSAGE\n");
         RecvTrooperSetWeapon(msg);
         return;
@@ -1541,7 +1511,7 @@ void __cdecl RecvVehicleExit(const AM2_ArmyMsgHdr *msg)
     const AM2_VehicleMsg *m = (const AM2_VehicleMsg *)msg;
     AM2_Object    *vehicle;
 
-    if (kCommObj->verbose)
+    if (g_commObject->verbose)
         orig_log("-->Vehicle Exit Received: Vehicle: %x, trooper: %x\n",
                  UidOnWire(m->hdr.uid),
                  UidOnWire(m->occupant));
@@ -1630,9 +1600,8 @@ static inline void RecordGameOver(int32_t winner)
 void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq)
 {
     const AM2_ArmyMsgHdr *m = msg;
-    AM2_Comm  *comm = kCommObj;
+    AM2_Comm  *comm = g_commObject;
     /* The uid is read from the message at every use. */
-#define uid (m->uid)
     int32_t   army;
     int32_t   kind;
 
@@ -1641,13 +1610,13 @@ void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq
     if (!comm->msgsEnabled)
         return;
 
-    if (!((AM2_Comm *)(comm))->ArmyInPlay(uid)) {
+    if (!((AM2_Comm *)(comm))->ArmyInPlay(m->uid)) {
         am2_log("ignoring message from defunct army\n");
         return;
     }
 
     /* uid 0 is nobody's, so the message is attributed to whoever sent it. */
-    army = uid ? (int32_t)UidArmy(UidOnWire(uid)) : slot;
+    army = m->uid ? (int32_t)UidArmy(UidOnWire(m->uid)) : slot;
 
     /* ADDR_LOG, which is a single `ret` here -- and it is handed the MESSAGE
      * where a format string goes. Kept because it is what the image does. */
@@ -1656,7 +1625,7 @@ void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq
     if (ArmyMsgFilter(m, army))
         return;
 
-    kind = UidObjKind(UidOnWire(uid));
+    kind = UidObjKind(UidOnWire(m->uid));
     switch (kind) {
     case 1:
     case 5:
@@ -1700,9 +1669,8 @@ void __cdecl ReceiveArmyMsg(const AM2_ArmyMsgHdr *msg, int32_t slot, int32_t seq
     am2_log("Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; "
             "msgsize: %d\n",
             kind, m->kind,
-            UidOnWire(uid),
+            UidOnWire(m->uid),
             m->len);
-#undef uid
 }
 
 void __cdecl ReceivePacket(AM2_Packet *packet, int32_t dpid)
@@ -1719,7 +1687,7 @@ void __cdecl ReceivePacket(AM2_Packet *packet, int32_t dpid)
 
     /* Only the first five packets of a session are logged. */
     if (pkt->seq < 5
-        && kCommObj->verbose)
+        && g_commObject->verbose)
         am2_log("Get Packed  %x bytes seq %d Chksum %x \n",
                 (int32_t)pkt->len,
                 (int32_t)pkt->seq,
@@ -1728,11 +1696,10 @@ void __cdecl ReceivePacket(AM2_Packet *packet, int32_t dpid)
     /* A bad checksum is counted and complained about, and then the packet is
      * walked anyway. */
     if (XorChecksum(pkt)) {
-#define ERRS (kCommObj->slots[(uint32_t)slot].chksumErrs)
         am2_log("Receive Checksum Error from %x seq %d\n",
                 dpid, (int32_t)pkt->seq);
-        ERRS = ERRS + 1;
-#undef ERRS
+        g_commObject->slots[(uint32_t)slot].chksumErrs =
+            g_commObject->slots[(uint32_t)slot].chksumErrs + 1;
     }
 
     /* UNSIGNED, as the original's `jbe` is. It matters: the bogus-length test
@@ -1912,7 +1879,7 @@ void __cdecl ReceivePlayerMsg(const AM2_PlayerMsg *msg, int32_t dpid)
 void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 {
     const AM2_FlowCtlMsg *m = (const AM2_FlowCtlMsg *)msg;
-    AM2_Comm       *comm = kCommObj;
+    AM2_Comm       *comm = g_commObject;
     AM2_Flow       *q;
 
     (void)dpid;   /* given, and never read -- alone in this family. */
@@ -1926,7 +1893,7 @@ void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 
     /* OUR record, not the sender's. */
     q = FindPlayerById(
-            kCommObj->selfId);
+            g_commObject->selfId);
     if (!q)
         return;
 
@@ -1937,7 +1904,7 @@ void __cdecl ReceiveFlowControlMsg(const AM2_CommMsgHdr *msg, int32_t dpid)
 void __cdecl CommDispatchMessage(AM2_CommMsgHdr *msg, int32_t size, int32_t from,
                                  int32_t to)
 {
-    const AM2_Comm *comm = kCommObj;
+    const AM2_Comm *comm = g_commObject;
     AM2_CommMsgHdr *m = msg;
     int32_t        type;
 
@@ -2041,11 +2008,11 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
     const AM2_Flow     *flow;
     int32_t            seq;
 
-    if (kCommObj->dplay == 0)
+    if (g_commObject->dplay == 0)
         return;
 
     flow = FindPlayerById(
-               (uint32_t)(int32_t)kCommObj->selfId);
+               (uint32_t)(int32_t)g_commObject->selfId);
     seq = (int32_t)flow->sequence;
 
     msg.hdr.len  = AM2_MSG_TROOPER_FIRE_LEN;
@@ -2064,7 +2031,7 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
 
     ArmyMessageSend(&msg.hdr);
 
-    if (kCommObj->verbose)
+    if (g_commObject->verbose)
         am2_log("Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), "
                 "loctarg %x, globTarg %x, weap %d, seq:%d\n",
                 t->uid, t->facing,
@@ -2189,7 +2156,7 @@ void __cdecl CommDrainMsgs(void)
 {
     AM2_MsgNode *node;
 
-    if (!kCommObj->active)
+    if (!g_commObject->active)
         return;
 
     for (node = MsgListRemHead(g_msgListB);
@@ -2199,21 +2166,19 @@ void __cdecl CommDrainMsgs(void)
          * its length -- what IDirectPlay::Receive filled in. */
         int32_t  from = (int32_t)node->from;
         AM2_CommMsgHdr *msg = (AM2_CommMsgHdr *)node->body;
-#define to ((int32_t)node->to)
 
         /* DPID_SYSMSG is 0: a system message goes to the system handler. */
         if (from == 0)
             orig_comm_system_msg(msg,
                                  (int32_t)node->bodyLen,
-                                 0, to);
+                                 0, (int32_t)node->to);
         else
             CommDispatchMessage(msg,
                                 (int32_t)node->bodyLen,
-                                from, to);
+                                from, (int32_t)node->to);
 
         MsgListAdd(g_msgListPool, node);
     }
-#undef to
 }
 
 /* 0x00401210. Drain one message list into another, head first, until the
@@ -2249,9 +2214,9 @@ void __cdecl TellEachSlot(void)
          * COMM_ARMY_OFF_REMOTE (+0x20C) until the VC6 relink put the two side
          * by side -- a different field of the same record, so it asked the
          * wrong question of each slot in a multiplayer session. */
-        if (!kCommObj->slots[slot].wasHere)
+        if (!g_commObject->slots[slot].wasHere)
             continue;
-        if (!((AM2_Comm *)(void *)kCommObj)->CommMustBroadcast((int16_t)slot))
+        if (!((AM2_Comm *)(void *)g_commObject)->CommMustBroadcast((int16_t)slot))
             continue;
 
         TellOneSlot(slot);
@@ -2531,14 +2496,14 @@ void __cdecl SendChatTo(char *text, int32_t slot)
      * before it knows whether it is zero. */
     rec->ink =
         *(g_objTableRecords
-          + (uint32_t)kCommObj->CommArmyOfSlot(
+          + (uint32_t)g_commObject->CommArmyOfSlot(
                 *(const int32_t *)&g_defaultOwner)
             * AM2_OBJ_TABLE_REC_SIZE
           + OBJ_TABLE_REC_OFF_INK);
     if (!rec->ink)
         rec->ink = g_whiteInk;
 
-    SendGameMsg(&rec->hdr, kCommObj->CommPlayerId(slot), 0);
+    SendGameMsg(&rec->hdr, g_commObject->CommPlayerId(slot), 0);
 }
 
 
@@ -2566,39 +2531,35 @@ void __cdecl SendChatTo(char *text, int32_t slot)
 void __cdecl CommTuneChangeLimit(void)
 {
     /* The comm object is read at every use. */
-#define COMM  (g_commObject)
-#define LIMIT (COMM->enoughChangeLimit)
     uint32_t seq;
     uint32_t sent;
 
-    seq = FindPlayerById(COMM->selfId)->sequence;
+    seq = FindPlayerById(g_commObject->selfId)->sequence;
 
     if (g_bandwidthLastSeq < seq) {
         sent = (uint32_t)AM2_THE_COMM->CommRecentTotal();
 
         if (sent > AM2_BANDWIDTH_HIGH) {
             if (sent > AM2_BANDWIDTH_VERY_HIGH)
-                LIMIT += 2u;
+                g_commObject->enoughChangeLimit += 2u;
             else
-                LIMIT += 1u;
+                g_commObject->enoughChangeLimit += 1u;
             g_bandwidthLastSeq = seq;
             orig_log("Exceeded bandwidth (%d), enoughChangeLimit increased to %d\n",
-                     sent, LIMIT);
-        } else if (LIMIT > g_changeLimitFloor
+                     sent, g_commObject->enoughChangeLimit);
+        } else if (g_commObject->enoughChangeLimit > g_changeLimitFloor
                    && sent < AM2_BANDWIDTH_LOW) {
-            LIMIT -= 1u;
+            g_commObject->enoughChangeLimit -= 1u;
             g_bandwidthLastSeq = seq;
             orig_log("Less than half bandwidth (%d), enoughChangeLimit decreased to %d\n",
-                     sent, LIMIT);
+                     sent, g_commObject->enoughChangeLimit);
         }
 
-        COMM->sendInterval = LIMIT + 1u;
+        g_commObject->sendInterval = g_commObject->enoughChangeLimit + 1u;
     }
 
     TellEachSlot();
     SendAllVehicleUpdates();
-#undef COMM
-#undef LIMIT
 }
 
 int commmsg_install(void)
@@ -2768,8 +2729,6 @@ int commmsg_install(void)
 
 /* The NACK message this side sends, kind 0xC: the range lives where a data
  * message keeps its sequence and checksum. */
-#define FLOW_NACK_OUT_FIRST (g_msgKind0c->first)
-#define FLOW_NACK_OUT_LAST  (g_msgKind0c->last)
 
 /* Both live in win32/dplay.cpp and win32/air.h's C++ half, and this is the
  * flat half, so they are declared here rather than included -- the same
@@ -2819,10 +2778,6 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq);
  * it is verified by reading and by the byte comparison. */
 int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
 {
-#define comm (g_commObject)
-#define VERBOSE (comm->verbose)
-#define FROM (node->from)
-#define MINE (comm->selfId)
     AM2_MsgNode *node = nodev;
     AM2_FlowMsg *msg;
     AM2_Flow *sender, *me;
@@ -2831,24 +2786,24 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
     uint32_t mask, now, seq, expected, last, lat, gap;
     int32_t  resent, any;
 
-    if (FROM == 0)
+    if (node->from == 0)
         return NoteKind31(node);
 
     msg = (AM2_FlowMsg *)node->body;
 
     switch (msg->pkt.kind) {
     case AM2_FLOW_PULSE_ACK:
-        sender = FindPlayerById(FROM);
-        me     = FindPlayerById(MINE);
+        sender = FindPlayerById(node->from);
+        me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
-            am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
             break;
         }
         if (!me) {
-            am2_log("Interrupt Level Can't find FlowQ for %x\n", MINE);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
             break;
         }
-        mask = GetPlayerMask(FROM);
+        mask = GetPlayerMask(node->from);
         now  = orig_get_tick_count();
 
         /* THE ACK IS CUMULATIVE: one message retires every sequence from
@@ -2867,12 +2822,12 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                     g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
-                    if (VERBOSE)
+                    if (g_commObject->verbose)
                         am2_log("Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x  \n",
-                                seq, FROM, FROM, mask);
-                    if (VERBOSE)
+                                seq, node->from, node->from, mask);
+                    if (g_commObject->verbose)
                         am2_log("Remote %d is acking %d, I had thru %d \n",
-                                FROM, msg->pkt.ack,
+                                node->from, msg->pkt.ack,
                                 sender->heHas);
                     continue;
                 }
@@ -2930,21 +2885,21 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
          * the send queue's flag to 1 instead, leaving the message for
          * whatever drains that queue. */
         resent = 0;
-        sender = FindPlayerById(FROM);
-        me     = FindPlayerById(MINE);
+        sender = FindPlayerById(node->from);
+        me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
-            am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
             break;
         }
         if (!me) {
-            am2_log("Interrupt Level Can't find FlowQ for %x\n", MINE);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
             break;
         }
-        if (VERBOSE)
+        if (g_commObject->verbose)
             am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
                     msg->nack.first,
                     msg->nack.last,
-                    FROM, FROM, me->sequence);
+                    node->from, node->from, me->sequence);
 
         mask = sender->wantBit;
         for (seq = msg->nack.first;
@@ -2966,26 +2921,26 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                 copy->checksum = 0;
                 copy->checksum = XorChecksum(copy);
                 {
-                    int32_t rc = ((AM2_Comm *)(void *)comm)->CommSend(
-                        FROM, 0, copy, copy->len);
+                    int32_t rc = ((AM2_Comm *)(void *)g_commObject)->CommSend(
+                        node->from, 0, copy, copy->len);
 
                     if (rc < 0)
                         am2_log("DPlaySend Failure %x to %x size %d\n",
-                                rc, FROM, copy->len);
+                                rc, node->from, copy->len);
                 }
                 MsgSlotA2(sender, seq);
-                if (VERBOSE)
+                if (g_commObject->verbose)
                     am2_log("Resend: seq %d to %d (%x)  nxtSeq = %d\n",
-                            seq, FROM, FROM,
+                            seq, node->from, node->from,
                             me->sequence);
                 sender->resends += 1;
                 resent++;
                 MsgListSetFlag(g_msgListSendq,
                                (int32_t)seq, 0, (int32_t)mask);
             } else {
-                if (VERBOSE)
+                if (g_commObject->verbose)
                     am2_log("ADDING to Resend Queue seq %d to id %x  mask %x\n",
-                            seq, FROM, mask);
+                            seq, node->from, mask);
                 MsgListSetFlag(g_msgListSendq,
                                (int32_t)seq, 1, (int32_t)mask);
             }
@@ -2993,16 +2948,16 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         goto pool;
 
     case AM2_FLOW_DATA:
-        mask   = GetPlayerMask(FROM);
-        sender = FindPlayerById(FROM);
+        mask   = GetPlayerMask(node->from);
+        sender = FindPlayerById(node->from);
         if (!sender) {
             am2_log("Can't Find FlowQ for id %x  seq \n",
-                    FROM, msg->pkt.seq);
+                    node->from, msg->pkt.seq);
             return 1;
         }
-        me = FindPlayerById(MINE);
+        me = FindPlayerById(g_commObject->selfId);
         if (!me) {
-            am2_log("Can't Find my FlowQ for id %x\n", MINE);
+            am2_log("Can't Find my FlowQ for id %x\n", g_commObject->selfId);
             return 1;
         }
 
@@ -3010,7 +2965,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         if (seq < AM2_FLOW_TRACE_FIRST)
             am2_log("Received seq %d  expected %d from %x, he has my seqthru  %d\t\n",
                     seq, sender->nextExpected + 1,
-                    FROM, msg->pkt.ack);
+                    node->from, msg->pkt.ack);
 
         /* A corrupt message is DROPPED, not queued -- hence the 1. */
         if (XorChecksum(msg)) {
@@ -3028,10 +2983,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         expected = sender->nextExpected + 1;
         if (me->sequence == 1 && expected == 1
             && me->ready == 0) {
-            if (comm->isHost == 0) {
-                if (VERBOSE)
+            if (g_commObject->isHost == 0) {
+                if (g_commObject->verbose)
                     am2_log("Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d\n",
-                            FROM, msg->pkt.seq,
+                            node->from, msg->pkt.seq,
                             sender->nextExpected,
                             sender->heHas,
                             me->ready);
@@ -3048,9 +3003,9 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                     - (me->field68 >> 1);
             }
         } else if (sender->nextExpected == 0) {
-            if (VERBOSE)
+            if (g_commObject->verbose)
                 am2_log("First message received from player %x, Received seq %d\n",
-                        FROM, msg->pkt.seq);
+                        node->from, msg->pkt.seq);
             sender->nextExpected =
                 msg->pkt.seq - 1;
             expected = msg->pkt.seq;
@@ -3066,10 +3021,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
          * is dropped for being far ahead. The node goes back to the pool. */
         if (expected < 10 && msg->pkt.seq > expected
             && msg->pkt.seq - expected > 50) {
-            if (VERBOSE)
+            if (g_commObject->verbose)
                 am2_log("Residual Message from %x: expected  %d received %d  from %x hehas %d \n",
-                        FROM, expected, msg->pkt.seq,
-                        FROM, msg->pkt.ack);
+                        node->from, expected, msg->pkt.seq,
+                        node->from, msg->pkt.ack);
             goto pool;
         }
 
@@ -3080,7 +3035,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
             && msg->pkt.ack
                 < me->sequence) {
             if (msg->pkt.seq == 1) {
-                if (VERBOSE)
+                if (g_commObject->verbose)
                     am2_log("New Player joining flow he first got my seq %d hehas was %d  \n",
                             msg->pkt.ack,
                             sender->heHas);
@@ -3101,13 +3056,13 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                     g_msgListSendq, (int32_t)seq, 0,
                     (int32_t)mask);
                 if (!sent) {
-                    if (VERBOSE)
+                    if (g_commObject->verbose)
                         am2_log("Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x  \n",
-                                seq, FROM, FROM, mask);
+                                seq, node->from, node->from, mask);
                     /* %x here where the PULSE ACK arm prints %d. */
-                    if (VERBOSE)
+                    if (g_commObject->verbose)
                         am2_log("Remote %x is acking %d, I had thru %d \n",
-                                FROM, msg->pkt.ack,
+                                node->from, msg->pkt.ack,
                                 sender->heHas);
                     continue;
                 }
@@ -3118,7 +3073,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                 if (lat > AM2_FLOW_RTT_CAP
                     && seq == sender->heHas + 1)
                     am2_log("??? seq %6d from %x latency %d acks for %d msgs %d thru %d  nxtSeq = %d \n",
-                            seq, FROM, lat,
+                            seq, node->from, lat,
                             msg->pkt.ack
                                 - sender->heHas,
                             sender->heHas,
@@ -3157,10 +3112,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
          * 1 here is what stops it being played twice. */
         if (msg->pkt.seq < expected) {
             sender->duplicates += 1;
-            if (VERBOSE)
+            if (g_commObject->verbose)
                 am2_log("Duplicate: expected %d received %d  from %x hehas %d \n",
                         expected, msg->pkt.seq,
-                        FROM, msg->pkt.ack);
+                        node->from, msg->pkt.ack);
             goto pool;
         }
 
@@ -3176,14 +3131,14 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
             last = msg->pkt.seq - 1;
             if (FLOW_QUEUE_HEAD(sender))
                 last = ChainField14(&sender->queue) - 1;
-            FLOW_NACK_OUT_FIRST = expected;
-            FLOW_NACK_OUT_LAST  = last;
+            g_msgKind0c->first = expected;
+            g_msgKind0c->last  = last;
             if (last < expected)
                 last = expected;
             if (last - expected > 50) {
                 am2_log("Flow Nacking ERROR too many missing from %d thru %d \n",
                         expected, last);
-                FLOW_NACK_OUT_LAST = expected + 10;
+                g_msgKind0c->last = expected + 10;
             }
 
             any = 0;
@@ -3193,11 +3148,11 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
             if (any) {
                 sender->nacksSent +=
                     last - expected + 1;
-                if (VERBOSE)
+                if (g_commObject->verbose)
                     am2_log("Flow Nacking %d thru %d  to %x at time %d I am good thru %d \n",
-                            expected, last, FROM, now,
+                            expected, last, node->from, now,
                             sender->nextExpected);
-                SendGameMsg((AM2_CommMsgHdr *)g_msgKind0c, (int32_t)FROM, 0);
+                SendGameMsg((AM2_CommMsgHdr *)g_msgKind0c, (int32_t)node->from, 0);
                 for (; expected <= last; expected++)
                     MsgSlotB2(sender, expected);
             }
@@ -3253,10 +3208,6 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
 pool:
     MsgListAdd(g_msgListPool, node);
     return 1;
-#undef comm
-#undef VERBOSE
-#undef FROM
-#undef MINE
 }
 
 /* RecvVehicle1B -- original 0x0045EB10, one caller. Message kind 0x1B is a
@@ -3502,12 +3453,10 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object and the request are read afresh at every use. */
-#define comm    (g_commObject)
-#define REQUEST (m->request)
     AM2_Object       *vehicle;
     AM2_Object       *item;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(m->hdr.uid),
                 UidOnWire(m->item),
@@ -3515,15 +3464,15 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
                 m->slot,
                 m->quant);
 
-    if (comm->isHost != 0) {
-        if (REQUEST == 2)
+    if (g_commObject->isHost != 0) {
+        if (m->request == 2)
             return;
-        if (REQUEST == 3)
+        if (m->request == 3)
             return;
     } else {
-        if (REQUEST == 0)
+        if (m->request == 0)
             return;
-        if (REQUEST == 1)
+        if (m->request == 1)
             return;
     }
 
@@ -3533,8 +3482,8 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
 
     /* The two DO arms are gated a second time, on the vehicle's own army --
      * a peer only acts on a grant it is entitled to see. */
-    if ((REQUEST == 2 || REQUEST == 3)
-        && !((AM2_Comm *)comm)->CommMustBroadcast(
+    if ((m->request == 2 || m->request == 3)
+        && !((AM2_Comm *)g_commObject)->CommMustBroadcast(
                               (int16_t)vehicle->owner))
         return;
 
@@ -3544,24 +3493,24 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
     if (!ObjIsType4(item))
         return;
 
-    if (REQUEST == 2) {
-        if (comm->verbose)
+    if (m->request == 2) {
+        if (g_commObject->verbose)
             am2_log((const char *)(uintptr_t)"Tell pickup item received; ammo %d\n",
                     m->quant);
         return;
     }
 
-    if (REQUEST == 3) {
-        if (comm->verbose)
+    if (m->request == 3) {
+        if (g_commObject->verbose)
             am2_log((const char *)(uintptr_t)"Tell Drop item received; ammo %d\n",
                     m->quant);
         /* The answer is discarded -- the original calls it and drops it. */
-        (void)((AM2_Comm *)comm)->CommMustBroadcast(
+        (void)((AM2_Comm *)g_commObject)->CommMustBroadcast(
                   (int16_t)vehicle->owner);
         return;
     }
 
-    if (REQUEST == 0) {
+    if (m->request == 0) {
         if ((uint8_t)item->owner == AM2_ARMY_NEUTRAL) {
             int32_t have    = item->ammo;
             int32_t granted = m->quant;
@@ -3580,13 +3529,11 @@ void __cdecl RecvVehicle1D(const AM2_ArmyMsgHdr *msg)
         return;
     }
 
-    if (REQUEST == 1) {
-        if (comm->verbose)
+    if (m->request == 1) {
+        if (g_commObject->verbose)
             am2_log((const char *)(uintptr_t)"Request drop item received; ammo %d\n",
                     m->quant);
     }
-#undef REQUEST
-#undef comm
 }
 
 /* RecvVehicle1F -- original 0x0045E860, one caller. Message kind 0x1F, the
@@ -3618,11 +3565,10 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
 {
     const AM2_ItemMsg *m = (const AM2_ItemMsg *)msg;
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     AM2_Object       *vehicle;
     AM2_Object       *item;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(m->hdr.uid),
                 UidOnWire(m->item),
@@ -3646,7 +3592,7 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
             return;
         if ((w->flags & 2u) == 0)
             return;
-        if (comm->verbose)
+        if (g_commObject->verbose)
             am2_log((const char *)(uintptr_t)"Weapon destroyed before dropping; but we handled it\n");
         return;
     }
@@ -3654,17 +3600,16 @@ void __cdecl RecvVehicle1F(const AM2_ArmyMsgHdr *msg)
     if (!ObjIsType4(item))
         return;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"Drop item received & performed; ammo %d\n",
                 m->quant);
 
-    if (!((AM2_Comm *)comm)->CommMustBroadcast(
+    if (!((AM2_Comm *)g_commObject)->CommMustBroadcast(
                            (int16_t)vehicle->owner))
         return;
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         am2_log((const char *)(uintptr_t)"\tDrop Item already handled (it's my unit)\n");
-#undef comm
 }
 
 /* RecvVehicle1C -- original 0x0045E980, one caller. Message kind 0x1C, the

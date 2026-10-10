@@ -76,11 +76,6 @@ extern "C" const uint8_t am2_guid_null[16] =
 
 static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 
-#define kCLSID_DirectPlay      (g_clsidDirectplay)
-#define kIID_IDirectPlay4A     (g_iidDirectplay4a)
-#define kCLSID_DirectPlayLobby (g_clsidDplayLobby)
-#define kIID_IDirectPlayLobby3A (g_iidDplayLobby3a)
-
 /* Both take the comm object in ecx and nothing else. */
 
 typedef void (__cdecl *am2_destroy_list_fn)(void *list);
@@ -107,8 +102,8 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreateDirectPlay(void *connectio
     if (*slot)
         ::CommDropDirectPlay(comm);
 
-    hr = CoCreateInstance(kCLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER,
-                          kIID_IDirectPlay4A, (LPVOID *)slot);
+    hr = CoCreateInstance(g_clsidDirectplay, NULL, CLSCTX_INPROC_SERVER,
+                          g_iidDirectplay4a, (LPVOID *)slot);
 
     /* A null connection means "create the object and stop" -- which is what
      * enumerating the available providers needs, since that is done on an
@@ -128,8 +123,8 @@ int32_t __attribute__((thiscall)) AM2_Comm::CreateDirectPlayLobby(void *outv)
     LPDIRECTPLAYLOBBY3A  lobby = NULL;
     HRESULT             hr;
 
-    hr = CoCreateInstance(kCLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER,
-                          kIID_IDirectPlayLobby3A, (LPVOID *)&lobby);
+    hr = CoCreateInstance(g_clsidDplayLobby, NULL, CLSCTX_INPROC_SERVER,
+                          g_iidDplayLobby3a, (LPVOID *)&lobby);
     /* Stored either way. The local was zeroed first, so a failure hands back
      * NULL rather than leaving the caller holding whatever it had. */
     *out = lobby;
@@ -233,34 +228,30 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommGetSessionDesc()
     AM2_Comm *comm = this;
 
     /* The interface and the slot are re-read at every use. */
-#define DP   (*DirectPlaySlot(comm))
-#define SLOT (comm->sessionDesc)
     DWORD          size;
     HRESULT        hr;
 
-    if (!DP)
+    if (!(*DirectPlaySlot(comm)))
         return 0;
 
     /* Whatever was fetched last time goes first -- on the game's heap, so
      * through the game's free. */
-    if (SLOT) {
-        orig_free(SLOT);
-        SLOT = NULL;
+    if (comm->sessionDesc) {
+        orig_free(comm->sessionDesc);
+        comm->sessionDesc = NULL;
     }
 
     /* DirectPlay will not say how big the description is except by refusing to
      * write it, so ask once with no buffer and read the size out of the
      * complaint. Anything other than that complaint is the final answer. */
-    hr = IDirectPlayX_GetSessionDesc(DP, NULL, &size);
+    hr = IDirectPlayX_GetSessionDesc((*DirectPlaySlot(comm)), NULL, &size);
     if (hr == (HRESULT)DPERR_BUFFERTOOSMALL) {
-        SLOT = orig_malloc(size);
-        if (!SLOT)
+        comm->sessionDesc = orig_malloc(size);
+        if (!comm->sessionDesc)
             return 0;
-        hr = IDirectPlayX_GetSessionDesc(DP, SLOT, &size);
+        hr = IDirectPlayX_GetSessionDesc((*DirectPlaySlot(comm)), comm->sessionDesc, &size);
     }
     return hr == DP_OK;
-#undef DP
-#undef SLOT
 }
 
 /* ---- the comm object's own lifetime ------------------------------------
@@ -362,55 +353,54 @@ found:
     {
         /* Every store indexes the array afresh rather than holding a record
          * pointer: the image addresses each field as table + slot*stride. */
-    #define rec (&RECAT(slot))
 
         if ((uint32_t)g_commObject->verbose != 0)
             orig_log("Creating Flow Queue for Player id %x\n", id);
 
-        rec->id = id;
-        rec->nextExpected = 0;
-        rec->highestSeq = 0;
-        rec->heHas = 0;
-        rec->sequence = 1;
-        rec->ownBit = 1u << slot;
-        g_playerSlotMask |= rec->ownBit;
+        (&RECAT(slot))->id = id;
+        (&RECAT(slot))->nextExpected = 0;
+        (&RECAT(slot))->highestSeq = 0;
+        (&RECAT(slot))->heHas = 0;
+        (&RECAT(slot))->sequence = 1;
+        (&RECAT(slot))->ownBit = 1u << slot;
+        g_playerSlotMask |= (&RECAT(slot))->ownBit;
         /* Each bit is made where it is stored; `want` is kept for the
          * flags below, the own bit read back from the record. */
         want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
-        rec->wantBit = want;
-        rec->ackSent = 0;
-        rec->sentAt = 0;
-        rec->recvPackets = 0;
-        rec->sentPackets = 0;
-        rec->acksSeen = 0;
-        rec->field34 = 0;
-        rec->nacksSent = 0;
+        (&RECAT(slot))->wantBit = want;
+        (&RECAT(slot))->ackSent = 0;
+        (&RECAT(slot))->sentAt = 0;
+        (&RECAT(slot))->recvPackets = 0;
+        (&RECAT(slot))->sentPackets = 0;
+        (&RECAT(slot))->acksSeen = 0;
+        (&RECAT(slot))->field34 = 0;
+        (&RECAT(slot))->nacksSent = 0;
         g_msgWantedFlags |= want;
-        rec->duplicates = 0;
-        rec->rttMin = 0;
-        rec->rttMax = 0;
-        rec->rttTotal = 0;
-        rec->readyAt = GetTickCount();
-        rec->ready = 1;
-        rec->heHas = 0;
-        rec->badChecksums = 0;
-        rec->field9C = 0;
-        rec->fieldA0 = 0;
-        rec->lossBurst = 0;
-        rec->lossPct = 0;
-        rec->fieldAC = 0;
-        rec->lagMs = 0;
-        rec->lagSpread = 0;
+        (&RECAT(slot))->duplicates = 0;
+        (&RECAT(slot))->rttMin = 0;
+        (&RECAT(slot))->rttMax = 0;
+        (&RECAT(slot))->rttTotal = 0;
+        (&RECAT(slot))->readyAt = GetTickCount();
+        (&RECAT(slot))->ready = 1;
+        (&RECAT(slot))->heHas = 0;
+        (&RECAT(slot))->badChecksums = 0;
+        (&RECAT(slot))->field9C = 0;
+        (&RECAT(slot))->fieldA0 = 0;
+        (&RECAT(slot))->lossBurst = 0;
+        (&RECAT(slot))->lossPct = 0;
+        (&RECAT(slot))->fieldAC = 0;
+        (&RECAT(slot))->lagMs = 0;
+        (&RECAT(slot))->lagSpread = 0;
 
-        rec->ready =
+        (&RECAT(slot))->ready =
             (uint32_t)g_commObject->isHost;
 
         {
             int32_t i;
 
             for (i = 0; i < AM2_PLAYER_RING_LEN; i++) {
-                rec->ringA[i] = 0;
-                rec->ringB[i] = 0;
+                (&RECAT(slot))->ringA[i] = 0;
+                (&RECAT(slot))->ringB[i] = 0;
             }
         }
         result = 1;
@@ -419,7 +409,6 @@ found:
 full:
         orig_log("Create FlowQ failed for ID %x \n", id);
     }
-#undef rec
 #undef NRECS
 #undef RECAT
     return result;
@@ -484,25 +473,20 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommRemovePlayer(int32_t id)
     /* Counted up from the slot; VC6's rotation of it is the image's
      * count-down walk, and its entry test is the only `slot < 4` there is. */
     for (n = slot; n < AM2_COMM_PLAYERS; n++) {
-#define DST (me->slots[n])
-#define SRC (me->slots[n + 1])
 
-        DST.colour = SRC.colour;
-        DST.id = SRC.id;
-        DST.readyToLoad = SRC.readyToLoad;
-        DST.ready = SRC.ready;
-        strcpy(DST.name,
-               SRC.name);
-        DST.team = SRC.team;
-        DST.wasHere = SRC.wasHere;
-        DST.remote = SRC.remote;
-        DST.unacked = SRC.unacked;
-        DST.field5C = SRC.field5C;
-        DST.heard = SRC.heard;
+        me->slots[n].colour = me->slots[n + 1].colour;
+        me->slots[n].id = me->slots[n + 1].id;
+        me->slots[n].readyToLoad = me->slots[n + 1].readyToLoad;
+        me->slots[n].ready = me->slots[n + 1].ready;
+        strcpy(me->slots[n].name,
+               me->slots[n + 1].name);
+        me->slots[n].team = me->slots[n + 1].team;
+        me->slots[n].wasHere = me->slots[n + 1].wasHere;
+        me->slots[n].remote = me->slots[n + 1].remote;
+        me->slots[n].unacked = me->slots[n + 1].unacked;
+        me->slots[n].field5C = me->slots[n + 1].field5C;
+        me->slots[n].heard = me->slots[n + 1].heard;
     }
-
-#undef DST
-#undef SRC
 
     me->slots[3].id = 0;
     me->slots[3].remote = 0;
@@ -534,22 +518,20 @@ void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
     self->dplay = 0;
     self->lobby = 0;
 
-#define SLOT (&self->slots[i])
     for (i = 0; i < 4; i++) {
-        SLOT->remote = 0;
-        SLOT->readyToLoad = 0;
-        SLOT->ready = 0;
-        SLOT->colour = i;
-        SLOT->chksumErrs = 0;
-        SLOT->id = 0;
-        SLOT->wasHere = 0;
-        SLOT->team = 0;
-        SLOT->unacked = 0;
-        SLOT->field5C = 0;
-        SLOT->heard = now;
-        memset(SLOT->name, 0, 0x40);
+        self->slots[i].remote = 0;
+        self->slots[i].readyToLoad = 0;
+        self->slots[i].ready = 0;
+        self->slots[i].colour = i;
+        self->slots[i].chksumErrs = 0;
+        self->slots[i].id = 0;
+        self->slots[i].wasHere = 0;
+        self->slots[i].team = 0;
+        self->slots[i].unacked = 0;
+        self->slots[i].field5C = 0;
+        self->slots[i].heard = now;
+        memset(self->slots[i].name, 0, 0x40);
     }
-#undef SLOT
 
     self->rxIndex = 0;
     self->sendStamp = now;
@@ -660,11 +642,9 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
                               DWORD dwFlags, LPVOID lpContext)
 {
     /* The comm object and the running count are read at every use. */
-#define COMM (g_commObject)
-#define SLOT (&COMM->slots[(size_t)g_commEnumCount])
     (void)dwPlayerType;
 
-    if (COMM->verbose)
+    if (g_commObject->verbose)
         orig_log("InitJoin dpId = %x PlayerName = %s (%s), Flags = %x , context = %x slot = %d \n",
                  dpId, lpName->lpszLongNameA, lpName->lpszShortNameA,
                  dwFlags, lpContext, g_commEnumCount);
@@ -672,27 +652,25 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
     orig_log("%s's dpid: %d\n",
              lpName->lpszShortNameA, dpId);
 
-    if (dpId == COMM->selfId) {
+    if (dpId == g_commObject->selfId) {
         g_ourSlot      = g_commEnumCount;
         *(int32_t *)&g_defaultOwner = g_commEnumCount;
     }
 
-    SLOT->id    = dpId;
-    SLOT->wasHere  = 1;
-    SLOT->colour  = g_commEnumCount;
+    g_commObject->slots[(size_t)g_commEnumCount].id    = dpId;
+    g_commObject->slots[(size_t)g_commEnumCount].wasHere  = 1;
+    g_commObject->slots[(size_t)g_commEnumCount].colour  = g_commEnumCount;
 
-    if (dpId != COMM->selfId) {
-        if (g_commEnumCount < COMM->playerCount)
+    if (dpId != g_commObject->selfId) {
+        if (g_commEnumCount < g_commObject->playerCount)
             AM2_THE_COMM->CommSetSlotRemote(g_commEnumCount);
         CommRegisterSelf(dpId);
     }
 
-    strcpy(SLOT->name, lpName->lpszShortNameA);
+    strcpy(g_commObject->slots[(size_t)g_commEnumCount].name, lpName->lpszShortNameA);
 
     g_commEnumCount++;
     return TRUE;
-#undef COMM
-#undef SLOT
 }
 
 
@@ -967,22 +945,20 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
 
     /* The ring index is read from memory at every use, and so is the shared
      * comm object in the catch-up loop. */
-#define AT self->statIndex
     if (!*DirectPlaySlot(comm))
         return 0;
 
     /* Statistics first, whether or not the send goes through. */
-    self->statTimes[AT] = GetTickCount();
-    self->statSizes[AT] = size;
+    self->statTimes[self->statIndex] = GetTickCount();
+    self->statSizes[self->statIndex] = size;
     self->statBytes   = self->statBytes
                                             + size;
     self->statPackets = self->statPackets
                                             + 1;
     if (size > self->statMax)
         self->statMax = size;
-    if (++AT >= COMM_STAT_RING)
-        AT = 0;
-#undef AT
+    if (++self->statIndex >= COMM_STAT_RING)
+        self->statIndex = 0;
 
     hr = IDirectPlayX_Send(*DirectPlaySlot(comm),
                            self->selfId, idTo,
@@ -1151,42 +1127,38 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommOnConnected()
 {
     AM2_Comm *self = this;
 
-#define COMM (g_commObject)
-#define CAPS ((LPDPCAPS)COMM->caps)
     if (!*DirectPlaySlot(self))
         return 0;
 
-    CAPS->dwSize = sizeof(DPCAPS);
-    if (IDirectPlayX_GetCaps(*DirectPlaySlot(self), CAPS, 0) != DP_OK)
+    ((LPDPCAPS)g_commObject->caps)->dwSize = sizeof(DPCAPS);
+    if (IDirectPlayX_GetCaps(*DirectPlaySlot(self), (LPDPCAPS)g_commObject->caps, 0) != DP_OK)
         return 0;
 
     if (g_commDebug(self)) {
         orig_log("DPLAY CAPS: \n");
-        orig_log("   MaxPacketSize %8d \n", CAPS->dwMaxBufferSize);
-        orig_log("   HeaderSize    %8d \n", CAPS->dwHeaderLength);
-        orig_log("   Latency       %8d \n", CAPS->dwLatency);
-        orig_log("   TimeOut       %8d \n", CAPS->dwTimeout);
-        if (CAPS->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
+        orig_log("   MaxPacketSize %8d \n", ((LPDPCAPS)g_commObject->caps)->dwMaxBufferSize);
+        orig_log("   HeaderSize    %8d \n", ((LPDPCAPS)g_commObject->caps)->dwHeaderLength);
+        orig_log("   Latency       %8d \n", ((LPDPCAPS)g_commObject->caps)->dwLatency);
+        orig_log("   TimeOut       %8d \n", ((LPDPCAPS)g_commObject->caps)->dwTimeout);
+        if (((LPDPCAPS)g_commObject->caps)->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
             orig_log(g_strCapsGuarYes);
         else
             orig_log(g_strCapsGuarNo);
     }
 
-    if (CAPS->dwMaxBufferSize < 0x400u)
-        COMM->bufferMax = CAPS->dwMaxBufferSize;
+    if (((LPDPCAPS)g_commObject->caps)->dwMaxBufferSize < 0x400u)
+        g_commObject->bufferMax = ((LPDPCAPS)g_commObject->caps)->dwMaxBufferSize;
 
-    if (CAPS->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD
-            < COMM->bufferDefault)
-        COMM->bufferDefault =
-            CAPS->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD;
+    if (((LPDPCAPS)g_commObject->caps)->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD
+            < g_commObject->bufferDefault)
+        g_commObject->bufferDefault =
+            ((LPDPCAPS)g_commObject->caps)->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD;
 
     if (g_commDebug(self))
         orig_log(" Max Buffer Size = %d Default buffer size to %d bytes\n",
-                 COMM->bufferMax,
-                 COMM->bufferDefault);
+                 g_commObject->bufferMax,
+                 g_commObject->bufferDefault);
     return 1;
-#undef COMM
-#undef CAPS
 }
 
 /* Give the connection back -- 0x0040EA40, thiscall, and the last of the
@@ -1237,39 +1209,35 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommDropDirectPlay()
 
     /* Our id is read from the object at each use, and the slots are
      * indexed, as in CommConstruct. */
-#define SLOT (&self->slots[i])
     for (i = 0; i < 4; i++) {
-        SLOT->remote = 0;
-        SLOT->readyToLoad = 0;
-        SLOT->ready = 0;
-        SLOT->wasHere = 0;
-        SLOT->team = 0;
-        SLOT->colour = (uint32_t)i;
-        SLOT->chksumErrs = 0;
+        self->slots[i].remote = 0;
+        self->slots[i].readyToLoad = 0;
+        self->slots[i].ready = 0;
+        self->slots[i].wasHere = 0;
+        self->slots[i].team = 0;
+        self->slots[i].colour = (uint32_t)i;
+        self->slots[i].chksumErrs = 0;
 
         /* Remote players are destroyed; ours is left for the call below. */
-        if (SLOT->id
-            && SLOT->id
+        if (self->slots[i].id
+            && self->slots[i].id
                != self->selfId)
-            DestroyFlow(SLOT->id);
-        SLOT->id = 0;
+            DestroyFlow(self->slots[i].id);
+        self->slots[i].id = 0;
 
-        SLOT->unacked = 0;
-        SLOT->field5C = 0;
-        SLOT->heard = GetTickCount();
-        memset(SLOT->name, 0, 0x40);
+        self->slots[i].unacked = 0;
+        self->slots[i].field5C = 0;
+        self->slots[i].heard = GetTickCount();
+        memset(self->slots[i].name, 0, 0x40);
     }
-#undef SLOT
 
     DestroyFlow(self->selfId);
     self->selfId = 0;
 
-#define LOBBY (*(LPDIRECTPLAYLOBBY3A *)&self->lobby)
-    if (LOBBY) {
-        IDirectPlayLobby_Release(LOBBY);
-        LOBBY = NULL;
+    if (*(LPDIRECTPLAYLOBBY3A *)&self->lobby) {
+        IDirectPlayLobby_Release((*(LPDIRECTPLAYLOBBY3A *)&self->lobby));
+        (*(LPDIRECTPLAYLOBBY3A *)&self->lobby) = NULL;
     }
-#undef LOBBY
 
     UnPauseGame(COMM_DROP_EVENT_MASK);
     g_defaultOwner      = 0;
@@ -1402,14 +1370,12 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
 
     /* The launcher chose the transport; the game chooses the rest. The
      * buffer is re-read from the comm object for every field. */
-#define SD (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)
-    SD->dwUser1      = 1;
-    SD->dwUser2      = 2;
-    SD->dwUser3      = 3;
-    SD->dwUser4      = 4;
-    SD->dwFlags      = DPSESSION_MIGRATEHOST;
-    SD->dwMaxPlayers = AM2_MAX_PLAYERS;
-#undef SD
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwUser1      = 1;
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwUser2      = 2;
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwUser3      = 3;
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwUser4      = 4;
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwFlags      = DPSESSION_MIGRATEHOST;
+    (((LPDPLCONNECTION)self->lobbyBuf)->lpSessionDesc)->dwMaxPlayers = AM2_MAX_PLAYERS;
 
     if (IDirectPlayLobby_SetConnectionSettings(
             (LPDIRECTPLAYLOBBY3A)g_commObject->lobby,
@@ -1426,7 +1392,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
 
     /* Connect hands back an IDirectPlay2; everything else here wants a 4A. */
     if (dp2) {
-        hr = IDirectPlayX_QueryInterface(dp2, kIID_IDirectPlay4A,
+        hr = IDirectPlayX_QueryInterface(dp2, g_iidDirectplay4a,
                                          (LPVOID *)DirectPlaySlot(self));
         IDirectPlayX_Release(dp2);
         if (hr < 0)
@@ -1500,7 +1466,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
     AM2_Comm  *comm   = this;
     AM2_Comm        *self   = comm;
     /* The shared comm object is read at every use. */
-#define shared g_commObject
     LPDIRECTPLAY4A  dp;
     DPNAME          who;
     HRESULT         hr;
@@ -1510,14 +1475,14 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
     who.lpszShortNameA  = (LPSTR)name;
 
     /* Offline: nobody to tell, so just claim the slot. */
-    if (shared->local) {
-        shared->slots[g_ourSlot].wasHere = 1;
-        shared->slots[g_ourSlot].id = 1;
+    if (g_commObject->local) {
+        g_commObject->slots[g_ourSlot].wasHere = 1;
+        g_commObject->slots[g_ourSlot].id = 1;
         self->connected = 1;
         return 1;
     }
 
-    dp = *DirectPlaySlot(shared);
+    dp = *DirectPlaySlot(g_commObject);
     if (!dp)
         return 0;
 
@@ -1535,25 +1500,24 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
         self->connected = 1;
     } else {
         /* One more of us. */
-        shared->playerCount += 1;
+        g_commObject->playerCount += 1;
         orig_log("numDPPlayers is %d \n",
-                 (uint32_t)shared->playerCount);
+                 (uint32_t)g_commObject->playerCount);
     }
 
     if (self->isHost) {
-        shared->slots[g_ourSlot].id =
+        g_commObject->slots[g_ourSlot].id =
             self->selfId;
-        shared->slots[g_ourSlot].wasHere = 1;
+        g_commObject->slots[g_ourSlot].wasHere = 1;
     }
 
     /* +0x404, the messages-enabled flag -- NOT the host flag at +0x3D8,
      * which this wrote until the relink compared the displacement: every
      * client that created its player would have called itself the host. */
-    shared->msgsEnabled = 1;
-    shared->active = 1;
-    CommRegisterSelf((DPID)shared->selfId);
+    g_commObject->msgsEnabled = 1;
+    g_commObject->active = 1;
+    CommRegisterSelf((DPID)g_commObject->selfId);
     return 1;
-#undef shared
 }
 
 /* Take a packet off the wire -- 0x0040E8A0, thiscall, `ret 0x14`.
@@ -1587,8 +1551,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommReceive(uint32_t *from_, uint32_
     /* The ring index and the size are read from memory at every use, and
      * the catch-up loop re-reads the count and each id from the shared
      * object -- the image's loads, one for one. */
-#define AT   self->rxIndex
-#define SIZE (*(DWORD *)size_)
     if (!*DirectPlaySlot(comm))
         return 0;
 
@@ -1596,20 +1558,18 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommReceive(uint32_t *from_, uint32_
                              (DWORD)flags_, data, (DWORD *)size_) != DP_OK)
         return 0;
 
-    self->rxSizes[AT] = SIZE;
+    self->rxSizes[self->rxIndex] = *(DWORD *)size_;
     self->rxBytes   = self->rxBytes
-                                          + SIZE;
+                                          + (*(DWORD *)size_);
     self->rxPackets = self->rxPackets
                                           + 1;
-    if (SIZE > self->rxMax)
-        self->rxMax = SIZE;
+    if ((*(DWORD *)size_) > self->rxMax)
+        self->rxMax = *(DWORD *)size_;
 
     now = GetTickCount();
-    self->rxTimes[AT] = now;
-    if (++AT >= COMM_STAT_RING)
-        AT = 0;
-#undef AT
-#undef SIZE
+    self->rxTimes[self->rxIndex] = now;
+    if (++self->rxIndex >= COMM_STAT_RING)
+        self->rxIndex = 0;
 
     slot = ((AM2_Comm *)comm)->CommSlotOfId(*(DPID *)from_);
 
@@ -2006,7 +1966,6 @@ int32_t __cdecl StartPacketThread(void)
     /* Indexed: the image's outer test is a signed `jl` on the buffer
      * cursor the two indexes strength-reduce to. */
 #define REC(i) (&g_packetRecords[(uint32_t)(i)])
-#define BUF    (g_packetBuffers)
     int32_t i;
     int32_t j;
 
@@ -2026,16 +1985,15 @@ void __cdecl PacketSlotReset(uint32_t slot);
     for (i = 0; i < 400; i++) {
         REC(i)->size = PACKET_BUFFER_BYTES;
         REC(i)->body =
-            (uint8_t *)&BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4)];
+            (uint8_t *)&g_packetBuffers[i * (int32_t)(PACKET_BUFFER_BYTES / 4)];
 
         for (j = 0; j < (int32_t)(PACKET_BUFFER_BYTES / 4); j++)
-            BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4) + j] =
+            g_packetBuffers[i * (int32_t)(PACKET_BUFFER_BYTES / 4) + j] =
                 (uint32_t)orig_rand();
 
         MsgListAdd(g_msgListPool, REC(i));
     }
 #undef REC
-#undef BUF
 
     g_packetEventA =
         CreateEventA(NULL, FALSE, FALSE, NULL);
@@ -2072,38 +2030,36 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 void __cdecl SendGameStartMsg(void)
 {
     /* The comm object is read at every use. */
-#define COMM (g_commObject)
-#define DESC ((LPDPSESSIONDESC2)COMM->sessionDesc)
     AM2_StartMsg *msg = g_msgGameStart;
 
     /* NOT gated on the verbosity field, unlike the rest of this group. */
     orig_log("SendGameStartMsg\n");
 
-    if (!COMM->local) {
+    if (!g_commObject->local) {
         int32_t  seed;
         LPDPSESSIONDESC2 desc;
 
         /* Host only; a client does nothing at all, not even the tail. */
-        if (!COMM->isHost)
+        if (!g_commObject->isHost)
             return;
 
-        msg->players = COMM->playerCount;
-        msg->hostId  = (int32_t)COMM->selfId;
+        msg->players = g_commObject->playerCount;
+        msg->hostId  = (int32_t)g_commObject->selfId;
 
         /* The shared seed: read once here and sent, so every machine agrees. */
         seed = orig_crt_time((int32_t *)0);
         g_gameSeed      = seed;
         g_gameSeedSent = seed;
 
-        if (COMM->verbose)
+        if (g_commObject->verbose)
             /* "Seed is %d" with a literal 0 -- the original never prints the
              * seed it just chose. Kept. */
             orig_log("SendGameStartMsg for %d  Players: Seed is %d \n",
-                    COMM->playerCount, 0);
+                    g_commObject->playerCount, 0);
 
         AM2_THE_COMM->CommGetSessionDesc();
 
-        desc = DESC;
+        desc = (LPDPSESSIONDESC2)g_commObject->sessionDesc;
         desc->dwFlags |= AM2_SESSION_FLAGS_START;
         AM2_THE_COMM->CommSetSessionDesc(desc, 0);
 
@@ -2115,8 +2071,6 @@ void __cdecl SendGameStartMsg(void)
     RequestState(2);
     g_stateEnterOnce = 1;
     g_netGame         = 1;
-#undef COMM
-#undef DESC
 }
 
 
@@ -2384,28 +2338,26 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotOfId(uint32_t id)
 void __cdecl PacketSlotReset(uint32_t slot)
 {
     /* Written out, in the image's order: the ownership bit goes in fifth. */
-#define REC (&g_playerRecords[slot])
-    REC->id = 0;
-    REC->nextExpected = 0;
-    REC->highestSeq = 0;
-    REC->heHas = 0;
-    REC->ackSent = 0;
-    REC->ownBit = 1u << slot;
-    REC->sentAt = 0;
-    REC->recvPackets = 0;
-    REC->sentPackets = 0;
-    REC->acksSeen = 0;
-    REC->field34 = 0;
-    REC->badChecksums = 0;
-    REC->nacksSent = 0;
-    REC->duplicates = 0;
-    REC->rttMin = 0;
-    REC->rttMax = 0;
-    REC->rttTotal = 0;
-    REC->readyAt = 0;
+    g_playerRecords[slot].id = 0;
+    g_playerRecords[slot].nextExpected = 0;
+    g_playerRecords[slot].highestSeq = 0;
+    g_playerRecords[slot].heHas = 0;
+    g_playerRecords[slot].ackSent = 0;
+    g_playerRecords[slot].ownBit = 1u << slot;
+    g_playerRecords[slot].sentAt = 0;
+    g_playerRecords[slot].recvPackets = 0;
+    g_playerRecords[slot].sentPackets = 0;
+    g_playerRecords[slot].acksSeen = 0;
+    g_playerRecords[slot].field34 = 0;
+    g_playerRecords[slot].badChecksums = 0;
+    g_playerRecords[slot].nacksSent = 0;
+    g_playerRecords[slot].duplicates = 0;
+    g_playerRecords[slot].rttMin = 0;
+    g_playerRecords[slot].rttMax = 0;
+    g_playerRecords[slot].rttTotal = 0;
+    g_playerRecords[slot].readyAt = 0;
 
-    MsgListInit(&REC->queue);
-#undef REC
+    MsgListInit(&g_playerRecords[slot].queue);
 }
 /* 0x0040FB80, one caller -- ShowMpResult. EIGHT bytes: it forwards to
  * CommSendLobbyProperty with the property id 2 and returns.
@@ -2689,59 +2641,51 @@ void *__cdecl MsgListInsert(AM2_MsgList *list, AM2_MsgNode *node)
 #define NEXT(p) (p->next)
 #define PREV(p) (p->prev)
 #define KEY(p)  (p->key)
-#define HEAD    (l->head)
-#define TAIL    (l->tail)
-#define COUNT   (l->count)
-#define MUTEX   ((HANDLE)l->mutex)
-    WaitForSingleObject(MUTEX, INFINITE);
+    WaitForSingleObject((HANDLE)l->mutex, INFINITE);
 
-    at = HEAD;
+    at = l->head;
     if (!at) {
-        HEAD = n;
-        TAIL = n;
+        l->head = n;
+        l->tail = n;
         PREV(n) = (AM2_MsgNode *)0;
         NEXT(n) = (AM2_MsgNode *)0;
-        COUNT++;
+        l->count++;
     } else if (KEY(at) > KEY(n)) {
         PREV(n) = (AM2_MsgNode *)0;
         NEXT(n) = at;
-        HEAD    = n;
+        l->head    = n;
         PREV(at) = n;
-        COUNT++;
+        l->count++;
     } else {
         while (at) {
             if (KEY(at) > KEY(n)) {
                 if (PREV(at))
                     NEXT(PREV(at)) = n;
                 else
-                    HEAD = n;
+                    l->head = n;
                 PREV(n)  = PREV(at);
                 NEXT(n)  = at;
                 PREV(at) = n;
-                COUNT++;
+                l->count++;
                 break;
             }
             if (!NEXT(at)) {                /* past the tail */
                 NEXT(at) = n;
                 PREV(n)  = at;
                 NEXT(n)  = (AM2_MsgNode *)0;
-                TAIL     = n;
-                COUNT++;
+                l->tail     = n;
+                l->count++;
                 break;
             }
             at = NEXT(at);
         }
     }
 
-    ReleaseMutex(MUTEX);
+    ReleaseMutex((HANDLE)l->mutex);
     return n;
 #undef NEXT
 #undef PREV
 #undef KEY
-#undef HEAD
-#undef TAIL
-#undef COUNT
-#undef MUTEX
 }
 
 /* MsgListTakeFlags -- original 0x00401330, two callers.
@@ -2771,7 +2715,6 @@ int32_t __cdecl MsgListTakeFlags(AM2_MsgList *list, void *dst)
 {
     /* The wanted mask is read afresh on every pass, the node found is kept
      * apart from the cursor, and the result is `found ? taken : 0`. */
-#define WANT (g_msgWantedFlags)
     AM2_MsgList *l  = list;
     AM2_MsgNode  *n;
     AM2_MsgNode  *found;
@@ -2782,10 +2725,10 @@ int32_t __cdecl MsgListTakeFlags(AM2_MsgList *list, void *dst)
 
     for (n = l->head; n;
          n = n->next) {
-        if (n->flags & WANT) {
+        if (n->flags & g_msgWantedFlags) {
             found = n;
-            taken = n->flags & WANT;
-            n->flags &= ~WANT;
+            taken = n->flags & g_msgWantedFlags;
+            n->flags &= ~g_msgWantedFlags;
             break;
         }
     }
@@ -2797,7 +2740,6 @@ int32_t __cdecl MsgListTakeFlags(AM2_MsgList *list, void *dst)
     ReleaseMutex((HANDLE)l->mutex);
 
     return found ? (int32_t)taken : 0;
-#undef WANT
 }
 
 /* CommPlayerLeft -- original 0x0040F790, two callers, both in WndProc's
@@ -3130,7 +3072,6 @@ void __cdecl SendPlayerMsg(int32_t arg)
 int32_t __cdecl DestroyFlow(uint32_t id)
 {
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     AM2_Flow *flow;
     AM2_Flow *mine;
     int32_t  seq;
@@ -3142,9 +3083,9 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     flow = FindPlayerById(id);
     if (!flow)
         orig_log("DestroyFlow: Flow queue for Player %x not found\n",
-                 comm->selfId);
+                 g_commObject->selfId);
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         orig_log("About to Destroy FlowQ for id %x sendqueue Size = %d \n",
                  id, MsgField12(g_msgListSendq));
 
@@ -3152,19 +3093,19 @@ int32_t __cdecl DestroyFlow(uint32_t id)
         return 0;
 
     mine = FindPlayerById(
-               comm->selfId);
+               g_commObject->selfId);
     if (!mine) {
         orig_log("DestroyFlow: Flow queue for me (%x) not found\n",
-                 comm->selfId);
+                 g_commObject->selfId);
         return 0;
     }
 
     DrainMsgList(&flow->queue);
 
-    if (id != comm->selfId) {
+    if (id != g_commObject->selfId) {
         uint32_t mask = GetPlayerMask(id);
 
-        if (comm->verbose)
+        if (g_commObject->verbose)
             orig_log(" Simulating Acks for  seq %d thru %d\n",
                      (int32_t)flow->heHas + 1,
                      (int32_t)mine->sequence - 1);
@@ -3180,7 +3121,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
                 & node->flags)
                 continue;   /* somebody still connected wants it */
 
-            if (comm->verbose)
+            if (g_commObject->verbose)
                 orig_log("Adding to freelist from sendque Buffer seq %d "
                          " elelment %x \n",
                          (int32_t)node->key, node);
@@ -3190,7 +3131,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
         }
     }
 
-    if (comm->verbose)
+    if (g_commObject->verbose)
         orig_log("Finished Destroying FlowQ for id %x sendqueue Size = %d \n",
                  id, MsgField12(g_msgListSendq));
 
@@ -3217,7 +3158,6 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 
     return 0;
 
-#undef comm
 }
 
 /* CommSystemMessage -- original 0x00410090, one caller: the message drain. The
@@ -3280,13 +3220,12 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
     const DPMSG_CREATEPLAYERORGROUP *m =
         (const DPMSG_CREATEPLAYERORGROUP *)msg;
     /* The comm object is read at every use. */
-#define comm (g_commObject)
     int32_t  slot;
     uint32_t t0;
 
     switch (m->dwType) {
     case DPSYS_DESTROYPLAYERORGROUP:
-        if (comm->verbose)
+        if (g_commObject->verbose)
             orig_log("DestroyPlayer Id=%x, to = %x\n",
                      m->dpId, to);
         PostMessageA(*(HWND *)&g_enumContext, AM2_WM_PLAYER_GONE,
@@ -3294,55 +3233,53 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         return;
 
     case DPSYS_CREATEPLAYERORGROUP:
-        if (comm->verbose) {
+        if (g_commObject->verbose) {
             orig_log("CreatePlayer to=%x, name = %s id = %x\n",
                      to, m->dpnName.lpszShortNameA, m->dpId);
         }
 
-        slot = comm->playerCount;
-        comm->slots[slot].wasHere = 1;
+        slot = g_commObject->playerCount;
+        g_commObject->slots[slot].wasHere = 1;
 
-        if (comm->isHost) {
+        if (g_commObject->isHost) {
             {
                 int32_t i;
 
                 /* Yes, when the slot is EMPTY, and -1 is what goes in --
                  * the slot read again for the argument. */
-#define SLOT_ID ((int32_t)comm->slots[i].id)
                 for (i = 0; i < AM2_COMM_ARMY_COUNT; i++) {
-                    if (SLOT_ID == -1)
-                        ((AM2_Comm *)comm)->CommRemovePlayer(SLOT_ID);
+                    if ((int32_t)g_commObject->slots[i].id == -1)
+                        ((AM2_Comm *)g_commObject)->CommRemovePlayer((int32_t)g_commObject->slots[i].id);
                 }
-#undef SLOT_ID
             }
 
-            comm->slots[g_ourSlot].id =
-                (int32_t)comm->selfId;
+            g_commObject->slots[g_ourSlot].id =
+                (int32_t)g_commObject->selfId;
 
-            slot = comm->playerCount;
-            comm->slots[slot].id = (int32_t)m->dpId;
+            slot = g_commObject->playerCount;
+            g_commObject->slots[slot].id = (int32_t)m->dpId;
 
-            ((AM2_Comm *)comm)->CommSetSlotRemote(
-                              comm->playerCount);
+            ((AM2_Comm *)g_commObject)->CommSetSlotRemote(
+                              g_commObject->playerCount);
 
             if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
-                strcpy(comm->slots[comm->playerCount].name,
+                strcpy(g_commObject->slots[g_commObject->playerCount].name,
                        m->dpnName.lpszShortNameA);
             }
 
-            comm->slots[comm->playerCount].heard = GetTickCount();
+            g_commObject->slots[g_commObject->playerCount].heard = GetTickCount();
 
-            slot = comm->playerCount;
-            comm->slots[slot].mapOk = 0;
+            slot = g_commObject->playerCount;
+            g_commObject->slots[slot].mapOk = 0;
 
-            comm->playerCount =
-                comm->playerCount + 1;
+            g_commObject->playerCount =
+                g_commObject->playerCount + 1;
 
-            if ((uint32_t)comm->playerCount
+            if ((uint32_t)g_commObject->playerCount
                 >= (uint32_t)AM2_COMM_ARMY_COUNT) {
                 LPDPSESSIONDESC2 desc;
 
-                CommGetSessionDesc(comm);
+                CommGetSessionDesc(g_commObject);
                 desc = (LPDPSESSIONDESC2)g_commObject->sessionDesc;
                 desc->dwFlags |= AM2_SESSION_FULL_FLAGS;
                 g_commObject->CommSetSessionDesc(desc, 0);
@@ -3386,8 +3323,8 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         return;
 
     case DPSYS_SETSESSIONDESC:
-        if (!comm->isHost)
-            CommGetSessionDesc(comm);
+        if (!g_commObject->isHost)
+            CommGetSessionDesc(g_commObject);
         return;
 
     default:
@@ -3395,7 +3332,6 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                  m->dwType, m->dwType, 0);
         return;
     }
-#undef comm
 }
 
 /* ProcessResendQueue -- original 0x00403050, 560 bytes, one caller. Drain up
@@ -3434,7 +3370,6 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
  */
 void __cdecl ProcessResendQueue(void)
 {
-#define comm (g_commObject)
     AM2_Packet  *buf = g_resendBuf;
     int32_t   taken;
     int32_t   drained = 0;
@@ -3443,16 +3378,16 @@ void __cdecl ProcessResendQueue(void)
     while (taken) {
         int32_t i;
 
-        if (comm->verbose && drained == 0)
+        if (g_commObject->verbose && drained == 0)
             orig_log("Entering ProcessResendQueue \n");
 
         for (i = 0; i < AM2_COMM_PLAYERS; i++) {
-            uint32_t id = comm->slots[i].id;
+            uint32_t id = g_commObject->slots[i].id;
             AM2_Flow *flow;
             int32_t  hr;
 
             if (!id || id == 0xFFFFFFFFu
-                || id == comm->selfId)
+                || id == g_commObject->selfId)
                 continue;
 
             flow = FindPlayerById(id);
@@ -3474,7 +3409,7 @@ void __cdecl ProcessResendQueue(void)
             hr = AM2_THE_COMM->CommSend(id, 0,
                           buf, buf->len);
 
-            if (comm->verbose)
+            if (g_commObject->verbose)
                 orig_log("RESENDING %d to %x size %d \n",
                         (int32_t)buf->seq, id,
                         (int32_t)buf->len);
@@ -3503,9 +3438,8 @@ void __cdecl ProcessResendQueue(void)
         taken = MsgListTakeFlags(g_msgListSendq, buf);
     }
 
-    if (comm->verbose && drained)
+    if (g_commObject->verbose && drained)
         orig_log("Exiting ProcessResendQueue \n");
-#undef comm
 }
 
 /* SendGameMsg -- original 0x004022D0, 928 bytes, fourteen callers. Every
@@ -3656,20 +3590,19 @@ int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags)
     g_sendRoll = roll;
 
     if (mine) {
-#define pct (mine->lossPct)
 
         if (mine->lossBurst != 0) {
             /* Drop the LAST `pct` of every hundred packets to this player --
              * a burst rather than a scatter, and it needs a destination
              * record, so a broadcast is never dropped this way. */
-            if (pct != 0 && flow != 0
+            if (mine->lossPct != 0 && flow != 0
                 && (int32_t)(flow->sentPackets
                              % (uint32_t)AM2_SEND_ROLL_MOD)
-                   > AM2_SEND_ROLL_MOD - pct
+                   > AM2_SEND_ROLL_MOD - mine->lossPct
                 && !(flags & AM2_DPSEND_GUARANTEED))
                 return 0;
         } else {
-            if (pct != 0 && roll <= pct
+            if (mine->lossPct != 0 && roll <= mine->lossPct
                 && !(flags & AM2_DPSEND_GUARANTEED))
                 return 0;
         }
@@ -3736,7 +3669,6 @@ int32_t __cdecl SendGameMsg(AM2_CommMsgHdr *msg, int32_t to, int32_t flags)
     g_exitGameFlag = 1;
     ExitGamePostClose();
     return hr;
-#undef pct
 }
 
 
@@ -3771,8 +3703,6 @@ void __cdecl CheckPlayerTimeout(void)
 {
     uint32_t  paused = GetPauseFlags();
     /* The comm object and each slot are read at every use. */
-#define comm (g_commObject)
-#define slot (&comm->slots[(uint32_t)i])
     uint32_t  now;
     int32_t   i;
 
@@ -3783,60 +3713,60 @@ void __cdecl CheckPlayerTimeout(void)
         return;
 
 
-    if (comm->isHost) {
+    if (g_commObject->isHost) {
         now  = GetTickCount();
 
-        for (i = 0; i < (int32_t)comm->playerCount; i++) {
-            int32_t  id   = (int32_t)slot->id;
+        for (i = 0; i < (int32_t)g_commObject->playerCount; i++) {
+            int32_t  id   = (int32_t)g_commObject->slots[(uint32_t)i].id;
 
-            if (id == -1 || id == (int32_t)comm->selfId)
+            if (id == -1 || id == (int32_t)g_commObject->selfId)
                 continue;
 
-            if (now - slot->heard <= AM2_TIMEOUT_PLAYER_MS
+            if (now - g_commObject->slots[(uint32_t)i].heard <= AM2_TIMEOUT_PLAYER_MS
                 || !(paused & (AM2_PAUSE_LEFT_A << i))) {
                 g_timeoutLoggedAt = 0;
                 continue;
             }
 
-            if (comm->verbose
+            if (g_commObject->verbose
                 && g_timeoutLoggedAt
                 && now - g_timeoutLoggedAt
                        > AM2_TIMEOUT_PLAYER_MS) {
                 orig_log("TIMING OUT PLAYER %d %s\n", i,
-                         slot->name);
+                         g_commObject->slots[(uint32_t)i].name);
                 g_timeoutLoggedAt = now;
             }
 
-            if (comm->timeoutsOn)
+            if (g_commObject->timeoutsOn)
                 PostMessageA(g_hwnd, AM2_WM_PLAYER_GONE,
-                             (WPARAM)slot->id, 0);
+                             (WPARAM)g_commObject->slots[(uint32_t)i].id, 0);
         }
         return;
     }
 
     now  = GetTickCount();
 
-    for (i = 0; i < (int32_t)comm->playerCount; i++) {
+    for (i = 0; i < (int32_t)g_commObject->playerCount; i++) {
 
-        if (slot->id
-                != (uint32_t)comm->connected)
+        if (g_commObject->slots[(uint32_t)i].id
+                != (uint32_t)g_commObject->connected)
             continue;
-        if (now - slot->heard <= AM2_TIMEOUT_HOST_MS)
+        if (now - g_commObject->slots[(uint32_t)i].heard <= AM2_TIMEOUT_HOST_MS)
             continue;
         if (!(paused & (AM2_PAUSE_LEFT_A << i)))
             continue;
 
-        if (comm->verbose
+        if (g_commObject->verbose
             && g_timeoutLoggedAt
             && now - g_timeoutLoggedAt
                    > AM2_TIMEOUT_HOST_MS) {
             orig_log("EXITING - HAVE NOT HEARD FROM HOST: %d %s\n", i,
-                     slot->name);
+                     g_commObject->slots[(uint32_t)i].name);
             g_timeoutLoggedAt = now;
         }
 
-        if (comm->timeoutsOn) {
-            if (comm->lobbied) {
+        if (g_commObject->timeoutsOn) {
+            if (g_commObject->lobbied) {
                 RequestState(AM2_STATE_MP_LOBBY);
             } else {
                 RequestState(AM2_STATE_MENU);
@@ -3854,8 +3784,6 @@ void __cdecl CheckPlayerTimeout(void)
             g_timeoutLoggedAt = 0;
         }
     }
-#undef comm
-#undef slot
 }
 
 int dplay_install(void)

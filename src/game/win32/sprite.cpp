@@ -143,7 +143,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
     x -= spr->hotX;
     y -= spr->hotY;
 
-    if (!ClipRect(&spr->bounds, &(*(const AM2_Rect *)g_screenClip), &x, &y, &clipped))
+    if (!ClipRect(&spr->bounds, &g_screenClip, &x, &y, &clipped))
         return;
 
 #if !defined(AM2_RELINK)   /* harness trace, not the original's */
@@ -493,19 +493,17 @@ void __cdecl InitMenuScreen(void)
         digits[i] = (uint8_t)i;
 
     /* The palette pointer is read afresh for every entry. */
-#define palette (*(const uint8_t *const *)&g_activePalette)
     for (i = 0; i < 256; i++) {
-        int32_t hi = palette[i * 4];
+        int32_t hi = (*(const uint8_t *const *)&g_activePalette)[i * 4];
 
-        if (palette[i * 4 + 2] > hi)
-            hi = palette[i * 4 + 2];
-        if (palette[i * 4 + 1] > hi)
-            hi = palette[i * 4 + 1];
+        if ((*(const uint8_t *const *)&g_activePalette)[i * 4 + 2] > hi)
+            hi = (*(const uint8_t *const *)&g_activePalette)[i * 4 + 2];
+        if ((*(const uint8_t *const *)&g_activePalette)[i * 4 + 1] > hi)
+            hi = (*(const uint8_t *const *)&g_activePalette)[i * 4 + 1];
 
         shades[i] = (uint8_t)(Clamp(10 - (hi + 4) / AM2_GLYPH_SHADE_STEP, 0, 9)
                               - AM2_GLYPH_DIGIT_BIAS);
     }
-#undef palette
 
     if (g_gameState == 2)
         rows = AM2_MENU_SPRITE_ROWS;
@@ -603,43 +601,38 @@ void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id)
     int32_t lo, hi, grown;
 
     /* Every global is re-read where it is used; the midpoint is a shift. */
-#define PAIRS (*(AM2_SpritePair * *)&g_spriteRegPairs)
-#define SLOTS (g_spriteTable)
-#define COUNT (g_spriteRegCount)
-#define CAP   (g_spriteRegCap)
-    hi = COUNT;
+    hi = g_spriteRegCount;
     lo = 0;
     while (hi > lo) {
         int32_t mid = ((hi - lo) >> 1) + lo;
 
-        if (PAIRS[mid].id == id)
+        if ((*(AM2_SpritePair * *)&g_spriteRegPairs)[mid].id == id)
             return;
-        if (PAIRS[mid].id < id)
+        if ((*(AM2_SpritePair * *)&g_spriteRegPairs)[mid].id < id)
             lo = mid + 1;
         else
             hi = mid;
     }
 
-    if (COUNT >= CAP) {
-        grown = CAP + AM2_SPRITE_REG_GROW;
-        SLOTS = (AM2_Sprite **)am2_realloc(SLOTS, (size_t)grown * 4);
-        PAIRS = (AM2_SpritePair *)am2_realloc(PAIRS, (size_t)grown * 8);
-        CAP   = grown;
+    if (g_spriteRegCount >= g_spriteRegCap) {
+        grown = g_spriteRegCap + AM2_SPRITE_REG_GROW;
+        g_spriteTable = (AM2_Sprite **)am2_realloc(g_spriteTable, (size_t)grown * 4);
+        (*(AM2_SpritePair * *)&g_spriteRegPairs) =
+            (AM2_SpritePair *)am2_realloc((*(AM2_SpritePair * *)&g_spriteRegPairs),
+                                          (size_t)grown * 8);
+        g_spriteRegCap   = grown;
     }
 
-    SLOTS[COUNT] = spr;
+    g_spriteTable[g_spriteRegCount] = spr;
 
-    if (lo < COUNT)
-        memmove(&PAIRS[lo + 1], &PAIRS[lo],
-                (size_t)(COUNT - lo) * sizeof(AM2_SpritePair));
+    if (lo < g_spriteRegCount)
+        memmove(&(*(AM2_SpritePair * *)&g_spriteRegPairs)[lo + 1],
+                &(*(AM2_SpritePair * *)&g_spriteRegPairs)[lo],
+                (size_t)(g_spriteRegCount - lo) * sizeof(AM2_SpritePair));
 
-    PAIRS[lo].id   = id;
-    PAIRS[lo].slot = COUNT;
-    COUNT++;
-#undef PAIRS
-#undef SLOTS
-#undef COUNT
-#undef CAP
+    (*(AM2_SpritePair * *)&g_spriteRegPairs)[lo].id   = id;
+    (*(AM2_SpritePair * *)&g_spriteRegPairs)[lo].slot = g_spriteRegCount;
+    g_spriteRegCount++;
 }
 
 typedef void (__cdecl *am2_load_shadow_fn)(const char *file, AM2_Sprite *spr);
@@ -1225,57 +1218,47 @@ int32_t __cdecl SpriteSetLoad(const char *name)
                  SET_NAME(set));
         return 0;
     }
-#define fp SET_FILE(set)
 
-    orig_fread(&id, 4, 1, fp);
+    orig_fread(&id, 4, 1, SET_FILE(set));
     if (id != want) {
         orig_log("Invalid file id in object data file <%s>\n", SET_NAME(set));
         return 0;
     }
 
-    orig_fread(set->palette, 4, 0x100, fp);
+    orig_fread(set->palette, 4, 0x100, SET_FILE(set));
 
     {
-#define pal (set->palette)
-#define remap (set->remap)
-#define display (g_activePalette)
 
-        if (display) {
+        if (g_activePalette) {
             /* The original pushes ONE argument here, not two -- `add esp, 0x10`
              * after this pair of calls covers exactly one push for the swap and
              * three for the match. SwapColourBytes reads no second parameter,
              * so what the original leaves in that slot is whatever was on the
              * stack; zero is the same function. */
             for (i = 0; i < 256; i++) {
-                uint32_t c = SwapColourBytes(pal[i]);
+                uint32_t c = SwapColourBytes(set->palette[i]);
 
-                remap[i] = NearestPalIndex(display, *(PALETTEENTRY *)&c, 0);
+                set->remap[i] = NearestPalIndex(g_activePalette, *(PALETTEENTRY *)&c, 0);
             }
         } else {
             for (i = 0; i < 256; i++)
-                remap[i] = (uint8_t)i;
+                set->remap[i] = (uint8_t)i;
         }
 
         for (i = 0; i < AM2_PALETTE_RESERVED; i++)
             set->remap10[i] = (uint8_t)i;
         for (i = AM2_PALETTE_RESERVED; i < 256; i++)
-            set->remap10[i] = remap[i];
+            set->remap10[i] = set->remap[i];
     }
 
-    orig_fread(&set->dirCount, 4, 1, fp);
-#define count SET_COUNT(set)
-    if (count > 0) {
+    orig_fread(&set->dirCount, 4, 1, SET_FILE(set));
+    if (SET_COUNT(set) > 0) {
         SET_DIR(set) = (AM2_SpriteDirEntry *)
-                           orig_malloc((size_t)count * 8);
-        memset(SET_DIR(set), 0, (size_t)count * 8);
-        orig_fread(SET_DIR(set), (size_t)count * 8, 1, fp);
+                           orig_malloc((size_t)SET_COUNT(set) * 8);
+        memset(SET_DIR(set), 0, (size_t)SET_COUNT(set) * 8);
+        orig_fread(SET_DIR(set), (size_t)SET_COUNT(set) * 8, 1, SET_FILE(set));
     }
     return 1;
-#undef pal
-#undef fp
-#undef display
-#undef remap
-#undef count
 }
 
 /* 0x00423FE0. Fill a sprite record from the packed data file.
@@ -1338,14 +1321,12 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
         return 0;
 
     /* The file is re-read from the set at every call. */
-#define fp SET_FILE(sset)
-#define dir SET_DIR(sset)
 
-    if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
+    if (orig_fseek(SET_FILE(sset), (int32_t)SET_DIR(sset)[slot].offset, 0) != 0) {
         orig_log("Error seeking to location %d in data file.\n",
-                 dir[slot].offset);
+                 SET_DIR(sset)[slot].offset);
     } else {
-        orig_fread(&got, 4, 1, fp);
+        orig_fread(&got, 4, 1, SET_FILE(sset));
         if (key == (uint32_t)got)
             ok = 1;
         else
@@ -1364,15 +1345,15 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
 
     spr->id = key;
 
-    orig_fread(&value, 4, 1, fp);
+    orig_fread(&value, 4, 1, SET_FILE(sset));
     spr->bounds.top   = 0;
     spr->bounds.left  = 0;
     spr->bounds.right = value;
 
-    orig_fread(&value, 4, 1, fp);
+    orig_fread(&value, 4, 1, SET_FILE(sset));
     spr->bounds.bottom = value;
 
-    orig_fread(&value, 4, 1, fp);
+    orig_fread(&value, 4, 1, SET_FILE(sset));
     spr->flags = (uint32_t)value;
     if (value & 4)
         spr->format = 1;
@@ -1389,20 +1370,20 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
 
     /* Both halves of each pair in one four-byte read, as the file stores
      * them and as the original reads them. */
-    orig_fread(&spr->hotX, 4, 1, fp);
-    orig_fread(&spr->attachX, 4, 1, fp);
+    orig_fread(&spr->hotX, 4, 1, SET_FILE(sset));
+    orig_fread(&spr->attachX, 4, 1, SET_FILE(sset));
 
-    orig_fread(&value, 4, 1, fp);
+    orig_fread(&value, 4, 1, SET_FILE(sset));
     if (value > 0) {
         if (spr->format == 0) {
             spr->image.surface =
-                CreateBitmapSurface(fp, (uint32_t)value, spr->bounds.right,
+                CreateBitmapSurface(SET_FILE(sset), (uint32_t)value, spr->bounds.right,
                                     spr->bounds.bottom,
                                     sset->remap,
                                     (uint32_t)flags);
         } else {
             spr->image.rle16 = (AM2_Rle16 *)orig_malloc((size_t)value);
-            orig_fread(spr->image.rle16, (size_t)value, 1, fp);
+            orig_fread(spr->image.rle16, (size_t)value, 1, SET_FILE(sset));
             if (spr->format == 3)
                 RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)value, 3,
                              sset->remap10);
@@ -1413,14 +1394,12 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
         }
     }
 
-    orig_fread(&value, 4, 1, fp);
+    orig_fread(&value, 4, 1, SET_FILE(sset));
     if (value > 0) {
         spr->overlay = (AM2_Rle16 *)orig_malloc((size_t)value);
-        orig_fread(spr->overlay, (size_t)value, 1, fp);
+        orig_fread(spr->overlay, (size_t)value, 1, SET_FILE(sset));
     }
     return 1;
-#undef dir
-#undef fp
 }
 
 /* 0x00445C00. Put a lost sprite's pixels back from LOOSE files.

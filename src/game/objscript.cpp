@@ -339,7 +339,6 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
  * frame. This comment used to say the opposite -- "It is NOT a clock, probed
  * at 500 for twelve seconds of play" -- on a probe taken with a dialog up,
  * which pauses it. See ADDR_GAME_CLOCK_MS in orig.h. */
-#define kScriptTiming (g_gameClockMs)
 
 /* SetObjScriptState -- original 0x004372A0, one caller, which is
  * RunScriptAction: the `setobjstate` action. It names itself twice, in two
@@ -392,7 +391,6 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
                                   int32_t frame)
 {
     /* The name table is read afresh at every use. */
-#define names kScriptNames
     AM2_Object           *obj;
     AM2_ObjScript        *script;
     uintptr_t             at;
@@ -402,16 +400,16 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
     if (nameidx <= 0)
         return 0;
 
-    if (names[nameidx].type != AM2_NAME_TYPE_REF) {
+    if (kScriptNames[nameidx].type != AM2_NAME_TYPE_REF) {
         am2_log("ERROR: SetObjScriptState was called with %s which is not "
-                "an item\n", names[nameidx].name);
+                "an item\n", kScriptNames[nameidx].name);
         return 0;
     }
 
-    obj = LookupByUID((uint32_t)names[nameidx].value);
+    obj = LookupByUID((uint32_t)kScriptNames[nameidx].value);
     if (!obj || !ObjIsItem(obj)) {
         am2_log("ERROR: SetObjScriptState was called with %s which is not "
-                "a valid object\n", names[nameidx].name);
+                "a valid object\n", kScriptNames[nameidx].name);
         return 0;
     }
 
@@ -429,15 +427,15 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
     if (at == 0) {
         am2_log("Tried to set object script state (%s) in object %s, which "
                 "has no object script.\n",
-                names[stateName].name,
-                names[obj->nameIdx].name);
+                kScriptNames[stateName].name,
+                kScriptNames[obj->nameIdx].name);
         return 0;
     }
 
-    state = names[stateName].value;
+    state = kScriptNames[stateName].value;
     if (state >= script->statecount) {
         am2_log("Bad state index associated with state %s\n",
-                names[stateName].name);
+                kScriptNames[stateName].name);
         return 0;
     }
 
@@ -447,7 +445,6 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
 
     UpdateObjectScript(obj);
     return 1;
-#undef names
 }
 
 /* 0x004351C0 and 0x00420410 stay original and are reached by address. The
@@ -489,7 +486,7 @@ int32_t __cdecl UpdateObjectScript(AM2_Object *obj)
 
     /* Nested on success; the bad state is the one arm that answers 0. */
     if (scr != (AM2_ObjScript *)0
-        && o->scriptNext < kScriptTiming) {
+        && o->scriptNext < g_gameClockMs) {
         int32_t st = o->scriptState;
 
         if (st <= scr->statecount && st >= 0) {
@@ -510,7 +507,7 @@ int32_t __cdecl UpdateObjectScript(AM2_Object *obj)
                 if (!ChangeObjectFrame(o, fb, 1))
                     orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
 
-                o->scriptNext = frame->a + (int32_t)kScriptTiming;
+                o->scriptNext = frame->a + (int32_t)g_gameClockMs;
 
                 void *owner = (void *)(uintptr_t)o->uid;
 
@@ -548,35 +545,32 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
 {
     /* Every level of the chain is read again at every use, as in the loader;
      * the action goes out as a struct copy whose `text` holds the length. */
-#define O  kObjScripts[i]
-#define ST O.states[j]
-#define FR ST.frames[k]
-#define AC FR.actions[m]
     int32_t i, j, k, m;
 
     WriteSaveTag(fp, AM2_SAVETAG_OBJSCRIPT);
     WriteSaveTag(fp, (uint32_t)kObjScriptCount);   /* a count, not a tag */
 
     for (i = 0; i < kObjScriptCount; i++) {
-        orig_fwrite(&O, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
+        orig_fwrite(&kObjScripts[i], AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
 
-        for (j = 0; j < O.statecount; j++) {
-            orig_fwrite(&ST, AM2_OBJ_STATE_REC_SIZE, 1, fp);
+        for (j = 0; j < kObjScripts[i].statecount; j++) {
+            orig_fwrite(&kObjScripts[i].states[j], AM2_OBJ_STATE_REC_SIZE, 1, fp);
 
-            for (k = 0; k < ST.framecount; k++) {
-                orig_fwrite(&FR, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
+            for (k = 0; k < kObjScripts[i].states[j].framecount; k++) {
+                orig_fwrite(&kObjScripts[i].states[j].frames[k], AM2_OBJ_FRAME_REC_SIZE, 1, fp);
 
-                for (m = 0; m < FR.actioncount; m++) {
-                    AM2_ScriptAction copy = AC;
+                for (m = 0; m < kObjScripts[i].states[j].frames[k].actioncount; m++) {
+                    AM2_ScriptAction copy = kObjScripts[i].states[j].frames[k].actions[m];
 
                     if (copy.text)
-                        *(int32_t *)&copy.text = (int32_t)strlen(AC.text);
+                        *(int32_t *)&copy.text = (int32_t)strlen(kObjScripts[i].states[j].frames[k].actions[m].text);
                     else
                         *(int32_t *)&copy.text = 0;
                     orig_fwrite(&copy, sizeof copy, 1, fp);
 
                     if (*(int32_t *)&copy.text > 0)
-                        orig_fwrite(AC.text, (size_t)*(int32_t *)&copy.text,
+                        orig_fwrite(kObjScripts[i].states[j].frames[k].actions[m].text,
+                                    (size_t)*(int32_t *)&copy.text,
                                     1, fp);
                 }
             }
@@ -584,10 +578,6 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
     }
 
     return 1;
-#undef O
-#undef ST
-#undef FR
-#undef AC
 }
 
 /* 0x004368D0. Free every level of the object-script table and clear the three
@@ -674,57 +664,55 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
     /* Every level of the chain is read again at every use -- the image
      * reloads kObjScripts before each access -- and the one count local the
      * top-level count was read into serves all four levels. */
-#define O  kObjScripts[i]
-#define ST O.states[j]
-#define FR ST.frames[k]
-#define AC FR.actions[m]
     for (i = 0; i < kObjScriptCount; i++) {
-        orig_fread(&O, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
+        orig_fread(&kObjScripts[i], AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
 
-        n = O.statecount;
+        n = kObjScripts[i].statecount;
         if (n == 0) {
-            O.statecap = 0;
-            O.states   = (AM2_ObjState *)0;
+            kObjScripts[i].statecap = 0;
+            kObjScripts[i].states   = (AM2_ObjState *)0;
             continue;
         }
 
-        O.states = (AM2_ObjState *)am2_malloc((size_t)n * sizeof(AM2_ObjState));
-        memset(O.states, 0, (size_t)n * sizeof(AM2_ObjState));
+        kObjScripts[i].states = (AM2_ObjState *)am2_malloc((size_t)n * sizeof(AM2_ObjState));
+        memset(kObjScripts[i].states, 0, (size_t)n * sizeof(AM2_ObjState));
 
-        for (j = 0; j < O.statecount; j++) {
-            orig_fread(&ST, AM2_OBJ_STATE_REC_SIZE, 1, fp);
+        for (j = 0; j < kObjScripts[i].statecount; j++) {
+            orig_fread(&kObjScripts[i].states[j], AM2_OBJ_STATE_REC_SIZE, 1, fp);
 
-            n = ST.framecount;
+            n = kObjScripts[i].states[j].framecount;
             if (n == 0) {
-                ST.framecap = 0;
-                ST.frames   = (AM2_ObjFrame *)0;
+                kObjScripts[i].states[j].framecap = 0;
+                kObjScripts[i].states[j].frames   = (AM2_ObjFrame *)0;
                 continue;
             }
 
-            ST.frames = (AM2_ObjFrame *)am2_malloc(
+            kObjScripts[i].states[j].frames = (AM2_ObjFrame *)am2_malloc(
                 (size_t)n * sizeof(AM2_ObjFrame));
-            memset(ST.frames, 0, (size_t)n * sizeof(AM2_ObjFrame));
+            memset(kObjScripts[i].states[j].frames, 0, (size_t)n * sizeof(AM2_ObjFrame));
 
-            for (k = 0; k < ST.framecount; k++) {
-                orig_fread(&FR, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
+            for (k = 0; k < kObjScripts[i].states[j].framecount; k++) {
+                orig_fread(&kObjScripts[i].states[j].frames[k], AM2_OBJ_FRAME_REC_SIZE, 1, fp);
 
-                n = FR.actioncount;
+                n = kObjScripts[i].states[j].frames[k].actioncount;
                 if (n == 0) {
-                    FR.actioncap = 0;
-                    FR.actions   = (AM2_ScriptAction *)0;
+                    kObjScripts[i].states[j].frames[k].actioncap = 0;
+                    kObjScripts[i].states[j].frames[k].actions   = (AM2_ScriptAction *)0;
                     continue;
                 }
 
-                FR.actions = (AM2_ScriptAction *)am2_malloc(
+                kObjScripts[i].states[j].frames[k].actions = (AM2_ScriptAction *)am2_malloc(
                     (size_t)n * sizeof(AM2_ScriptAction));
-                memset(FR.actions, 0, (size_t)n * sizeof(AM2_ScriptAction));
+                memset(kObjScripts[i].states[j].frames[k].actions, 0,
+                       (size_t)n * sizeof(AM2_ScriptAction));
 
-                for (m = 0; m < FR.actioncount; m++) {
+                for (m = 0; m < kObjScripts[i].states[j].frames[k].actioncount; m++) {
                     int32_t len, idx;
 
-                    orig_fread(&AC, (size_t)sizeof(AM2_ScriptAction), 1, fp);
+                    orig_fread(&kObjScripts[i].states[j].frames[k].actions[m],
+                               (size_t)sizeof(AM2_ScriptAction), 1, fp);
 
-                    len = *(int32_t *)&AC.text;
+                    len = *(int32_t *)&kObjScripts[i].states[j].frames[k].actions[m].text;
                     if (len <= 0)
                         continue;
 
@@ -733,15 +721,12 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 
                     idx = ctx->count;
                     ScriptAddToken(ctx, AM2_TOKEN_STRING, buf, 0);
-                    AC.text = (char *)ctx->tokens[idx].value;
+                    kObjScripts[i].states[j].frames[k].actions[m].text =
+                        (char *)ctx->tokens[idx].value;
                 }
             }
         }
     }
-#undef O
-#undef ST
-#undef FR
-#undef AC
 
     return 1;
 }

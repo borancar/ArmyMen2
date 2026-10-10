@@ -37,8 +37,6 @@
 
 #include <stdint.h>
 
-#define g_paintObj      (g_paintObject)
-
 typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
                                           int32_t);
 typedef void (__cdecl *am2_void_fn)(void);
@@ -83,7 +81,7 @@ static_assert(sizeof(AM2_ConnRow) == ROW_STRIDE, "connection row");
 
 void __cdecl StartSelectedGame(void)
 {
-    AM2_ListBox  *screen = ((AM2_CommPanelScreen *)g_paintObj)->list;
+    AM2_ListBox  *screen = ((AM2_CommPanelScreen *)g_paintObject)->list;
     AM2_ListRows *list   = screen->rows;
     int32_t       index  = screen->chosen;
     void    *connection;
@@ -99,7 +97,6 @@ void __cdecl StartSelectedGame(void)
 
     /* { int32 count; Row *rows; } -- the pointer is the second dword. The comm
      * object is re-read at every use, as the image does. */
-#define COMM (g_commObject)
     connection = ((AM2_ConnRow *)list->text)[index].connection;
 
     if (!connection) {
@@ -112,35 +109,34 @@ void __cdecl StartSelectedGame(void)
             return;
         }
 
-        COMM->local = 1;
+        g_commObject->local = 1;
 
         /* A DirectPlay object left over from browsing sessions is dropped: a
          * local game has no use for it and it would otherwise stay
          * connected. */
-        if (COMM->dplay)
-            CommDropDirectPlay(COMM);
+        if (g_commObject->dplay)
+            CommDropDirectPlay(g_commObject);
 
         /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
         for (i = 1; i < 4; i++) {
-            COMM->slots[i].wasHere = 1;
-            orig_sprintf(COMM->slots[i].name,
+            g_commObject->slots[i].wasHere = 1;
+            orig_sprintf(g_commObject->slots[i].name,
                          "Computer%d", i);
         }
 
         g_menuRequest    = REQUEST_LOCAL;
         g_menuRequestSet = 1;
         ApplyGameSettings();
-        COMM->isHost = 1;
+        g_commObject->isHost = 1;
     } else {
         /* An existing session: point DirectPlay at it and let the menu
          * know. */
-        if (CommInitializeConnection(COMM, connection)) {
-            COMM->local = 0;
+        if (CommInitializeConnection(g_commObject, connection)) {
+            g_commObject->local = 0;
             g_menuRequest    = REQUEST_JOINED;
             g_menuRequestSet = 1;
         }
     }
-#undef COMM
 }
 
 /* The multiplayer HOST button, 0x0042F310, registered the same way.
@@ -252,9 +248,8 @@ void __cdecl HostBattle(void)
 {
     AM2_BattleNameScreen *dlg = (AM2_BattleNameScreen *)(g_paintObject);
     const char *battle = dlg->battle;
-#define player (dlg->player)
 
-    if (strlen(battle) < 1 || strlen(player) < 1) {
+    if (strlen(battle) < 1 || strlen(dlg->player) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -266,22 +261,21 @@ void __cdecl HostBattle(void)
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
-    if (!g_commObject->CommCreatePlayer(player, 0, 0, 0)) {
+    if (!g_commObject->CommCreatePlayer(dlg->player, 0, 0, 0)) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
     /* The host is always slot 0. */
     strcpy(g_commObject->slots[0].name,
-           player);
+           dlg->player);
 
     PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = REQUEST_HOSTED;
     g_menuRequestSet = 1;
 
-    strcpy(&g_savedPlayerName, player);
+    strcpy(&g_savedPlayerName, dlg->player);
     strcpy(&g_savedBattleName, battle);
-#undef player
 }
 
 /* ------------------------------------------------------------------ *

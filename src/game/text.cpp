@@ -100,7 +100,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         dstX = penX;
         dstY = y;
 
-        if (!ClipRect(&src, &(*(const AM2_Rect *)g_screenClip), &dstX, &dstY, &out))
+        if (!ClipRect(&src, &g_screenClip, &dstX, &dstY, &out))
             return;                 /* not `continue` -- see the header note */
 
         if (g_drawTarget == g_primarySurface) {

@@ -112,9 +112,6 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 
 
 
-#define kIID_IDirectDraw2 (g_iidDirectdraw2)
-#define kGuidSysMouse     (g_guidSysMouse)
-#define kGuidSysKeyboard  (g_guidSysKeyboard)
 /* THE DATA FORMATS ARE THE API'S, NOT THE IMAGE'S, in the standalone build.
  * The original's c_dfDIMouse is intact at ADDR_DF_MOUSE, but its `rgodf`
  * points at 0x004643A0 -- a const array MSVC placed BELOW .rdata, inside the
@@ -190,7 +187,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
     hr = orig_DirectDrawCreate(NULL, &g_ddraw, NULL);
     if (hr)
         return hr;
-    hr = IDirectDraw_QueryInterface(g_ddraw, kIID_IDirectDraw2,
+    hr = IDirectDraw_QueryInterface(g_ddraw, g_iidDirectdraw2,
                                     (LPVOID *)&g_ddraw2);
     if (hr)
         return hr;
@@ -276,7 +273,7 @@ int32_t __cdecl InitInput(HWND hWnd)
 
     /* Mouse: exclusive, so the system pointer goes away and motion arrives
      * raw, and buffered, so it arrives as deltas rather than positions. */
-    hr = IDirectInput_CreateDevice(g_dinput, kGuidSysMouse, &g_diMouse, NULL);
+    hr = IDirectInput_CreateDevice(g_dinput, g_guidSysMouse, &g_diMouse, NULL);
     if (hr)
         return ReportError(hr, "CreateDevice (mouse)");
     hr = IDirectInputDevice_SetDataFormat(g_diMouse, kFormatMouse);
@@ -293,7 +290,7 @@ int32_t __cdecl InitInput(HWND hWnd)
         return ReportError(hr, "Set buffer size (mouse)");
 
     /* Keyboard: non-exclusive. Taking it exclusively would take Alt-Tab too. */
-    hr = IDirectInput_CreateDevice(g_dinput, kGuidSysKeyboard, &g_diKeyboard,
+    hr = IDirectInput_CreateDevice(g_dinput, g_guidSysKeyboard, &g_diKeyboard,
                                    NULL);
     if (hr)
         return ReportError(hr, "CreateDevice (keyboard)");
@@ -432,8 +429,8 @@ void __cdecl UpdateMouseState(void)
 
     g_cursorX += g_mouseDX;
     g_cursorY += g_mouseDY;
-    g_cursorX = Clamp(g_cursorX, (*(const AM2_Rect *)g_screenClip).left, (*(const AM2_Rect *)g_screenClip).right - 1);
-    g_cursorY = Clamp(g_cursorY, (*(const AM2_Rect *)g_screenClip).top, (*(const AM2_Rect *)g_screenClip).bottom - 1);
+    g_cursorX = Clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
+    g_cursorY = Clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
 
     /* x first here schedules y's store first, as the image has it. */
     ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;

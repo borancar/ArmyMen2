@@ -96,9 +96,7 @@ void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key)
 {
     /* The search holds the count; the move re-reads it; the records shift
      * down as whole-struct copies. */
-#define RECS  (player->nacks)
-#define COUNT (player->nackCount)
-    int32_t  n = COUNT;
+    int32_t  n = player->nackCount;
     int32_t  i, j;
     uint32_t kind;
 
@@ -108,24 +106,22 @@ void __cdecl CommRemoveKeyed(AM2_Flow *player, uint32_t key)
         return;
 
     for (i = 0; i < n; i++) {
-        if (RECS[i].seq == key) {
+        if (player->nacks[i].seq == key) {
             j    = i + 1;
-            kind = RECS[i].count;
+            kind = player->nacks[i].count;
             if (kind > AM2_KEYED_TALLY_MAX)
                 kind = AM2_KEYED_TALLY_MAX;
             player->nackTally[kind] += 1;
 
-            for (; j < COUNT; j++) {
-                AM2_NackRec *src = &RECS[j];
+            for (; j < player->nackCount; j++) {
+                AM2_NackRec *src = &player->nacks[j];
 
                 src[-1] = *src;
             }
-            COUNT -= 1;
+            player->nackCount -= 1;
             return;
         }
     }
-#undef RECS
-#undef COUNT
 }
 
 /* The record these read is reached through the image's own lookup, which is
@@ -230,8 +226,6 @@ AM2_Flow *__cdecl FindPlayerById(uint32_t id)
  * here is enough; `extern "C"` because that is how dplay.h declares it. */
 extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
-#define kMsgCommObj  (g_commObject)
-
 /* 0x00411E90, and the one message in this family that is not a value.
  *
  * It TRUNCATES IN THE CALLER'S BUFFER. If the text is longer than 255 bytes
@@ -259,7 +253,7 @@ void __cdecl SendChatMsg(char *text, int32_t system)
     if (system)
         sender = 4;
     else
-        sender = (uint8_t)((AM2_Comm *)kMsgCommObj)->CommArmyOfSlot(
+        sender = (uint8_t)((AM2_Comm *)g_commObject)->CommArmyOfSlot(
                      (int32_t)g_defaultOwner);
 
     record->ink = sender;

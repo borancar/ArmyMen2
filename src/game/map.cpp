@@ -956,23 +956,21 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
 void __cdecl FreeScenarios(void)
 {
     /* The table pointer is re-read after every free, as the original does. */
-#define TAB (g_scenarios)
-#define PART_ROWS(i, k) (TAB[i].parts[k].rows)
+#define PART_ROWS(i, k) (g_scenarios[i].parts[k].rows)
     int32_t i, k;
 
-    if (TAB) {
+    if (g_scenarios) {
         for (i = 0; i < g_scenarioCount; i++)
             for (k = 0; k < (int32_t)AM2_SCENARIO_PARTS; k++)
                 if (PART_ROWS(i, k))
                     am2_free(PART_ROWS(i, k));
-        am2_free(TAB);
+        am2_free(g_scenarios);
     }
 
     /* Both are cleared with or without a table to free, as one eight-byte
      * memset over the header (ADDR_SCENARIO_UNREAD, the count, the table). */
     memset((void *)&g_scenarioUnread, 0, 8);
 #undef PART_ROWS
-#undef TAB
 }
 
 /* AddLevelRecord -- original 0x0043E160, one caller.
@@ -1483,14 +1481,12 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
  * after the walk if the file did not supply them, so every consumer
  * downstream may assume its layer exists. Two of the nine have no chunk arm
  * at all and are created only here. */
-#define MAP_PLANE ((g_mapTilesW) \
-                   * (g_mapTilesH))
 /* Allocate and zero a layer the file did not supply; the size is re-read
  * for each of the two uses, as the original does. */
 #define DEFAULT_LAYER(slot)                     \
     if (*(slot) == 0) {                         \
-        *(slot) = am2_malloc(MAP_PLANE);        \
-        memset(*(slot), 0, MAP_PLANE);          \
+        *(slot) = am2_malloc((g_mapTilesW * g_mapTilesH)); \
+        memset(*(slot), 0, (g_mapTilesW * g_mapTilesH)); \
     }
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
@@ -1544,7 +1540,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         switch (tag) {
         /* Seven planes, one shape.  Only the global differs. */
         case AM2_IFF_NPAD:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_mapPadLayer = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_mapPadLayer, plane, 1, f);
@@ -1594,42 +1590,42 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         }
 
         case AM2_IFF_BPAD:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_mapPadbitLayer = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_mapPadbitLayer, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_MOVE:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             *(uint8_t * *)&g_cellWeights = (uint8_t *)am2_malloc(plane);
             orig_map_fread(*(uint8_t * *)&g_cellWeights, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_OWNR:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_tileKind = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_tileKind, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_TRIG:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_tileFlags = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_tileFlags, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_REGN:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_regionOfCell = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_regionOfCell, plane, 1, f);
             consumed += plane;
             break;
         case AM2_IFF_ELEV:
-            plane = MAP_PLANE;
+            plane = g_mapTilesW * g_mapTilesH;
             if ((int32_t)size != plane) MISMATCH();
             g_tileAttrs = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_tileAttrs, plane, 1, f);
@@ -1856,8 +1852,6 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (g_loadPending == 0)
         for (i = 0; i < objCount; i++) {
             AM2_MapRec *r     = &objs[i];
-#define type (r->type)
-#define kind (r->kind)  /* re-read at each use */
             int32_t   army;
             int32_t   flags = 0;
             void     *obj = 0;
@@ -1871,9 +1865,9 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
             /* The point is read from the record after each arm's sprite
              * lookup, not before it. */
-            if (type != 0x19) {
+            if (r->type != 0x19) {
                 /* An ITEM. */
-                int32_t key = PackKey(type + 0x14, kind, 0);
+                int32_t key = PackKey(r->type + 0x14, r->kind, 0);
                 AM2_Sprite *spr = PreloadSpriteByKey(key, 0x1000, 1);
 
                 at.x = r->x16;
@@ -1883,7 +1877,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     at.y = (int16_t)(at.y + spr->hotY);
                 }
                 obj = CreateItem(r->script, army,
-                                 PackKey(type + 0x14, kind, 0),
+                                 PackKey(r->type + 0x14, r->kind, 0),
                                  at, flags, 1, 0);
                 /* No null test of its own: ObjIsWatchedKind answers 0 for one. */
                 if (ObjIsWatchedKind((const AM2_Object *)obj)
@@ -1907,8 +1901,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                  * zero, which CreateWeapon turns into 3 rounds, and a crate
                  * with NUMB=30 came out under-stocked.) */
                 int32_t  numb = r->numb;
-                int32_t  aai, key = PackKey(type + 0x14, kind, 0);
-                int32_t  code = kind;
+                int32_t  aai, key = PackKey(r->type + 0x14, r->kind, 0);
+                int32_t  code = r->kind;
                 AM2_Sprite    *spr;
                 AM2_Point settled;
 
@@ -1923,11 +1917,11 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     if (code == 0x64)
                         continue;
                     code -= 0x64;
-                    key = PackKey(type + 0x14, code, 0);
+                    key = PackKey(r->type + 0x14, code, 0);
                 }
                 if (RespawnKindAllowed(code) == 0)
                     continue;
-                aai = EnsureSpriteAaiRecord(type + 0x14, code, 0);
+                aai = EnsureSpriteAaiRecord(r->type + 0x14, code, 0);
 
             haveRecord:
                 if (aai < 0)
@@ -1988,9 +1982,6 @@ bad:
     SetGameDir((g_mapBlock));
     return 0;
 #undef DEFAULT_LAYER
-#undef MAP_PLANE
-#undef type
-#undef kind
 }
 
 void map_install(void)

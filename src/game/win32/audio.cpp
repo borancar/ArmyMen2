@@ -180,15 +180,11 @@ void __cdecl ReleaseSoundObjects(void)
     if (g_dsound)
         IDirectSound_Release(g_dsound);
 }
-#define kIID_DS3DListener (g_iidDs3dListener)
 
 typedef HRESULT (WINAPI *am2_dsound_create_fn)(GUID *, LPDIRECTSOUND *, IUnknown *);
 #define orig_DirectSoundCreate (*(am2_dsound_create_fn)ADDR_DIRECTSOUNDCREATE)
 
 /* The listener's starting parameters, as float bit patterns in the original. */
-#define LISTENER_Z       (-1.0f)
-#define DOPPLER_FACTOR   9.9f
-#define ROLLOFF_FACTOR   0.25f
 
 static_assert(DSSCL_PRIORITY == 2, "DSSCL_PRIORITY");
 static_assert((DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D) == 0x11, "primary caps");
@@ -234,17 +230,17 @@ int32_t __cdecl InitDirectSound(void)
 
     /* The 3D listener is not created, it is asked for -- it is the primary
      * buffer seen through another interface. */
-    if (IDirectSoundBuffer_QueryInterface(g_dsPrimary, kIID_DS3DListener,
+    if (IDirectSoundBuffer_QueryInterface(g_dsPrimary, g_iidDs3dListener,
                                           (LPVOID *)&g_dsListener) != DS_OK)
         return SoundFailed("Unable to initialize 3d sound\n");
 
-    if (IDirectSound3DListener_SetPosition(g_dsListener, 0.0f, 0.0f, LISTENER_Z,
+    if (IDirectSound3DListener_SetPosition(g_dsListener, 0.0f, 0.0f, -1.0f,
                                            DS3D_DEFERRED) != DS_OK)
         return SoundFailed("Unable to set listener position\n");
-    if (IDirectSound3DListener_SetDopplerFactor(g_dsListener, DOPPLER_FACTOR,
+    if (IDirectSound3DListener_SetDopplerFactor(g_dsListener, 9.9f,
                                                 DS3D_DEFERRED) != DS_OK)
         return SoundFailed("Unable to set sound doppler factor\n");
-    if (IDirectSound3DListener_SetRolloffFactor(g_dsListener, ROLLOFF_FACTOR,
+    if (IDirectSound3DListener_SetRolloffFactor(g_dsListener, 0.25f,
                                                 DS3D_DEFERRED) != DS_OK)
         return SoundFailed("Unable to set sound roll off factor\n");
     if (IDirectSound3DListener_CommitDeferredSettings(g_dsListener) != DS_OK)
@@ -964,7 +960,6 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
-#define g_defaultPos    (g_zeroPoint)
 
 /* ParseWave -- original 0x0040C220, one caller, and that caller is
  * ReadWaveFile below. The RIFF chunk walk: given the whole file in memory,
@@ -1479,13 +1474,10 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
         return;
 
     /* The slot, its record and the buffer are re-read at every use. */
-#define SLOT (&(g_soundSlots)[index])
-#define REC  (SLOT->sound)
-#define BUF  (REC->buffer)
-    if (!REC || !BUF)
+    if (!(g_soundSlots[index].sound) || !(g_soundSlots[index].sound->buffer))
         return;
 
-    IDirectSoundBuffer_GetStatus(BUF, &status);
+    IDirectSoundBuffer_GetStatus((g_soundSlots[index].sound->buffer), &status);
 
     if (x != 0) {
         AM2_Point ear;
@@ -1522,34 +1514,32 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
 
     /* Louder wins, and so does anything whose predecessor has finished. */
     if (!(status & DSBSTATUS_PLAYING) ||
-        GetTickCount() > SLOT->started
-                         + SLOT->bytes
+        GetTickCount() > g_soundSlots[index].started
+                         + g_soundSlots[index].bytes
                            / SOUND_BYTES_PER_MS ||
-        volume > SLOT->volume) {
-        IDirectSoundBuffer_SetVolume(BUF, volume);
-        SLOT->volume  = volume;
-        SLOT->started = GetTickCount();
+        volume > g_soundSlots[index].volume) {
+        IDirectSoundBuffer_SetVolume((g_soundSlots[index].sound->buffer), volume);
+        g_soundSlots[index].volume  = volume;
+        g_soundSlots[index].started = GetTickCount();
     }
 
     if (status & DSBSTATUS_PLAYING) {
         if (flags & SOUND_FLAG_RESTART) {
             DWORD played;
 
-            IDirectSoundBuffer_GetCurrentPosition(BUF, &played, NULL);
-            if (SLOT->bytes - played
+            IDirectSoundBuffer_GetCurrentPosition((g_soundSlots[index].sound->buffer), &played,
+                                                  NULL);
+            if (g_soundSlots[index].bytes - played
                     < SOUND_ALMOST_DONE)
-                IDirectSoundBuffer_SetCurrentPosition(BUF, 0);
+                IDirectSoundBuffer_SetCurrentPosition((g_soundSlots[index].sound->buffer), 0);
         } else if (flags & SOUND_FLAG_NO_INTERRUPT) {
             return;
         } else {
-            IDirectSoundBuffer_SetCurrentPosition(BUF, 0);
+            IDirectSoundBuffer_SetCurrentPosition((g_soundSlots[index].sound->buffer), 0);
         }
     }
 
-    IDirectSoundBuffer_Play(BUF, 0, 0, 0);
-#undef SLOT
-#undef REC
-#undef BUF
+    IDirectSoundBuffer_Play((g_soundSlots[index].sound->buffer), 0, 0, 0);
 }
 
 /* Stop one dynamic sound, by slot and by name -- 0x0040B860.
@@ -1585,7 +1575,6 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
         return;
 
     /* The buffer is re-read at each use, as the image does. */
-#define buf (rec->buffer)
     if (*name != '\0') {
         const char *held = rec->name;
 
@@ -1594,19 +1583,18 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
         if (strcmp(name, held) != 0)
             return;      /* the slot has been reused; not ours to stop */
 
-        if (buf)
-            IDirectSoundBuffer_Stop(buf);
+        if (rec->buffer)
+            IDirectSoundBuffer_Stop(rec->buffer);
         rec->active = 0;
         return;
     }
 
     /* No name: stop whatever is there, and only touch the flag if there was
      * one. */
-    if (!buf)
+    if (!rec->buffer)
         return;
-    IDirectSoundBuffer_Stop(buf);
+    IDirectSoundBuffer_Stop(rec->buffer);
     rec->active = 0;
-#undef buf
 }
 
 /* Follow the sounds around -- 0x0040BCF0.
@@ -1653,31 +1641,29 @@ void __cdecl Update3DAudioVolumes(void)
         return;
 
     /* The record is re-read from its slot at every use, as the image does. */
-#define REC ((g_dynamic)[i])
-#define BUF (REC->buffer)
     /* From the second slot, not the first -- 0x004FA3C4, not 0x004FA3C0. */
     for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
-        if (!REC)
+        if (!g_dynamic[i])
             continue;
-        buf = BUF;
+        buf = g_dynamic[i]->buffer;
         if (!buf)
             continue;
 
         IDirectSoundBuffer_GetStatus(buf, &status);
         if (status & DSBSTATUS_PLAYING) {
-            where = g_defaultPos;
-            if (REC->owner) {
-                obj = LookupByUID(REC->owner);
+            where = g_zeroPoint;
+            if (g_dynamic[i]->owner) {
+                obj = LookupByUID(g_dynamic[i]->owner);
                 if (!obj) {
                     /* Whatever was making this noise is gone. */
-                    REC->owner = 0;
-                    IDirectSoundBuffer_Stop(BUF);
-                    REC->active = 0;
+                    g_dynamic[i]->owner = 0;
+                    IDirectSoundBuffer_Stop(g_dynamic[i]->buffer);
+                    g_dynamic[i]->active = 0;
                     continue;
                 }
                 where = obj->pos;
-            } else if (REC->pos.x != 0) {
-                where = REC->pos;
+            } else if (g_dynamic[i]->pos.x != 0) {
+                where = g_dynamic[i]->pos;
             }
 
             /* A zero x means nowhere, and nowhere gets left alone -- note this
@@ -1693,14 +1679,12 @@ void __cdecl Update3DAudioVolumes(void)
                     vol = DSBVOLUME_MIN;
                 else
                     vol = g_volumeAtZero - dist * SOUND_3D_FALLOFF;
-                IDirectSoundBuffer_SetVolume(BUF, vol);
+                IDirectSoundBuffer_SetVolume(g_dynamic[i]->buffer, vol);
             }
         } else {
-            REC->active = 0;
+            g_dynamic[i]->active = 0;
         }
     }
-#undef REC
-#undef BUF
 }
 
 /* Load one wave into a DirectSound buffer -- 0x0040C530.
@@ -1867,13 +1851,12 @@ int32_t __cdecl InitWaveSounds(void)
     SetGameDir(g_waveDir);
 
     /* The slot is indexed afresh at each use, as the image does. */
-#define slot (&g_soundSlots[i])
     for (i = 0; i < (int32_t)WAVE_COUNT; i++) {
         DSBCAPS  caps;
 
-        if (!LoadWaveSound(&slot->sound, g_dsound, g_waveNames[i])) {
+        if (!LoadWaveSound(&g_soundSlots[i].sound, g_dsound, g_waveNames[i])) {
             orig_log("Unable to initialize wave %d\n", i);
-            slot->sound = NULL;
+            g_soundSlots[i].sound = NULL;
             continue;
         }
 
@@ -1884,11 +1867,10 @@ int32_t __cdecl InitWaveSounds(void)
          * have shown it. See the note in CLAUDE.md about this exact shape. */
         caps.dwSize = sizeof caps;
         IDirectSoundBuffer_GetCaps(
-            slot->sound->buffer,
+            g_soundSlots[i].sound->buffer,
             &caps);
-        slot->bytes = caps.dwBufferBytes;
+        g_soundSlots[i].bytes = caps.dwBufferBytes;
     }
-#undef slot
     return 1;
 }
 
@@ -1911,19 +1893,17 @@ void __cdecl FreeDynamicSounds(void)
 
     /* An index loop over the slots (the image's signed `jle` against the end
      * address), each slot re-read at every use. */
-#define SLOT ((g_dynamic)[i])
     for (i = 0; i <= AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
-        if (!SLOT)
+        if (!g_dynamic[i])
             continue;
-        if (SLOT->buffer)
+        if (g_dynamic[i]->buffer)
             IDirectSoundBuffer_Release(
-                SLOT->buffer);
-        if (SLOT->name)
-            orig_free(SLOT->name);
-        orig_free(SLOT);
-        SLOT = NULL;
+                g_dynamic[i]->buffer);
+        if (g_dynamic[i]->name)
+            orig_free(g_dynamic[i]->name);
+        orig_free(g_dynamic[i]);
+        g_dynamic[i] = NULL;
     }
-#undef SLOT
 }
 
 /* ------------------------------------------------------ save ---- */
@@ -1951,22 +1931,21 @@ int32_t __cdecl SaveAudioSection(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVETAG_AUDIO);
 
     /* The record is re-read from its slot at every use, as the image does. */
-#define SND ((g_dynamic)[i])
     for (i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
-        if (SND
-            && (name = SND->name) != NULL
-            && SND->buffer != (const void *)0
-            && (int32_t)SND->active != 0
-            && (int32_t)SND->looping != 0) {
+        if (g_dynamic[i]
+            && (name = g_dynamic[i]->name) != NULL
+            && g_dynamic[i]->buffer != (const void *)0
+            && (int32_t)g_dynamic[i]->active != 0
+            && (int32_t)g_dynamic[i]->looping != 0) {
             if (*name) {
                 len = (int32_t)strlen(name);
                 orig_fwrite(&len, 4, 1, fp);
-                orig_fwrite(SND->name,
+                orig_fwrite(g_dynamic[i]->name,
                             (size_t)len, 1, fp);
-                orig_fwrite(&SND->looping,  4, 1, fp);
-                orig_fwrite(&SND->pos,      4, 1, fp);
-                orig_fwrite(&SND->priority, 4, 1, fp);
-                orig_fwrite(&SND->owner,    4, 1, fp);
+                orig_fwrite(&g_dynamic[i]->looping,  4, 1, fp);
+                orig_fwrite(&g_dynamic[i]->pos,      4, 1, fp);
+                orig_fwrite(&g_dynamic[i]->priority, 4, 1, fp);
+                orig_fwrite(&g_dynamic[i]->owner,    4, 1, fp);
             } else {
                 len = 0;
                 orig_fwrite(&len, 4, 1, fp);
@@ -1976,7 +1955,6 @@ int32_t __cdecl SaveAudioSection(am2_FILE *fp)
             orig_fwrite(&len, 4, 1, fp);
         }
     }
-#undef SND
 
     return 1;
 }
@@ -2033,18 +2011,16 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
 void __cdecl SpeakLine(int32_t group, int32_t owner)
 {
     struct VoiceGroup { int32_t count; const char *names[4]; };
-#define GROUPS (g_voiceGroups)
     if ((int32_t)g_defaultOwner != owner)
         return;
 
     {
         /* Chosen before the call's other arguments are pushed. */
-        int32_t     r    = orig_rand() % GROUPS[group].count;
-        const char *name = GROUPS[group].names[r];
+        int32_t     r    = orig_rand() % g_voiceGroups[group].count;
+        const char *name = g_voiceGroups[group].names[r];
 
         PlayDynamicSound(name, 0, 0, 0, 0, AM2_VOICE_SLOT, 1, 0);
     }
-#undef GROUPS
 }
 
 /* 0x00448380, two callers -- TrooperPickupItem and

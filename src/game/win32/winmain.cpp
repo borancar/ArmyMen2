@@ -410,15 +410,13 @@ void __cdecl ReportLeaks(void)
 
 
     /* The record array is read again after the copy. */
-#define REC (*(const uint8_t *const *)&g_leakRecords \
-             + (size_t)i * 16)
     for (int32_t i = 0; i < shown; i++) {
-        orig_strncpy(name, (const char *)(REC + 4), 4);
+        orig_strncpy(name,
+                     (const char *)((*(const uint8_t *const *)&g_leakRecords + (size_t)i * 16) + 4), 4);
         orig_log("%08d bytes  file: %s  line: %d\n",
-                 *(const int32_t *)(REC + 12), name,
-                 *(const int32_t *)(REC + 8));
+                 *(const int32_t *)((*(const uint8_t *const *)&g_leakRecords + (size_t)i * 16) + 12), name,
+                 *(const int32_t *)((*(const uint8_t *const *)&g_leakRecords + (size_t)i * 16) + 8));
     }
-#undef REC
 }
 
 /* 0x0041E710. Drop the record array and the two counters with it. */

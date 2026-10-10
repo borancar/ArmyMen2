@@ -57,7 +57,6 @@ extern "C" const char *const am2_cheat_words[41] = {
     "xxx",
 };
 #endif
-#define kCheatWords  (g_cheatWords)
 
 #define g_viewRect   ((AM2_Rect *)&g_viewX)
 
@@ -117,7 +116,7 @@ void __cdecl CheatLine(const char *line)
         return;
 
     /* The master switch is compared before the table is walked. */
-    if (orig_stricmp(line, kCheatWords[0]) == 0) {
+    if (orig_stricmp(line, g_cheatWords[0]) == 0) {
         int32_t army = ((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot((int32_t)g_defaultOwner);
 
         /* The reply's colour is byte 1 of the army's own object-table record,
@@ -138,7 +137,7 @@ void __cdecl CheatLine(const char *line)
         return;
 
     for (n = 1; n < AM2_CHEAT_COUNT + 1; n++)
-        if (orig_stricmp(line, kCheatWords[n]) == 0)
+        if (orig_stricmp(line, g_cheatWords[n]) == 0)
             break;
 
 again:

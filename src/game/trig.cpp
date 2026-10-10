@@ -6,11 +6,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-#define kCos   (g_trigCos)
-#define kSin   (g_trigSin)
 /* Centres, so these are indexed by the signed ratio directly -- see orig.h. */
-#define kAtanC (g_atanCos)
-#define kAtanS (g_atanSin)
 
 #define kD(a)  (*(const double *)((void *)(uintptr_t)(a)))
 
@@ -76,8 +72,8 @@ void __cdecl BuildTrigTables(void)
         double angle = (double)step * kD(((uintptr_t)g_dblTwoPi))
                        * kD(((uintptr_t)g_dblOne256));
 
-        kCos[i] = (float)x87cos(angle);
-        kSin[i] = (float)(x87sin(angle) * kD(((uintptr_t)g_dblSinScale)));
+        g_trigCos[i] = (float)x87cos(angle);
+        g_trigSin[i] = (float)(x87sin(angle) * kD((uintptr_t)g_dblSinScale));
     }
 
     /* Reverse lookup, twice over, the two differing only in which table is the
@@ -88,9 +84,9 @@ void __cdecl BuildTrigTables(void)
      * and the best-so-far stands. If every candidate is skipped the entry
      * keeps the byte from the initial best, which is 0. */
     for (int32_t pass = 0; pass < 2; pass++) {
-        const float *num = pass ? kCos : kSin;
-        const float *den = pass ? kSin : kCos;
-        int8_t      *out = pass ? kAtanS : kAtanC;
+        const float *num = pass ? g_trigCos : g_trigSin;
+        const float *den = pass ? g_trigSin : g_trigCos;
+        int8_t      *out = pass ? g_atanSin : g_atanCos;
 
         for (int32_t ratio = -AM2_TRIG_ATAN_RANGE;
              ratio <= AM2_TRIG_ATAN_RANGE; ratio++) {

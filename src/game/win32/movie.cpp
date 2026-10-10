@@ -446,25 +446,23 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
 
     DDSURFACEDESC ddsd;
     /* Both are read off the movie at every use. */
-#define smack (movie->smack)
-#define surf  (movie->surface)
     HRESULT       hr;
 
     /* The timer does not stop when the window loses focus, so this does. */
     if (GetFocus() != g_hWnd)
         return;
 
-    if (smack->newPalette &&
+    if (movie->smack->newPalette &&
         !movie->ddType) {
         ::MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
 
         /* See the standing note: a lock used as a question, never answered. */
-        hr = IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL);
+        hr = IDirectDrawSurface_Lock(movie->surface, NULL, &ddsd, DDLOCK_WAIT, NULL);
         if (hr == DDERR_SURFACELOST) {
-            if (IDirectDrawSurface_Restore(surf) != DD_OK)
+            if (IDirectDrawSurface_Restore(movie->surface) != DD_OK)
                 return;
             IDirectDrawSurface_SetPalette(
-                surf, *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner +
+                movie->surface, *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner +
                                                MOVIE_PALETTE_OFF));
             ::MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
         }
@@ -472,29 +470,27 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
 
     memset(&ddsd, 0, sizeof ddsd);
     ddsd.dwSize = sizeof ddsd;
-    hr = IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL);
-    if (hr == DDERR_SURFACELOST && IDirectDrawSurface_Restore(surf) != DD_OK)
+    hr = IDirectDrawSurface_Lock(movie->surface, NULL, &ddsd, DDLOCK_WAIT, NULL);
+    if (hr == DDERR_SURFACELOST && IDirectDrawSurface_Restore(movie->surface) != DD_OK)
         return;
 
     /* Straight into the locked bits, at the surface's own pitch. */
-    smack_tobuffer(smack, 0, 0, (uint32_t)ddsd.lPitch,
-                   smack->height, ddsd.lpSurface,
+    smack_tobuffer(movie->smack, 0, 0, (uint32_t)ddsd.lPitch,
+                   movie->smack->height, ddsd.lpSurface,
                    movie->ddType);
-    smack_doframe(smack);
-    IDirectDrawSurface_Unlock(surf, NULL);
+    smack_doframe(movie->smack);
+    IDirectDrawSurface_Unlock(movie->surface, NULL);
 
     BlitCentred(movie, (LPDIRECTDRAWSURFACE)arg);
 
     /* Last frame ends the movie; anything else advances it. */
-    if (smack->frameNum ==
-        smack->frames - 1) {
+    if (movie->smack->frameNum ==
+        movie->smack->frames - 1) {
         movie->running = 0;
         MovieFinished();
     } else {
-        smack_nextframe(smack);
+        smack_nextframe(movie->smack);
     }
-#undef surf
-#undef smack
 }
 
 /* Original: 0x00445390, 2 call sites. Draw a frame if one is due.

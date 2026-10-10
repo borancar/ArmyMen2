@@ -147,7 +147,6 @@ extern "C" const AM2_DefKeyword am2_def_keywords[101] = {
     {"", 0, 0},
 };
 #endif
-#define kDefKeywords (g_defNameTable)
 
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
@@ -275,8 +274,8 @@ int32_t __cdecl DefFindKeyword(const char *name)
 {
     int32_t i;
 
-    for (i = 0; kDefKeywords[i].name[0] != '\0'; i++)
-        if (strcmp(name, kDefKeywords[i].name) == 0)
+    for (i = 0; g_defNameTable[i].name[0] != '\0'; i++)
+        if (strcmp(name, g_defNameTable[i].name) == 0)
             return i;
 
     return -1;
@@ -342,9 +341,9 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp)
             return 0;
         }
 
-        if (kDefKeywords[idx].handler != 0)
-            rc = ((int32_t (__cdecl *)(int32_t, char *))kDefKeywords[idx].handler)(
-                     kDefKeywords[idx].value, rest);
+        if (g_defNameTable[idx].handler != 0)
+            rc = ((int32_t (__cdecl *)(int32_t, char *))g_defNameTable[idx].handler)(
+                     g_defNameTable[idx].value, rest);
 
         if (rc != 0) {
             orig_log("Invalid table entry: line %d, token #%d\n%s\n",
@@ -438,27 +437,25 @@ void __cdecl LoadDefTables(void)
     /* Indexed by id; VC6 walks it as a pointer and tests the pointer. */
     for (id = 0; id < AM2_MISSILE_DEF_COUNT; id++) {
         const AM2_MissileDefRec *src;
-#define dst (&g_missileDefs[id])
 
-        memset(dst, 0, AM2_MISSILE_DEF_BYTES);
+        memset((&g_missileDefs[id]), 0, AM2_MISSILE_DEF_BYTES);
         src = MissileDefFind(id);
         if (src == 0)
             continue;
 
-        dst->kind        = src->kind;
-        dst->cooldown    = src->cooldown;
-        dst->life        = src->life;
-        dst->field0C     = src->field0C;
-        dst->range       = src->range;
-        dst->rangeMin    = src->rangeMin;
-        dst->capacity    = src->capacity;
-        dst->damage     = src->damage;
-        dst->blastDamage = src->blastDamage;
-        dst->automatic   = src->automatic;
-        dst->field28     = src->field28;
-        dst->weight      = src->weight;
-        dst->field30     = src->field30;
-#undef dst
+        g_missileDefs[id].kind        = src->kind;
+        g_missileDefs[id].cooldown    = src->cooldown;
+        g_missileDefs[id].life        = src->life;
+        g_missileDefs[id].field0C     = src->field0C;
+        g_missileDefs[id].range       = src->range;
+        g_missileDefs[id].rangeMin    = src->rangeMin;
+        g_missileDefs[id].capacity    = src->capacity;
+        g_missileDefs[id].damage     = src->damage;
+        g_missileDefs[id].blastDamage = src->blastDamage;
+        g_missileDefs[id].automatic   = src->automatic;
+        g_missileDefs[id].field28     = src->field28;
+        g_missileDefs[id].weight      = src->weight;
+        g_missileDefs[id].field30     = src->field30;
     }
 
     /* The rank records. A projection of a 0x20-byte parsed record onto a
