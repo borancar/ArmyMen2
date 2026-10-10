@@ -1885,7 +1885,7 @@ void __cdecl ViewUpdate(void)
     vpt.y = (int16_t)(dy + g_listenerPos.y);
 
 clamp_eye:
-    vpt.x = (int16_t)Clamp(tx, halfW + g_mapInset.left, g_mapInset.right - halfW - 1);
+    vpt.x = (int16_t)Clamp(tx, (w >> 1) + g_mapInset.left, g_mapInset.right - halfW - 1);
     /* The clamped y goes straight into the eye; x is held until the stores
      * below, in the order the image makes them. */
     g_listenerPos.y = (int16_t)Clamp(vpt.y, (h >> 1) + g_mapInset.top,

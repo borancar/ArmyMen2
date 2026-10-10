@@ -1250,7 +1250,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         ++g_pathGeneration;
 
         g_pathNodes[fromTile].g      = 0;
-        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(fromTile, toTile);
+        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(from & 0xFFFF, toTile);
         g_pathNodes[fromTile].depth  = 0;
         g_pathNodes[fromTile].stamp  =
             g_pathGeneration;
@@ -1280,7 +1280,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         curTile = cur & 0xFFFF;
 
         /* Pop, and detach the new head's back link. `from` IS the head. */
-        from = g_pathNodes[curTile].next;
+        from = g_pathNodes[cur & 0xFFFF].next;
         if (0 < (uint16_t)from)
             g_pathNodes[from & 0xFFFF].prev = 0;
         g_pathNodes[curTile].state = 2;
@@ -1309,7 +1309,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 continue;
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
-            t = nb & 0xFFFF;
+            t = (curTile + g_tileStep8[i]) & 0xFFFF;
             if (g_regionOfCell[t] > 0 && g_regionOfCell[t] != startRegion
                 && g_regionOfCell[t] != goalRegion)
                 continue;
@@ -1409,7 +1409,7 @@ budget:
     /* Out of budget. Keep what was found if it got closer than the start
      * was -- `jbe` on the two heuristics as WORDS (`cmp di, ax`), so equal
      * counts as progress. Otherwise it shares the exhausted list's zero. */
-    if ((uint16_t)PathHeuristic(curTile, toTile)
+    if ((uint16_t)PathHeuristic(cur & 0xFFFF, toTile)
         <= (uint16_t)PathHeuristic(fromTile, toTile)) {
         PathUnwind(cur, out, n);
         goto ok;
@@ -9637,7 +9637,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             if ((age > o->turnInterval && changed)
                 || age > 0x320u) {
                 o->turnCommitted = first;
-                gun->turnStamp =
+                o->rowSet.rows->turnStamp =
                     g_gameClockMs;
             } else {
                 turn = 0;
@@ -9872,14 +9872,11 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     SetKindFrames(o, r->state);
 
     {
-    /* The y is read once, ahead of the sound-list lookup. */
-    int32_t engineY = o->pos.y;
-
     /* The engine sound for the state, two tables of it -- wheeled (kind 1)
      * and tracked (kinds 2, 3, 4, 6, 7) -- where states 2 and 3 share an arm
      * and state 4 is silent. Each arm is its own call, which VC6 merges. */
 #define ENGINE(snd) PlaySoundAt((snd), 1, 0, o->pos.x, \
-                                engineY)
+                                o->pos.y)
     if (ListFirstField548(o)) {
         int32_t kind = o->deathKind;
 
