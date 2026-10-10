@@ -900,10 +900,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     stride = cols - r + l0 - 1;
 
     for (row = t0; row <= b; row++) {
-        col = l0;
-        while (1) {
-            if (col > r)
-                break;
+        for (col = l0; col <= r; col++) {
             const AM2_CellEntry *node = *cell++;
 
             while (node) {
@@ -933,7 +930,6 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
             nextNode:
                 node = node->next;
             }
-            col++;
         }
         cell += stride;
     }
