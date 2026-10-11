@@ -2960,7 +2960,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
             return 1;
         }
 
-        seq = ((AM2_FlowMsg *)node->body)->pkt.seq;
+        seq = msg->pkt.seq;              /* `msg` is node->body */
         if (seq < AM2_FLOW_TRACE_FIRST)
             am2_log("Received seq %d  expected %d from %x, he has my seqthru  %d\t\n",
                     seq, sender->nextExpected + 1,
