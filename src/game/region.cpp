@@ -9032,11 +9032,13 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
          * The facing is read inside the test, after the distance checks, as
          * the image loads it; held in a local it was read ahead of them
          * (closer registers, 90 bytes off against 104, but the wrong
-         * shape). */
-        if (reach < 6
-            || (reach < 0x18
+         * shape). Two arms with one body each rather than an `||`: the
+         * merged form takes one scratch register more before the test. */
+        if (reach < 6)
+            out->bearing = o->facing;
+        else if (reach < 0x18
                 && AngleDelta(bearing, o->facing)
-                     < 0x40))
+                     < 0x40)
             out->bearing = o->facing;
 
         o->field574 = out->bearing;

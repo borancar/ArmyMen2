@@ -8314,8 +8314,10 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     e->healthPct = 0;
     e->captionA[0]     = '\0';
     e->secondPct = 0;
+    /* Cleared through the widget and THEN taken as a pointer: the other
+     * order holds the null test of `obj` back below the clears. */
+    e->captionB[0] = '\0';
     capB = e->captionB;
-    *capB = '\0';
     e->ammo       = -1;
 
     if (!obj) {
