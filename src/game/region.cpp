@@ -3260,6 +3260,12 @@ heading:
  * THE FACING GOES TO out+4, not out+0 as in AiRouteToward, and only one field
  * is written rather than that function's two. The state comes from one of the
  * two three-entry tables in orig.h, indexed by the AI context's class. */
+/* AiTrooperStep's file saw NearestAllowedTile with a 16-bit tile: the image
+ * pushes the link's int16 `into` straight from a word load, with no
+ * extension, where the callee itself masks a dword. The call goes through
+ * that view. */
+typedef uint16_t (__cdecl *AM2_NearestTile16Fn)(AM2_Object *, uint16_t, AM2_Point *);
+
 void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx *ctx)
 {
     const AM2_Point    *dest = &ob->dest;
@@ -3357,7 +3363,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
             /* NearestAllowedTile writes the point, so the x half is cleared first
              * rather than the whole local -- the original's `mov word`. */
             pt.x = 0;
-            NearestAllowedTile(ob, kLinks(fromRegion)[link].into,
+            ((AM2_NearestTile16Fn)NearestAllowedTile)(ob, kLinks(fromRegion)[link].into,
                                &pt);
         }
 
