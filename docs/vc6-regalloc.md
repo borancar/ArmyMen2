@@ -439,6 +439,15 @@ changes nothing or is worse. The first site still keeps its own copy.
   The image computes it after the test, which is `for (i = depth; walk;
   ...) path[i--] = ...` (24 -> 6 bytes).
 
+- **A ternary argument is evaluated before the call's other arguments;
+  two calls VC6 merges are not.** PausedFrameStep's badge was
+  `DrawSprite(variant == 3 ? g_mpMarkA : g_mpMarkB, xy[0], xy[1], 0)`,
+  which loads the sprite first. The image loads the coordinates, pushes
+  them, and picks the sprite last, `mov eax, A; ...; je; mov eax, B; push
+  eax; call`: that is `if (variant == 3) DrawSprite(A, ...); else
+  DrawSprite(B, ...);` with the two calls' common tail merged (482 -> 72
+  bytes, and to the image's shape once `badge` was an int32).
+
 ## `for (;;)` and `while (1)` are different loops to VC6
 
 The two compile differently (2026-10-10). VC6 rotates `for (;;) { if (c)
