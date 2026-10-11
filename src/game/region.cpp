@@ -2117,7 +2117,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
-        int16_t end = off + rowbytes;
+        int16_t end = off + rowbytes;          /* a word too; both fit (see the header) */
         int16_t col = AM2_TILEMASK_MARGIN;     /* a word, as the image keeps it */
         uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
@@ -2680,9 +2680,9 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    box->bottom = tile.bottom + AM2_TILEMASK_MARGIN;
     box->right = tile.right + AM2_TILEMASK_MARGIN;
     box->left = tile.left - AM2_TILEMASK_MARGIN;
+    box->bottom = tile.bottom + AM2_TILEMASK_MARGIN;   /* right, left, bottom, top: the image's order */
     box->top = tile.top - AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0,
@@ -4747,7 +4747,6 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     uint8_t  slack;
     int32_t  solve;
     uint8_t  facing;
-    int32_t  reach;
     AM2_Rect box;
 
     if (g_perframeCountA
@@ -4800,11 +4799,11 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     ++g_sightGeneration;
     orig_log_one(o);
 
-    reach = g_rankRecords[o->rank].sight_range;
-    box.right  = (int32_t)o->pos.x + reach;
-    box.left   = (int32_t)o->pos.x - reach;
-    box.top    = (int32_t)o->pos.y - reach;
-    box.bottom = (int32_t)o->pos.y + reach;
+    /* The rank record read at each edge, as the image re-reads it. */
+    box.right  = (int32_t)o->pos.x + (g_rankRecords[o->rank].sight_range);
+    box.left   = (int32_t)o->pos.x - (g_rankRecords[o->rank].sight_range);
+    box.top    = (int32_t)o->pos.y - (g_rankRecords[o->rank].sight_range);
+    box.bottom = (int32_t)o->pos.y + (g_rankRecords[o->rank].sight_range);
 
     if (flags)
         it = ObjectsInRect(&box, g_objMapDesc,
