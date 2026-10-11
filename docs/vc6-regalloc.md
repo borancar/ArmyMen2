@@ -1200,11 +1200,32 @@ and probed until the spellings ran out; none moved. What each one IS:
   call, a `const` or `void *` parameter, the hint body as a second
   inline helper, and the loop reusing the object variable with the
   original saved first are all propagated back to one web.
-- **DrawEffectLayer** (220 bytes): `frame` is a memory-only local in the
-  image (computed into eax, stored, reloaded once at its use) where ours
-  gives it esi between the lock loops; the point's stamp goes to ebp in
-  the image and esi in ours, and the frame slot sits after `box`/`hit`
-  rather than before. Not yet probed beyond reading.
+- **DrawEffectLayer** (220 -> 8 bytes, solved bar one register in a
+  clone, 12 artifact lines from our build, with the aim arrays declared
+  as one struct so VC6 can share a pointer over them as it does in the
+  image). `frame = e / 50 + 1; if (frame >= 5) frame = 5;` copies the
+  quotient into the frame's register before the shift (`mov esi, edx;
+  shr esi, 4; inc esi`) and keeps the frame in esi through the lock
+  loops, reloading it three times. **Written as a min over the sum
+  seen twice** (`E < 5 ? E : 5`, what a `min()` macro expands to) the
+  sum is formed in a temporary, `shr edx, 4; lea eax, [edx+1]`, the
+  frame lives in memory and is read once at its use, and every slot
+  falls into the image's order. The mini-lab showed the duplicated sum
+  is the trigger (`q + 1` twice; a `q` local, two statements, `1 + q`,
+  the cast outside, a helper returning the quotient, `uint32_t frame`
+  all keep the copy). The B arm's `shr edx, 4; lea esi, [edx+1]` is the
+  same thing: the sum assigned and then tested. **Two side effects:**
+  the duplicated expression references `g_aimStampA[army]` twice and
+  that moves the base register every aim array shares from the A
+  point's y to the B point's (in the clone and the real build alike; a
+  pointer to the element, `*(g_aimStampA + army)`, a byte-offset form,
+  and the point through a local pointer all do the same, while fewer
+  references to the B point's y move it back). Reading the stamp into a
+  local keeps the base on A but makes the stamp a web (eax) where the
+  image's is a rotation temporary that lands in ebp with eax, ecx and
+  edx taken by the clock and the multiply; `register`, `const`,
+  `uint32_t`, function scope, `volatile` and a clock local instead all
+  leave that. 8 bytes: `mov eax` for `mov ebp` and its `sub`.
 - **The HudPanel constructor** (100 bytes): the image loads `w->x` into
   eax, stores it to `stop`, and keeps a COPY in ecx for `g_hudPanelX`
   (`mov ecx, eax` between the two stores); ours stores both from one

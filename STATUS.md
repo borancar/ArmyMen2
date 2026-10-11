@@ -191,8 +191,8 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 13,580 of edit
-  distance over the 58 functions that are not byte-identical (149,696
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 13,368 of edit
+  distance over the 58 functions that are not byte-identical (149,682
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
@@ -206,7 +206,10 @@ main result so far (details in `src/vc6/README.md`):
   the TANK and JEEP sound arms too, so the tail's four reads earn it the
   register copy the image reloads after the clamp; `i` zeroed with the
   declarations; the final sample in the loop's `pt`): relink 1588
-  of 1646, 58 differ. Re-transcribing FindPath whole from its listing scored worse than
+  of 1646, 58 differ. DrawEffectLayer 220 -> 8 bytes (the A frame as a
+  min over a sum VC6 sees twice, which puts the frame in memory and the
+  sum in a `lea`; the stamp read into a local so the shared aim-array
+  base stays on the A point; the B test on the same sum). Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in
