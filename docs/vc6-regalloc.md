@@ -938,6 +938,36 @@ free: relink and compare every function, not just the ones the change names.
   `from` to ebp, but spills the weight instead), and four spellings of the
   weight helper do not reproduce the split (2026-10-10).
 
+## SelectionClick in the lab (2026-10-11)
+
+Two bytes from the image: the ctrl-click deselect arm loads the zero point
+for `OnSelectionChanged` into eax where the image takes ecx. A clone with
+the globals as extern symbols (absolute addresses in the clone give VC6 a
+different aliasing picture and 164 lines of difference; typed symbols
+give our relink's bytes exactly) reproduces the real build, so the tie is
+local to the function. What the ablation found:
+
+- With the site written as a local copy (`AM2_Point pt = g_zeroPoint;`,
+  the committed form) the load is a web and takes eax, and the rest of
+  the function matches the image. Written as the global directly, in any
+  spelling (`*(const AM2_Point *)&g`, `(&g)[0]`, `&g.x`, through an int
+  prototype, through a volatile int), the load is a rotation temporary
+  and takes edx -- and the drag arm's tail stops merging into the
+  function's tail as the image has it, 34 lines off.
+- The image's ecx is the rotation one step before ours. Two dead
+  volatile reads inserted ahead of the site move it to ecx and restore
+  the structure (9 lines, the lowest seen); one read gives eax. So the
+  original had two more rotation-consuming temporaries before this site
+  that emit nothing we can see, and no local copy of `n`, `uid`, the
+  item array, the list pointer or the flags, no operand order, no
+  pre-increment, no positive `if`, and no arm order (the loop written
+  after the select tail as a `goto` target) supplies them.
+
+Left as it is. The method is worth keeping: `labvsours.py` diffs a clone
+against OUR listing first, `labab.py` runs a variant file through the lab
+and reports the one register under study, and the volatile-read probe
+measures the rotation distance to the image in steps.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
