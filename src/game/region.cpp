@@ -9678,9 +9678,10 @@ typedef int32_t (__cdecl *AM2_Step3RandFn)(void);
  * before it is read. It is a pure reconstructed function, so calling it and
  * discarding the answer is indistinguishable from not calling it.
  *
- * The `push esi` before CanPickUp at 0x0045D358 is likewise not reproduced:
- * the callee reads only [esp+8], so the second push is stray and the
- * `add esp, 8` cleans both. Faithful to what executes. */
+ * The `push esi` before CanPickUp at 0x0045D358 IS reproduced, as an unread
+ * second argument: the callee reads only its first, so the vehicle pushed
+ * after it changes nothing that executes, and with it the call is the
+ * image's two pushes and `add esp, 8`. */
 void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 {
     int32_t   speed = 0;          /* ebp, spilled to E-28 */
@@ -10051,7 +10052,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     tileArg = p->heightSet;
             }
 
-            if (CanPickUp(p) && ListFirstField548(o)) {
+            if (CanPickUp(p, o) && ListFirstField548(o)) {
                 p->pickupAfter =
                     g_gameClockMs + 0x7D0u;
 

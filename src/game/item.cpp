@@ -350,9 +350,11 @@ const char *__cdecl UnitClassName(AM2_Object *unit)
  * type test on nearly all of them, so the cooldown comparison and the
  * three-code chain may be reached far less often than the count suggests.
  */
-int32_t __cdecl CanPickUp(AM2_Object *obj)
+int32_t __cdecl CanPickUp(AM2_Object *obj, AM2_Object *by)
 {
     const AM2_Object *o = obj;
+
+    (void)by;               /* Step3Drive pushes the vehicle; never read */
 
     if (!ObjIsType4((const AM2_Object *)obj))
         return 0;

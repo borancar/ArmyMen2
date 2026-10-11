@@ -664,8 +664,9 @@ int32_t __cdecl HeldWeaponCode(struct AM2_Object *unit);
 const char *__cdecl UnitClassName(struct AM2_Object *unit);
 
 /* 0x004337C0. Can this item be picked up: a weapon, past its
- * OBJ_OFF_PICKUP_AFTER, with a code of 0x1F, 0x20 or 0x21. */
-int32_t __cdecl CanPickUp(struct AM2_Object *obj);
+ * OBJ_OFF_PICKUP_AFTER, with a code of 0x1F, 0x20 or 0x21. The caller
+ * also pushes the object asking, which is never read. */
+int32_t __cdecl CanPickUp(struct AM2_Object *obj, struct AM2_Object *by);
 
 /* 0x00449200. Put an object into state 5 and give up its alternate table
  * record; idempotent, and what stops ObjsAreAllied choosing REC3 again. */

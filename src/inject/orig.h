@@ -11916,7 +11916,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x004337C0, one caller. Whether an item can be picked up: it must be a
  * weapon, its OBJ_OFF_PICKUP_AFTER must have passed, and the code its
  * OBJ_OFF_FIELD_C0 record holds must be 0x1F, 0x20 or 0x21. Reconstructed. */
-#define ADDR_CAN_PICK_UP         0x004337C0u  /* int32_t(void *obj) */
+#define ADDR_CAN_PICK_UP         0x004337C0u  /* int32_t(void *obj, void *by) */
 /* 0x00402F00, one caller. A random value that AVERAGES its first argument:
  * `100 - spread` draws of `rand() % (centre * 2)`, divided by that count. A
  * spread of 0 short-circuits and returns the centre unchanged; a spread of 100
