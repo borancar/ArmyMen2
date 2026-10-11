@@ -984,6 +984,18 @@ rule, as far as one case shows it: a value loaded for a single test is
 the second operand of `test`; a value that is a local (even one VC6 keeps
 only in a scratch register) is the first.
 
+The same mini-lab on the next two register-only functions found nothing:
+PausedFrameStep's `slot = 0` store scheduled before the row-pointer copy
+in the image and after it in ours is unchanged by zeroing the counter
+ahead of the copy, by putting the copy in the `for` header, or by any
+declaration placement; LoadOptions's last sentinel `if` has its skip
+edge jump to the else arm's epilogue in ours (with `pop esi` hoisted
+above the store) and to its own in the image, and fourteen spellings --
+`return`s in either arm, a dead statement after the `if` or after the
+else loop, a ternary, an empty-else, nesting, the tests reordered, the
+store through a pointer, the key loop as a pointer walk -- all give
+ours. Both stay.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
