@@ -537,7 +537,12 @@ the arms the other way round (shape 110 -> 108).
   the end of the loop body, shape 78 -> 66) and FindPath's out-of-budget
   refusal (its own `PathChargeFrame; return 0;` in the budget test, the
   shared `fail:` still below, 82 -> 60). Sweeps that did this mechanically
-  for every return-ending label found nothing else.
+  for every return-ending label found nothing else. What remains of
+  SightScan (2026-10-11) is the second copy itself: the image has only the
+  in-arm one, entered from four `goto`s. The labelled block alone still
+  moves to after the allied arm's last `goto` whatever that arm's tail
+  looks like (28 -> 43); a full copy at each `goto` merges nowhere (52);
+  and the kind-7 arm written after the sight test is worse (54).
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
