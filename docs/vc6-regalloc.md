@@ -543,6 +543,14 @@ the arms the other way round (shape 110 -> 108).
   moves to after the allied arm's last `goto` whatever that arm's tail
   looks like (28 -> 43); a full copy at each `goto` merges nowhere (52);
   and the kind-7 arm written after the sight test is worse (54).
+- **VehicleUpdateAppend tests the position bit twice** (2026-10-11): the
+  image does `and ecx, 0x80000000` before the position bytes and `test ecx,
+  ecx` again before the action byte, so its source has two `if (flags &
+  0x80000000u)` blocks where ours has one. Splitting ours reproduces both
+  tests exactly, but VC6 then spills `flags` to an 8-byte frame (the image
+  keeps it in ebp with a `push ecx` frame) and the earlier flag tests
+  reshuffle: 11 -> 17. Declaration order and an int32 `action` do not move
+  the spill. Kept as one block until something does.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
