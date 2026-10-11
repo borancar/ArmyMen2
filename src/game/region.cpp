@@ -9686,7 +9686,9 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 {
     int32_t   speed = 0;          /* ebp, spilled to E-28 */
     int32_t   tileArg = 0;        /* E-4, zeroed at entry and read once */
-    AM2_Point  step = {0, 0};      /* E-20, MoveStepPoint's out point */
+    AM2_Point  step;               /* E-20, MoveStepPoint's out point; never
+                                   * read before that call fills it, and the
+                                   * image's prologue zeroes only two slots */
     uint8_t   facing;             /* E-24, after it stops holding the turn */
     uint8_t   gunFacing;          /* E-16 */
     AM2_Anim *const *animRec;     /* E-12, the address of a row's animPlaying */
