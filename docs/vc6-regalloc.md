@@ -1097,6 +1097,35 @@ into a local ahead of its comparison is how the first call comes first,
 and a register-only swap between two webs is a use count, which the
 threshold measures).
 
+## TrooperFire in the lab: a web at the kind test, and the else arm's start (2026-10-11)
+
+Fourteen bytes, all one rotation step from the target arm's facing call
+on: the image forms both addresses first (`lea eax, [ebx+12h]; lea ecx,
+[esi+12h]; push eax; push ecx`), ours pushes each as it is formed with
+`eax` twice. A full clone (4 artifact lines from our build) found:
+
+- **The `eax, eax` pair comes from `def` being a web at that point.**
+  `def = w->typeRec; if (def->kind != MEDI && def->kind != WREN)` gives
+  it; so does a fresh local for the record. Written as the expression,
+  `w->typeRec->kind` in both tests (or `kind = w->typeRec->kind` and
+  testing the local), the arm is the image's to the instruction, the
+  `(int16_t)f` store included. A local held only for two reads in the
+  same statement still counts as a web for the rotation.
+- **But the else arm then starts one register late**, and so does
+  everything after it (its first temporary `ecx` where the image has
+  `eax`). The arm's first temporary follows the if arm's TEXT: a
+  `volatile` read appended after the if arm's last statement moves the
+  else arm's first temporary one step, and two of them put it back on
+  the image (diff 38, the two reads and nothing else). So the original's
+  if arm ends with two temporaries more than the expression form
+  spells, and none of the natural ones found supply them: the sight
+  stores or the ground chained, `heading` assigned inside the call or
+  declared in the arm, `spot`/`target` declared in the arm, ObjHeight
+  into a local, `fired` normalised, the record read earlier. `int32_t
+  heading` restores the else arm's start but changes the byte slot's
+  reload. The committed form keeps the else arm and the tail right and
+  leaves the one arm a step out; it stays.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
