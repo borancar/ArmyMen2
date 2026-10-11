@@ -1200,10 +1200,10 @@ and probed until the spellings ran out; none moved. What each one IS:
   call, a `const` or `void *` parameter, the hint body as a second
   inline helper, and the loop reusing the object variable with the
   original saved first are all propagated back to one web.
-- **DrawEffectLayer** (220 -> 8 bytes, solved bar one register in a
-  clone, 12 artifact lines from our build, with the aim arrays declared
-  as one struct so VC6 can share a pointer over them as it does in the
-  image). `frame = e / 50 + 1; if (frame >= 5) frame = 5;` copies the
+- **DrawEffectLayer** (220 bytes -> byte-identical, relink 1588 ->
+  1589; found in a clone, 12 artifact lines from our build, with the
+  aim arrays declared as one struct so VC6 can share a pointer over
+  them as it does in the image). `frame = e / 50 + 1; if (frame >= 5) frame = 5;` copies the
   quotient into the frame's register before the shift (`mov esi, edx;
   shr esi, 4; inc esi`) and keeps the frame in esi through the lock
   loops, reloading it three times. **Written as a min over the sum
@@ -1225,7 +1225,16 @@ and probed until the spellings ran out; none moved. What each one IS:
   image's is a rotation temporary that lands in ebp with eax, ecx and
   edx taken by the clock and the multiply; `register`, `const`,
   `uint32_t`, function scope, `volatile` and a clock local instead all
-  leave that. 8 bytes: `mov eax` for `mov ebp` and its `sub`.
+  leave that. **What settles both is the B arm's point:** read from the
+  array at each use (`g_aimPointB[army].x`, as the A arm reads its
+  own) instead of through `const int16_t *ptB = &g_aimPointB[army]`,
+  the base stays on the A point with the A sum duplicated in full, the
+  stamp is the temporary in ebp, and the function is exact. So the base
+  register's anchor is decided by how the references are spelled, not
+  by how many there are: a pointer local to an element counts for the
+  arm it is in, and a CSE'd expression over an element counts against
+  its own arm. Both are worth trying on any function that walks
+  several parallel global arrays through one register.
 - **The HudPanel constructor** (100 bytes): the image loads `w->x` into
   eax, stores it to `stop`, and keeps a COPY in ecx for `g_hudPanelX`
   (`mov ecx, eax` between the two stores); ours stores both from one
