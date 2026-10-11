@@ -160,7 +160,16 @@ main result so far (details in `src/vc6/README.md`):
   is `at` on both ways in) and AiTrooperStep 16 -> 14 (the waypoint test
   reads `moveAt` itself) by the same substitution: 40 off in shape, 551 on
   code alone. Each candidate the sweeps offer must be read before it is
-  kept -- most substitute a value that is NOT equal on every path.
+  kept -- most substitute a value that is NOT equal on every path. Then
+  FlowRecvMessage 16 -> 15 (the data arm's sequence read through `msg`),
+  SightScan 28 -> 25 (`cand` cleared first and set when not refused; the
+  retry deadline stored before the sight count), Step3Drive 29 -> 28 on code
+  (CanPickUp takes the unread second argument it is pushed), MissionEnded
+  4 -> 2 and AiTrooperStep 14 -> 12 (stores moved into the image's order)
+  and ScriptParseActionRecon 70 -> 68 on code: 40 off in shape, about 540
+  on code alone. Statement-move sweeps (adjacent, two to six apart, and past
+  whole blocks) offer many candidates that read a value before it is set;
+  read every one.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
