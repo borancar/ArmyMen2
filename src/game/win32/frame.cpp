@@ -1903,9 +1903,15 @@ void __cdecl PausedFrameStep(void)
                        xy[1] + 3, 0);
         }
 
-        if (badge)
-            DrawSprite(variant == 3 ? g_mpMarkA : g_mpMarkB,
-                       xy[0], xy[1], 0);
+        /* Two calls, not a ternary argument: VC6 merges their tails, so
+         * the image loads the coordinates first and picks the sprite last,
+         * where a ternary argument is evaluated ahead of them. */
+        if (badge) {
+            if (variant == 3)
+                DrawSprite(g_mpMarkA, xy[0], xy[1], 0);
+            else
+                DrawSprite(g_mpMarkB, xy[0], xy[1], 0);
+        }
 
         if (g_commObject->CommSlotHasPlayer(slot))
             DrawLatencyBar(idx, slot);
