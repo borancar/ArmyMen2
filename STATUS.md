@@ -169,7 +169,10 @@ main result so far (details in `src/vc6/README.md`):
   and ScriptParseActionRecon 70 -> 68 on code: 40 off in shape, about 540
   on code alone. Statement-move sweeps (adjacent, two to six apart, and past
   whole blocks) offer many candidates that read a value before it is set;
-  read every one.
+  read every one. RowUpdate 13 -> 12 (the top written through a pointer to
+  the rect) and RefundPlacedUnit to the image's shape (a volatile re-read of
+  the follower uid; docs/vc6-regalloc.md): 39 off in shape, about 538 on
+  code alone (487 counting a constant held in a register as a register).
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,

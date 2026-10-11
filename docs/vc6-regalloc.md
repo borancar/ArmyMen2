@@ -567,6 +567,17 @@ the arms the other way round (shape 110 -> 108).
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
   is not removed by respelling, as UpdateTrooperAction's (above) was by
   reordering whole statements; ScriptIf's blocks have one statement each.
+- **A re-read VC6 will not reproduce otherwise: a volatile read
+  (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
+  in `while (uid) o = LookupByUID(uid);`, once for the test and again for the
+  argument. VC6 merges any two plain reads of one address -- through a
+  member, a cast to another integer type, a raw offset, an inline accessor
+  -- and only `*(volatile uint32_t *)&...` at the argument keeps the second
+  load: shape 1 -> 0, relink bytes 62 -> 20. The same cast elsewhere
+  (ObjRemap's box top, ScriptParseEvent's token kind, RowUpdate's rect top)
+  is worse, because a volatile access also stops VC6 scheduling around it;
+  use it only where the re-read is the whole difference.
+
 - **Which `return 0` a conditional exit reuses (RegionFindPath, 2026-10-11).**
   RegionFindPath is at the image's shape; its one remaining byte difference
   is the target of the empty-open-list `je`: the image jumps to the FIRST
