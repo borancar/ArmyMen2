@@ -2403,10 +2403,21 @@ void __cdecl DrawEffectLayer(void)
             int32_t frame;
             RECT    box, hit;
 
-            frame = (int32_t)((uint32_t)(g_gameClockMs - g_aimStampA[army])
-                              / AM2_AIM_STEP_MS) + 1;
-            if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
-                frame = AM2_AIM_FRAMES_A;
+            /* The frame is a min() over an expression VC6 sees twice: the
+             * sum is formed in a temporary (`shr edx, 4; lea eax, [edx+1]`)
+             * and the local lives in memory, where a single expression
+             * clamped afterwards keeps it in a register through the two lock
+             * loops. The stamp is read into a local so the array is
+             * referenced once: a second reference moves the base register
+             * every aim array shares from the A point to the B point. */
+            {
+                int32_t stamp = g_aimStampA[army];
+
+                frame = (uint32_t)(g_gameClockMs - stamp) / AM2_AIM_STEP_MS + 1
+                        < AM2_AIM_FRAMES_A
+                        ? (int32_t)((uint32_t)(g_gameClockMs - stamp) / AM2_AIM_STEP_MS + 1)
+                        : AM2_AIM_FRAMES_A;
+            }
 
             box.left   = g_aimPointA[army].x + AM2_AIM_BOX_LEFT;
             box.right  = g_aimPointA[army].x + AM2_AIM_BOX_RIGHT;
@@ -2481,11 +2492,15 @@ void __cdecl DrawEffectLayer(void)
             int32_t *held = &g_aimFrameB[army];
             int32_t  frameB;
 
+            /* The same sum twice, as above: written once and tested through
+             * the local, the quotient is copied into the register before the
+             * shift and incremented in place; the image shifts the quotient
+             * and forms the sum with a `lea`. */
             frameB = (int32_t)((uint32_t)(g_gameClockMs - g_aimStampB[army])
-                               / AM2_AIM_B_STEP_MS) + 1;
+                               / AM2_AIM_B_STEP_MS + 1);
 
             /* Past the fourth step it stops counting and starts flickering. */
-            if ((uint32_t)frameB > 4) {
+            if ((uint32_t)(g_gameClockMs - g_aimStampB[army]) / AM2_AIM_B_STEP_MS + 1 > 4) {
                 if (*held != 0 && orig_rand() % AM2_AIM_B_HOLD != 1) {
                     frameB = *held;
                 } else {
