@@ -573,6 +573,9 @@ the arms the other way round (shape 110 -> 108).
   is far worse (DirtyCollect 2 -> 70), so the original used the default
   scheduler. On ObjHitMaskAction `#pragma optimize` with `a`, `w`, `p`, `y` or
   `t` on changes nothing, and `g` off or `s` on wrecks it.
+  Across seven small functions, `/Ob0`, `/Ox` match the default exactly;
+  `/Ob2`, `/Op`, `/Oa` and `/Ow` are each worse somewhere (ObjRemap 7 -> 60
+  under `/Ob2`), so `/O2 /GX` stands.
 
 - **A re-read VC6 will not reproduce otherwise: a volatile read
   (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
