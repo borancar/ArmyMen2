@@ -173,9 +173,11 @@ main result so far (details in `src/vc6/README.md`):
   the rect) and RefundPlacedUnit to the image's shape (a volatile re-read of
   the follower uid; docs/vc6-regalloc.md): 39 off in shape, about 538 on
   code alone (487 counting a constant held in a register as a register).
-  Then ObjHitMaskAction 40 -> 29 and ListMaskAction 41 -> 35, from how the
-  ring-marking helper is written (docs/vc6-regalloc.md): about 521 on code
-  alone over the 39.
+  Then ObjHitMaskAction 40 -> 24 and ListMaskAction 41 -> 32, from how the
+  ring-marking helper is written, the column and row-end counters as words,
+  and the box stores in the image's order (docs/vc6-regalloc.md); SightScan
+  25 -> 23 with the rank's sight range re-read at each box edge: about 511
+  on code alone over the 39.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
