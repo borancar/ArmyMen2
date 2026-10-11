@@ -1134,6 +1134,27 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
         g_pathMaxNodes = AM2_PATH_MIN_NODES;
 }
 
+/* The same charge as the budget test's own copy has it: the even budget
+ * doubled at both uses (`lea eax, [ecx + ecx]`), where the copy above
+ * doubles once in place (`add ecx, ecx`). */
+static inline void PathChargeFrameL(uint32_t startTicks, int32_t considered)
+{
+    uint32_t elapsed = Ticks() - startTicks;
+    int32_t  budget;
+
+    g_pathFrameMs += (int32_t)elapsed;
+    if (elapsed <= AM2_PATH_MIN_ELAPSED)
+        return;
+
+    budget  = (int32_t)((uint32_t)(g_pathMaxSearches * considered)
+                        / elapsed);
+    budget += g_pathMaxNodes / 2;
+    budget  = (int32_t)((uint32_t)budget >> 1);
+    g_pathMaxNodes = budget * 2;
+    if ((uint32_t)(budget * 2) <= AM2_PATH_MIN_NODES)
+        g_pathMaxNodes = AM2_PATH_MIN_NODES;
+}
+
 /* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by
  * filling from index depth downwards. `*n` is depth + 1, so it counts the
  * start tile as well as every step. The loop stops on a zero tile, which is
@@ -1412,7 +1433,7 @@ budget:
      * the exhausted list's copy below, which the image lays out inline. */
     if ((uint16_t)PathHeuristic(cur & 0xFFFF, toTile)
         > (uint16_t)PathHeuristic(fromTile, toTile)) {
-        PathChargeFrame(startTicks, considered);
+        PathChargeFrameL(startTicks, considered);
         return 0;
     }
     PathUnwind(cur, out, n);
