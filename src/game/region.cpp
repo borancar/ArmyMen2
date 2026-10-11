@@ -1159,16 +1159,23 @@ static inline void PathChargeFrameL(uint32_t startTicks, int32_t considered)
  * filling from index depth downwards. `*n` is depth + 1, so it counts the
  * start tile as well as every step. The loop stops on a zero tile, which is
  * the start node's PARENT -- tile 0 cannot be a path element, which is the
- * same thing the entry guard relies on when it refuses a zero argument. */
+ * same thing the entry guard relies on when it refuses a zero argument.
+ *
+ * The index is an int read back out of the node after `*n` is stored (the
+ * image re-reads the word through the same pointer, since `n` may alias),
+ * and it is an INDEX, not a pointer: VC6 strength-reduces `out[i--]` into
+ * the `sub ecx, 2` pointer the image walks, and forms that pointer in the
+ * loop preheader, AFTER the `end > 0` test. A pointer local written out by
+ * hand is formed before the test and costs the shape three. */
 static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
 {
-    uint16_t *p;
+    int32_t i;
 
     *n = g_pathNodes[end].depth + 1;
-    p  = out + g_pathNodes[end].depth;
+    i  = g_pathNodes[end].depth;
     while (end > 0) {
-        *p-- = end;
-        end  = g_pathNodes[end].parent;
+        out[i--] = end;
+        end = g_pathNodes[end].parent;
     }
 }
 
