@@ -3453,7 +3453,9 @@ walk:
 
         while (d < AM2_AI_WAYPOINT_DIST) {
             at = ob->moveAt;
-            if ((int32_t)at
+            /* The field, signed, as the image compares it (the index is
+             * never negative, so the same test as through `at`). */
+            if ((int32_t)ob->moveAt
                 >= (int32_t)ob->moveCount - 1) {
                 if (d >= AM2_AI_WAYPOINT_DIST)
                     break;
