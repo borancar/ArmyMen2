@@ -116,7 +116,14 @@ main result so far (details in `src/vc6/README.md`):
   AiTrooperStep 37 -> 32 (a uint16 waypoint index), ObjHitMaskAction
   48 -> 45 (a cell index beside the pointer), DrawMapObjects 190 -> 92
   bytes. The register-normalised total over the 50 still off in shape is
-  737. PlacementAllowed
+  737. Eighth round (2026-10-11), after finding that the sweeps scored an
+  exact match as a regression (an empty listing): DiedEffectB,
+  HudEdgeUpdate (captionB cleared through the widget, then taken as a
+  pointer), Type2PlayerInput (the keep-facing test as two arms) and
+  CollapseEqualDeltas (no inner counter of its own) match, so the relink
+  is at 1585. RegionFindPath 24 -> 6 bytes (the path copied by index).
+  DamageTrooper logged `UIDN:%x` where the image's string is `uid:%x`;
+  fixed. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

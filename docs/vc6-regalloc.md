@@ -419,6 +419,26 @@ changes nothing or is worse. The first site still keeps its own copy.
   pushed one dword less, which moved every later stack offset and cleanup.
   `AI_ANGLE3` (region.cpp) and `AngleOfDelta3` (air.cpp) pass the third.
 
+- **A source counter that shadows another is a web of its own; VC6's is
+  not.** CollapseEqualDeltas' inner loop was `for (j = i + 1; j < n; j++)
+  { ...; i++; }`, where `j` is always `i + 1`. The image steps a second
+  register beside `i` too, but that one is VC6's induction variable and
+  carries no weight. A source `j` outweighed `n` for `ecx` and pushed `n`
+  into `edi`. Written `while (i + 1 < n)`, with the count re-read into `n`
+  for the outer test (the image loads it into n's own register), it
+  matches (2026-10-11).
+- **A sum stored and then tested again as a sum.** DiedEffectB's wrap is
+  `dir = angle + sector; if (angle + sector < 0) dir += 0x100; else if
+  (dir >= 0x100) dir -= 0x100;`. Testing `dir` lets VC6 use the add's own
+  flags (`jns`) where the image has `cmp` against the zero register. The
+  second written sum also gives `sector` the use that wins it `ebx`.
+  Matches.
+- **An indexed store is formed after the loop guard; a slot pointer before
+  it.** RegionFindPath's path copy as `for (slot = path + depth; walk;
+  ...) *slot-- = ...` computes the `lea` ahead of the walk's null test.
+  The image computes it after the test, which is `for (i = depth; walk;
+  ...) path[i--] = ...` (24 -> 6 bytes).
+
 ## `for (;;)` and `while (1)` are different loops to VC6
 
 The two compile differently (2026-10-10). VC6 rotates `for (;;) { if (c)
