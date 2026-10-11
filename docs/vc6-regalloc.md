@@ -565,7 +565,8 @@ the arms the other way round (shape 110 -> 108).
   with another block that has the same branch target (4 -> 9, and 19 for the
   ALLOF/INORDER step). Extra parentheses, `!(a < b)`, an `int32_t` cast,
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
-  is not the textual one ListMaskAction's arms showed.
+  is not removed by respelling, as UpdateTrooperAction's (above) was by
+  reordering whole statements; ScriptIf's blocks have one statement each.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
