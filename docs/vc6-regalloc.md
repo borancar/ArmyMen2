@@ -654,6 +654,33 @@ the arms the other way round (shape 110 -> 108).
   and army tail is written out in each arm rather than called through one
   inline helper (123 -> 107). Applying the reorder to every other `n0 =
   value; (*at)++;` tail, singly and in every pair, found nothing further.
+- **Re-transcribing a stuck function from its listing, measured
+  (FindPath, ScriptPad, the mask pair, 2026-10-11).** A whole-body rewrite
+  of FindPath in the image's block order scored 110 against the source's
+  50: the gains were in two details and everything structural lost. What
+  paid: PathUnwind indexing `out[i--]` with the depth re-read into an int
+  after `*n` is stored, so VC6 forms the pointer in the loop preheader,
+  after the `end > 0` test, as the image does (50 -> 47); ScriptPad's pad
+  slot taking `(int16_t)g_padCount` rather than the id just stored there,
+  which the image stores from the register (60 -> 53). What lost, each
+  measured alone from the committed source: `nb` used directly instead of
+  re-reading `curTile + g_tileStep8[i]` (+3..+9), node[cur] spelled one way
+  throughout (+1..+9), `while ((uint16_t)from)` (+5), the heuristics as
+  locals (+2), and every form of the budget block. The image's budget
+  block falls into the exhausted-list charge and shares one `return 1`
+  charge with the found arm; every source with the charge written in
+  both `return 1` arms gave VC6 three or four charge copies it did not
+  cross-jump (the copies differ in which register holds `considered`), and
+  every `goto fail` form moved the `return 0` block to the end of the
+  function: at function level VC6 moves a block ending in `ret` that is
+  reached only by jumps to the end (A1/A4 forms, 70), while inside a loop
+  it defers if-bodies ending in a jump to just after the loop, in source
+  order, nested after parent (the budget variants, 99-134). ListMaskAction
+  recomputing the row width from the box inside the row loop as the image
+  does (+12), ObjHitMaskAction without its `ci` index (+8..+22), a helper
+  taking the cell pointer (+22), ScriptPad's trigger loop as `do/while`
+  or `goto` (+35..+47; the arm store sinks), and its string block with an
+  explicit `goto triggers_done` (0) all lose or do nothing.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and

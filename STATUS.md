@@ -177,7 +177,13 @@ main result so far (details in `src/vc6/README.md`):
   ring-marking helper is written, the column and row-end counters as words,
   and the box stores in the image's order (docs/vc6-regalloc.md); SightScan
   25 -> 23 with the rank's sight range re-read at each box edge: about 511
-  on code alone over the 39.
+  on code alone over the 39. HudPostUpdate 8 -> 4 (the idle overlay row
+  re-read), FindPath 50 -> 47 (PathUnwind indexes `out[i--]`, so the
+  pointer forms after the `end` test as the image's does) and ScriptPad
+  60 -> 53 (the pad slot takes g_padCount itself, not the id read back):
+  about 497 on code alone. Re-transcribing FindPath whole from its listing
+  scored worse than the source in every structural form; the measurements
+  are in docs/vc6-regalloc.md.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
