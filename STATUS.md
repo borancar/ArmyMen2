@@ -141,6 +141,12 @@ main result so far (details in `src/vc6/README.md`):
   charge doubled at both uses, as its `lea` has it), ListMaskAction 43 -> 41
   (the row walk has no entry test) and SelectFirePose 22 -> 21 (the bazooka
   kneel arm returns where it sets the pose): about 625 in total over the 41.
+  Then ScriptParseActionRecon 129 -> 84: where the image keeps two copies of
+  an arm's tail and VC6 had merged ours, two statements are swapped in one
+  copy (SETFACING's VARNAME, SETITEMFLAG); TRIGGERDELAY's refvar arm folds
+  its step into its own end-of-script test; and the creates' location and
+  army tail is written out per arm instead of through one inline helper
+  (docs/vc6-regalloc.md). About 580 over the 41.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
