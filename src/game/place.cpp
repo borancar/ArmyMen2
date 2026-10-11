@@ -1004,9 +1004,12 @@ void __cdecl RefundPlacedUnit(AM2_Object *o, int32_t slot, int32_t *points)
 found:
 
         /* Climb to the root of the chain -- see the note above. */
+        /* The image reads the uid twice, for the test and again for the
+         * argument; a volatile read is the only form found that stops VC6
+         * merging the two (perhaps the original field was volatile). */
         while ((uint32_t)o->followers.capacity)
             o = LookupByUID(
-                (uint32_t)o->followers.capacity);
+                *(volatile uint32_t *)&o->followers.capacity);
 
         kind = kUnitType(i)->kind;
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
