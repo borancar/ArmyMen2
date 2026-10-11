@@ -792,6 +792,12 @@ the arms the other way round (shape 110 -> 108).
     (21 -> 29, 26, 32). UpdateTrooperAction's `found = 1` is a register
     in the image's loop and a stack store in ours; the image zeroes its
     try counter in five arms where ours stores a different local.
+    SightScan's image gives ebx to the zero and ebp to the constant 1
+    (so `*outBearing = 0` stores `bl`, and ebp is pushed in the
+    prologue); ours gives ebx to the 1 and ebp to the zero (a byte
+    immediate, and a late `push ebp`). Lightening the 1 -- the turret
+    test as `count >= 2`, first site, second, both -- is 21 -> 27, 23,
+    29; the 1's weight is not what decides it.
   - What remains in those functions is which register a value gets
     (ScriptParseActionRecon's kind-name pushes come from edx, eax and
     ecx in both listings, and VC6 cross-jumps only the common suffix),
