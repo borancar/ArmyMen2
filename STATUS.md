@@ -151,7 +151,12 @@ main result so far (details in `src/vc6/README.md`):
   it. About 560 over the 41. A function that ends in jump tables has those
   tables read as code by the shape count, so a change in its length moves
   the count by a few even where the code itself matches better; score such
-  a change on the code alone (up to the first table).
+  a change on the code alone (up to the first table). Then the
+  MpPanelScreen constructor 19 -> 18 (its army-points loop compares the end
+  address signed, `jl`), RegionFindPath to the image's shape (the next open
+  head read through CUR) and ScrollMapCache 11 -> 10 (BltFast's `This` read
+  from the global), the last two from substituting a copy for its source
+  one use at a time: 40 off in shape, 554 on code alone.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
