@@ -1845,12 +1845,12 @@ void __cdecl ViewUpdate(void)
     if (obj) {
         const AM2_Object *o = (const AM2_Object *)obj;
 
-        /* Both copies are a word at a time, as the image makes them. */
+        /* Both copies are a word at a time, as the image makes them, and
+         * the eye takes each word from the register it was loaded into
+         * rather than reading the target back. */
         if (g_viewSnap) {
-            g_viewTarget.x = (&o->pos)->x;
-            g_viewTarget.y = (&o->pos)->y;
-            tx = g_viewTarget.x;
-            vpt.y = g_viewTarget.y;
+            g_viewTarget.x = tx = (&o->pos)->x;
+            g_viewTarget.y = vpt.y = (&o->pos)->y;
             g_viewSnap = 0;
             goto clamp_eye;
         }
