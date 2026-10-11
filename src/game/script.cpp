@@ -1723,8 +1723,24 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED
             && ((int32_t)(uintptr_t)ctx->tokens[*at].value) == AM2_TOK_REFVAR) {
             STEP();
-            VARNAME("Line [%4d]:  expected variable name but variable %s not "
-                    "declared\n")
+            /* VARNAME written out with the step folded into its own test:
+             * the image keeps this arm's end-of-script message inline and
+             * jumps back to TRIGGER's uid call, where VARNAME's separate
+             * increment let VC6 share the message and copy the call. */
+            {
+                int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
+                if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {
+                    am2_log("Line [%4d]:  expected variable name but variable %s not "
+                            "declared\n", ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value);
+                    return 0;
+                }
+                act->xvar = v;
+            }
+            if (++(*at) >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
+            goto trigger_uid;
         } else if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
             TYPEERR(AM2_TOKEN_INTEGER)
         else {
