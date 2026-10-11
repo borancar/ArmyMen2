@@ -2407,17 +2407,12 @@ void __cdecl DrawEffectLayer(void)
              * sum is formed in a temporary (`shr edx, 4; lea eax, [edx+1]`)
              * and the local lives in memory, where a single expression
              * clamped afterwards keeps it in a register through the two lock
-             * loops. The stamp is read into a local so the array is
-             * referenced once: a second reference moves the base register
-             * every aim array shares from the A point to the B point. */
-            {
-                int32_t stamp = g_aimStampA[army];
-
-                frame = (uint32_t)(g_gameClockMs - stamp) / AM2_AIM_STEP_MS + 1
-                        < AM2_AIM_FRAMES_A
-                        ? (int32_t)((uint32_t)(g_gameClockMs - stamp) / AM2_AIM_STEP_MS + 1)
-                        : AM2_AIM_FRAMES_A;
-            }
+             * loops and reloads it three times. */
+            frame = (uint32_t)(g_gameClockMs - g_aimStampA[army]) / AM2_AIM_STEP_MS + 1
+                    < AM2_AIM_FRAMES_A
+                    ? (int32_t)((uint32_t)(g_gameClockMs - g_aimStampA[army])
+                                / AM2_AIM_STEP_MS + 1)
+                    : AM2_AIM_FRAMES_A;
 
             box.left   = g_aimPointA[army].x + AM2_AIM_BOX_LEFT;
             box.right  = g_aimPointA[army].x + AM2_AIM_BOX_RIGHT;
@@ -2488,7 +2483,6 @@ void __cdecl DrawEffectLayer(void)
         }
 
         if (g_aimLiveB[army]) {
-            const int16_t *ptB = (const int16_t *)&g_aimPointB[army];
             int32_t *held = &g_aimFrameB[army];
             int32_t  frameB;
 
@@ -2514,10 +2508,15 @@ void __cdecl DrawEffectLayer(void)
             if (!LockSurface(target))
                 return;
 
+            /* The point read from the array at each use, as the A arm does:
+             * through a pointer local, VC6 puts the base register every aim
+             * array shares on THIS point rather than the A arm's. */
             DrawSprite(g_aimSpritesB[0],
-                       ptB[0] + AM2_AIM_B_OFF_X, ptB[1] + AM2_AIM_B_OFF_Y, 0);
+                       g_aimPointB[army].x + AM2_AIM_B_OFF_X,
+                       g_aimPointB[army].y + AM2_AIM_B_OFF_Y, 0);
             DrawSprite(g_aimSpritesB[frameB],
-                       ptB[0] + AM2_AIM_B_OFF_X2, ptB[1] + AM2_AIM_B_OFF_Y2, 0);
+                       g_aimPointB[army].x + AM2_AIM_B_OFF_X2,
+                       g_aimPointB[army].y + AM2_AIM_B_OFF_Y2, 0);
 
             UnlockSurface();
         }
