@@ -1126,6 +1126,36 @@ on: the image forms both addresses first (`lea eax, [ebx+12h]; lea ecx,
   reload. The committed form keeps the else arm and the tail right and
   leaves the one arm a step out; it stays.
 
+## Three more register-only functions in the lab, nothing landed (2026-10-11)
+
+- **ParseScenarios** (15 bytes) holds `remaining` in ebp and `table` in
+  ebx; ours the reverse, and the image loads the parameter as a web
+  (`mov ebp, [esp+28h]` ahead of `push edi`, then `sub ebp, 4`) where
+  ours copies it into a local first (`lea ebx, [eax-4]`). Using the
+  parameter in place gives the image's web structure, but ebx/ebp stay
+  swapped and the `count << 6` temporary then reuses eax straight after
+  the `xor eax, eax` (the image rotates to ecx), 15 -> 37. In a clone
+  (4 artifact lines), no spelling moved either register: `rec` removed,
+  `took` folded, the two globals chained or reordered, the count read at
+  its declaration, the loop as `while` or counted down, a byte table
+  pointer, `uint32_t remaining`, the parts walked by pointer, extra
+  stores of `table`, and even dropping `remaining`'s inner decrement
+  (which should hand ebx to `table` by count, and does not). The local
+  copy stays.
+- **RegionFindPath** (one `je`): the loop's `if (!head) return 0;` is
+  cross-jumped into the first `return 0` in the image and the last in
+  ours. A label on the first copy (inside its `if` block) with a `goto`
+  from the loop makes VC6 move that block to the end for both; `for
+  (;;)`, `do/while`, a label on the second copy and `while (head)` with
+  the test after the loop are all worse. It stays at one byte.
+- **OptionsDefaults** (15 bytes): `mask = r->which ? flags : other` is
+  a web in the image (eax, loaded after the `test` that frees it) and a
+  rotation temporary in ours (edx, hoisted above the test), and every
+  temporary after it is one register out. An if/else for the select, a
+  function-scope `mask`, the test operands swapped, `(mask & bit) ? 1 :
+  0`, and the checked store as an if/else all keep it a temporary; the
+  if/else stores change the shape.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
