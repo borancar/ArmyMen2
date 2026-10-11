@@ -1844,7 +1844,7 @@ void __cdecl PausedFrameStep(void)
         int32_t  team;
         int32_t  mates;
         int32_t  variant;
-        int32_t  badge;
+        int16_t  badge;
         char     scoreText[20];
         char     teamText[20];
         int32_t  width;
