@@ -723,7 +723,12 @@ the arms the other way round (shape 110 -> 108).
   DamageTrooper's armour arm as a goto or hoisted after the loop (4,
   4 -> 6), CommSend's two error logs swapped or as an if/else chain
   (4, 4 -> 8). VC6 places those blocks from the CFG, not from the
-  source order.
+  source order. MoviesScreen's four button blocks read `sprites[idx][0]`
+  twice through a `lea`'d pointer in the image; a pointer local to the
+  element or to the pair gives the same code as the indexed reads (12),
+  a chained assignment 20, the page index written inline 37.
+  ScrollMapCache blitting through its `cache` local rather than the
+  global (the image reloads the spilled local) is 10 -> 11.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
