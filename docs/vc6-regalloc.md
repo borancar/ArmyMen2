@@ -1241,6 +1241,39 @@ and probed until the spellings ran out; none moved. What each one IS:
   register. `stop` stored from the field, the global read back from
   `stop`, a chained assignment, and two locals all CSE back to one.
 
+## The two largest, by the lab and the per-TU runner (2026-10-12)
+
+- **ScriptParseActionRecon** (2,336 bytes): four of its hunks are one
+  thing. The image's type-error block for the INTEGER/STRING arms that
+  push the kind name from edx (six arms) is shared from the kind-name
+  load on: each arm does `mov edx, [name]; jmp` and the block pushes
+  edx, the word buffer and the token's address from eax. Ours shares it
+  only from the call, each arm pushing for itself, because the arm that
+  owns the block (ADDEXP's `int_tail`) holds the token's address in ecx
+  -- its tail is written with the step before the store (`n = value;
+  (*at)++; act->n0 = n;`), which keeps `*at` in eax across the test, and
+  that spelling is there because the plain tail (`act->n0 = value;
+  (*at)++;`) makes SETITEMFLAG's tail identical and VC6 merges it away
+  (v3 70 -> 113). In the image the two tails differ: ADDEXP tests the
+  kind from memory (`cmp [eax], 3`) and SETITEMFLAG through a register
+  (`mov ecx, [edx+ecx*4]; cmp ecx, 3`), so they never merge. A mini-lab
+  (five variants of a two-arm switch) shows VC6 picks the register form
+  for the arm whose error path is cross-jumped from the kind-name load
+  into another arm's, and the memory form for the arm that owns the
+  block or merges only from the pushes; which arm owns it is layout
+  order. No spelling tried gives ADDEXP the memory form, eax and the
+  plain tail together: `*at += 1`, `++(*at)`, the test reversed, a
+  block-local for the value with the store first, the index in a local,
+  and SETITEMFLAG's kind read into a local all leave it (113, or 118
+  with the index local). The step-before-store trade stays.
+- **Step3Drive** (974 bytes): the speed clamps written as the min/max
+  macros expand to (ternaries, with and without the clamp value inlined
+  twice, for the two acceleration arms and the two stuck-count arms)
+  compile to the same bytes as the `if`s; the turn stamp stored through
+  `gun` instead of the re-read row is worse (v3 24 -> 30), and the stamp
+  read into a local changes nothing. Its big remainder is still `r` in
+  ebp where the image reloads the parameter from its slot.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
