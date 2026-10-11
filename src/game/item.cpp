@@ -11069,7 +11069,8 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
  * CLAUDE.md records a defect from calling it with pointers instead. */
 void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
 {
-    int32_t        x, y, left, top;
+    int32_t        x, left, top;
+    int16_t        y;              /* the position's own width */
     int32_t        cl, ct, cr, cb, col, idx;
     int32_t        cols, cell, stride;
 
