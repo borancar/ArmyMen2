@@ -135,7 +135,13 @@ main result so far (details in `src/vc6/README.md`):
   constructor (`%i`, as the image's literal) and UpdateTrooperAction
   28 -> 10 (BlockWeightRoute takes the fifth argument every caller pushes,
   the stop arms written in different orders so VC6 keeps them apart,
-  `klass` an int32): 41 off in shape. PlacementAllowed
+  `klass` an int32): 41 off in shape. Then ScriptPad 87 -> 60 (the
+  delay's second integer check written out, so VC6 does not merge it with
+  the first; 726 -> 648 bytes), FindPath 51 -> 50 (the budget test's frame
+  charge doubled at both uses, as its `lea` has it), ListMaskAction 43 -> 41
+  (the row walk has no entry test) and SelectFirePose 22 -> 21 (the bazooka
+  kneel arm returns where it sets the pose): about 625 in total over the 41.
+  PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and

@@ -369,7 +369,11 @@ Partly solved in the real function (2026-10-10): writing `return 0` at the
 LAST site only (the NACK arm's `!me` test), with the other three left as
 `break`, makes that log the copy the second and third jump into, and the
 shape goes 25 -> 19. `return 0` at all four, or at any other single site,
-changes nothing or is worse. The first site still keeps its own copy.
+changes nothing or is worse. The first site still keeps its own copy. A
+clone with all four callee-saved registers live (a triple loop in one arm)
+and two more one-call `break` arms still gives each inline arm its own
+epilogue copy (2026-10-11), so register pressure alone is not what the
+original had.
 
 ## Loop and temporary shapes that show in the image
 
