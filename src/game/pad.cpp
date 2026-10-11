@@ -350,9 +350,15 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
             AM2_PadNumber *num = g_padNumbers;
 
             for (i = 0; i < AM2_PAD_BITS; i++, num++) {
-                if (mask[i] & entered)
+                /* The entry read once for both tests: as a local it is the
+                 * first operand of the image's `test eax, ebx`; indexed in
+                 * each test VC6 writes the operands the other way round (the
+                 * last byte of this function, found in the lab). */
+                int32_t m = mask[i];
+
+                if (m & entered)
                     PadNumberEnter(o, num);
-                else if (mask[i] & left)
+                else if (m & left)
                     PadNumberLeave(o, num);
             }
             changed = 1;
