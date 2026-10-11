@@ -2328,10 +2328,7 @@ eos:
     case AM2_TOK_SETUILOCK:
         STEP();
         act->code = 0x39;
-        WANT(AM2_TOKEN_INTEGER)
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
-        return 1;
+        goto int_tail;          /* the image jumps into ADDEXP's copy */
 
     case AM2_TOK_SETDAMAGEPAD:
         STEP();
@@ -2453,6 +2450,7 @@ eos:
     name_then_int:
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
+    int_tail:
         WANT(AM2_TOKEN_INTEGER)
         /* The step before the store. SETITEMFLAG and SETUILOCK end in the
          * same words; written alike in all three, VC6 merged SETITEMFLAG's
