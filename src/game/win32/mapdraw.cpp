@@ -805,7 +805,9 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         if (!g_depthCursor->next) {
             at = g_depthCursor;
         append:
-            APPEND(at);
+            /* The cursor, which is `at` on both ways in: the flag walk
+             * stores it before its `goto`. */
+            APPEND(g_depthCursor);
             goto done;
         }
         g_depthCursor = g_depthCursor->next;
