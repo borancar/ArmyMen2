@@ -191,8 +191,8 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 13,668 of edit
-  distance over the 61 functions that are not byte-identical (153,866
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 13,580 of edit
+  distance over the 58 functions that are not byte-identical (149,696
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
@@ -201,8 +201,12 @@ main result so far (details in `src/vc6/README.md`):
   into a local for both tests puts it first in the `test`; found in the
   lab, docs/vc6-regalloc.md), and RefundPlacedUnit byte-identical (the
   pillbox weapon's uid passed straight to LookupByUID: a local for it was
-  a web in eax where the image's rotation temporary is ecx): relink 1587
-  of 1646, 59 differ. Re-transcribing FindPath whole from its listing scored worse than
+  a web in eax where the image's rotation temporary is ecx), and
+  VehicleBlockWeight byte-identical (one weight returned explicitly from
+  the TANK and JEEP sound arms too, so the tail's four reads earn it the
+  register copy the image reloads after the clamp; `i` zeroed with the
+  declarations; the final sample in the loop's `pt`): relink 1588
+  of 1646, 58 differ. Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in

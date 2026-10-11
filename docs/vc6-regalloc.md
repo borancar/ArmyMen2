@@ -1024,6 +1024,47 @@ worse everywhere, 42 -> 150 here, so the file was not built that way.)
 BlockWeightRoute's `abs(a - b)` with the operands swapped and its two
 distances compared the other way round change nothing (36).
 
+## VehicleBlockWeight in the lab: a register web is earned by reads (2026-10-11)
+
+Thirty-two bytes, all in the prologue's two zeros and the clamp. The
+image zeroes ebp, stores it to `sound`'s slot and tests both mask counts
+against it, zeroes edi separately for `weight`'s slot, and after the loop
+reloads `weight` into edi -- once at the loop's exit (the empty-mask edge
+jumps past that load, edi still holding the prologue's zero) and again
+after the clamp's `mov [esp+10h], 40h`. Ours materialised one zero for
+both slots and the clamp wrote `mov edi, 40h`.
+
+A full clone of the function in the lab (extern symbols for the globals;
+it reproduced our build to the instruction) settled it in four steps:
+
+- **`i = 0` with the declarations.** The first zero is the non-boat
+  loop's index, which the image's second loop starts from without an
+  `xor` of its own; `sound`'s store and both `count > 0` tests reuse it.
+  Ours zeroed `i` inside each `if`; 32 -> 14 on its own. The boat loop
+  counts on a second variable, zeroed just before its own count test.
+- **One `weight`, no `answer`.** Two variables with `answer = weight`
+  after the loop and `answer = weight = 40h` in the clamp give the
+  loop-exit load but fold the clamp to `mov edi, 40h` (the store to
+  `weight` is dead); written as two statements VC6 sinks the copy to
+  the join (it knows `answer == weight` on every path, the empty one
+  through the two zeros) and the loop-exit load disappears. An
+  uninitialised `answer` changes the frame.
+- **With one `weight` and one `return`, it stays in memory** (the three
+  epilogues each read the slot). The image's edi is `weight`'s register
+  copy in the tail, which VC6 grants when the tail reads it enough:
+  **`return weight;` written in the TANK and JEEP arms as well** makes
+  four reads, and with them the prologue's separate `xor edi, edi`, the
+  reload at the loop's exit, and the store-then-reload clamp all appear.
+- **The final sample's point is the loop's `pt`.** A fresh block-scope
+  point takes `apply`'s dead argument slot (0x28) where the image's is in
+  `facing`'s (0x20), the slot the loop's `pt` already has.
+
+Byte-identical, relink 1587 -> 1588. The rule to carry: **a local that
+lives in memory across a loop gets a register copy for the tail only
+when the tail's reads pay for it, and explicit returns are reads.** Where
+the image reloads a variable right after storing a constant to its slot,
+that is the copy being re-synced, not a second variable.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
