@@ -2184,7 +2184,11 @@ void __cdecl AirFrameDraw(void)
                     > AM2_AIR_CYCLE_STEP_MS) {
                 int32_t f = obj->formationSlot + 1;
 
-                if (f == 1)
+                /* Tested as the sum rather than through `f`: VC6 then does
+                 * not know f is 1 in the arm and keeps the image's `inc`
+                 * instead of folding it to a constant and jumping past the
+                 * next test. */
+                if (obj->formationSlot + 1 == 1)
                     f++;
                 if (f > AM2_AIR_CYCLE_FRAMES)
                     f = 0;
