@@ -695,7 +695,16 @@ the arms the other way round (shape 110 -> 108).
   UpdateTrooperAction's `pos` assigned before the classify call,
   non-const, or with the step point read from the object (10, all
   identical code: the image hoists `lea edi, [esi+0x12]` because its
-  zero register is ebx where ours is edi).
+  zero register is ebx where ours is edi). SightScan's score block:
+  the kind-7 arm's `goto score`, the arm falling through to `score:`
+  after an if/else chain, and the label inside the arm with the end
+  copy removed give identical code (23) or worse (38); VC6 pulls the
+  labelled block up to the aiMode arm's unconditional `goto` and
+  duplicates it for the kind-7 fall-through whatever the source order.
+  Three of the remaining counts are listing artifacts, not shape: a
+  `push` of a function or string address that the per-TU relink
+  listing leaves as `push 0` (SightScan's two sight callbacks,
+  MpPanelScreen's one string; WndProc's is the known relocation).
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
