@@ -1318,19 +1318,68 @@ load into another arm's block, and from memory when the arm owns the
 block or shares it only from the pushes; which arm owns it is layout
 order.
 
-Still open there, each tried in the clone: the shared end-of-script
-block sits in MOVEITEM in the image and in ours is merged into
-TRIGGERDELAY's inline copy (a message local, `ActStep`, the test
-inverted, DROPITEM given its own copy, the block reordered: none keep
-them apart); SETFACING's `xvar` store before the step, which the image
-has, merges its VARNAME block into SETGUNFACING's identical one (the
-image keeps both; a positive test, a message local, a function-scope
-or `long` variable all still merge); SETITEMOWNER's `if (n0 < 0)
-return 0; return 1;` is a `setge` in ours and a branch to the shared
-return in the image (a local, a ternary, the test reversed, `break` to
-a return after the switch: all `setge`); SETITEMFLAG's INTEGER test is
-index-first in ours and base-first in the image (positive, kind-name
-local and `ActStep` forms are worse).
+Two more landed the next day (1,862 -> 1,834 bytes; lab hunks
+21 -> 12), both the natural spelling:
+
+- **MAKESMOKE and MAKEFLAME**: `if (kind != INTEGER) return 1; n0 =
+  value; (*at)++; return 1;` gives the early return an inline
+  epilogue of its own before the store. `if (kind == INTEGER) { n0 =
+  value; (*at)++; } return 1;` makes the test a forward jump to the
+  arm's final return 1, which is the block SETM80 and SETDAMAGEPAD
+  share -- the image's `jne 0x442af4`.
+- **SETITEMOWNER**: `if (n0 < 0) return 0; return 1;` is a `setge`
+  (and so are a local, a ternary and the reversed test). With the
+  INTEGER path and the colour path as one if/else joined on a single
+  `return 1`, the join is duplicated into both and the sign test stays
+  a branch to the shared return 0, as the image has it.
+
+**The end-of-script block's owner** (the one hunk that moves the whole
+function's addresses): the image has the shared block at MOVEITEM's
+`eos:` label, falling into `default: return 0`, with TRIGGERDELAY's
+refvar path and FIREWEAPON each holding a PRIVATE copy; ours puts the
+shared block at TRIGGERDELAY's copy. Mini-labs of a switch with the
+same shape pinned the mechanism:
+
+- A labelled block with many jumps to it merges into the FIRST
+  identical block in layout order, whatever that block's origin -- an
+  explicit inline copy, `ActStep`'s inline expansion, or a copy VC6 made
+  itself -- once the label block's own fall-through predecessor has
+  been redirected (MOVEITEM's `return ScriptLocation()` goes to the
+  shared call at the function's end, so MOVEITEM becomes `jge eos; jmp
+  place` and the eos block is free to move). A fall-through-only copy
+  later in layout is never merged (FIREWEAPON's and CREATETROOPER's
+  `ActStep` copies stay private in ours as in the image).
+- The image's private copies are therefore made AFTER that merge. VC6
+  does make such a copy for `STEP(); L:` when the labelled block `L`
+  is moved away: in the lab, UNITFIRE's `place:` moved to the function
+  end gives UNITFIRE `jl place` and a private eos copy, while
+  FIREWEAPON's `STEP(); return ScriptLocation()` (redirected to the
+  same block) is left as `jge eos; jmp place`. Which arm the copy lands
+  in does not follow the label's position: with `place:` in either arm
+  the copy is UNITFIRE's, where the image has it in FIREWEAPON with
+  UNITFIRE's step cross-jumped into FIREWEAPON's.
+- What was tried against this and failed: TRIGGERDELAY's refvar as
+  `STEP(); goto trigger_uid` (cross-jumps into TRIGGER's identical
+  step), as `ActStep`, as the positive test with the log inline, with
+  `trigger_uid:` in TRIGGER's arm or after the refvar's step; the
+  integer path's check as `goto eos`; MOVEITEM without the `located:`
+  label and DROPITEM with its own test in four spellings; FIREWEAPON
+  as `STEP()` with `place:` in either arm. Every all-`goto` spelling
+  hands the label block to the first `jcc eos; jmp X` claimant in
+  layout (CREATETROOPER's `ActStep` when TRIGGERDELAY's step has been
+  cross-jumped away). The remaining unknown is what kept MOVEITEM's
+  block as `jl place; [eos]` in the original -- i.e. what stopped
+  TRIGGERDELAY's copy from existing at merge time.
+
+Still open: SETFACING's `xvar` store before the step merges its
+VARNAME block into SETGUNFACING's identical one (the image keeps both;
+a positive test, a message local, two separate ifs, `*at += 1`, the
+store through `act->xvar` directly, a function-scope or `long`
+variable all still merge); SETUILOCK's copy owns the shared type-error
+block where the image has ADDEXP owning it and SETUILOCK jumping in (a
+positive test in SETUILOCK, identical to ADDEXP's, merges the wrong
+way: 26 hunks); FIREWEAPON's kind test is register-form and
+UNITFIRE's memory-form, the image the other way round.
 
 ## Running decomp-permuter against VC6
 
