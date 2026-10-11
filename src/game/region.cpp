@@ -6116,7 +6116,9 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
             return 0;
 
         g_regionCurrent  = g_regionOpenHead;
-        g_regionOpenHead = g_regionOpenHead->next;
+        /* Through CUR, just loaded from the head: the same node, and the
+         * read the image makes. */
+        g_regionOpenHead = g_regionCurrent->next;
         if (g_regionOpenHead)
             g_regionOpenHead->prev = (AM2_Region *)0;
 
