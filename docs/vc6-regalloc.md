@@ -1367,9 +1367,23 @@ same shape pinned the mechanism:
   as `STEP()` with `place:` in either arm. Every all-`goto` spelling
   hands the label block to the first `jcc eos; jmp X` claimant in
   layout (CREATETROOPER's `ActStep` when TRIGGERDELAY's step has been
-  cross-jumped away). The remaining unknown is what kept MOVEITEM's
-  block as `jl place; [eos]` in the original -- i.e. what stopped
-  TRIGGERDELAY's copy from existing at merge time.
+  cross-jumped away). The label's own source position is irrelevant:
+  `eos:` and `default:` moved to the end of the switch, with MOVEITEM
+  as `if (*at >= count) goto eos; return ScriptLocation()`, compiles to
+  the identical function. An explicit `return 0` on the label instead
+  of the fall into `default:` makes VC6 merge about eighty
+  instructions' worth of return-0 epilogues into it (2,997 instructions
+  against the image's 3,087). STEP as an inline function at every site
+  (`if (!ActStep(ctx, at)) return 0;`) merges every copy into the
+  first one in layout, TRIGGER's. The remaining unknown is what kept
+  MOVEITEM's block as `jl place; [eos]` in the original -- i.e. what
+  stopped TRIGGERDELAY's copy from existing at merge time.
+
+The other four helpers -- WANT, TYPEERR, VARNAME and VARNAME_EQ -- are
+inline functions now (`ActWant`, `ActTypeErr`, `ActVarName`,
+`ActVarNameEq`): VC6 expands them to the same code as the macros, to the
+instruction, in the lab and in the real build. Only STEP has to stay a
+macro, for the `goto eos` above.
 
 **ADDEXP and SETUILOCK, both as the plain WANT and stores** (1,834 ->
 1,498 bytes; lab hunks 12 -> 5, v3 62 -> 14). The first clone session
