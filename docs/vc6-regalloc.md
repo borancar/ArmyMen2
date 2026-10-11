@@ -780,7 +780,11 @@ the arms the other way round (shape 110 -> 108).
     parse (8 -> 18), ScriptPad's pad count incremented last (53 -> 69),
     FindPath's `g` as a sum or a shift (47, same code), SelectFirePose's
     grenade arm returning in place (20, same code), PointActionC through
-    a sprite-slot pointer (3, same code), ObjRemap's `y` as an int (8).
+    a sprite-slot pointer (3, same code), ObjRemap's `y` as an int (8),
+    MissionEnded's attempt count stored after the close (2 -> 4),
+    DepthInsert's link-after arm written out with the new node formed
+    first, in three orders (2 -> 10..17; its 460 bytes are one register
+    swap across the whole function behind a two-line shape difference).
   - What remains in those functions is which register a value gets
     (ScriptParseActionRecon's kind-name pushes come from edx, eax and
     ecx in both listings, and VC6 cross-jumps only the common suffix),
