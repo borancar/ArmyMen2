@@ -191,10 +191,10 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 12,522 of edit
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 12,384 of edit
   distance over the 57 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
-  ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
+  ScriptParseActionRecon 2,336, Step3Drive 974 -> 836 (the turret aim held in a local keeps `speed` in ebp; its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
   SightScan 910, FindPath 834; MissionEnded's attempt-count store after
   the close is 2 -> 4. ObjTileHook byte-identical (the mask entry read
