@@ -567,12 +567,12 @@ the arms the other way round (shape 110 -> 108).
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
   is not removed by respelling, as UpdateTrooperAction's (above) was by
   reordering whole statements; ScriptIf's blocks have one statement each.
-- **ScriptParseActionRecon, 129 -> 84 by the same reordering**
+- **ScriptParseActionRecon, 129 -> 77 by the same reordering**
   (2026-10-11). Its arms end in a handful of identical tails, and wherever
   the image keeps two copies VC6 had merged ours into one. Swapping two
   independent statements in ONE of the copies keeps them apart:
   SETFACING's VARNAME stores `xvar` after the step rather than before
-  (107 -> 94), SETITEMFLAG steps before storing `n0` (94 -> 84). The
+  (107 -> 94), ADDEXP steps before storing `n0`, which leaves SETITEMFLAG its own tail (94 -> 77). The
   generated code differs only in that order. Two more pieces were about
   which copy survives: TRIGGERDELAY's refvar arm folds VARNAME's increment
   into its own end-of-script test (129 -> 123), and the creates' location
