@@ -2664,7 +2664,11 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     g_pads[g_padCount].compared = 0;
     g_pads[g_padCount].number = number;
 
-    g_padNumbers[number].pads[g_padNumbers[number].count] = (int16_t)g_pads[g_padCount].id;
+    /* The slot takes the count itself, which is the id just stored: the
+     * image stores the register holding g_padCount (`mov word ptr [...], bp`)
+     * rather than re-reading the id; reading the id back costs the shape
+     * seven. */
+    g_padNumbers[number].pads[g_padNumbers[number].count] = (int16_t)g_padCount;
     g_padNumbers[number].count++;
 
     if (++(*at) >= ctx->count) {
