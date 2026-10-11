@@ -327,7 +327,7 @@ int32_t __cdecl BlockWeightAt(struct AM2_Object *from, AM2_Point at, AM2_Point r
  * saying whether the object's current route leg falls inside anything. On
  * saturation it advances the route or drops it. */
 int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at, AM2_Object *chain,
-                                 int32_t *inside);
+                                 int32_t *inside, AM2_Point atAgain);
 
 /* 0x0045B690. The same total for a chain the caller has already collected,
  * with the tile term on AM2_TILE_OPEN and no height step. */

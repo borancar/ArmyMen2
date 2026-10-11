@@ -7669,7 +7669,7 @@ have_facing:
     /* Walkable: take this heading and step, with no sweep at all -- the
      * `i == 0` arm of the dispatch below (0x0044B14B jumps straight to it),
      * so none of the stop arms runs on a clear step. */
-    if (BlockWeightRoute(o, stepPoint, at, &inside) < AM2_STEP_ROUTE_OK)
+    if (BlockWeightRoute(o, stepPoint, at, &inside, stepPoint) < AM2_STEP_ROUTE_OK)
         goto swept;
 
     /* Blocked. A claimed vehicle standing in the way is boarded rather than
@@ -7720,7 +7720,7 @@ sweep:
             while (facing = (uint8_t)(facing + (uint8_t)g_stepFacingSweep[i - 1]),
                    AnimStepPoint(o, facing, pose, &stepPoint, 0),
                    (at = ObjectsAtPoint(&stepPoint, g_objMapDesc)),
-                   BlockWeightRoute(o, stepPoint, at, &inside)
+                   BlockWeightRoute(o, stepPoint, at, &inside, stepPoint)
                        >= AM2_STEP_ROUTE_OK) {
                 {
                     uint32_t claimed = o->uid56C;

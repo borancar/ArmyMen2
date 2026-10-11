@@ -2963,8 +2963,12 @@ int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *
  * taken, which is what puts one copy in the dead `chain` slot; the weight
  * lives in two variables because the three zero exits skip the copy. */
 int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
-                                 AM2_Object *chain, int32_t *inside)
+                                 AM2_Object *chain, int32_t *inside,
+                                 AM2_Point atAgain)
 {
+    /* Every caller pushes `at` a second time, after `inside`; the body
+     * never reads it (UpdateTrooperAction's three calls, `add esp, 0x14`). */
+    (void)atAgain;
     AM2_Object *o;
     int32_t     total = 0;
     AM2_Point   leg;
