@@ -2009,12 +2009,16 @@ int32_t __cdecl ObjBoxAction(AM2_Object *obj, AM2_TileMask *out)
  * the rest of the ring block, in both callers. */
 static inline void MarkTileRingIdx(AM2_TileMask *m, const int32_t *ring, int32_t idx)
 {
-    const int32_t *p;
+    int32_t i;
 
-    for (p = ring; p < ring + AM2_TILEMASK_RING; p++) {
-        if (*p + idx < 0)
+    /* An index, not a walking pointer: VC6 strength-reduces it to the
+     * pointer walk either way, but keeps the index's SIGNED end test (`jl`
+     * against the table's end) where a pointer compare is unsigned (`jb`).
+     * Three sites in each mask function. */
+    for (i = 0; i < AM2_TILEMASK_RING; i++) {
+        if (ring[i] + idx < 0)
             return;
-        m->cells[*p + idx] |= AM2_TILEMASK_PAD_CELL;
+        m->cells[ring[i] + idx] |= AM2_TILEMASK_PAD_CELL;
     }
 }
 
