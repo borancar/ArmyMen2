@@ -1371,15 +1371,27 @@ same shape pinned the mechanism:
   block as `jl place; [eos]` in the original -- i.e. what stopped
   TRIGGERDELAY's copy from existing at merge time.
 
+**ADDEXP and SETUILOCK, both as the plain WANT and stores** (1,834 ->
+1,498 bytes; lab hunks 12 -> 5, v3 62 -> 14). The first clone session
+gave ADDEXP a positive test because ADDEXP-as-WANT merged SETITEMFLAG's
+identical tail into it; with MAKESMOKE/MAKEFLAME and SETITEMOWNER in
+their final forms that merge no longer happens, and it was the positive
+test that kept SETUILOCK's copy as the block's owner (SETUILOCK's
+positive form alone: 25 hunks; SETITEMFLAG positive as well: 20). With
+the two tails written alike VC6 keeps the LATER copy, ADDEXP's -- its
+error block is the one the six other arms jump into -- and SETUILOCK's
+whole tail becomes `jmp` into it from the token load on, as the image
+has it. FIREWEAPON's and UNITFIRE's kind tests, register-form and
+memory-form the wrong way round before, take the image's forms as a
+consequence, which says those forms follow the function's overall
+allocation and are not a property of the arm.
+
 Still open: SETFACING's `xvar` store before the step merges its
 VARNAME block into SETGUNFACING's identical one (the image keeps both;
 a positive test, a message local, two separate ifs, `*at += 1`, the
 store through `act->xvar` directly, a function-scope or `long`
-variable all still merge); SETUILOCK's copy owns the shared type-error
-block where the image has ADDEXP owning it and SETUILOCK jumping in (a
-positive test in SETUILOCK, identical to ADDEXP's, merges the wrong
-way: 26 hunks); FIREWEAPON's kind test is register-form and
-UNITFIRE's memory-form, the image the other way round.
+variable all still merge), and the end-of-script block above. Those
+two are the whole remaining shape difference of the function.
 
 ## Running decomp-permuter against VC6
 

@@ -191,7 +191,7 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 12,858 of edit
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 12,522 of edit
   distance over the 57 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
@@ -218,11 +218,17 @@ main result so far (details in `src/vc6/README.md`):
   value read before the zero store), then 1,862 -> 1,834 (MAKESMOKE
   and MAKEFLAME storing inside a positive INTEGER test so the early
   return is the shared return-1 block; SETITEMOWNER's two paths joined
-  on one `return 1`, which keeps the sign test a branch). The
-  end-of-script block's owner is now understood (the label block merges
-  into the first identical block in layout once its own fall-through
-  is redirected, and the image's private copies are later duplicates)
-  but no spelling reproduces the image's placement yet
+  on one `return 1`, which keeps the sign test a branch), then
+  1,834 -> 1,498 (ADDEXP and SETUILOCK both as the plain WANT and
+  stores: VC6 then keeps ADDEXP's copy as the owner of the shared
+  type-error block and makes SETUILOCK's tail one jump into it, and
+  FIREWEAPON's and UNITFIRE's kind tests fall into the image's forms
+  with it). What is left in the lab is two placements: the end-of-script
+  block, whose owner is now understood (the label block merges into the
+  first identical block in layout once its own fall-through is
+  redirected, and the image's private copies are later duplicates) but
+  not yet reproduced, and SETFACING's VARNAME block, which merges into
+  SETGUNFACING's identical one in every spelling tried
   (docs/vc6-regalloc.md). Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
