@@ -1033,11 +1033,10 @@ found:
                 }
             }
 
-            {
-                uint32_t wuid = inside->inventory[0];
-
-                w = LookupByUID(wuid);
-            }
+            /* The uid straight into the call: as a local it was a web and
+             * took eax, where the image's rotation temporary is ecx, and
+             * every register after it was one off (found in the lab). */
+            w = LookupByUID(inside->inventory[0]);
             if (!w)
                 return;
             if (!ObjIsType4(w))
