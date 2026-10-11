@@ -2211,8 +2211,14 @@ eos:
         act->code = 0x26;
         WANT(AM2_TOKEN_INTEGER)
         act->n0 = 0;
-        act->subject = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
+        /* The step before the store: the same reordering as ADDEXP's, which
+         * changes which of the identical integer tails VC6 shares, towards
+         * the image's arrangement. */
+        {
+            int32_t n = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+            act->subject = n;
+        }
         return 1;
 
     case AM2_TOK_SETBRIEFING:
