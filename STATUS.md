@@ -146,7 +146,12 @@ main result so far (details in `src/vc6/README.md`):
   copy (SETFACING's VARNAME, ADDEXP, INACTIVATEREGION); TRIGGERDELAY's refvar arm folds
   its step into its own end-of-script test; and the creates' location and
   army tail is written out per arm instead of through one inline helper
-  (docs/vc6-regalloc.md). About 570 over the 41.
+  (docs/vc6-regalloc.md). Then HudSquadUpdate 16 -> 7 and SelectFirePose
+  21 -> 20, each by an if/else where ours stored a default and overwrote
+  it. About 560 over the 41. A function that ends in jump tables has those
+  tables read as code by the shape count, so a change in its length moves
+  the count by a few even where the code itself matches better; score such
+  a change on the code alone (up to the first table).
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
