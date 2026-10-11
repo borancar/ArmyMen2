@@ -551,6 +551,13 @@ the arms the other way round (shape 110 -> 108).
   keeps it in ebp with a `push ecx` frame) and the earlier flag tests
   reshuffle: 11 -> 17. Declaration order and an int32 `action` do not move
   the spill. Kept as one block until something does.
+- **RowUpdate re-reads `rect.top` right after storing it** (2026-10-11) for
+  `bottom = top + h`, while `left` is reused from its register. Writing the
+  top store through an `AM2_Rect *` copy of `&r->rect` reproduces that
+  reload, but VC6 then re-reads `left` too (13 either way). All 64
+  per-store/per-read choices of pointer or member, casts to `int32_t *`, an
+  index into the rect, statement orders and dropping `w`/`h` leave it at 13
+  or worse.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
