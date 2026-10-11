@@ -199,7 +199,10 @@ main result so far (details in `src/vc6/README.md`):
   SightScan 910, FindPath 834; MissionEnded's attempt-count store after
   the close is 2 -> 4. ObjTileHook byte-identical (the mask entry read
   into a local for both tests puts it first in the `test`; found in the
-  lab, docs/vc6-regalloc.md): relink 1586 of 1646, 60 differ. Re-transcribing FindPath whole from its listing scored worse than
+  lab, docs/vc6-regalloc.md), and RefundPlacedUnit byte-identical (the
+  pillbox weapon's uid passed straight to LookupByUID: a local for it was
+  a web in eax where the image's rotation temporary is ecx): relink 1587
+  of 1646, 59 differ. Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in

@@ -984,6 +984,18 @@ rule, as far as one case shows it: a value loaded for a single test is
 the second operand of `test`; a value that is a local (even one VC6 keeps
 only in a scratch register) is the first.
 
+RefundPlacedUnit (20 bytes, all one rotation step from one site on) went
+the same way without a clone: the raw diff's first hunk was `mov eax,
+[ebx+0x54c]; push eax` against the image's ecx, the source had `uint32_t
+wuid = inside->inventory[0]; w = LookupByUID(wuid);`, and the local is a
+web (eax by priority) where a direct argument is a rotation temporary
+(ecx, after the `test eax, eax` before it). Passed directly it is
+byte-identical, relink 1586 -> 1587. Together with SelectionClick's
+finding this is a usable rule: **a value that feeds one call is a
+rotation temporary when written in the call and a web when copied to a
+local first; the two take different registers, and the image says
+which it was.**
+
 The same mini-lab on the next two register-only functions found nothing:
 PausedFrameStep's `slot = 0` store scheduled before the row-pointer copy
 in the image and after it in ours is unchanged by zeroing the counter
