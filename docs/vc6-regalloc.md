@@ -567,6 +567,13 @@ the arms the other way round (shape 110 -> 108).
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
   is not removed by respelling, as UpdateTrooperAction's (above) was by
   reordering whole statements; ScriptIf's blocks have one statement each.
+- **The CPU target and per-function pragmas are not the lever
+  (2026-10-11).** For StepRowAnim, ViewUpdate, MissionEnded and DirtyCollect,
+  `/G3`, `/G4`, `/G5` and `/GB` compile identically to the default and `/G6`
+  is far worse (DirtyCollect 2 -> 70), so the original used the default
+  scheduler. On ObjHitMaskAction `#pragma optimize` with `a`, `w`, `p`, `y` or
+  `t` on changes nothing, and `g` off or `s` on wrecks it.
+
 - **A re-read VC6 will not reproduce otherwise: a volatile read
   (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
   in `while (uid) o = LookupByUID(uid);`, once for the test and again for the
