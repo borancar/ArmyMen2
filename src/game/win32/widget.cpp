@@ -9506,16 +9506,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 >= ((AM2_ListBox *)*slot)->topRow + ((AM2_ListBox *)*slot)->visible)
                 (((AM2_ListBox *)*slot)->topRow) =
                     (((AM2_ListBox *)*slot)->selected) - (((AM2_ListBox *)*slot)->visible) + 1;
-            {
-                int32_t span = bar->span;
-
-                bar->shift =
-                    ThumbShift((((AM2_ListBox *)*slot)->topRow),
-                               (((AM2_ListBox *)*slot)->rows->count) - (((AM2_ListBox *)*slot)->visible),
-                               span
-                               - (bar->sprite0)
-                                     ->bounds.bottom);
-            }
+            /* The span read at its use: a local read ahead of the thumb call
+             * had VC6 load the sprite bottom to a register (v3 18 -> 11). */
+            bar->shift =
+                ThumbShift((((AM2_ListBox *)*slot)->topRow),
+                           (((AM2_ListBox *)*slot)->rows->count) - (((AM2_ListBox *)*slot)->visible),
+                           bar->span
+                           - (bar->sprite0)
+                                 ->bounds.bottom);
         }
     }
 
