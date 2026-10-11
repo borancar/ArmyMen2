@@ -567,6 +567,18 @@ the arms the other way round (shape 110 -> 108).
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
   is not removed by respelling, as UpdateTrooperAction's (above) was by
   reordering whole statements; ScriptIf's blocks have one statement each.
+- **ScriptParseActionRecon, 129 -> 84 by the same reordering**
+  (2026-10-11). Its arms end in a handful of identical tails, and wherever
+  the image keeps two copies VC6 had merged ours into one. Swapping two
+  independent statements in ONE of the copies keeps them apart:
+  SETFACING's VARNAME stores `xvar` after the step rather than before
+  (107 -> 94), SETITEMFLAG steps before storing `n0` (94 -> 84). The
+  generated code differs only in that order. Two more pieces were about
+  which copy survives: TRIGGERDELAY's refvar arm folds VARNAME's increment
+  into its own end-of-script test (129 -> 123), and the creates' location
+  and army tail is written out in each arm rather than called through one
+  inline helper (123 -> 107). Applying the reorder to every other `n0 =
+  value; (*at)++;` tail, singly and in every pair, found nothing further.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
