@@ -2315,8 +2315,14 @@ eos:
         STEP();
         act->code = 0x33;
         WANT(AM2_TOKEN_INTEGER)
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
+        /* The step before the store: SETUILOCK ends in the same words, and
+         * written alike VC6 kept its copy for both; the image keeps this
+         * one in place. */
+        {
+            int32_t n = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+            act->n0 = n;
+        }
         return 1;
 
     case AM2_TOK_SETUILOCK:
