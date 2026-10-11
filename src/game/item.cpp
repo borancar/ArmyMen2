@@ -9863,6 +9863,22 @@ void __cdecl ToggleSelect(AM2_Object *obj)
  * The record index is recomputed from OBJ_OFF_TABLE_REC_KIND at the bottom of
  * each loop rather than latched, which is the original's spelling; for the
  * boat loop that is the same 5 it entered with.
+ *
+ * BYTE-IDENTICAL, AND THE SHAPE OF THE TAIL IS WHAT GOT IT THERE. There is one
+ * weight, not an accumulator and an answer: the original's edi is `weight`'s
+ * register copy, zeroed in the prologue, left alone through the loop (where
+ * the sum lives in its slot), reloaded at the loop's exit and again after the
+ * clamp stores 0x40 to the slot. VC6 only gives it that register because the
+ * tail reads it four times -- the TANK and JEEP arms each `return weight`
+ * themselves. Written as a single return the reads collapse to one and the
+ * weight stays in memory; written with a second `answer` variable the clamp
+ * folds to `mov edi, 40h` with no store. The other loop's index is `i`,
+ * zeroed with the declarations: that is the ebp the prologue zeroes first,
+ * which `sound`'s store and both `count > 0` tests then reuse, and which the
+ * second loop starts from without an xor of its own. The boat loop counts on
+ * `n`, zeroed just before its own count test. The final sample's point is
+ * the loop's `pt`, not a fresh local -- a fresh one takes `apply`'s dead
+ * argument slot instead of `facing`'s.
  */
 int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at,
                                    int32_t apply)
@@ -9870,23 +9886,21 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
     AM2_Object       *v       = veh;
     int32_t        sound   = 0;
     int32_t        weight  = 0;
-    int32_t        answer  = 0;
-    int32_t        i;
+    int32_t        i       = 0;
+    int32_t        n;
     int32_t        rec;
     void          *list;
     AM2_Point      pt;
     AM2_Object       *o;
 
-#define AM2_MASK_REC(n) (g_vehicleMasks[n].count)
-
     if (v->vehicleKind == AM2_VEHICLE_KIND_BOAT) {
         int32_t facing8 = facing & 0xFF;
         rec = AM2_VEHICLE_KIND_BOAT * AM2_VEHICLE_MASK_DIRS + facing8;
-        if (AM2_MASK_REC(rec) > 0) {
-        i = 0;
+        n = 0;
+        if (g_vehicleMasks[rec].count > 0) {
         do {
-            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + at.x);
-            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + at.y);
+            pt.x = (int16_t)(g_vehicleMasks[rec].pts[n].x + at.x);
+            pt.y = (int16_t)(g_vehicleMasks[rec].pts[n].y + at.y);
 
             /* &base, and that is the one byte the two loops differ in. */
             list = ObjectsAtPoint(&at,
@@ -9924,11 +9938,11 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
                 }
             }
 
-            i++;
+            n++;
             rec = (v->vehicleKind
                    * AM2_VEHICLE_MASK_DIRS) + facing8;
-        } while (i < AM2_MASK_REC((v->vehicleKind
-                                   * AM2_VEHICLE_MASK_DIRS) + facing8));
+        } while (n < g_vehicleMasks[(v->vehicleKind
+                                     * AM2_VEHICLE_MASK_DIRS) + facing8].count);
 
         return weight;
         }
@@ -9939,8 +9953,7 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
     /* This loop indexes the masks afresh at every use; the boat loop
      * above holds the index in `rec`. */
 
-    if (AM2_MASK_REC((v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8)) > 0) {
-        i = 0;
+    if (g_vehicleMasks[v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8].count > 0) {
         do {
             pt.x =
                 (int16_t)(g_vehicleMasks[v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8].pts[i].x + at.x);
@@ -10005,21 +10018,18 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
             }
 
             i++;
-        } while (i < AM2_MASK_REC((v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8)));
-        /* Inside the test: with no mask points the answer keeps the
-         * zero it was declared with, which is the weight too. */
-        answer = weight;
+        } while (i < g_vehicleMasks[v->vehicleKind * AM2_VEHICLE_MASK_DIRS + facing8].count);
     }
 
 
     /* One last sample, at the vehicle's own point, and a weight at or above
      * AM2_BLOCK_CLEAR replaces everything the mask accumulated. */
     {
-        AM2_Point pt = at;
+        pt = at;
 
         list = ObjectsAtPoint(&pt, g_objMapDesc);
         if (BlockWeightTroops(v, pt, (AM2_Object *)list, at) >= AM2_BLOCK_CLEAR)
-            answer = weight = AM2_VEHICLE_BLOCKED_WEIGHT;
+            weight = AM2_VEHICLE_BLOCKED_WEIGHT;
     }
 
     if (sound) {
@@ -10027,19 +10037,20 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
 
         /* PlaySoundAt takes 16-bit coordinates; the original pushes each
          * as the dword loaded from its half of `at`. */
-        if (kind == AM2_VEHICLE_KIND_TANK)
+        if (kind == AM2_VEHICLE_KIND_TANK) {
             PlaySoundAt(AM2_SND_CRUSH_TANK, 2, 0, at.x, at.y);
-        else if (kind == AM2_VEHICLE_KIND_JEEP)
+            return weight;
+        }
+        if (kind == AM2_VEHICLE_KIND_JEEP) {
             PlaySoundAt(AM2_SND_CRUSH_JEEP, 2, 0, at.x, at.y);
-        else
-            PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, at.x, at.y);
+            return weight;
+        }
+        PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, at.x, at.y);
     }
 
     }
 
-    return answer;
-
-#undef AM2_MASK_REC
+    return weight;
 }
 
 /* NearestClearVehiclePoint -- original 0x0045B930, one caller. The same square
