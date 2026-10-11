@@ -1156,6 +1156,21 @@ on: the image forms both addresses first (`lea eax, [ebx+12h]; lea ecx,
   0`, and the checked store as an if/else all keep it a temporary; the
   if/else stores change the shape.
 
+## ObjAfterMove: the height local's type moves three slots (2026-10-11)
+
+Its one shape hunk is the item height: the image sign-extends it into a
+dword slot (`movsx eax, [edi+98h]; mov [esp+1Ch], eax`), tests the full
+register, and reads the slot's low byte in the loop; ours keeps an
+`int8_t` (`mov al; mov [esp+0Fh], al; test al, al`). An `int32_t` tested
+as an int takes ebx and reshapes the loops (53 -> 159 bytes); tested
+through `(int8_t)` it stays in memory and the frame becomes the image's
+(idx at 0Ch, row at 10h, height at 1Ch; 53 -> 41 bytes) but the test is
+`test al, al` and the two inlined ShiftTileCover loops change their
+operand order (`mov edx, [ecx]; add edx, eax` becomes `mov esi, [ecx];
+mov edx, eax; add edx, esi`), shape 1 -> 4. Swapping the helper's add,
+the declaration order, the test on the object's field and `uint8_t`
+casts move nothing further. Shape wins; the byte local stays.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
