@@ -123,7 +123,13 @@ main result so far (details in `src/vc6/README.md`):
   CollapseEqualDeltas (no inner counter of its own) match, so the relink
   is at 1585. RegionFindPath 24 -> 6 bytes (the path copied by index).
   DamageTrooper logged `UIDN:%x` where the image's string is `uid:%x`;
-  fixed. PlacementAllowed
+  fixed. Then ViewUpdate 238 -> 112 bytes (the snap arm's eye takes each
+  word from the register it was loaded into), LoadMap 300 -> 296 (each arm
+  stores the record's owner), and AirFrameDraw reaches the image's shape by
+  testing the sum rather than `f`, which keeps VC6 from folding the
+  increment to a constant (bytes 58 -> 74: two registers swap). Counting
+  `inc`/`dec` on a register as the `add`/`lea` it replaces, 43 functions
+  are still off in shape, about 700 in total. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and
