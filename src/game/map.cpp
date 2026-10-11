@@ -1756,18 +1756,16 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
                 if (index >= 0) {
                     AM2_MapRec *r = &objs[index];
-                    uint8_t  owner;
 
                     r->move = (uint8_t)move;
                     if (elow != 0) {
                         r->elev = (uint8_t)((elow >> 4) & 0xF);
-                        owner   = (uint8_t)(elow & 0xF);
+                        r->owner = (uint8_t)(elow & 0xF);
                     } else {
                         r->elev = (uint8_t)elev;
-                        owner   = (uint8_t)ownr;
+                        r->owner = (uint8_t)ownr;
                     }
                     r->trig = (uint8_t)trig;
-                    r->owner = owner;
                     r->field11 = 0;
                     r->numb = (int8_t)numb;
 
