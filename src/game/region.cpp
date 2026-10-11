@@ -4804,10 +4804,10 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
         }
     }
 
-    o->fieldF4 = 0;
     o->fieldFC =
         g_gameClockMs
         + AM2_AI_TROOPER_RETRY_MS;
+    o->fieldF4 = 0;
     ++g_sightGeneration;
     orig_log_one(o);
 
