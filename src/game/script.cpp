@@ -2210,15 +2210,16 @@ eos:
         STEP();
         act->code = 0x26;
         WANT(AM2_TOKEN_INTEGER)
-        act->n0 = 0;
-        /* Through a temporary, the store before the step: of the forms
-         * tried this leaves VC6's sharing of the identical integer tails
-         * closest to the image's. */
+        /* The value is read before the zero is stored: the image loads it,
+         * stores the zero, stores it, then reloads the index. Written the
+         * other way round VC6 recomputes the token's address after the
+         * store. */
         {
             int32_t n = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            act->n0 = 0;
             act->subject = n;
-            (*at)++;
         }
+        (*at)++;
         return 1;
 
     case AM2_TOK_SETBRIEFING:
@@ -2312,7 +2313,17 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_RESERVED)
+        /* TYPEERR with the kind name in a local: the local is a web and
+         * takes edx, where the macro's temporary takes eax here, and with
+         * edx the error's tail is the one the shared block has, so it
+         * joins that block after the pushes instead of keeping a copy. */
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            const char *kn = kKindName(AM2_TOKEN_RESERVED);
+
+            am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                    ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kn);
+            return 0;
+        }
         if (((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_STRATEGIC) {
             am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
                     ctx->tokens[*at].line);
@@ -2328,7 +2339,13 @@ eos:
     case AM2_TOK_SETUILOCK:
         STEP();
         act->code = 0x39;
-        goto int_tail;          /* the image jumps into ADDEXP's copy */
+        /* Its own copy, which the image shares with ADDEXP's block from
+         * the token load on; a goto into that block gives it a second
+         * predecessor and changes how VC6 allocates it. */
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
 
     case AM2_TOK_SETDAMAGEPAD:
         STEP();
@@ -2450,18 +2467,19 @@ eos:
     name_then_int:
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-    int_tail:
-        WANT(AM2_TOKEN_INTEGER)
-        /* The step before the store. SETITEMFLAG and SETUILOCK end in the
-         * same words; written alike in all three, VC6 merged SETITEMFLAG's
-         * tail away. With this one different, SETITEMFLAG keeps its own and
-         * its type error joins the shared one, as in the image. */
-        {
-            int32_t n = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        /* The positive test, with the store inside it. This arm owns the
+         * type-error block six INTEGER and STRING arms share from their
+         * kind-name load on (the token's address pushed from eax); written
+         * as WANT with the stores after, VC6 either merges SETITEMFLAG's
+         * identical tail into it or, with the step before the store, holds
+         * the address in ecx and the other arms push for themselves
+         * (docs/vc6-regalloc.md). */
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             (*at)++;
-            act->n0 = n;
+            return 1;
         }
-        return 1;
+        TYPEERR(AM2_TOKEN_INTEGER)
 
     case AM2_TOK_FIREWEAPON:
         STEP();
