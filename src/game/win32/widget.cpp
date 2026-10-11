@@ -9223,7 +9223,12 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
     i = 0;
-    for (points = g_armyPoints; points < g_armyPoints + AM2_COMM_SLOTS; points++, i++) {
+    /* A SIGNED compare against the end address (`jl`, not `jb`): the
+     * original holds the address as an integer, as the slot loaded with
+     * 0x515FE0 outright suggests. Same loop on any address below 2 GB. */
+    for (points = g_armyPoints;
+         (int32_t)(uintptr_t)points < (int32_t)(uintptr_t)(g_armyPoints + AM2_COMM_SLOTS);
+         points++, i++) {
         char       *name = this->playerNames[i];
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
