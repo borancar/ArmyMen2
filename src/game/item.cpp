@@ -5138,7 +5138,7 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
                     g_commObject;
 
                 if (comm->verbose)
-                    orig_log("DamageTrooper: droping armor UIDN:%x\n",
+                    orig_log("DamageTrooper: droping armor uid:%x\n",
                              armour->uid);
 
                 TrooperDropItemSend(obj, armour, slot, 0,

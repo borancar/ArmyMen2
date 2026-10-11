@@ -6047,7 +6047,6 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
     int32_t  i;
     int32_t  g;
     int32_t  h;
-    int16_t *slot;
 
     if (!RegionAt(to)->active)
         return 0;
@@ -6184,9 +6183,11 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 
     *len = g_regionCurrent->depth + 1;
 
-    for (slot = path + g_regionCurrent->depth; g_regionWalk;
+    /* Indexed, not a slot pointer: the image forms the address only once
+     * the walk is known non-null. */
+    for (i = g_regionCurrent->depth; g_regionWalk;
          g_regionWalk = g_regionWalk->parent)
-        *slot-- = g_regionWalk->id;
+        path[i--] = g_regionWalk->id;
 
     (void)edges;
     return 1;
