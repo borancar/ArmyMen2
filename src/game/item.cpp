@@ -4977,11 +4977,13 @@ raise_k:
             break;
 
         case 5: case 11: case 12:                       /* MORT, MINE, EXPL */
-            /* The carry pose is stored first and overwritten: the image's
-             * store order, where the arm below is an if/else. */
-            out->state = AM2_POSE_CARRY;
+            /* An if/else: written as a carry pose stored first and then
+             * overwritten, the store order matched the image but the shape
+             * and the length did not. */
             if (cls > 0 && cls <= 2)
                 out->state = AM2_POSE_KNEEL;
+            else
+                out->state = AM2_POSE_CARRY;
             break;
 
         case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */
