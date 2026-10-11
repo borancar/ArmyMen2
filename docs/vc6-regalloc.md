@@ -558,6 +558,14 @@ the arms the other way round (shape 110 -> 108).
   per-store/per-read choices of pointer or member, casts to `int32_t *`, an
   index into the rect, statement orders and dropping `w`/`h` leave it at 13
   or worse.
+- **ScriptIf's two reversed end-of-script tests are not about spelling**
+  (2026-10-11). The image has eight separate `cmp; jl; push "Unexpected end
+  of script"; call; xor eax, eax; epilogue` blocks. Ours writes two of them
+  as `count <= at` (`jg`), because in the image's direction VC6 merges each
+  with another block that has the same branch target (4 -> 9, and 19 for the
+  ALLOF/INORDER step). Extra parentheses, `!(a < b)`, an `int32_t` cast,
+  `+ 0`, and a separate `++` statement all merge the same way, so this merge
+  is not the textual one ListMaskAction's arms showed.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
