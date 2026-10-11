@@ -2349,9 +2349,9 @@ void __cdecl MissionEnded(int32_t lost)
             return;
         }
 
+        g_attemptCount = 0;        /* before the close, as the image stores it */
         orig_findclose(h);
         g_scriptReload = 1;
-        g_attemptCount = 0;
         strcpy(g_scriptReloadPath, path);
         g_levelIndex += 1;
         return;
