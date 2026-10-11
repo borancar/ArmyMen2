@@ -2754,10 +2754,10 @@ static inline void SpinRepaint(AM2_Widget *edit)
  * function pointer, and it defaults to -1. */
 static inline void PointerIdleOverlay(int32_t ours)
 {
-    int32_t row = g_weaponFnSlot2;
-
-    if (ours && row >= 0) {
-        OverlayPrepare(row, 0);
+    /* The row read for the test and again for the argument, as the image
+     * reads it; through a local VC6 keeps it in a register. */
+    if (ours && g_weaponFnSlot2 >= 0) {
+        OverlayPrepare(g_weaponFnSlot2, 0);
         return;
     }
     OverlayPrepare(g_pointerOverlay, 0);
