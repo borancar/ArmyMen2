@@ -9881,8 +9881,9 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     /* Firing at a POINT: same spread, no target object. */
                     (void)AngleBetween(&o->pos,
                                        &r->spot.at);
-                    spot.at = r->spot.at;
-                    spot.ground = r->spot.ground;
+                    /* Copied whole: the image reads both halves through the
+                     * pointer it has just handed AngleBetween. */
+                    spot = r->spot;
                     FireWeaponB(weapon, o, height,
                                (uint8_t)(o->turretFacing
                                          + (orig_step3_rand() % 5) - 2),
