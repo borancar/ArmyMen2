@@ -577,6 +577,29 @@ the arms the other way round (shape 110 -> 108).
   `/Ob2`, `/Op`, `/Oa` and `/Ow` are each worse somewhere (ObjRemap 7 -> 60
   under `/Ob2`), so `/O2 /GX` stands.
 
+- **An inline helper's exact wording leaks into its callers (2026-10-11).**
+  VC6 inlines before it merges, fuses and schedules, so a helper that never
+  appears in the binary still shapes the caller's code. The ring marker's
+  `at = ring[i] + idx; if (at < 0)` fused into `add; js`; the same loop with
+  the sum written twice (`if (*p + idx < 0) return; cells[*p + idx] |= 2`)
+  gives the image's `add; test; jl`, and with it the rest of the ring block:
+  ObjHitMaskAction 40 -> 36 (-> 29 with one arm's flag store moved after the
+  ring), ListMaskAction 41 -> 35 once it marks through the mask too and its
+  pixel row is a word. Converting the other helpers the off functions use
+  between macro and inline-function form (TYPEERR, WANT, STEP, AIMED, ENGINE,
+  UNLINK, SQUAD_INK, the depth-list links, FLOW_QUEUE_HEAD, PointerFriendTail
+  expanded in place) compiles identically or worse; the depth-list links and
+  SQUAD_INK as functions are much worse, so those were macros or open code.
+- **A rotated loop sinks a switch's common store (ScriptPad).** The image's
+  trigger loop has the kind test at its head and `++(*at) < count` as a
+  conditional back edge, falling into the `<=>` switch; every source form
+  with that back edge (`do/while`, `for` with `break`, explicit `goto`s) makes
+  VC6 sink the arms' identical `trigger |= bit` store into the join block,
+  splitting every `or [mem], x` into load/or/store (60 -> 95). Volatile or
+  pointer-formed stores and an increment in each arm do not stop it. The
+  `while (1)` form with `goto` exits keeps the arms but ends `jge; jmp`
+  where the image has `jl`. Unresolved.
+
 - **A re-read VC6 will not reproduce otherwise: a volatile read
   (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
   in `while (uid) o = LookupByUID(uid);`, once for the test and again for the
