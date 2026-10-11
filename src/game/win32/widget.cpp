@@ -6210,9 +6210,12 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
                 weapon = WeaponByUid(uid);
             }
-            sq->recs[slot].index = 1;
+            /* An if/else, not a default overwritten: the image stores
+             * each value in its own arm. */
             if (weapon)
                 sq->recs[slot].index = HudSquadWeaponIcon(weapon);
+            else
+                sq->recs[slot].index = 1;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
             SQUAD_BAR(sq->recs[slot].barW, obj);
             SQUAD_INK(sq->recs[slot].barColour, obj);
