@@ -1098,10 +1098,17 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     spr = r->sprite;
     w = spr->bounds.right;
     h = spr->bounds.bottom;
-    r->rect.left   = r->pos.x - spr->hotX;
-    r->rect.top    = r->pos.y - spr->hotY - r->yAdjust;
-    r->rect.right  = r->rect.left + w;
-    r->rect.bottom = r->rect.top + h;
+    {
+        /* The top is written through a pointer to the rect and read back
+         * for the bottom, as the image reloads it; the bottom is stored
+         * before the right. */
+        AM2_Rect *rc = &r->rect;
+
+        r->rect.left   = r->pos.x - spr->hotX;
+        rc->top        = r->pos.y - spr->hotY - r->yAdjust;
+        r->rect.bottom = r->rect.top + h;
+        r->rect.right  = r->rect.left + w;
+    }
 
     cl = r->rect.left   >> 8;
     ct = r->rect.top    >> 8;
