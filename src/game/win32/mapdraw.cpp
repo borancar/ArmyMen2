@@ -1244,7 +1244,7 @@ void __cdecl ScrollMapCache(void)
         return;
     if (dy > 0) {
         wide.top    = g_visibleTiles.bottom - dy;
-        wide.bottom = g_visibleTiles.bottom;
+        wide.bottom = wide.top + dy;    /* the image adds dy back: top + dy, not the bottom again */
     } else {
         wide.bottom = g_visibleTiles.top - dy;
         wide.top    = g_visibleTiles.top;
