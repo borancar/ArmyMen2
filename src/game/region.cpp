@@ -7731,6 +7731,13 @@ sweep:
          * CLAUDE.md records) AND OBJ_OFF_FIELD_10C is clear. This compared
          * Field548's VALUE against the owner, which matched only sometimes, so
          * Sarge alternately swept three headings and six. */
+        /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
+         * 0x0044B174, stored before the limit is chosen -- and stops when
+         * the count reaches the limit, so the limit is one more than the
+         * headings tried: three for the player's trooper and six for
+         * everyone else's. And every try steps with the SAVED pose from
+         * ObjNextKind538 (slot +0x2c), not the state. */
+        i = 1;
         if (ObjType2Field548(o)
             && (int32_t)o->owner == (int32_t)g_defaultOwner
             && !o->field10C)
@@ -7738,12 +7745,6 @@ sweep:
         else
             tries = AM2_STEP_SWEEP_OTHER;
         {
-            /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
-             * 0x0044B174 -- and stops when the count reaches the limit, so the
-             * limit is one more than the headings tried: three for the player's
-             * trooper and six for everyone else's. And every try steps with the
-             * SAVED pose from ObjNextKind538 (slot +0x2c), not the state. */
-            i = 1;
 
             while (facing = (uint8_t)(facing + (uint8_t)g_stepFacingSweep[i - 1]),
                    AnimStepPoint(o, facing, pose, &stepPoint, 0),

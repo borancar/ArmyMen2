@@ -1138,7 +1138,9 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;
 
-        for (x = cl; x <= cr; x++, cell++, used++) {
+        /* `used` before `cell`: the image steps the entry pointer before the
+         * cell index at the bottom of the loop (v3 12 -> 10). */
+        for (x = cl; x <= cr; x++, used++, cell++) {
             /* Re-indexed at each use, the entry and its cell alike, and
              * tested in ObjRemap's order: unlinked, or linked elsewhere. */
             if (r->buffer[used].cell < 0 || r->buffer[used].cell != cell) {

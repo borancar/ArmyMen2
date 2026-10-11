@@ -45,12 +45,17 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
     uint32_t       written;
     uint8_t        key;
     int32_t        row;
+    uint16_t      *offs;
 
     (void)unused;                       /* pushed by the caller, never read */
 
     out->width  = (uint16_t)width;
     out->height = (uint16_t)height;
 
+    /* A walking pointer for the row offsets: the image keeps it in a
+     * register and steps it by two per row, with `out` on the frame
+     * (v3 11 -> 10). */
+    offs    = out->rowOffset;
     w       = (uint8_t *)&out->rowOffset[height];
     written = (uint32_t)(height * sizeof out->rowOffset[0] + sizeof *out);
     p       = g_frameBuf;
@@ -61,7 +66,7 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
         const uint8_t *start = p;
         const uint8_t *end   = p + width;
 
-        out->rowOffset[row] = (uint16_t)(w - (uint8_t *)out);
+        *offs++ = (uint16_t)(w - (uint8_t *)out);
 
         /* Always emits pairs, and always at least one pair per row -- a row
          * that is entirely background still gets its count followed by a zero
