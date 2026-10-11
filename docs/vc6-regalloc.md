@@ -714,7 +714,16 @@ the arms the other way round (shape 110 -> 108).
   immediate 0) with the two planning arms jumping forward to it; ours
   pulls the label up to the last planning arm and keeps the else arm's
   own copy, and neither store order (12, unchanged) nor dropping the
-  else arm's copy (25, 26) moves it.
+  else arm's copy (25, 26) moves it. The functions at one to four are
+  the same kind of thing, measured 2026-10-11: ObjAfterMove's height as
+  an int (1 -> 16; the image's `movsx` into a dword slot is the
+  allocator widening an int8 local), ScriptIf's three count compares in
+  the image's operand order singly and together (4 -> 9..21), ScriptParseEvent
+  reading the kind by index beside the token pointer (4, same code),
+  DamageTrooper's armour arm as a goto or hoisted after the loop (4,
+  4 -> 6), CommSend's two error logs swapped or as an if/else chain
+  (4, 4 -> 8). VC6 places those blocks from the CFG, not from the
+  source order.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
