@@ -1874,33 +1874,6 @@ int32_t __cdecl ObjBoxAction(AM2_Object *obj, AM2_TileMask *out)
     return 1;
 }
 
-/* The ring the two markers below OR a 2 into: the 5x5 block around a cell less
- * its four corners and its centre, as INDEX deltas over the scratch grid.
- *
- * TWO THINGS IN HERE ARE THE ORIGINAL BEING WRONG AND ARE REPRODUCED. The
- * guard is a BREAK, not a skip: the deltas run in ascending order, so a cell
- * in the top two rows of the grid has a negative first delta and loses its
- * ENTIRE ring rather than the two rows above it. And there is no upper bound
- * at all, so a cell in the bottom two rows writes past the end of the grid --
- * which is survivable only because both callers hand this a 0x1020-byte stack
- * scratch whose cells never fill it.
- *
- * Written as a loop over ADDR_TILEMASK_NEIGHBOURS because that is what the
- * original does -- it walks the table with a pointer from 0x00554B84 to
- * 0x00554BD4 -- rather than as twenty adds. */
-static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx)
-{
-    int32_t i;
-
-    for (i = 0; i < AM2_TILEMASK_RING; i++) {
-        int32_t at = ring[i] + idx;
-
-        if (at < 0)
-            return;
-        cells[at] |= AM2_TILEMASK_PAD_CELL;
-    }
-}
-
 /* ObjHitMaskAction -- original 0x004389D0, 1,056 bytes, two callers, and both
  * of them are ItemTeardown and ObjAfterMove above.
  *
@@ -2007,16 +1980,28 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
  * regressed. It also means this function cannot be behind a difference in any
  * configuration -- worth knowing when `mission`'s frame gate fails, which it
  * does on this machine for reasons of its own. */
-/* MarkTileRing through the mask itself, for ObjHitMaskAction: the image
- * reaches the cells at +0x10 from the mask and walks a cell INDEX beside
- * the cell pointer, which VC6 folds into one induction variable plus a
- * hoisted offset (`lea eax, [ebx + ecx]`). */
+/* The ring the two markers below OR a 2 into: the 5x5 block around a cell less
+ * its four corners and its centre, as INDEX deltas over the scratch grid.
+ *
+ * TWO THINGS IN HERE ARE THE ORIGINAL BEING WRONG AND ARE REPRODUCED. The
+ * guard is a BREAK, not a skip: the deltas run in ascending order, so a cell
+ * in the top two rows of the grid has a negative first delta and loses its
+ * ENTIRE ring rather than the two rows above it. And there is no upper bound
+ * at all, so a cell in the bottom two rows writes past the end of the grid --
+ * which is survivable only because both callers hand this a 0x1020-byte stack
+ * scratch whose cells never fill it.
+ *
+ * Written as a loop over ADDR_TILEMASK_NEIGHBOURS because that is what the
+ * original does -- it walks the table with a pointer from 0x00554B84 to
+ * 0x00554BD4 -- rather than as twenty adds.
+ *
+ * Reached through the mask rather than a cells pointer: the image addresses
+ * the cells at +0x10 from the mask. The sum is written twice, not held in a
+ * local: as one named `at` VC6 fuses the sign test into the add (`add; js`);
+ * written as it is here the image's `add; test; jl` comes out, and with it
+ * the rest of the ring block, in both callers. */
 static inline void MarkTileRingIdx(AM2_TileMask *m, const int32_t *ring, int32_t idx)
 {
-    /* The sum written twice, not held in a local: as one named `at` VC6
-     * fuses the sign test into the add (`add; js`); written as it is here
-     * the image's `add; test; jl` comes out, and with it the rest of the
-     * ring block. */
     const int32_t *p;
 
     for (p = ring; p < ring + AM2_TILEMASK_RING; p++) {
@@ -2143,8 +2128,10 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
             if (splitOdd == off % 2) {
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    marked = 1;
+                    /* The ring before the flag in this arm only, which is
+                     * the order the image stores them. */
                     MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
+                    marked = 1;
                 }
 
                 col++;
@@ -2651,7 +2638,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     int32_t         phase;
     int32_t         k;
     int32_t         tilew;
-    int32_t         y;
+    int16_t         y;              /* a pixel row: a word, as the image keeps it */
     int32_t         marked = 0;
 
     /* The address-of that cannot be null -- see above. */
@@ -2753,7 +2740,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
 
                 col++;
@@ -2764,12 +2751,12 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
         } while (++off < end);
     }
