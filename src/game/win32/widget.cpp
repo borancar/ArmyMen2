@@ -7934,12 +7934,15 @@ AM2_HudPanel::AM2_HudPanel()
         w->x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
     w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
+    /* x is read before h is stored -- the image loads it ahead of that
+     * store, which VC6 never does for a read written after it. */
     {
         int32_t h = spr->bounds.bottom;
+        int32_t x = w->x;
 
         w->h = h;
+        self->stop = x;
     }
-    self->stop = w->x;
     self->open = 1;
     g_hudPanelX = w->x;
 
@@ -8001,7 +8004,7 @@ AM2_HudPanel::AM2_HudPanel()
 
         /* The points readout, formatted into the panel's own buffer. */
         points = self->pointsText;
-        am2_sprintf(points, "%d", g_ourPoints);
+        am2_sprintf(points, "%i", g_ourPoints);
 
         /* The edit takes its rectangle as FOUR ints, not a struct. The
          * original still routes them through RectSet and copies the
