@@ -9709,12 +9709,12 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
         turn = AngleDelta(o->facing, r->heading);
         turn = Clamp(turn, -8, 8);
 
-        /* The row is re-read for its animation and bias; only the heading
-         * comes through `gun`. */
-        animRec = &o->rowSet.rows->animPlaying;
-        first  = RoundTo8((o->rowSet.rows->headingBias + gun->heading) & 0xFF,
+        /* The whole first block reads through `gun`, so the row pointer is
+         * held across the calls instead of re-read from the object. */
+        animRec = &gun->animPlaying;
+        first  = RoundTo8((gun->headingBias + gun->heading) & 0xFF,
                           (*animRec)->directionBits);
-        second = RoundTo8((gun->headingBias + turn
+        gunFacing = RoundTo8((gun->headingBias + turn
                            + gun->heading) & 0xFF,
                           (*animRec)->directionBits);
 
@@ -9723,23 +9723,20 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
          * `changed` term below is the original's, ugly ordering and all --
          * it asks whether +0x5A8 is set OR the rounded value differs from
          * what was last committed. */
-        if (first != second) {
+        if (first != gunFacing) {
             int32_t changed = (o->turnRecommit != 0
-                               || second != o->turnCommitted);
+                               || gunFacing != o->turnCommitted);
             uint32_t age = g_gameClockMs
                            - gun->turnStamp;
 
             if ((age > o->turnInterval && changed)
                 || age > 0x320u) {
                 o->turnCommitted = first;
-                o->rowSet.rows->turnStamp =
-                    g_gameClockMs;
+                gun->turnStamp = g_gameClockMs;
             } else {
                 turn = 0;
             }
         }
-        gunFacing = second;
-
         facing = (uint8_t)(o->facing + turn);
 
         /* State 1 skips target selection and the speed ramp entirely and
@@ -9782,12 +9779,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             if (!noTarget
                 && (uint16_t)o->fieldC0 == (uint16_t)target.x
                 && (uint16_t)target.x != 0) {
-                int32_t d1 = ApproxDist((const AM2_Point *)&step,
-                                        &target) - 1;
-                int32_t d2 = ApproxDist(&o->pos,
-                                        &target);
-
-                if (d1 <= d2
+                if (ApproxDist((const AM2_Point *)&step, &target) - 1
+                        <= ApproxDist(&o->pos, &target)
                     && ApproxDist(&o->pos,
                                   &o->scriptPoint) >= 0x30)
                     r->approach = 0;
@@ -9945,8 +9938,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     /* Firing straight ahead: no spread at all, and the
                      * heading is the gun facing scaled to the animation's
                      * direction count rather than a raw byte. */
-                    spot.at = r->spot.at;
-                    spot.ground = r->spot.ground;
+                    spot = r->spot;
                     FireWeaponB(weapon, o, height,
                                (uint8_t)(gunFacing
                                          << (8 - (*animRec)->directionBits)),
