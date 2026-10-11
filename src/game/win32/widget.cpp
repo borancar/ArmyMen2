@@ -4789,12 +4789,11 @@ void __cdecl HudPostUpdate(void)
     /* ---- the two key arms --------------------------------------------- */
     aiming = 0;
     if (ActionKeyDown(AM2_ACTION_0A) || ActionKeyDown(AM2_ACTION_06)) {
-        void *ctx = g_objCtxObjA;
-
         /* Everything AIMS except a kind-3 vehicle, which has its own gunner
          * handling. Note the refusal needs BOTH tests: a non-vehicle reaches
          * the arm through the first `je`, not past it. */
-        if (!ObjIsType3((const AM2_Object *)ctx)
+        /* Through the global for both tests, as the image reads it. */
+        if (!ObjIsType3((const AM2_Object *)g_objCtxObjA)
             || g_objCtxObjA->vehicleKind != 3) {
             OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
             aiming = 1;

@@ -339,7 +339,7 @@ int32_t __cdecl ObjTileHook(AM2_Object *obj)
 
     /* The eight-bit layer. */
     bitLayer = g_mapPadbitLayer;
-    if (bitLayer != 0) {
+    if (g_mapPadbitLayer != 0) {      /* the global, re-read for the test */
         if (tile != 0) curBits  = bitLayer[tile];
         if (prev != 0) prevBits = bitLayer[prev];
 
