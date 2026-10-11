@@ -2013,14 +2013,16 @@ static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx
  * hoisted offset (`lea eax, [ebx + ecx]`). */
 static inline void MarkTileRingIdx(AM2_TileMask *m, const int32_t *ring, int32_t idx)
 {
-    int32_t i;
+    /* The sum written twice, not held in a local: as one named `at` VC6
+     * fuses the sign test into the add (`add; js`); written as it is here
+     * the image's `add; test; jl` comes out, and with it the rest of the
+     * ring block. */
+    const int32_t *p;
 
-    for (i = 0; i < AM2_TILEMASK_RING; i++) {
-        int32_t at = ring[i] + idx;
-
-        if (at < 0)
+    for (p = ring; p < ring + AM2_TILEMASK_RING; p++) {
+        if (*p + idx < 0)
             return;
-        m->cells[at] |= AM2_TILEMASK_PAD_CELL;
+        m->cells[*p + idx] |= AM2_TILEMASK_PAD_CELL;
     }
 }
 
