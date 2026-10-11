@@ -2117,8 +2117,8 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
-        int32_t end = off + rowbytes;
-        int32_t col = AM2_TILEMASK_MARGIN;
+        int16_t end = off + rowbytes;
+        int16_t col = AM2_TILEMASK_MARGIN;     /* a word, as the image keeps it */
         uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
         int32_t ci  = (int32_t)(c - out->cells);
