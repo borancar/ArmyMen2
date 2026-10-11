@@ -1008,6 +1008,22 @@ else loop, a ternary, an empty-else, nesting, the tests reordered, the
 store through a pointer, the key loop as a pointer walk -- all give
 ours. Both stay.
 
+AirFrameDraw (42 bytes) in the mini-lab: the image's frame counter is
+`mov esi, [edi+0xa0]; inc esi; cmp esi, 1; jne; inc esi; cmp esi, 3`
+with the object in edi. Written `f = slot + 1; if (f == 1) f++;` VC6
+gives the registers (f esi, obj edi) but folds the arm to `mov esi, 2`
+and jumps past the `> 3` test; so do `1 == f`, `f -= -1`, a `switch`,
+unsigned, int16, uint8, a `++f` test, a ternary, a nested `if` and
+`/O1` (which spells the constant `push 2; pop esi`). `f - 1 == 0` and
+`!(f ^ 1)` keep an `inc` but change the test. The committed sum test
+(`obj->formationSlot + 1 == 1`) is the only form that keeps the `inc`,
+and its second read of the field is one more use of `obj`, which is
+what hands `obj` esi over f. The two cannot both be had from any
+spelling found; it stays. (`/O1` on the whole of mapdraw.cpp is far
+worse everywhere, 42 -> 150 here, so the file was not built that way.)
+BlockWeightRoute's `abs(a - b)` with the operands swapped and its two
+distances compared the other way round change nothing (36).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
