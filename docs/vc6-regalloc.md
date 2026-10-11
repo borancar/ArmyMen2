@@ -680,7 +680,22 @@ the arms the other way round (shape 110 -> 108).
   does (+12), ObjHitMaskAction without its `ci` index (+8..+22), a helper
   taking the cell pointer (+22), ScriptPad's trigger loop as `do/while`
   or `goto` (+35..+47; the arm store sinks), and its string block with an
-  explicit `goto triggers_done` (0) all lose or do nothing.
+  explicit `goto triggers_done` (0) all lose or do nothing. ObjRemap's
+  bottom cell as `(box.bottom - box.top) + top` rather than `+ y +
+  box.top` is the image's reload of the saved top (7 -> 6; the relink
+  byte count rises 170 -> 212 as registers move). Measured with no gain
+  the same day: SelectFirePose's two raise poses as label/copy/goto in
+  every arm (VC6 keeps duplicating the machine-gun arm's copies, 20 ->
+  22..35); RowUpdate's rect stores in the image's right-before-bottom
+  order with and without the rect pointer (12 -> 13..30); BoxAction's row
+  loop as `y <= c.bottom` (9, unchanged); EncodeGlyph with a
+  `rowOffset` pointer local (11 -> 15); VehicleUpdateAppend's bit-31
+  test as `!= 0`, a masked local, or a signed compare (11, 11, 12: the
+  image's `and` over ours' `test` is a copy the allocator makes);
+  UpdateTrooperAction's `pos` assigned before the classify call,
+  non-const, or with the step point read from the object (10, all
+  identical code: the image hoists `lea edi, [esi+0x12]` because its
+  zero register is ebx where ours is edi).
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and

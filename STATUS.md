@@ -180,10 +180,13 @@ main result so far (details in `src/vc6/README.md`):
   on code alone over the 39. HudPostUpdate 8 -> 4 (the idle overlay row
   re-read), FindPath 50 -> 47 (PathUnwind indexes `out[i--]`, so the
   pointer forms after the `end` test as the image's does) and ScriptPad
-  60 -> 53 (the pad slot takes g_padCount itself, not the id read back):
-  about 497 on code alone. Re-transcribing FindPath whole from its listing
-  scored worse than the source in every structural form; the measurements
-  are in docs/vc6-regalloc.md.
+  60 -> 53 (the pad slot takes g_padCount itself, not the id read back) and
+  ObjRemap 7 -> 6 (the bottom cell from the saved top): about 496 on code
+  alone. Re-transcribing FindPath whole from its listing scored worse than
+  the source in every structural form, and a round of alternative spellings
+  over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
+  and UpdateTrooperAction moved nothing; the measurements are in
+  docs/vc6-regalloc.md.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
