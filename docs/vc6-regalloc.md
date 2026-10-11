@@ -1171,6 +1171,46 @@ mov edx, eax; add edx, esi`), shape 1 -> 4. Swapping the helper's add,
 the declaration order, the test on the object's field and `uint8_t`
 casts move nothing further. Shape wins; the byte local stays.
 
+## The rest of the register-only list in the lab (2026-10-11, second pass)
+
+Each was cloned (or scored with the per-TU runner where a clone was dear)
+and probed until the spellings ran out; none moved. What each one IS:
+
+- **ShotHitsObj** (7 bytes): the seven refusals of the below-the-shot
+  branch are cross-jumped into the FIRST `return 0` (the shot-proof one)
+  in the image and into the last (the armour switch's fall-through) in
+  ours; the five epilogue copies sit at the same addresses in both. A
+  label on the first copy, a forward `goto` to a label at the end, a
+  label on the sarge or heightAdj copy, and seven plain `return 0`s all
+  make VC6 move the labelled block to the end (the same thing
+  RegionFindPath did). The `goto`-into-the-earlier-copy trick works for
+  switch arms, not for an `if` at the head of a function.
+- **DrawMapObjects** (92 bytes, slots only): six spilled locals in a
+  different frame order (image, ascending: cell, stride, l0, t0, r, b;
+  ours: r, cell, b, l0, t0, stride). Declaration order changes nothing
+  (five orders tried); the ORDER OF THE CLAMPS does swap r and b, so
+  slots follow the order webs are created in, but no statement order
+  produced the image's. Loop forms, `cols`/`last` removed, `d` removed:
+  nothing. RunScriptAction's 60 bytes are the same kind of difference.
+- **PointerPickMode6** (110 bytes): the image keeps the object in eax
+  through every test before the first call and copies it to ebp (`mov
+  ebp, eax`) just before the board-hint loop, reading `o->uid` through
+  the copy afterwards; modes 4 and 5 do the same (`mov ebp, esi`). Ours
+  holds it in edi from the prologue. A local copy in the tail or at the
+  call, a `const` or `void *` parameter, the hint body as a second
+  inline helper, and the loop reusing the object variable with the
+  original saved first are all propagated back to one web.
+- **DrawEffectLayer** (220 bytes): `frame` is a memory-only local in the
+  image (computed into eax, stored, reloaded once at its use) where ours
+  gives it esi between the lock loops; the point's stamp goes to ebp in
+  the image and esi in ours, and the frame slot sits after `box`/`hit`
+  rather than before. Not yet probed beyond reading.
+- **The HudPanel constructor** (100 bytes): the image loads `w->x` into
+  eax, stores it to `stop`, and keeps a COPY in ecx for `g_hudPanelX`
+  (`mov ecx, eax` between the two stores); ours stores both from one
+  register. `stop` stored from the field, the global read back from
+  `stop`, a chained assignment, and two locals all CSE back to one.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
