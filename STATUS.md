@@ -191,8 +191,8 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 13,360 of edit
-  distance over the 57 functions that are not byte-identical (147,714
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 12,886 of edit
+  distance over the 57 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
@@ -211,7 +211,11 @@ main result so far (details in `src/vc6/README.md`):
   the B test on the same sum; the B point read from the array at each
   use rather than through a pointer local, which is what keeps the base
   register every aim array shares on the A point): relink 1589 of
-  1646, 57 differ. Re-transcribing FindPath whole from its listing scored worse than
+  1646, 57 differ. ScriptParseActionRecon 2,336 -> 1,862 bytes and
+  shape 70 -> 63 from a lab clone of the whole function (ADDEXP as a
+  positive test owning the shared type-error block, SETUILOCK's own
+  copy, SETITEMFLAG's kind name through a local, INACTIVATEREGION's
+  value read before the zero store). Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in

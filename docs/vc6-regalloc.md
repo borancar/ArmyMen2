@@ -1274,6 +1274,64 @@ and probed until the spellings ran out; none moved. What each one IS:
   read into a local changes nothing. Its big remainder is still `r` in
   ebp where the image reloads the parameter from its slot.
 
+## ScriptParseActionRecon in a full clone (2026-10-12)
+
+The clone is the real function: `mkspar.py` (job scratch) copies
+script.cpp's includes, `ActStep` and the function body into one file,
+and `labvar4.py` compiles it IN PLACE under src/game with the relink's
+defines, then resolves the object's relocations itself (functions from
+the per-TU symbol table, placed data, the `am2_os_*` redirects, and the
+clone's own `.text` for the jump tables; string literals get one
+sentinel address each) and scores the v3 shape against the image. It
+reproduces the real build to the instruction and costs about forty
+seconds a variant, against two minutes for the per-TU runner. Three
+things landed (shape 70 -> 63, 2,336 -> 1,862 bytes):
+
+- **INACTIVATEREGION**: `n0 = 0; { n = value; subject = n; (*at)++ }`
+  recomputed the token's address after the zero store; the image loads
+  the value, stores the zero, stores the value, reloads the index.
+  `{ n = value; n0 = 0; subject = n; } (*at)++;` is it.
+- **The INTEGER/STRING type-error block that six arms share from the
+  kind-name load** (eight hunks, one cause). Its owner is ADDEXP's
+  `int_tail`. Written as WANT and the stores, ADDEXP's block is
+  identical to SETITEMFLAG's INTEGER tail and VC6 merges them; written
+  with the step before the store (the old fix for that), the owner
+  holds the token address in ecx and every member pushes for itself.
+  **A positive test with the stores inside it** (`if (kind == INTEGER)
+  { n0 = value; (*at)++; return 1; } TYPEERR`) is not identical to
+  SETITEMFLAG's tail and keeps the memory-form test with the address in
+  eax, and the members' pushes merge. SETUILOCK then needs its own copy
+  of the WANT+stores rather than `goto int_tail`: a goto into the block
+  gives it a second predecessor and VC6 allocates it the register way.
+  (The image still has SETUILOCK jumping into ADDEXP's block and ADDEXP
+  as the owner; ours has SETUILOCK's copy as the owner and ADDEXP's
+  error jumping into it -- same code, three hunks of placement.)
+- **SETITEMFLAG's RESERVED type error** kept a whole copy of the shared
+  block because its kind-name temporary was eax where the shared block's
+  tail wants edx; the kind name read into a local is a web, takes edx,
+  and the tail joins the block after the pushes as the image does.
+
+A mini-lab of a two-arm switch pinned the register-form/memory-form
+rule behind the first of these: VC6 compares the token's kind from a
+register when the arm's error path is cross-jumped from the kind-name
+load into another arm's block, and from memory when the arm owns the
+block or shares it only from the pushes; which arm owns it is layout
+order.
+
+Still open there, each tried in the clone: the shared end-of-script
+block sits in MOVEITEM in the image and in ours is merged into
+TRIGGERDELAY's inline copy (a message local, `ActStep`, the test
+inverted, DROPITEM given its own copy, the block reordered: none keep
+them apart); SETFACING's `xvar` store before the step, which the image
+has, merges its VARNAME block into SETGUNFACING's identical one (the
+image keeps both; a positive test, a message local, a function-scope
+or `long` variable all still merge); SETITEMOWNER's `if (n0 < 0)
+return 0; return 1;` is a `setge` in ours and a branch to the shared
+return in the image (a local, a ternary, the test reversed, `break` to
+a return after the switch: all `setge`); SETITEMFLAG's INTEGER test is
+index-first in ours and base-first in the image (positive, kind-name
+local and `ActStep` forms are worse).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
