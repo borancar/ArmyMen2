@@ -1483,6 +1483,51 @@ static inline int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
     return 0;
 }
 
+/* Zero, with the message, when the token is not of the kind wanted. */
+static inline int32_t ActTypeErr(const AM2_ScriptCtx *ctx, const int32_t *at, int32_t kind)
+{
+    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+            ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kKindName(kind));
+    return 0;
+}
+
+static inline int32_t ActWant(const AM2_ScriptCtx *ctx, const int32_t *at, int32_t kind)
+{
+    if (ctx->tokens[*at].kind == kind)
+        return 1;
+    return ActTypeErr(ctx, at, kind);
+}
+
+/* `name` must be a declared integer variable: its index goes to xvar. */
+static inline int32_t ActVarName(const AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act,
+                                 const char *msg)
+{
+    int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
+
+    if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {
+        am2_log(msg, ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value);
+        return 0;
+    }
+    act->xvar = v;
+    (*at)++;
+    return 1;
+}
+
+/* The same, as setvar and addvar test it: against -1 exactly. */
+static inline int32_t ActVarNameEq(const AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act,
+                                   const char *msg)
+{
+    int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
+
+    if (v == -1 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {
+        am2_log(msg, ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value);
+        return 0;
+    }
+    act->xvar = v;
+    (*at)++;
+    return 1;
+}
+
 
 /* 0x00440D70. One act, into a 0x48-byte record.
  *
@@ -1513,37 +1558,15 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 /* Every case is written out for itself, as the image has them: the token
  * step, the kind test with its own error, the store. VC6 folds the identical
  * tails together; the end-of-script message is the one shared block, and it
- * falls into the default `return 0`. */
+ * falls into the default `return 0`. The kind test, its error and the
+ * variable-name lookup are the inline functions above; VC6 expands them to
+ * the same code as the macros they replaced (measured in the lab). */
+/* STEP is the one helper that stays a macro: it jumps to the `eos:` label
+ * in MOVEITEM, and the image's shared end-of-script block IS that label's
+ * block (every other arm's `jge` lands on it). An inline function cannot
+ * jump there, and `if (!ActStep(ctx, at)) return 0;` at every site makes
+ * VC6 merge all the copies into the first one in layout instead. */
 #define STEP()    if (++(*at) >= ctx->count) goto eos
-#define TYPEERR(K)                                                          \
-    {                                                                       \
-        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n", \
-                ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kKindName(K)); \
-        return 0;                                                           \
-    }
-#define WANT(K)   if (ctx->tokens[*at].kind != (K)) TYPEERR(K)
-/* `name` must be a declared variable: its index goes to xvar. */
-#define VARNAME(MSG)                                                        \
-    {                                                                       \
-        int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);   \
-        if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {           \
-            am2_log(MSG, ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value); \
-            return 0;                                                       \
-        }                                                                   \
-        act->xvar = v;                                                      \
-        (*at)++;                                                            \
-    }
-/* The same, as setvar and addvar test it: against -1 exactly. */
-#define VARNAME_EQ(MSG)                                                     \
-    {                                                                       \
-        int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);   \
-        if (v == -1 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {     \
-            am2_log(MSG, ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value); \
-            return 0;                                                       \
-        }                                                                   \
-        act->xvar = v;                                                      \
-        (*at)++;                                                            \
-    }
 
     memset(act, 0, sizeof *act);
     act->uid = -2;
@@ -1590,7 +1613,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
      * frees it here. */
     case AM2_TOK_SHOWMESSAGE:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 1;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
@@ -1598,7 +1622,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_SHOWBITMAP:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 2;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
@@ -1606,7 +1631,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_SHOWBITMAPNOPAUSE:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 3;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
@@ -1614,7 +1640,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_SHOWFAILURE:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 4;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
@@ -1622,7 +1649,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_SHOWPDA:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 5;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
@@ -1630,7 +1658,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_PLAYSOUND:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 6;
         act->text = (char *)ctx->tokens[*at].value;
         act->n0 = 0;
@@ -1654,7 +1683,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     case AM2_TOK_PLAYITEMSOUND:
         STEP();
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->code = 7;
         act->text = (char *)ctx->tokens[*at].value;
         act->n0 = 0;
@@ -1692,10 +1722,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_TRACEVAR:
         STEP();
         act->code = 9;
-        WANT(AM2_TOKEN_STRING)
-        VARNAME("Line [%4d]:  expected variable name in TRACEVAR but variable "
-                "%s not declared\n")
-        return 1;
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
+        return ActVarName(ctx, at, act, "Line [%4d]:  expected variable name in TRACEVAR but variable "
+                "%s not declared\n");
 
     case AM2_TOK_TRIGGER:
         STEP();
@@ -1709,9 +1739,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED
             && ((int32_t)(uintptr_t)ctx->tokens[*at].value) == AM2_TOK_REFVAR) {
             STEP();
-            /* VARNAME written out with the step folded into its own test:
+            /* ActVarName written out with the step folded into its own test:
              * the image keeps this arm's end-of-script message inline and
-             * jumps back to TRIGGER's uid call, where VARNAME's separate
+             * jumps back to TRIGGER's uid call, where ActVarName's separate
              * increment let VC6 share the message and copy the call. */
             {
                 int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
@@ -1728,7 +1758,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             }
             goto trigger_uid;
         } else if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
-            TYPEERR(AM2_TOKEN_INTEGER)
+            return ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
         else {
             act->delay = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             if (act->delay < 0) {
@@ -1748,10 +1778,12 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_CREATETROOPER:
         STEP();
         act->code = 0x0D;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->text = (char *)ctx->tokens[*at].value;
         STEP();
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_RIFLE:     act->item = 1;    break;
         case AM2_TOK_BAZOOKA:   act->item = 4;    break;
@@ -1787,10 +1819,12 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_CREATEVEHICLE:
         STEP();
         act->code = 0x0F;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->text = (char *)ctx->tokens[*at].value;
         STEP();
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_JEEP:      act->n0 = 0;      break;
         case AM2_TOK_TANK:      act->n0 = 1;      break;
@@ -1817,11 +1851,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->code = 0x10;
         /* The name is optional here, unlike the other two creates. */
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            WANT(AM2_TOKEN_STRING)
+            if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
             act->text = (char *)ctx->tokens[*at].value;
             STEP();
         }
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_BAZOOKA:       act->item = 4;    break;
         case AM2_TOK_GRENADE:       act->item = 2;    break;
@@ -1875,7 +1911,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->code = 0x0E;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         if (act->n0 < 0x78 || act->n0 > 0x95) {
             am2_log("Line[%4d]:  Invalid explosion type.\n", ctx->tokens[*at].line);
@@ -1902,7 +1939,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_CREATEROACH:
         STEP();
         act->code = 0x11;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->text = (char *)ctx->tokens[*at].value;
         STEP();
         if (!ScriptLocation(ctx, at, act, 0))
@@ -1917,7 +1955,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
          * from how the statement reads. */
         if (!ScriptResolveName(ctx, at, &act->target, 0))
             return 0;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         {
             int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
 
@@ -1941,7 +1980,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -1953,7 +1993,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -1965,7 +2006,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -1977,7 +2019,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         act->extra = 0;
@@ -2073,7 +2116,8 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         /* `order <who> follow <whom>` or `order <who> goto <somewhere>`. */
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_FOLLOW:
@@ -2097,7 +2141,8 @@ eos:
             || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_INMODE)
             return 1;
         STEP();
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_ATTACK: (*at)++; act->n0 = 6; return 1;
         case AM2_TOK_DEFEND: (*at)++; act->n0 = 7; return 1;
@@ -2128,8 +2173,9 @@ eos:
             return 1;
         }
         STEP();
-        WANT(AM2_TOKEN_STRING)
-        /* VARNAME with its last two statements swapped. SETGUNFACING ends
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
+        /* ActVarName with its last two statements swapped. SETGUNFACING ends
          * in the same words, and written alike VC6 kept one copy of the two;
          * the image has one in each arm. */
         {
@@ -2163,10 +2209,10 @@ eos:
             return 1;
         }
         STEP();
-        WANT(AM2_TOKEN_STRING)
-        VARNAME("Line [%4d]:  expected variable name but variable %s not "
-                "declared\n")
-        return 1;
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
+        return ActVarName(ctx, at, act, "Line [%4d]:  expected variable name but variable %s not "
+                "declared\n");
 
     case AM2_TOK_SETVAR:
         STEP();
@@ -2178,8 +2224,9 @@ eos:
             (*at)++;
             return 1;
         }
-        VARNAME_EQ("Line [%4d]:  expected variable name in SetVar but "
-                   "variable %s not declared\n")
+        if (!ActVarNameEq(ctx, at, act, "Line [%4d]:  expected variable name in SetVar but "
+                   "variable %s not declared\n"))
+            return 0;
         return 1;
 
     case AM2_TOK_ADDVAR:
@@ -2192,15 +2239,18 @@ eos:
             (*at)++;
             return 1;
         }
-        WANT(AM2_TOKEN_STRING)
-        VARNAME_EQ("Line [%4d]:  expected variable name in AddVar but "
-                   "variable %s not declared\n")
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
+        if (!ActVarNameEq(ctx, at, act, "Line [%4d]:  expected variable name in AddVar but "
+                   "variable %s not declared\n"))
+            return 0;
         return 1;
 
     case AM2_TOK_ACTIVATEREGION:
         STEP();
         act->code = 0x26;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->subject = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         act->n0 = 1;
         (*at)++;
@@ -2209,7 +2259,8 @@ eos:
     case AM2_TOK_INACTIVATEREGION:
         STEP();
         act->code = 0x26;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         /* The value is read before the zero is stored: the image loads it,
          * stores the zero, stores it, then reloads the index. Written the
          * other way round VC6 recomputes the token's address after the
@@ -2231,7 +2282,8 @@ eos:
         STEP();
         act->code = 0x28;
     string_arg:
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -2239,7 +2291,8 @@ eos:
     case AM2_TOK_SETSTRATMAP:
         STEP();
         act->code = 0x29;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         act->text = (char *)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -2256,7 +2309,8 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_ATTACK: (*at)++; act->n0 = 6; return 1;
         case AM2_TOK_DEFEND: (*at)++; act->n0 = 7; return 1;
@@ -2274,7 +2328,8 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         /* stand 1, kneel 2, prone 3, none 0. */
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_STAND: (*at)++; act->n0 = 1; return 1;
@@ -2293,7 +2348,8 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        WANT(AM2_TOKEN_RESERVED)
+        if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
+            return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_SLOW:   (*at)++; act->n0 = 1; return 1;
         case AM2_TOK_NORMAL: (*at)++; act->n0 = 0; return 1;
@@ -2313,8 +2369,8 @@ eos:
             return 0;
         if (*at >= ctx->count)
             goto eos;
-        /* TYPEERR with the kind name in a local: the local is a web and
-         * takes edx, where the macro's temporary takes eax here, and with
+        /* ActTypeErr written out with the kind name in a local: the local is a web and
+         * takes edx, where the inlined function's temporary takes eax here, and with
          * edx the error's tail is the one the shared block has, so it
          * joins that block after the pushes instead of keeping a copy. */
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
@@ -2331,7 +2387,8 @@ eos:
         }
         STEP();
         act->code = 0x33;
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -2344,7 +2401,8 @@ eos:
          * the image. A goto there instead gives the block a second
          * predecessor before allocation and VC6 allocates it the register
          * way (docs/vc6-regalloc.md). */
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -2352,7 +2410,8 @@ eos:
     case AM2_TOK_SETDAMAGEPAD:
         STEP();
         act->code = 0x3A;
-        WANT(AM2_TOKEN_STRING)
+        if (!ActWant(ctx, at, AM2_TOKEN_STRING))
+            return 0;
         {
             int32_t p = ScriptFindName((const char *)ctx->tokens[*at].value);
 
@@ -2370,7 +2429,8 @@ eos:
             act->subject = kScriptNames[p].value;
         }
         STEP();
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         STEP();
         act->n0 = 0;
@@ -2476,7 +2536,8 @@ eos:
          * in either arm, or the step before the store, hands the block to
          * SETUILOCK's copy or leaves ADDEXP's test in a register
          * (docs/vc6-regalloc.md). */
-        WANT(AM2_TOKEN_INTEGER)
+        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+            return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -2515,10 +2576,6 @@ place:
         return ScriptLocation(ctx, at, act, 0) != 0;
     }
 #undef STEP
-#undef TYPEERR
-#undef WANT
-#undef VARNAME
-#undef VARNAME_EQ
 }
 
 /* AM2_PROBE_NOACTION runs the ORIGINAL action parser under our ReadScript and
