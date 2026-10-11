@@ -919,7 +919,7 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
     if (n > 1) {
         wr = values;
         do {
-            int32_t delta, j;
+            int32_t delta;
             /* Advanced, then read one behind, so the first pass reads
              * values[0] and writes values[1]. The image adds before it loads
              * (`add ebx, 2` ahead of `mov dx, [ebx-2]`); `*wr++` loads first. */
@@ -930,7 +930,9 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
             delta = (int32_t)values[i] - prev;
             kept++;
 
-            for (j = i + 1; j < n; j++) {
+            /* No counter of its own: the `j` the image steps beside `i` is
+             * the compiler's, and a source one outweighs `n` for ecx. */
+            while (i + 1 < n) {
                 if ((int32_t)values[i + 1] - (int32_t)values[i] != delta)
                     break;
                 i++;
@@ -939,11 +941,13 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
             i++;
             *wr = values[i - 1];
 
-            /* The count is re-read for the loop test, as the original does;
-             * the inner bound keeps the value read on entry. Nothing in the
-             * loop writes it, so the two agree unless the count lives inside
-             * the array. */
-        } while (i < *count);
+            /* The count is re-read for the loop test, as the original does,
+             * into `n` -- the image loads it into n's own register -- so the
+             * next pass's inner bound is the fresh value. Nothing in the loop
+             * writes it, so the two agree unless the count lives inside the
+             * array. */
+            n = *count;
+        } while (i < n);
     }
 
     *count = kept + 1;
