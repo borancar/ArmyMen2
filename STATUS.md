@@ -156,7 +156,11 @@ main result so far (details in `src/vc6/README.md`):
   address signed, `jl`), RegionFindPath to the image's shape (the next open
   head read through CUR) and ScrollMapCache 11 -> 10 (BltFast's `This` read
   from the global), the last two from substituting a copy for its source
-  one use at a time: 40 off in shape, 554 on code alone.
+  one use at a time. DepthInsert 3 -> 2 (append through the cursor, which
+  is `at` on both ways in) and AiTrooperStep 16 -> 14 (the waypoint test
+  reads `moveAt` itself) by the same substitution: 40 off in shape, 551 on
+  code alone. Each candidate the sweeps offer must be read before it is
+  kept -- most substitute a value that is NOT equal on every path.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
