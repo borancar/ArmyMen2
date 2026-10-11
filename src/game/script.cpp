@@ -2129,8 +2129,19 @@ eos:
         }
         STEP();
         WANT(AM2_TOKEN_STRING)
-        VARNAME("Line [%4d]:  expected variable name but variable %s not "
-                "declared\n")
+        /* VARNAME with its last two statements swapped. SETGUNFACING ends
+         * in the same words, and written alike VC6 kept one copy of the two;
+         * the image has one in each arm. */
+        {
+            int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
+            if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {
+                am2_log("Line [%4d]:  expected variable name but variable %s not "
+                        "declared\n", ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value);
+                return 0;
+            }
+            (*at)++;
+            act->xvar = v;
+        }
         return 1;
 
     case AM2_TOK_SETGUNFACING:
