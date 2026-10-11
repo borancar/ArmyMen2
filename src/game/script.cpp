@@ -2339,9 +2339,11 @@ eos:
     case AM2_TOK_SETUILOCK:
         STEP();
         act->code = 0x39;
-        /* Its own copy, which the image shares with ADDEXP's block from
-         * the token load on; a goto into that block gives it a second
-         * predecessor and changes how VC6 allocates it. */
+        /* The same words as ADDEXP's tail, and VC6 keeps ADDEXP's copy:
+         * this arm becomes one jump into it from the token load on, as in
+         * the image. A goto there instead gives the block a second
+         * predecessor before allocation and VC6 allocates it the register
+         * way (docs/vc6-regalloc.md). */
         WANT(AM2_TOKEN_INTEGER)
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
@@ -2467,19 +2469,17 @@ eos:
     name_then_int:
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        /* The positive test, with the store inside it. This arm owns the
-         * type-error block six INTEGER and STRING arms share from their
-         * kind-name load on (the token's address pushed from eax); written
-         * as WANT with the stores after, VC6 either merges SETITEMFLAG's
-         * identical tail into it or, with the step before the store, holds
-         * the address in ecx and the other arms push for themselves
+        /* This arm owns the type-error block six INTEGER and STRING arms
+         * share from their kind-name load on (the token's address pushed
+         * from eax), and SETUILOCK's whole tail is a jump into this one.
+         * Both need the plain WANT here and in SETUILOCK: a positive test
+         * in either arm, or the step before the store, hands the block to
+         * SETUILOCK's copy or leaves ADDEXP's test in a register
          * (docs/vc6-regalloc.md). */
-        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            (*at)++;
-            return 1;
-        }
-        TYPEERR(AM2_TOKEN_INTEGER)
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
 
     case AM2_TOK_FIREWEAPON:
         STEP();
