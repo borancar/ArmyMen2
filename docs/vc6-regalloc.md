@@ -968,6 +968,22 @@ against OUR listing first, `labab.py` runs a variant file through the lab
 and reports the one register under study, and the volatile-read probe
 measures the rotation distance to the image in steps.
 
+## ObjTileHook in the lab: `test` operand order (2026-10-11)
+
+One byte: `test ebx, eax` against the image's `test eax, ebx`, in `if
+(mask[i] & entered) ... else if (mask[i] & left)`. A mini-lab (one loop,
+no image comparison, `minilab.py`) showed every spelling of the test --
+operands swapped, `!= 0`, inverted, a `hit` temporary, the mask walked
+by pointer, `entered` widened or cast, the array indexed directly --
+writes `test <variable>, <loaded value>`. Reading the entry into a local
+used by BOTH tests, `int32_t m = mask[i]; if (m & entered) ... else if
+(m & left)`, writes `test eax, <variable>`: the local is now the first
+operand, and the second test still reads `left` from the frame as a
+byte. Carried into pad.cpp it is byte-identical, relink 1585 -> 1586. The
+rule, as far as one case shows it: a value loaded for a single test is
+the second operand of `test`; a value that is a local (even one VC6 keeps
+only in a scratch register) is the first.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports

@@ -197,7 +197,9 @@ main result so far (details in `src/vc6/README.md`):
   ScriptParseActionRecon 2,336, Step3Drive 974 (its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
   SightScan 910, FindPath 834; MissionEnded's attempt-count store after
-  the close is 2 -> 4. Re-transcribing FindPath whole from its listing scored worse than
+  the close is 2 -> 4. ObjTileHook byte-identical (the mask entry read
+  into a local for both tests puts it first in the `test`; found in the
+  lab, docs/vc6-regalloc.md): relink 1586 of 1646, 60 differ. Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in
