@@ -2718,8 +2718,20 @@ triggers_done:
                 if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
                     return 0;
                 g_pads[g_padCount].delay0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-                if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+                /* The second check written out rather than through
+                 * ScriptExpect: inlined twice the same way, the two copies
+                 * merge, where the image keeps three integer checks. */
+                if (++(*at) >= ctx->count) {
+                    am2_log("Unexpected end of script.\n");
                     return 0;
+                }
+                if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+                    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                            ctx->tokens[*at].line,
+                            ScriptTokenText(&ctx->tokens[*at], kScriptWord),
+                            kKindName(AM2_TOKEN_INTEGER));
+                    return 0;
+                }
                 g_pads[g_padCount].delay1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
                 (*at)++;
             }
