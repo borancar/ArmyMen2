@@ -567,6 +567,18 @@ the arms the other way round (shape 110 -> 108).
   `+ 0`, and a separate `++` statement all merge the same way, so this merge
   is not removed by respelling, as UpdateTrooperAction's (above) was by
   reordering whole statements; ScriptIf's blocks have one statement each.
+- **Which `return 0` a conditional exit reuses (RegionFindPath, 2026-10-11).**
+  RegionFindPath is at the image's shape; its one remaining byte difference
+  is the target of the empty-open-list `je`: the image jumps to the FIRST
+  `return 0` epilogue (the inactive-destination test), ours to the LAST (the
+  depth test after the loop). In a lab clone the choice flips with the code
+  after the depth test: with nothing but `return 1` it becomes a `setcc`, no
+  depth block exists and the jump takes the first epilogue; with any
+  statement after it (a store, a call, the path loop) the jump takes the
+  depth block. A `goto` to a label on the first return moves that block to
+  the end; a combined early test, a top-tested `while`, the depth test
+  inside the found arm, `(cur = head) == 0`, a `goto` to a return at the
+  very end, and five spellings of the depth test all fail to reproduce it.
 - **ScriptParseActionRecon, 129 -> 74 by the same reordering**
   (2026-10-11). Its arms end in a handful of identical tails, and wherever
   the image keeps two copies VC6 had merged ours into one. Swapping two
