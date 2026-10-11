@@ -181,7 +181,8 @@ main result so far (details in `src/vc6/README.md`):
   re-read), FindPath 50 -> 47 (PathUnwind indexes `out[i--]`, so the
   pointer forms after the `end` test as the image's does) and ScriptPad
   60 -> 53 (the pad slot takes g_padCount itself, not the id read back) and
-  ObjRemap 7 -> 6 (the bottom cell from the saved top): about 496 on code
+  ObjRemap 7 -> 6 (the bottom cell from the saved top) and MpPanelScreen
+  18 -> 11 (the arrow bar's span read at its use): about 489 on code
   alone. Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend

@@ -705,6 +705,16 @@ the arms the other way round (shape 110 -> 108).
   `push` of a function or string address that the per-TU relink
   listing leaves as `push 0` (SightScan's two sight callbacks,
   MpPanelScreen's one string; WndProc's is the known relocation).
+  MpPanelScreen 18 -> 11 from reading `bar->span` in the ThumbShift
+  argument rather than into a local ahead of the call: the local made
+  VC6 load the sprite bottom to a register where the image subtracts it
+  as a memory operand (the other four ThumbShift callers already read
+  it in place). AiTrooperStep's shared move-target tail: the image has
+  the else arm fall into `set_move_to` (moveTo, then moveEnd as an
+  immediate 0) with the two planning arms jumping forward to it; ours
+  pulls the label up to the last planning arm and keeps the else arm's
+  own copy, and neither store order (12, unchanged) nor dropping the
+  else arm's copy (25, 26) moves it.
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
