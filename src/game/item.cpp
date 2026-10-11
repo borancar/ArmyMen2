@@ -4961,7 +4961,7 @@ raise_s:
 raise_k:
                     out->state = AM2_POSE_RAISE_KNEEL;
                 }
-                break;
+                return 1;
             case 2:
                 out->state = AM2_POSE_KNEEL;
                 break;
