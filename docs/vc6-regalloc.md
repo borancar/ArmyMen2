@@ -611,6 +611,13 @@ the arms the other way round (shape 110 -> 108).
   reading the global for the test and again for the argument is 8 -> 4. The
   same unnaming of `reach` in SightScan is 25 -> 23. `unname.py` and
   `unname_helper.py` sweep this over callers and helper bodies.
+  Sweeps that found nothing on 2026-10-11, all run over every off function
+  from the then-current source: a global read into a local at the top of the
+  function (namevar), each `for`/`while` as `while (1) { if (!c) break; }`
+  and as a guarded `do/while` (loopform), each cast assignment through a
+  temporary (tempify), each labelled tail block moved to the function's end
+  (labelend), and the helper bodies' own locals unnamed (unname_helper, after
+  PointerIdleOverlay's). The pattern they would have caught is spent.
 
 - **A re-read VC6 will not reproduce otherwise: a volatile read
   (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
