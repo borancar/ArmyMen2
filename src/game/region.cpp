@@ -4951,14 +4951,16 @@ in_sight:
             /* Modes 2 and 3 refuse a candidate that is allied WITH US, but only
              * once a second has passed since we were last hit -- and the refusal
              * skips recording it while still revealing it below. */
-            cand = it;
-            if ((o->aiMode == 3
+            /* Cleared first and set when NOT refused: the image tests and
+             * then stores `it` on the fall-through. */
+            cand = (AM2_Object *)0;
+            if (!((o->aiMode == 3
                  || o->aiMode == 2)
                 && (uint32_t)(g_gameClockMs
                               - o->hitTime)
                        > AM2_SIGHT_KIND7_RANGE
-                && ObjsAreAllied(it, o, 0))
-                cand = (AM2_Object *)0;
+                && ObjsAreAllied(it, o, 0)))
+                cand = it;
 
             if (ObjIsOurs(o, 0)) {
                 RevealObj(it);
