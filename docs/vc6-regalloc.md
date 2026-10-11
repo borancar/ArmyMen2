@@ -798,6 +798,20 @@ the arms the other way round (shape 110 -> 108).
     immediate, and a late `push ebp`). Lightening the 1 -- the turret
     test as `count >= 2`, first site, second, both -- is 21 -> 27, 23,
     29; the 1's weight is not what decides it.
+  - The 22 functions at the image's shape but not its bytes (1,106 bytes
+    between them, 2 to 220 each) were read the same way, from the raw
+    instruction diff of the relink json (`rawdiff.py`, no compile):
+    ObjTileHook is one `test` with its operands swapped and the source
+    operand order does not reach it (1 either way); LoadOptions's last
+    sentinel store is scheduled between the epilogue's pops with the
+    skip edge jumping to the else arm's copy, and an explicit `return`
+    before the else changes nothing; PausedFrameStep's `active = 0`
+    initialised at its declaration is 2 -> 10; MovieStart's poll
+    guarded on the global 4 -> 9; ParseScenarios's size parameter used
+    in place (the image's `sub ebp, 4`) 15 -> 37; RefundPlacedUnit's
+    case arms in the other order the same bytes; WndProc's paint rect
+    at function scope the same bytes (ours shares its slot with
+    another arm's buffer, the image does not). None applied.
   - What remains in those functions is which register a value gets
     (ScriptParseActionRecon's kind-name pushes come from edx, eax and
     ecx in both listings, and VC6 cross-jumps only the common suffix),
