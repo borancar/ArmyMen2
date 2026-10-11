@@ -1550,9 +1550,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (size != 0xC) MISMATCH();
             orig_map_fread(hdr, 0xC, 1, f);
             consumed += 0xC;
+            /* Both dimensions first, then the shift, as the image stores them. */
+            g_mapTilesW      = hdr[0];
             g_mapTilesH      = hdr[1];
             (*(int32_t *)&g_mapRowShift)    = Log2Mask(hdr[0]) & 0xFF;
-            g_mapTilesW      = hdr[0];
             g_mapExtentX     = g_mapTilesW << 4;
             g_mapExtentY     = g_mapTilesH << 4;
             g_mapExtentShift = Log2Mask(g_mapExtentX) & 0xFF;
@@ -1636,8 +1637,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             if (tmp == 0)
                 goto skip;
             orig_map_fread(tmp, size, 1, f);
-            consumed += (int32_t)size;
             ParseScenarios(tmp, (int32_t)size);
+            consumed += (int32_t)size;      /* counted after the parse */
             am2_free(tmp);
             break;
         }
