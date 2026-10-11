@@ -448,6 +448,21 @@ changes nothing or is worse. The first site still keeps its own copy.
   DrawSprite(B, ...);` with the two calls' common tail merged (482 -> 72
   bytes, and to the image's shape once `badge` was an int32).
 
+- **Identical arms are merged by what the source says, so an image that
+  keeps them apart wrote them differently.** UpdateTrooperAction's three
+  stop arms, `out->state = 1; turned = 1; out->bearing = facing; speed =
+  0;` written alike in `if ... else if (a) S else if (b) S`, came out as
+  one copy behind an `a || b` test; the image has a copy per arm. With the
+  four statements in a different order in each arm (the generated stores
+  are scheduled the same either way) VC6 keeps them apart (v3 25 -> 18,
+  then 16 with the third arm). This merge happens on the intermediate
+  code: retyping a store or spelling its operand differently does not
+  stop it, and once registers are assigned a tail merge needs matching
+  registers too (PointerPickMode0's hint tail, HudSquadUpdate's ink arms).
+- **Retry a rejected type after a structural fix.** UpdateTrooperAction's
+  `klass` as an int32 was worse (28 -> 30) while the arms were merged and
+  better (16 -> 10) once they were not; PausedFrameStep's `badge` the same.
+
 ## `for (;;)` and `while (1)` are different loops to VC6
 
 The two compile differently (2026-10-10). VC6 rotates `for (;;) { if (c)

@@ -129,7 +129,13 @@ main result so far (details in `src/vc6/README.md`):
   testing the sum rather than `f`, which keeps VC6 from folding the
   increment to a constant (bytes 58 -> 74: two registers swap). Counting
   `inc`/`dec` on a register as the `add`/`lea` it replaces, 43 functions
-  are still off in shape, about 700 in total. PlacementAllowed
+  are still off in shape, about 700 in total. Then PausedFrameStep
+  reaches the image's shape (the badge drawn by two calls rather than a
+  ternary argument, `badge` an int32: 482 -> 4 bytes), the HudPanel
+  constructor (`%i`, as the image's literal) and UpdateTrooperAction
+  28 -> 10 (BlockWeightRoute takes the fifth argument every caller pushes,
+  the stop arms written in different orders so VC6 keeps them apart,
+  `klass` an int32): 41 off in shape. PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
   ObjClearFootprint and ObjClearRoachFootprint match, and
