@@ -1065,6 +1065,38 @@ when the tail's reads pay for it, and explicit returns are reads.** Where
 the image reloads a variable right after storing a constant to its slot,
 that is the copy being re-synced, not a second variable.
 
+## BlockWeightTroops in the lab: a priority threshold, not a spelling (2026-10-11)
+
+Eighty-two bytes, every one a swap: the image holds `from` in ebp and
+the inlined helper's `w` in ebx, ours the reverse, and the image's
+distance arm calls `ApproxDist(&f->pos, &o->pos)` FIRST, keeping its
+result in the register `from` just died in (`add ebp, 12h` forms the
+argument in place, `mov ebp, eax` takes the result), then
+`ApproxDist(&ref, ...)`. A clone (0 lines from our build) measured:
+
+- The call order is not the operand order. Swapping the comparison only
+  flips the `cmp`; VC6 evaluates the `ref` call first either way, and
+  spills `&f->pos` across it. Written `int32_t d = ApproxDist(&f->pos,
+  &o->pos);` ahead of the test the calls come out as the image's, but
+  then `from`'s load is hoisted above the loop (the image, and ours,
+  load it at the loop head), `d` takes ebx and `w` spills to a slot.
+  A per-iteration `f = from`, `ref` by pointer, `register`, and the
+  local at the helper's top or the caller's all leave that.
+- The ebx/ebp swap is priority. Taking uses off `from` one at a time,
+  seven keep it in ebx (ours) and six hand ebx to `w` (the image), with
+  nothing else moving. Which two of its eight reads the original did
+  not count is not known: a local alias for the type-2 arm, a second
+  inline helper for it, `return w` where `w` is known to be the full
+  weight (VC6 still emits `mov eax, 0Fh`), extra `return w` sites, the
+  item flag returned directly, `w` as int16/uint32, and declaration
+  orders all leave the count; an `int8_t w` takes ebx by the
+  byte-register constraint and writes `mov bl`.
+
+It stays; the two mechanisms are usable elsewhere (a distance computed
+into a local ahead of its comparison is how the first call comes first,
+and a register-only swap between two webs is a use count, which the
+threshold measures).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
