@@ -9749,8 +9749,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             noTarget = ((uint16_t)target.x == 0);
 
             if (!noTarget
-                && ApproxDist(&target,
-                              &o->pos) < 0xC0) {
+                && ApproxDist(&o->pos,
+                              &target) < 0xC0) {
                 int32_t d = AngleDelta(o->facing,
                                        *(const uint8_t *)r);
                 d = abs(d);
@@ -9764,8 +9764,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             if (!noTarget
                 && (uint16_t)o->fieldC0 == (uint16_t)target.x
-                && ApproxDist(&target,
-                              &o->pos) < 0x60)
+                && ApproxDist(&o->pos,
+                              &target) < 0x60)
                 r->stop = 1;
             else
                 r->stop = 0;
@@ -9812,13 +9812,17 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             /* +0xD8 counts consecutive blocked frames and scales the speed
              * by it -- again in opposite directions on the two arms. */
+            /* The product is formed in each arm, as the image multiplies
+             * twice; hoisting it ahead of the test is four off the shape.
+             * ApproxDist's arguments above are (position, target), the
+             * order the image pushes, and the distance is symmetric. */
             if ((uint32_t)o->stuckCount > 0 && speed != 0) {
-                int32_t t = (int32_t)o->stuckCount * speed;
-
                 if (r->field0C != 0) {
+                    int32_t t = (int32_t)o->stuckCount * speed;
                     int32_t c = o->field55C;
                     speed = (c > t) ? c : t;
                 } else {
+                    int32_t t = (int32_t)o->stuckCount * speed;
                     int32_t c = o->field558;
                     speed = (c < t) ? c : t;
                 }
