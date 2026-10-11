@@ -1484,20 +1484,6 @@ static inline int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
 }
 
 
-/* `createtrooper`, `createvehicle`: a location and an army, and the army's
- * own result decides the return. */
-static inline int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
-                               AM2_ScriptAction *act)
-{
-    if (!ActStep(ctx, at))
-        return 0;
-    if (!ScriptLocation(ctx, at, act, 0))
-        return 0;
-    int32_t army = ScriptArmyColour(ctx, at);
-    act->army = army;
-    return army >= 0;
-}
-
 /* 0x00440D70. One act, into a 0x48-byte record.
  *
  * 59 keywords behind a byte-index dispatch, four of which dispatch again.
@@ -1783,7 +1769,20 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                     ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord));
             return 0;
         }
-        return ActPlaceAndArmy(ctx, at, act);
+        /* A location and an army, and the army's own result decides the
+         * return. Written out in both creates rather than as one inline
+         * helper: from the helper VC6 kept a single copy after
+         * createvehicle; written out, the step stays here and
+         * createvehicle's arms jump back to it, as in the image. */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (!ScriptLocation(ctx, at, act, 0))
+            return 0;
+        {
+            int32_t army = ScriptArmyColour(ctx, at);
+            act->army = army;
+            return army >= 0;
+        }
 
     case AM2_TOK_CREATEVEHICLE:
         STEP();
@@ -1803,7 +1802,15 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                     ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord));
             return 0;
         }
-        return ActPlaceAndArmy(ctx, at, act);
+        if (!ActStep(ctx, at))
+            return 0;
+        if (!ScriptLocation(ctx, at, act, 0))
+            return 0;
+        {
+            int32_t army = ScriptArmyColour(ctx, at);
+            act->army = army;
+            return army >= 0;
+        }
 
     case AM2_TOK_CREATEPOWERUP:
         STEP();
