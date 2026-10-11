@@ -2397,11 +2397,11 @@ eos:
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             act->n0 = 4;
             (*at)++;
-            return 1;
+        } else {
+            act->n0 = ScriptArmyColour(ctx, at);
+            if (act->n0 < 0)
+                return 0;
         }
-        act->n0 = ScriptArmyColour(ctx, at);
-        if (act->n0 < 0)
-            return 0;
         return 1;
 
     case AM2_TOK_SETM80:
@@ -2444,10 +2444,10 @@ eos:
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
         /* No bounds check before this read. */
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
-            return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+        }
         return 1;
 
     case AM2_TOK_MAKEFLAME:
@@ -2455,10 +2455,10 @@ eos:
         act->code = 0x32;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
-            return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+        }
         return 1;
 
     case AM2_TOK_ADDEXP:
