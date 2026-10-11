@@ -2211,13 +2211,13 @@ eos:
         act->code = 0x26;
         WANT(AM2_TOKEN_INTEGER)
         act->n0 = 0;
-        /* The step before the store: the same reordering as ADDEXP's, which
-         * changes which of the identical integer tails VC6 shares, towards
-         * the image's arrangement. */
+        /* Through a temporary, the store before the step: of the forms
+         * tried this leaves VC6's sharing of the identical integer tails
+         * closest to the image's. */
         {
             int32_t n = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            (*at)++;
             act->subject = n;
+            (*at)++;
         }
         return 1;
 

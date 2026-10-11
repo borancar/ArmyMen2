@@ -3411,8 +3411,8 @@ after_region:
 
         ob->routeGoal = pt;
         if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
-            ob->routeGoal = *(&ob->dest);
             ob->moveFrom  = *(&ob->pos);
+            ob->routeGoal = *(&ob->dest);
             goto set_move_to;
         }
         /* A route was found; PlanPathTo filled the waypoints itself. */
