@@ -3390,8 +3390,13 @@ after_region:
         ob->routeGoal = *dest;
         goto walk;
     } else {
+        /* Its own copy of the target stores, in this order -- the shared
+         * one below has them the other way round. */
         ob->routeGoal = pt;
         ob->moveFrom  = *(&ob->pos);
+        ob->moveTo    = pt;
+        ob->moveEnd   = 0;
+        goto two_waypoints;
     }
 set_move_to:
     ob->moveEnd = 0;
