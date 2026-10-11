@@ -785,6 +785,13 @@ the arms the other way round (shape 110 -> 108).
     DepthInsert's link-after arm written out with the new node formed
     first, in three orders (2 -> 10..17; its 460 bytes are one register
     swap across the whole function behind a two-line shape difference).
+    Step3Drive's big remainder is `r` in ebp against the image's `speed`
+    there (27 field uses of `r` to 21 of `speed`); taking the six
+    `r->spot` uses through a pointer local, or the three `r->field0C`
+    tests through one, moves the weight but not the way the image went
+    (21 -> 29, 26, 32). UpdateTrooperAction's `found = 1` is a register
+    in the image's loop and a stack store in ours; the image zeroes its
+    try counter in five arms where ours stores a different local.
   - What remains in those functions is which register a value gets
     (ScriptParseActionRecon's kind-name pushes come from edx, eax and
     ecx in both listings, and VC6 cross-jumps only the common suffix),
