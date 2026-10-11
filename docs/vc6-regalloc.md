@@ -811,7 +811,11 @@ the arms the other way round (shape 110 -> 108).
     in place (the image's `sub ebp, 4`) 15 -> 37; RefundPlacedUnit's
     case arms in the other order the same bytes; WndProc's paint rect
     at function scope the same bytes (ours shares its slot with
-    another arm's buffer, the image does not). None applied.
+    another arm's buffer, the image does not). SelectionClick's deselect
+    site loads the zero point into eax where the image takes ecx (the
+    tail's call takes eax in both); the local copy the source carries
+    for it no longer moves it, and passing the global directly is 2 ->
+    42 bytes. None applied.
   - What remains in those functions is which register a value gets
     (ScriptParseActionRecon's kind-name pushes come from edx, eax and
     ecx in both listings, and VC6 cross-jumps only the common suffix),
