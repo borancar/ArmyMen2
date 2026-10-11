@@ -2057,10 +2057,10 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                g_mapTilesH - AM2_TILEMASK_MARGIN);
     tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
-    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
-    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
     out->box.left = tile.left - AM2_TILEMASK_MARGIN;
+    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
+    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
+    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
     w = out->box.right - out->box.left + 1;
