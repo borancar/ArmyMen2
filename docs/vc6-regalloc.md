@@ -600,6 +600,18 @@ the arms the other way round (shape 110 -> 108).
   `while (1)` form with `goto` exits keeps the arms but ends `jge; jmp`
   where the image has `jl`. Unresolved.
 
+- **A sweep hit can match the count without matching the image.** The
+  shape count drops stack loads, so a variant that reads a GLOBAL where the
+  image reads a stack local can score better while being wrong:
+  HudPostUpdate's handler calls pushed `g_dragAnchor` in place of the local
+  `at` (4 -> 1) where every `call eax` in the image pushes `[esp+0x10]`.
+  Check the image's operand before keeping a substitution the count likes.
+- **An inline helper's local the image reads twice (HudPostUpdate,
+  2026-10-11).** PointerIdleOverlay held `g_weaponFnSlot2` in a `row` local;
+  reading the global for the test and again for the argument is 8 -> 4. The
+  same unnaming of `reach` in SightScan is 25 -> 23. `unname.py` and
+  `unname_helper.py` sweep this over callers and helper bodies.
+
 - **A re-read VC6 will not reproduce otherwise: a volatile read
   (RefundPlacedUnit, 2026-10-11).** The image loads the follower uid twice
   in `while (uid) o = LookupByUID(uid);`, once for the test and again for the
