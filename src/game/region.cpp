@@ -9987,12 +9987,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     }
 #undef ENGINE
 
-    *(uint8_t *)((uint8_t *)o->rowSet.rows + 0x50u) =
-        o->facing;
+    o->rowSet.rows[0].heading = o->facing;
     }
     if (o->rowSet.count > 1)
-        *(uint8_t *)((uint8_t *)o->rowSet.rows + 0xB0u) =
-            o->turretFacing;
+        o->rowSet.rows[1].heading = o->turretFacing;
 
     StepObjRows((AM2_Object *)o);
     o->field44 = speed;
