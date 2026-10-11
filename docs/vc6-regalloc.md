@@ -701,10 +701,23 @@ the arms the other way round (shape 110 -> 108).
   copy removed give identical code (23) or worse (38); VC6 pulls the
   labelled block up to the aiMode arm's unconditional `goto` and
   duplicates it for the kind-7 fall-through whatever the source order.
-  Three of the remaining counts are listing artifacts, not shape: a
-  `push` of a function or string address that the per-TU relink
-  listing leaves as `push 0` (SightScan's two sight callbacks,
-  MpPanelScreen's one string; WndProc's is the known relocation).
+  Three of the remaining counts were listing artifacts, not shape: a
+  `push` of a function address that the per-TU relink listing left as
+  `push 0`. THE SCORER'S SYMBOL TABLE WAS STALE: the one-TU scorer
+  (xsc, via rl1 with LOAD=syms.pkl) resolves a reference to another
+  TU's function through a table saved from an earlier full compile,
+  keyed by DECORATED name, and `ObjIsHittable(void *)` had since been
+  retyped to `ObjIsHittable(AM2_Object *)` -- so SightScan's two
+  callback pushes, and every retyped callee's call, missed. The full
+  relink compiles all TUs together and never saw it. Rebuilt the table
+  (SAVE= on a full rl1 run) and gave rl1 a fallback under LOAD to the
+  undecorated name when it is unique, which survives the next retyping.
+  With fresh listings for all 39: SightScan 23 -> 21, WndProc's single
+  remaining instruction was the same artifact and it is at the image's
+  shape; 487 on code alone. MpPanelScreen's `"%s.txt"` stays as the
+  one genuine unresolvable: the string occurs more than once in the
+  image and the site is misaligned, so the content check cannot pick
+  its copy.
   MpPanelScreen 18 -> 11 from reading `bar->span` in the ThumbShift
   argument rather than into a local ahead of the call: the local made
   VC6 load the sprite bottom to a register where the image subtracts it

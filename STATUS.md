@@ -183,7 +183,10 @@ main result so far (details in `src/vc6/README.md`):
   60 -> 53 (the pad slot takes g_padCount itself, not the id read back) and
   ObjRemap 7 -> 6 (the bottom cell from the saved top) and MpPanelScreen
   18 -> 11 (the arrow bar's span read at its use): about 489 on code
-  alone. Re-transcribing FindPath whole from its listing scored worse than
+  alone -- and 487 once the per-TU scorer's symbol table was rebuilt
+  (it dated from before the trooper-AI retyping, so a retyped callee's
+  pushed address scored as `push 0`: SightScan 23 -> 21, WndProc's last
+  byte was that and not a relocation; docs/vc6-regalloc.md). Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in
