@@ -2744,7 +2744,9 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - box->top) * w
                              + AM2_TILEMASK_MARGIN;
 
-        for (; off < end; off++) {
+        /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
+         * multiple of 32 here, so every row has bytes to walk. */
+        do {
             if (splitOdd == off % 2) {
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
@@ -2767,7 +2769,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 marked = 1;
                 MarkTileRing(out->cells, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
-        }
+        } while (++off < end);
     }
 
     return marked;
