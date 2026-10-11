@@ -186,7 +186,12 @@ main result so far (details in `src/vc6/README.md`):
   alone -- and 487 once the per-TU scorer's symbol table was rebuilt
   (it dated from before the trooper-AI retyping, so a retyped callee's
   pushed address scored as `push 0`: SightScan 23 -> 21, WndProc's last
-  byte was that and not a relocation; docs/vc6-regalloc.md). Re-transcribing FindPath whole from its listing scored worse than
+  byte was that and not a relocation; docs/vc6-regalloc.md). A per-hunk
+  sweep of every function then (each hunk read with its raw context, asking
+  what expression makes VC6 emit the image's load or store): Step3Drive
+  30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
+  12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
+  10 -> 9: 39 off in shape, 465 on code alone. Re-transcribing FindPath whole from its listing scored worse than
   the source in every structural form, and a round of alternative spellings
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in

@@ -742,6 +742,51 @@ the arms the other way round (shape 110 -> 108).
   a chained assignment 20, the page index written inline 37.
   ScrollMapCache blitting through its `cache` local rather than the
   global (the image reloads the spilled local) is 10 -> 11.
+
+- **Read each hunk with its raw context, and ask what expression emits
+  the image's instruction (2026-10-11).** Every gain of the day came
+  that way and none from a structural rewrite or a sweep. What the
+  hunks said, function by function:
+  - Step3Drive 30 -> 21: the image pushes `&target` before `&o->pos` at
+    both distance tests, i.e. `ApproxDist(&o->pos, &target)` (the
+    distance is symmetric); and it multiplies `stuckCount * speed` in
+    EACH clamp arm, where a `t` hoisted ahead of the `if` was one `imul`.
+    Re-reading `o->rowSet.rows` for the bias and the stamp (not `gun`)
+    stays: the image reloads it (33, 37 with `gun`).
+  - ListMaskAction 32 -> 29, ObjHitMaskAction 24 -> 21: the ring marker's
+    end test is `jl` in the image, `jb` from a pointer walk; written as
+    an index loop (`ring[i]`, `i < AM2_TILEMASK_RING`) VC6 still
+    strength-reduces to the pointer walk but keeps the signed compare.
+    The phase split with `k -= phase` after the join, or as a ternary,
+    and a `cells` local for the index are all worse (29..76).
+  - RowUpdate 12 -> 10: the loop increments in the image's order,
+    `x++, used++, cell++` (the entry pointer stepped before the cell).
+  - EncodeGlyph 11 -> 10: a walking `uint16_t *offs` stored through
+    `*offs++`, which the image keeps in a register with `out` on the
+    frame; indexing `offs[row]` was 15.
+  - UpdateTrooperAction 10 -> 5: `i = 1` stored before the sweep limit
+    is chosen -- the image's `mov [esp+0x1c], 1` sits ahead of the
+    ObjType2Field548 call, and VC6 does not move a store across a call.
+  - ScrollMapCache 10 -> 9: the lower strip's `wide.bottom = wide.top +
+    dy` -- the image computes bottom - dy, stores it, adds dy back.
+  - Measured and worse: AiTrooperStep through its `pos` pointer (12 ->
+    20; the image recomputes `&ob->pos` at each use after all),
+    VehicleUpdateAppend's position and action as two `if`s on the same
+    mask (11 -> 17; the image's second `test ecx, ecx` is the masked
+    value kept, not a second test), FlowRecvMessage's in-switch
+    `return 0`s as breaks (15 -> 20), ScriptParseActionRecon's `eos:`
+    moved into the TRIGGERDELAY arm (70 -> 192), INACTIVATEREGION through
+    a token pointer (76), LoadMap counting the scenario chunk before the
+    parse (8 -> 18), ScriptPad's pad count incremented last (53 -> 69),
+    FindPath's `g` as a sum or a shift (47, same code), SelectFirePose's
+    grenade arm returning in place (20, same code), PointActionC through
+    a sprite-slot pointer (3, same code), ObjRemap's `y` as an int (8).
+  - What remains in those functions is which register a value gets
+    (ScriptParseActionRecon's kind-name pushes come from edx, eax and
+    ecx in both listings, and VC6 cross-jumps only the common suffix),
+    the zero register's identity (Step3Drive's `r` in ebp against the
+    image's stack slot), and a spill the allocator chooses (SightScan's
+    `cand`).
 - **A combination can match where each half is worse.** ParseScenarioPart
   matched only with three changes together (`took = 8` before an
   overwriting `if`, no separate `count <= 0` return ahead of the loop, and
