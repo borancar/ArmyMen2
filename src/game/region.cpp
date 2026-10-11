@@ -7756,23 +7756,25 @@ sweep:
         } else if (out->hit) {
             /* Three arms with one body, written out three times as the
              * image has them -- one `||` test gives one copy and moves the
-             * whole chain ahead of the sweep. */
+             * whole chain ahead of the sweep. The statements are in a
+             * different order in each: written alike, VC6 merges the
+             * first two into one copy, which the image keeps apart. */
             out->state   = 1;
+            speed        = 0;
             turned       = 1;
             out->bearing = facing;
-            speed        = 0;
         } else if (!found) {
             out->state   = 1;
             turned       = 1;
-            out->bearing = facing;
             speed        = 0;
+            out->bearing = facing;
         } else if (g_mpSession
                    && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
                    && ObjType2Field548(o)) {
             out->state   = 1;
+            speed        = 0;
             turned       = 1;
             out->bearing = facing;
-            speed        = 0;
         } else {
             goto sweep;
         }
@@ -7800,8 +7802,7 @@ swept:
         speed  = 0;
         out->bearing  = facing;
         o->stuckCount = (int32_t)(g_gameClockMs + AM2_TROOPER_TURN_MS);
-        o->fieldD6   += (int16_t)AngleDelta(o->facing,
-                                            out->bearing);   /* read back, as stored */
+        o->fieldD6   += (int16_t)AngleDelta(o->facing, facing);   /* the local, just stored */
         acc = o->fieldD6;
         if (acc > 0x100)
             o->fieldD6 = (int16_t)(acc - 0x100);
