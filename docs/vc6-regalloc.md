@@ -569,6 +569,19 @@ free: relink and compare every function, not just the ones the change names.
 
 ## Not yet understood
 
+- **Why the image keeps four copies of ScriptParseActionRecon's
+  end-of-script error.** The image has the shared `eos:` block (its `xor
+  eax, eax` among the pops, as a fall-through into the common `return 0`)
+  and three more inline copies, TRIGGERDELAY's, FIREWEAPON's and one in
+  the 0x14..0x1E arms, each with its own epilogue and `xor eax, eax`
+  before the pops. Our build merges all four into one. In the lab
+  (`tools/vc6lab.py`, 2026-10-11) a small switch keeps such copies apart
+  only when each arm is an inlined helper, and even that merges again
+  once a dozen more arms jump to `eos:`. Explicit copies, inlined checks,
+  an inline step helper, returning a variable and an EH frame (the image
+  has none) do not reproduce it at full size. Whatever keeps the copies
+  apart is not a source spelling found so far.
+
 - Exactly how the field a walking pointer is anchored on is chosen.
 - Why, in OptionsDefaults, the image allocates `bit` before `mask` while
   still loading `which` (through the ternary) first. Every order of its five
