@@ -1718,6 +1718,24 @@ an `(int8_t)` cast keeps it on the frame), ObjHitMaskAction 330 -> 246
 (`marked` bare and zeroed just before the row loop), ScrollMapCache 226 -> 204
 (the cache surface in a local, loaded back for both BltFast pushes).
 
+**Arg slots and loop shape (2026-10-12).** EncodeGlyph 164 -> 38 came from
+asking what variable naturally lives in the image's spill slots: the first
+parameter is the BYTE cursor that gets advanced (its arg slot then holds
+`written`, a local copy `out` is what gets spilled), the row-offset pointer is
+a second local, the key is read from the global, and `offs` is stepped before
+`p` at the loop end (the prototype in font.h changed to `uint8_t *buf`).
+BoxAction 88 -> 0: VC6 /O2 turns a plain byte-store loop into the memset
+expansion (`rep stosd; and ecx,3; rep stosb`), and with a nested loop the row
+address is computed BEFORE the inner guard, which no `memset(...)` + `if`
+spelling reproduces (VC6 sinks the address into the guarded block); the
+image's shape is `for y { at = ...; for x { cells[at++] = CELL; } }`, with a
+separate `y` kept in ebp and spilled to the dead arg slot. AddToItemList 104
+-> 64 (the two uid arms are coupled: they cross-jump when identical, so the
+case-0 arm uses the index form with the pointer formed before the increment
+and the own arm the index form with the pointer last). PointActionC 52 -> 30
+(`rows` re-read after the first row's stores), ScrollMapCache 204 -> 168 (the
+two src stores in the image's order).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
