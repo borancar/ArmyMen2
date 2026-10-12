@@ -2622,6 +2622,7 @@ static inline int32_t PointerFriendTail(AM2_Object *o)
         if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
+            uint32_t uid = o->uid;
 
             if (!g_mouseButton
                 || GetTickCount()
@@ -2637,7 +2638,7 @@ static inline int32_t PointerFriendTail(AM2_Object *o)
                 }
                 if (none) {
                     OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-                    g_pointerHoverUid = o->uid;
+                    g_pointerHoverUid = uid;
                 }
             }
             return 0;
