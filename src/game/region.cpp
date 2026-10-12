@@ -1267,7 +1267,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     if (toTile >= AM2_PATH_TILES)
         return 0;
 
-    startRegion = g_regionOfCell[fromTile];
+    startRegion = g_regionOfCell[from & 0xFFFF];
     startTicks  = Ticks();
 
     if (g_pathResume == -1) {
