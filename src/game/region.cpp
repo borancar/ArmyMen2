@@ -2649,7 +2649,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     int32_t         phase;
     int32_t         k;
     int32_t         tilew;
-    int16_t         y;              /* a pixel row: a word, as the image keeps it */
+    int32_t         y;              /* a pixel row; as a word it costs a movsx the image does not have */
     int32_t         marked = 0;
 
     /* The address-of that cannot be null -- see above. */
