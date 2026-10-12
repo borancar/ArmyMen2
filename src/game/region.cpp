@@ -7616,7 +7616,8 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     int32_t  speed   = 0;
     int32_t  tries;
     int32_t  i;                /* 0 for the plain step, else the sweep's try */
-    int32_t  found;            /* the facing is settled, then: anything is here */
+    int32_t  found;            /* the facing is settled */
+    int32_t  holding;          /* CanPickUpWeapon's `already`: a weapon here is the one held */
     int32_t  pose;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
@@ -7853,127 +7854,131 @@ settle_facing:
 
     /* Everything standing where the trooper is going: an item to step up
      * onto, an item to ask for or take, something watched to reveal or bump,
-     * and a healer arm. `found` says whether anything was there at all. */
-    found = 0;
-    for (; at; at = at->queryNext) {
-        int32_t slot, qty = 0;   /* slot is only read once CanPickUpWeapon fills it */
+     * and a healer arm. With nothing at all there the held weapon is left
+     * alone; otherwise it is dropped unless one of the things there IS the
+     * weapon held (`holding`, which CanPickUpWeapon sets and nothing resets
+     * between the objects). */
+    if (at) {
+        holding = 0;
+        do {
+            int32_t slot;   /* only read once CanPickUpWeapon fills it */
 
-        if (at == o)
-            continue;
-        found = 1;
+            if (at == o)
+                continue;
 
-        /* THE STEP-UP, and it shares its slot with the move value -- see
-         * orig.h. Only an item, only one flagged by a negative
-         * OBJ_OFF_RANK, and only one within 0x10 of our own height. */
-        if (ObjIsItem(at) && at->itemFlag < 0) {
-            int32_t theirs = at->heightSet;
-            int32_t ours   = o->heightSet;
-            int32_t d      = theirs - ours;
+            /* THE STEP-UP, and it shares its slot with the move value -- see
+             * orig.h. Only an item, only one flagged by a negative
+             * OBJ_OFF_RANK, and only one within 0x10 of our own height. */
+            if (ObjIsItem(at) && at->itemFlag < 0) {
+                int32_t theirs = at->heightSet;
+                int32_t ours   = o->heightSet;
+                int32_t d      = theirs - ours;
 
-            if (abs(d) <= AM2_TROOPER_STEP_UP)
-                speed = theirs;
-        }
-
-        if (ObjType2Field548(o) && CanPickUpWeapon(at, o, &slot, &qty)) {
-            /* Off-line, or as the host, take it outright. In a session a
-             * client ASKS -- and the two comm tests are not each other's
-             * negation: the first lets the host through, the second refuses
-             * anyone the comm object does not answer for. */
-            int32_t local = 1;
-
-            if (g_mpSession) {
-                AM2_Comm *comm = AM2_THE_COMM;
-
-                local = 0;
-                if (comm->isHost && comm->CommMustBroadcast((int16_t)o->owner))
-                    local = 1;
-                else if (!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
-                         || AM2_THE_COMM->isHost)
-                    goto watched;
+                if (abs(d) <= AM2_TROOPER_STEP_UP)
+                    speed = theirs;
             }
-            if (!local) {
-                /* THE QUANTITY IS COMPUTED HERE, not taken from
-                 * CanPickUpWeapon's out-param: it is the item type's capacity
-                 * -- or 999 when the type has none -- minus what the weapon
-                 * already in that slot is carrying, and simply the item's own
-                 * count when the slot is empty. Passing the out-param instead
-                 * asks for the wrong number and looks entirely reasonable. */
-                AM2_Object *old;
-                int32_t     cap;
-                int32_t     had = 0;
-                /* Its own local, not `qty`: that one's address went to
-                 * CanPickUpWeapon, so it lives in memory. */
-                int32_t     want;
 
-                /* The hold is stamped BEFORE the quantity is worked out. */
-                at->pickupAfter = g_gameClockMs + AM2_SIGHT_REVEAL_MS;
+            if (ObjType2Field548(o) && CanPickUpWeapon(at, o, &slot, &holding)) {
+                /* Off-line, or as the host, take it outright. In a session a
+                 * client ASKS -- and the two comm tests are not each other's
+                 * negation: the first lets the host through, the second refuses
+                 * anyone the comm object does not answer for. */
+                int32_t local = 1;
 
-                /* No slot -- not a weapon -- asks for one, and the slot is
-                 * never indexed. */
-                if (slot < 0) {
-                    want = 1;
-                    old = (AM2_Object *)0;
-                    cap = want;
-                } else {
-                    old = WeaponByUid(o->inventory[slot]);
-                    cap = at->typeRec->capacity;
-                    if (!cap)
-                        cap = AM2_TROOPER_NO_CAPACITY;
-                    if (!old) {
-                        want = at->ammo;
+                if (g_mpSession) {
+                    AM2_Comm *comm = AM2_THE_COMM;
+
+                    local = 0;
+                    if (comm->isHost && comm->CommMustBroadcast((int16_t)o->owner))
+                        local = 1;
+                    else if (!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
+                             || AM2_THE_COMM->isHost)
+                        goto watched;
+                }
+                if (!local) {
+                    /* THE QUANTITY IS COMPUTED HERE, not taken from
+                     * CanPickUpWeapon's out-param: it is the item type's capacity
+                     * -- or 999 when the type has none -- minus what the weapon
+                     * already in that slot is carrying, and simply the item's own
+                     * count when the slot is empty. Passing the out-param instead
+                     * asks for the wrong number and looks entirely reasonable. */
+                    AM2_Object *old;
+                    int32_t     cap;
+                    int32_t     had = 0;
+                    /* Its own local, not `holding`: that one's address went to
+                     * CanPickUpWeapon, so it lives in memory. */
+                    int32_t     want;
+
+                    /* The hold is stamped BEFORE the quantity is worked out. */
+                    at->pickupAfter = g_gameClockMs + AM2_SIGHT_REVEAL_MS;
+
+                    /* No slot -- not a weapon -- asks for one, and the slot is
+                     * never indexed. */
+                    if (slot < 0) {
+                        want = 1;
+                        old = (AM2_Object *)0;
+                        cap = want;
                     } else {
-                        had = old->ammo;
-                        want = cap - had;
+                        old = WeaponByUid(o->inventory[slot]);
+                        cap = at->typeRec->capacity;
+                        if (!cap)
+                            cap = AM2_TROOPER_NO_CAPACITY;
+                        if (!old) {
+                            want = at->ammo;
+                        } else {
+                            had = old->ammo;
+                            want = cap - had;
+                        }
                     }
+
+                    /* Gated on a comm-object flag, and reached through the folded
+                     * `ret` at ADDR_LOG -- which is what NAMES this function. The
+                     * last argument is the item's army. */
+                    if (AM2_THE_COMM->verbose)
+                        orig_log_six(
+                            (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
+                            (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
+                                                        : AM2_STR_NO)),
+                            cap, at->typeRec->capacity, had, want,
+                            (int32_t)at->owner);
+
+                    TrooperWantItemSend(o, at, 0, slot, want);
+                } else {
+                    TrooperPickupItem(o, at, slot);
                 }
-
-                /* Gated on a comm-object flag, and reached through the folded
-                 * `ret` at ADDR_LOG -- which is what NAMES this function. The
-                 * last argument is the item's army. */
-                if (AM2_THE_COMM->verbose)
-                    orig_log_six(
-                        (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
-                        (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
-                                                    : AM2_STR_NO)),
-                        cap, at->typeRec->capacity, had, want,
-                        (int32_t)at->owner);
-
-                TrooperWantItemSend(o, at, 0, slot, want);
-            } else {
-                TrooperPickupItem(o, at, slot);
             }
-        }
 
-watched:
-        if (ObjIsWatchedKind(at)) {
-            if (HeldWeaponCode(o) == AM2_ITEM_KIND_MSWP) {
-                /* The mine sweeper reveals rather than sets off. */
-                if (at->flags & 0x200) {
-                    RevealObj(at);
-                    PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
+    watched:
+            if (ObjIsWatchedKind(at)) {
+                if (HeldWeaponCode(o) == AM2_ITEM_KIND_MSWP) {
+                    /* The mine sweeper reveals rather than sets off. */
+                    if (at->flags & 0x200) {
+                        RevealObj(at);
+                        PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
+                    }
+                } else if ((!g_mpSession
+                            || AM2_THE_COMM->CommMustBroadcast((int16_t)at->owner))
+                           && ((uint8_t)o->owner != (uint8_t)at->owner
+                               || (uint32_t)(g_gameClockMs - at->deadline58)
+                                      > AM2_AI_KEEP_RANGE_MS)) {
+                    /* Your own mine is safe for five seconds; anyone else's, and
+                     * your own after that, goes off under you. */
+                    DamageObject(at, 1, 4, at->uid, 0, 0);
                 }
-            } else if ((!g_mpSession
-                        || AM2_THE_COMM->CommMustBroadcast((int16_t)at->owner))
-                       && ((uint8_t)o->owner != (uint8_t)at->owner
-                           || (uint32_t)(g_gameClockMs - at->deadline58)
-                                  > AM2_AI_KEEP_RANGE_MS)) {
-                /* Your own mine is safe for five seconds; anyone else's, and
-                 * your own after that, goes off under you. */
-                DamageObject(at, 1, 4, at->uid, 0, 0);
             }
-        }
 
-        /* A medic tent heals whoever stands in it, twice a second. */
-        if ((int32_t)at->type == 1
-            && at->aai->type == 0x20
-            && g_gameClockMs > o->field5B0 + AM2_TROOPER_HEAL_MS) {
-            HealObject(o, AM2_TROOPER_HEAL, at);
-            o->field5B0 = g_gameClockMs;
-        }
+            /* A medic tent heals whoever stands in it, twice a second. */
+            if ((int32_t)at->type == 1
+                && at->aai->type == 0x20
+                && g_gameClockMs > o->field5B0 + AM2_TROOPER_HEAL_MS) {
+                HealObject(o, AM2_TROOPER_HEAL, at);
+                o->field5B0 = g_gameClockMs;
+            }
+        } while ((at = at->queryNext) != 0);
+
+        if (!holding)
+            o->heldWeaponUid = 0;
     }
-
-    if (!found)
-        o->heldWeaponUid = 0;
 
 pose:
     SetUnitPose(o, out->state);
