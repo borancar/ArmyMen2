@@ -6189,12 +6189,16 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (obj->riding)
                 goto next;
 
-            sq->recs[slot].index = 0;
-            sq->recs[slot].detailArg = (int32_t)obj->uid;
-            SQUAD_BAR(sq->recs[slot].barW, obj);
-            SQUAD_INK(sq->recs[slot].barColour, obj);
-            sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
-            slot++;
+            {
+                AM2_SquadRec *r = &sq->recs[slot];
+
+                r->index = 0;
+                sq->recs[slot].detailArg = (int32_t)obj->uid;
+                SQUAD_BAR(r->barW, obj);
+                SQUAD_INK(r->barColour, obj);
+                r->icons = AM2_HUD_SQUAD_PIPS_MAX;
+                slot++;
+            }
 
         } else if (ObjIsType2(obj)) {
             const AM2_Object *weapon;
