@@ -1494,6 +1494,26 @@ through `pos`, the store order of `moveTo`/`moveEnd`, the `into` temp and
 the BeginMoveTo store order scored the same or worse. The MpPanelScreen
 constructor's map-list counter set before the lookup: 584 -> 578.
 
+**The near-matches, reviewed (2026-10-12).** LoadOptions, MovieStart,
+PausedFrameStep, WndProc, DirtyCollect, SelectionClick and RegionFindPath
+each differ by one to three instructions and have zero shape difference
+(a register, a frame slot, or one block's position). A second-model review
+of each proposed new spellings, all measured on the real build and none
+moving a byte: LoadOptions' success arm with its own `return`; MovieStart's
+`movie` alias reused for the delete, the test written on the global, a
+function-scope holder; PausedFrameStep's row and walker as a chained
+assignment, as duplicated expressions, in reverse roles, and with the row
+from `active - 1` (the last three cost 50 to 64 bytes); WndProc's
+`PAINTSTRUCT` hoisted to function scope (37 bytes worse) or declared first
+in the paint helper; DirtyCollect's walk from the sentinel record (133
+worse), with the record bound after the test, and with a 16-bit index;
+SelectionClick's casts dropped one at a time and the zero point passed
+directly (42 worse); RegionFindPath with the guards nested around the
+whole body and one trailing `return 0` (59 worse). Where a spelling
+changes nothing it is because VC6 canonicalises it; where it changes
+something it is worse, so these seven are at the edge of what the source
+can say and the remaining difference is allocator tie-breaking.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
