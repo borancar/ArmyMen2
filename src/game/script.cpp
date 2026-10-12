@@ -1483,6 +1483,15 @@ static inline int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
     return 0;
 }
 
+/* The same test on the token already reached. */
+static inline int32_t ActAtEnd(const AM2_ScriptCtx *ctx, const int32_t *at)
+{
+    if (*at < ctx->count)
+        return 1;
+    am2_log("Unexpected end of script.\n");
+    return 0;
+}
+
 /* Zero, with the message, when the token is not of the kind wanted. */
 static inline int32_t ActTypeErr(const AM2_ScriptCtx *ctx, const int32_t *at, int32_t kind)
 {
@@ -1556,18 +1565,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                                       AM2_ScriptAction *act)
 {
 /* Every case is written out for itself, as the image has them: the token
- * step, the kind test with its own error, the store. VC6 folds the identical
- * tails together; the end-of-script message is the one shared block, and it
- * falls into the default `return 0`. The kind test, its error and the
- * variable-name lookup are the inline functions above; VC6 expands them to
- * the same code as the macros they replaced (measured in the lab). */
-/* STEP is the one helper that stays a macro: it jumps to the `eos:` label
- * in MOVEITEM, and the image's shared end-of-script block IS that label's
- * block (every other arm's `jge` lands on it). An inline function cannot
- * jump there, and `if (!ActStep(ctx, at)) return 0;` at every site makes
- * VC6 merge all the copies into the first one in layout instead. */
-#define STEP()    if (++(*at) >= ctx->count) goto eos
-
+ * step, the kind test with its own error, the store. The step, the end test,
+ * the kind test and the variable-name lookup are the inline functions above,
+ * each used as `if (!f(...)) return 0;`, and there is NO shared end-of-script
+ * label: VC6 folds the eighty-odd identical `log; return 0` copies into the
+ * one beside `default: return 0` (MOVEITEM's) and keeps the fall-through ones
+ * private (CREATETROOPER, FIREWEAPON, TRIGGERDELAY), which is the image's
+ * layout. A `goto eos` spelling can never reproduce it (docs/vc6-regalloc.md). */
     memset(act, 0, sizeof *act);
     act->uid = -2;
 
@@ -1577,7 +1581,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
 
     case AM2_TOK_SETCAMERAFOCUS:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x1D;
         /* Six arms end in this call and VC6 keeps one copy of it. A goto
          * from SUSPENDAI makes this first copy the one that survives, as
@@ -1591,7 +1596,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SUSPENDAI:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x1B;
         if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
             /* No name means everyone. */
@@ -1601,7 +1607,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         goto resolve_subject;
 
     case AM2_TOK_REVIVEAI:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x1C;
         if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
             act->subject = g_svarId15;
@@ -1612,7 +1619,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     /* The record keeps the token's own string. Nothing copies it and nothing
      * frees it here. */
     case AM2_TOK_SHOWMESSAGE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 1;
@@ -1621,7 +1629,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SHOWBITMAP:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 2;
@@ -1630,7 +1639,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SHOWBITMAPNOPAUSE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 3;
@@ -1639,7 +1649,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SHOWFAILURE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 4;
@@ -1648,7 +1659,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SHOWPDA:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 5;
@@ -1657,7 +1669,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_PLAYSOUND:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 6;
@@ -1682,7 +1695,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_PLAYITEMSOUND:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->code = 7;
@@ -1707,7 +1721,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_PLAYMUSIC:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 8;
         act->text = 0;
         if (ctx->tokens[*at].kind != AM2_TOKEN_STRING)
@@ -1720,7 +1735,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_TRACEVAR:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 9;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
@@ -1728,17 +1744,20 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                 "%s not declared\n");
 
     case AM2_TOK_TRIGGER:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         /* The uid lands at +0x00 and the zero at +0x04 -- the call pushes
          * the record and then the record plus four. TRIGGERDELAY ends in
          * the same call, and the image has one copy of it, in that arm. */
-        goto trigger_uid;
+        return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
 
     case AM2_TOK_TRIGGERDELAY:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED
             && ((int32_t)(uintptr_t)ctx->tokens[*at].value) == AM2_TOK_REFVAR) {
-            STEP();
+            if (!ActStep(ctx, at))
+                return 0;
             /* ActVarName written out with the step folded into its own test:
              * the image keeps this arm's end-of-script message inline and
              * jumps back to TRIGGER's uid call, where ActVarName's separate
@@ -1776,12 +1795,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
 
     case AM2_TOK_CREATETROOPER:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0D;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->text = (char *)ctx->tokens[*at].value;
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
@@ -1817,12 +1838,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         }
 
     case AM2_TOK_CREATEVEHICLE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0F;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->text = (char *)ctx->tokens[*at].value;
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
@@ -1847,14 +1870,16 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         }
 
     case AM2_TOK_CREATEPOWERUP:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x10;
         /* The name is optional here, unlike the other two creates. */
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
             if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
             act->text = (char *)ctx->tokens[*at].value;
-            STEP();
+            if (!ActStep(ctx, at))
+                return 0;
         }
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
@@ -1907,7 +1932,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_CREATEEXPLOSION:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0E;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
@@ -1937,19 +1963,22 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_CREATEROACH:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x11;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->text = (char *)ctx->tokens[*at].value;
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
         act->army = ScriptArmyColour(ctx, at);
         return act->army >= 0;
 
     case AM2_TOK_SETOBJSTATE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x25;
         /* The object at +0x1C and the state at +0x18 -- the other way round
          * from how the statement reads. */
@@ -1974,12 +2003,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SETOBJBMP:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x24;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -1987,12 +2017,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_HEAL:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0A;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -2000,12 +2031,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SETMAXHEALTH:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0B;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -2013,12 +2045,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_DAMAGE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x0C;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -2035,7 +2068,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_DEPLOY:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x12;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2047,12 +2081,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_UNDEPLOY:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x13;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_RESURRECT:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x14;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2062,7 +2098,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_ALLY:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x15;
         act->subject = ScriptArmyColour(ctx, at);
         if (act->subject < 0)
@@ -2071,7 +2108,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return act->target >= 0;
 
     case AM2_TOK_UNALLY:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x16;
         act->subject = ScriptArmyColour(ctx, at);
         if (act->subject < 0)
@@ -2080,7 +2118,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return act->target >= 0;
 
     case AM2_TOK_SETFORCECOLOR:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x17;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2088,25 +2127,23 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return act->target >= 0;
 
     case AM2_TOK_MOVEITEM:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x1F;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        /* DROPITEM ends in this same test; one goto from there makes
-         * this the copy both use, as in the image. */
-    located:
-        if (*at < ctx->count)
-            return ScriptLocation(ctx, at, act, 0) != 0;
-eos:
-        am2_log("Unexpected end of script.\n");
-        /* fall through */
+        if (!ActAtEnd(ctx, at))
+            return 0;
+        return ScriptLocation(ctx, at, act, 0) != 0;
+
     default:
         /* Every other reserved word in 64..186 -- the weapons, the pickups,
          * the AI modes and the poses. They are arguments, not actions. */
         return 0;
 
     case AM2_TOK_ORDER:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
             if (!ScriptResolveName(ctx, at, &act->subject, 0))
                 return 0;
@@ -2114,20 +2151,22 @@ eos:
         } else if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
                                       &act->army))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         /* `order <who> follow <whom>` or `order <who> goto <somewhere>`. */
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_FOLLOW:
-            STEP();
+            if (!ActStep(ctx, at))
+                return 0;
             act->code = 0x19;
             if (!ScriptResolveName(ctx, at, &act->target, 0))
                 return 0;
             break;
         case AM2_TOK_GOTO:
-            STEP();
+            if (!ActStep(ctx, at))
+                return 0;
             act->code = 0x18;
             if (!ScriptLocation(ctx, at, act, 0))
                 return 0;
@@ -2140,7 +2179,8 @@ eos:
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED
             || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_INMODE)
             return 1;
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
@@ -2152,12 +2192,13 @@ eos:
         return 0;
 
     case AM2_TOK_SETFACING:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x20;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             /* A facing is a byte: the value is stored, then cut to one. */
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -2172,12 +2213,11 @@ eos:
             (*at)++;
             return 1;
         }
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
-        /* ActVarName with its last two statements swapped. SETGUNFACING ends
-         * in the same words, and written alike VC6 kept one copy of the two;
-         * the image has one in each arm. */
+        /* ActVarName written out; SETGUNFACING's is the same words. */
         {
             int32_t v = ScriptFindName((const char *)ctx->tokens[*at].value);
             if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {
@@ -2185,18 +2225,19 @@ eos:
                         "declared\n", ctx->tokens[*at].line, (const char *)ctx->tokens[*at].value);
                 return 0;
             }
-            (*at)++;
             act->xvar = v;
+            (*at)++;
         }
         return 1;
 
     case AM2_TOK_SETGUNFACING:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x21;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             act->n0 = (uint8_t)act->n0;
@@ -2208,14 +2249,16 @@ eos:
             (*at)++;
             return 1;
         }
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         return ActVarName(ctx, at, act, "Line [%4d]:  expected variable name but variable %s not "
                 "declared\n");
 
     case AM2_TOK_SETVAR:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x23;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2230,7 +2273,8 @@ eos:
         return 1;
 
     case AM2_TOK_ADDVAR:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x22;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2247,7 +2291,8 @@ eos:
         return 1;
 
     case AM2_TOK_ACTIVATEREGION:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x26;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
@@ -2257,7 +2302,8 @@ eos:
         return 1;
 
     case AM2_TOK_INACTIVATEREGION:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x26;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
@@ -2274,12 +2320,14 @@ eos:
         return 1;
 
     case AM2_TOK_SETBRIEFING:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x27;
         goto string_arg;        /* the image shares SETBRIEFVO's tail */
 
     case AM2_TOK_SETBRIEFVO:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x28;
     string_arg:
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
@@ -2289,7 +2337,8 @@ eos:
         return 1;
 
     case AM2_TOK_SETSTRATMAP:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x29;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
@@ -2298,7 +2347,8 @@ eos:
         return 1;
 
     case AM2_TOK_SETAIMODE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2A;
         if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
             if (!ScriptResolveName(ctx, at, &act->subject, 0))
@@ -2307,8 +2357,8 @@ eos:
         } else if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
                                       &act->army))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
@@ -2322,12 +2372,13 @@ eos:
         return 0;
 
     case AM2_TOK_SETAIPOSE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2B;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         /* stand 1, kneel 2, prone 3, none 0. */
@@ -2342,12 +2393,13 @@ eos:
         return 0;
 
     case AM2_TOK_SETSPEED:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2C;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_RESERVED))
             return 0;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
@@ -2359,16 +2411,18 @@ eos:
         return 0;
 
     case AM2_TOK_SETNPC:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2D;
         goto name_then_int;     /* the image shares ADDEXP's tail */
 
     case AM2_TOK_SETITEMFLAG:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         /* ActTypeErr written out with the kind name in a local: the local is a web and
          * takes edx, where the inlined function's temporary takes eax here, and with
          * edx the error's tail is the one the shared block has, so it
@@ -2385,7 +2439,8 @@ eos:
                     ctx->tokens[*at].line);
             return 0;
         }
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x33;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
@@ -2394,7 +2449,8 @@ eos:
         return 1;
 
     case AM2_TOK_SETUILOCK:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x39;
         /* The same words as ADDEXP's tail, and VC6 keeps ADDEXP's copy:
          * this arm becomes one jump into it from the token load on, as in
@@ -2408,7 +2464,8 @@ eos:
         return 1;
 
     case AM2_TOK_SETDAMAGEPAD:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x3A;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
@@ -2428,11 +2485,13 @@ eos:
             /* The pad it resolves to, not the name-table index. */
             act->subject = kScriptNames[p].value;
         }
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
         act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->n0 = 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
@@ -2450,12 +2509,13 @@ eos:
         return 1;
 
     case AM2_TOK_SETITEMOWNER:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x34;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             act->n0 = 4;
             (*at)++;
@@ -2467,12 +2527,13 @@ eos:
         return 1;
 
     case AM2_TOK_SETM80:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2E;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count)
-            goto eos;
+        if (!ActAtEnd(ctx, at))
+            return 0;
         act->army = ScriptArmyColour(ctx, at);
         if (act->army >= 0)
             return 1;
@@ -2480,7 +2541,8 @@ eos:
         return 1;
 
     case AM2_TOK_DROPITEM:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x38;
         /* The item goes to +0x40 and whoever drops it to +0x18, which is the
          * other way round from every other two-name action. */
@@ -2488,20 +2550,25 @@ eos:
             return 0;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        goto located;
+        if (!ActAtEnd(ctx, at))
+            return 0;
+        return ScriptLocation(ctx, at, act, 0) != 0;
 
     case AM2_TOK_SETZOMBIE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x2F;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_SETSCIENTIST:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x30;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_MAKESMOKE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x31;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
@@ -2513,7 +2580,8 @@ eos:
         return 1;
 
     case AM2_TOK_MAKEFLAME:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x32;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
@@ -2524,7 +2592,8 @@ eos:
         return 1;
 
     case AM2_TOK_ADDEXP:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x35;
     name_then_int:
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
@@ -2543,7 +2612,8 @@ eos:
         return 1;
 
     case AM2_TOK_FIREWEAPON:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x36;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2562,14 +2632,16 @@ eos:
         return ScriptLocation(ctx, at, act, 0) != 0;
 
     case AM2_TOK_UNITFIRE:
-        STEP();
+        if (!ActStep(ctx, at))
+            return 0;
         act->code = 0x37;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             act->n0 = (uint8_t)act->n0;
-            STEP();
+            if (!ActStep(ctx, at))
+                return 0;
         } else
             act->n0 = -1;
 place:
