@@ -1445,6 +1445,24 @@ the blocked branch's load of `o->stuckCount` ahead of `facing = o->facing`
 (five permutations of the three statements and `++`/`+ 1` spellings do
 not move it) and where `o->facing` is stored after the second AngleDelta.
 
+**SightScan 910 -> 808 and FindPath, from the same kind of review**
+(2026-10-12). Three things moved SightScan: the box's left edge first
+(VC6 computes the first of a +/- pair into a copy and the second in
+place, which decides which edge is `lea` and which `sub`);
+AiSightTrace's walk as a `for` over `n` and `i` left uninitialised and
+`g_tileAttrs` indexed at each use (the image reloads the global every
+iteration, and has no `n = 0` store before the trace call); and the
+function's result held in a variable that starts at zero, so the zero
+register is shared with the tests. Measured and not kept: `cand` cleared
+once at the loop top only, the kind-7 arm setting `cand` first and
+dropping its own null test, a second pointer for the allied arm's target.
+All three were within a few bytes either way. FindPath: the budget
+refusal as the fall-through of the heuristic compare with `fail:` inside
+its body, the goto-partial form, only the first heuristic held, the
+doubling split into a shift and an add, and `nb` held across the rule
+call with `state` read through `t` all scored worse or the same (397 or
+342 against 287).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
