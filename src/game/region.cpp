@@ -4750,6 +4750,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     AM2_Object *keep;
     AM2_Object *best;
     AM2_Object *alt;
+    AM2_Object *result;
     AM2_Object *it;
     int32_t  bestRange;
     int32_t  bestScore;
@@ -5051,6 +5052,10 @@ finish:
     if (!o->fieldF4)
         o->fieldEC = 0;
 
+    /* The result starts at zero and takes `best`, or the fallback `alt`
+     * (null when there is neither); the image returns it from two
+     * epilogues. */
+    result = 0;
     if (best) {
         AM2_Point anchor;
 
@@ -5059,18 +5064,13 @@ finish:
         anchor      = ObjAnchorPoint(o);
         /* Overwrites the store above, and measures from the ANCHOR. */
         *outBearing = AngleBetween(&anchor, &best->pos);
-        goto out;
-    }
-    /* The fallback, or nothing at all: `alt` is null when there is
-     * neither. ONE return for every path past the throttle -- with two,
-     * VC6 saves ebx/esi/edi in the prologue instead of after it. */
-    if (alt) {
+        result = best;
+    } else if (alt) {
         *outRange   = bestRange;
         *outBearing = bestBearing;
+        result = alt;
     }
-    best = alt;
-out:
-    return best;
+    return result;
 }
 
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
