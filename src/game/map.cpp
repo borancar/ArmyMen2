@@ -1688,7 +1688,6 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
          * that the tail turns into objects and frees. */
         case AM2_IFF_OLAY: {
             int32_t first = 0, n, recCount, item, junk1, junk2;
-            AM2_MapRec *rec;
 
             /* The record count goes through v, and `first` stays 0 when a
              * chunk declares none -- the indices below are then absolute. */
@@ -1698,10 +1697,9 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 first = objCount;
                 objCount += v;
                 objs = (AM2_MapRec *)am2_realloc(objs, (size_t)objCount * 0x1C);
-                rec  = &objs[first];
-                memset(rec, 0, (size_t)v * 0x1C);
-                for (n = first; n < objCount; n++, rec++) {
-                    orig_map_fread(rec, 0x10, 1, f);
+                memset(&objs[first], 0, (size_t)v * 0x1C);
+                for (n = first; n < objCount; n++) {
+                    orig_map_fread(&objs[n], 0x10, 1, f);
                     consumed += 0x10;
                 }
             }
