@@ -4780,8 +4780,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     bestRange   = AM2_SIGHT_SCAN_FAR;
     bestBearing = 0x80;
     slack       = 0x80;
-    bestScore   = 0;
     alt         = (AM2_Object *)0;
+    bestScore   = 0;
     solve       = 1;
 
     /* A weapon already earmarked stays the fallback while it is still there,
@@ -4860,21 +4860,24 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     if (!keep)
         goto finish;
 
-    /* ---- phase two: score what survived ---- */
-    for (it = keep; it;
-         it = it->queryNext) {
+    /* ---- phase two: score what survived ----
+     * The kept list itself is the cursor: a separate `it` costs a register
+     * copy at the loop entry that the image does not have. */
+    for (; keep;
+         keep = keep->queryNext) {
         AM2_Object *cand       = (AM2_Object *)0;
         uint8_t  candBearing = 0x80;
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
         /* An if/else, not `goto allied`: the image lays the allied arm out
          * after the rest, where a goto pulls it up behind the test. */
-        if (!ObjsAreAllied(o, it, 0)) {
-            if (IsKind7(it)) {
-                cand        = it;
+        if (!ObjsAreAllied(o, keep, 0)) {
+            if (IsKind7(keep)) {
+                cand        = keep;
                 candBearing = AngleBetween(&o->pos,
-                                           &it->pos);
+                                           &keep->pos);
                 candRange   = AM2_SIGHT_KIND7_RANGE;
+score:
                 if (!cand)
                     continue;
                 ++*nOther;
@@ -4885,8 +4888,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                     continue;
                 best        = cand;
                 bestRange   = candRange;
-                slack       = 0;
                 bestBearing = candBearing;
+                slack       = 0;
                 continue;
             }
 
@@ -4906,13 +4909,12 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                     look = o->turretFacing;
 
                 viewerAttr = ObjTileAttr(o);
-                dy = (int32_t)it->pos.y
-                     - (int32_t)o->pos.y;
-                dx = (int32_t)it->pos.x
+                dx = (int32_t)keep->pos.x
                      - (int32_t)o->pos.x;
+                dy = (int32_t)keep->pos.y
+                     - (int32_t)o->pos.y;
                 highest     = AM2_AI_SIGHT_FLOOR;
-                candRange   = ApproxDistXY(dx, (int32_t)it->pos.y
-                                           - (int32_t)o->pos.y);
+                candRange   = ApproxDistXY(dx, dy);
                 candBearing = AI_ANGLE3(dx, dy, candRange);
 
                 if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
@@ -4924,11 +4926,11 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 /* Keyed on the BEARING, not the facing -- see orig.h. */
                 dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
                 if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
-                    AiSightTrace(o, it, dir, viewerAttr, g_sightGeneration, highest);
+                    AiSightTrace(o, keep, dir, viewerAttr, g_sightGeneration, highest);
 
                 if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
                     int32_t mine = ObjHeight(o);
-                    int32_t his  = ObjHeight(it);
+                    int32_t his  = ObjHeight(keep);
 
                     if (his >= mine) {
                         if (candRange > g_sightBlockByDir[dir].low)
@@ -4950,48 +4952,51 @@ in_sight:
              * once a second has passed since we were last hit -- and the refusal
              * skips recording it while still revealing it below. */
             /* Cleared first and set when NOT refused: the image tests and
-             * then stores `it` on the fall-through. */
+             * then stores the object on the fall-through. */
             if (!((o->aiMode == 3
                  || o->aiMode == 2)
                 && (uint32_t)(g_gameClockMs
                               - o->hitTime)
                        > AM2_SIGHT_KIND7_RANGE
-                && ObjsAreAllied(it, o, 0)))
-                cand = it;
+                && ObjsAreAllied(keep, o, 0)))
+                cand = keep;
 
             if (ObjIsOurs(o, 0)) {
-                RevealObj(it);
-                it->revealedUntil =
+                RevealObj(keep);
+                keep->revealedUntil =
                     g_gameClockMs
                     + AM2_SIGHT_REVEAL_MS;
             }
 
             goto score;
         } else {
-            if (ObjIsTypeIn238(it)) {
+            if (ObjIsTypeIn238(keep)) {
 
                 ++*nAllied;
-                if (!it->targetUid)
+                if (!keep->targetUid)
                     continue;
-                cand = LookupByUID(
-                    it->targetUid);
-                if (!cand) {
-                    it->targetUid = 0;
+                {
+                AM2_Object *w = LookupByUID(
+                    keep->targetUid);
+                cand = w;
+                if (!w) {
+                    keep->targetUid = 0;
                     goto score;                 /* cand is null; score refuses */
                 }
-                if (cand->health <= 0) {
-                    it->targetUid = 0;
+                if (w->health <= 0) {
+                    keep->targetUid = 0;
                     continue;
                 }
-                if ((int32_t)cand->flags & 0x204) {
-                    it->targetUid = 0;
+                if ((int32_t)w->flags & 0x204) {
+                    keep->targetUid = 0;
                     continue;
                 }
-                if (ObjsAreAllied(o, cand, 0))
+                if (ObjsAreAllied(o, w, 0))
                     continue;
                 DistAndAngle(&o->pos,
-                             &cand->pos,
+                             &w->pos,
                              &candRange, &candBearing);
+                }
                 /* Only mode 1 adopts an ally's target, and only close by. */
                 if (o->aiMode != 1)
                     goto score;
@@ -5001,48 +5006,30 @@ in_sight:
             }
 
             /* Not a unit: a dropped weapon worth walking to. */
-            if (!flags || !ObjIsType4(it))
+            if (!flags || !ObjIsType4(keep))
                 continue;
             DistAndAngle(&o->pos,
-                         &it->pos,
+                         &keep->pos,
                          &candRange, &candBearing);
             /* Asked again here, as the image does (0x004041B0). */
-            if (!it)
+            if (!keep)
                 continue;
-            if (!RegionsNear(it, o, solve)) {
+            if (!RegionsNear(keep, o, solve)) {
                 solve = 0;
                 continue;
             }
             solve = 0;
             {
-                int32_t n = TryTakeWeapon(it, o);
+                int32_t n = TryTakeWeapon(keep, o);
 
                 if (n <= bestScore)
                     continue;
-                alt         = it;
+                alt         = keep;
                 bestScore   = n;
                 bestRange   = candRange;
                 bestBearing = candBearing;
             }
         }
-        continue;
-        /* The scoring every other arm jumps to. The kind-7 arm above has
-         * its own copy: written once, as a label inside that arm, VC6 laid
-         * the block out after the last arm instead. */
-score:
-        if (!cand)
-            continue;
-        ++*nOther;
-        ++o->fieldF4;
-        /* Discarded two instructions later; a call, so it counts. */
-        (void)AngleDelta(facing, candBearing);
-        if (candRange >= bestRange + slack)
-            continue;
-        best        = cand;
-        bestRange   = candRange;
-        slack       = 0;
-        bestBearing = candBearing;
-        continue;
     }
 
 finish:
@@ -5058,15 +5045,15 @@ finish:
         AM2_Point anchor;
 
         *outRange   = bestRange;
+        result      = best;
         *outBearing = bestBearing;
         anchor      = ObjAnchorPoint(o);
         /* Overwrites the store above, and measures from the ANCHOR. */
         *outBearing = AngleBetween(&anchor, &best->pos);
-        result = best;
     } else if (alt) {
         *outRange   = bestRange;
+        result      = alt;
         *outBearing = bestBearing;
-        result = alt;
     }
     return result;
 }
