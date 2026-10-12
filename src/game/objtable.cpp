@@ -114,18 +114,20 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
          * owner variable here. */
         switch (obj->type) {
         case 0: case 5: case 6: case 7:
-            counter = &g_uidCounter[g_defaultOwner & 7];
-            id = (g_defaultOwner << AM2_UID_OWNER_SHIFT) | *counter;
+            owner = g_defaultOwner & 7;
+            id = (g_defaultOwner << AM2_UID_OWNER_SHIFT) | g_uidCounter[owner];
+            counter = &g_uidCounter[owner];
             (*counter)++;
             break;
         case 1: case 2: case 3: case 4: case 8:
         own:
-            counter = &g_uidCounter[(uint32_t)(int32_t)obj->owner & 7];
+            owner = (uint32_t)(int32_t)obj->owner & 7;
             /* The original shifts the unmasked value; only three bits
              * survive, so this matches. */
             id = ((uint32_t)(int32_t)obj->owner << AM2_UID_OWNER_SHIFT)
-               | *counter;
-            (*counter)++;
+               | g_uidCounter[owner];
+            g_uidCounter[owner]++;
+            counter = &g_uidCounter[owner];
             break;
         default:
             /* The > 8 fall-through. Its own label keeps 1-4 and 8 in the

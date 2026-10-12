@@ -1778,6 +1778,9 @@ int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
     /* The output record is addressed from `out` at every use. */
     AM2_Rect c;
     int32_t  stride;
+    int32_t  y;
+    int32_t  x;
+    int32_t  at;
 
     /* In the original's order: the two x edges, then the two y edges. */
     c.left = Clamp(area.left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
@@ -1802,11 +1805,10 @@ int32_t __cdecl BoxAction(AM2_Rect area, AM2_TileMask *out)
            (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
 
     stride = out->box.right - out->box.left + 1;
-    for (; c.top <= c.bottom; c.top++) {
-        if (c.left > c.right)
-            continue;
-        memset(out->cells + (c.top - out->box.top) * stride - out->box.left + c.left,
-               AM2_TILEMASK_BOX_CELL, (size_t)(c.right - c.left + 1));
+    for (y = c.top; y <= c.bottom; y++) {
+        at = (y - out->box.top) * stride - out->box.left + c.left;
+        for (x = c.left; x <= c.right; x++)
+            out->cells[at++] = AM2_TILEMASK_BOX_CELL;
     }
     return 1;
 }
