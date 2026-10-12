@@ -9661,12 +9661,13 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         rows = new AM2_Rec(0);
 
+        i = 0;
         {
             const AM2_NameRec *maps = ScriptListFind(
                 g_mpScriptName);
 
             if (maps)
-                for (i = 0; i < maps->count; i++) {
+                for (; i < maps->count; i++) {
                     AM2_Level *lvl = FindLevelByName(maps->maps[i]);
 
                     if (!lvl)
