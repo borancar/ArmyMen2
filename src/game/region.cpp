@@ -7617,7 +7617,6 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     int32_t  tries;
     int32_t  i;                /* 0 for the plain step, else the sweep's try */
     int32_t  found;            /* the facing is settled */
-    int32_t  holding;          /* CanPickUpWeapon's `already`: a weapon here is the one held */
     int32_t  pose;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
@@ -7859,7 +7858,8 @@ settle_facing:
      * weapon held (`holding`, which CanPickUpWeapon sets and nothing resets
      * between the objects). */
     if (at) {
-        holding = 0;
+        int32_t holding = 0;   /* CanPickUpWeapon's `already`: a weapon here is the one held */
+
         do {
             int32_t slot;   /* only read once CanPickUpWeapon fills it */
 
