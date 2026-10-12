@@ -805,9 +805,10 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         if (!g_depthCursor->next) {
             at = g_depthCursor;
         append:
-            /* The cursor, which is `at` on both ways in: the flag walk
-             * stores it before its `goto`. */
-            APPEND(g_depthCursor);
+            /* `at` is the old tail on both ways in. It must NOT be the
+             * cursor global: the macro points that at the new node first, and
+             * the new node would then link to itself. */
+            APPEND(at);
             goto done;
         }
         g_depthCursor = g_depthCursor->next;
