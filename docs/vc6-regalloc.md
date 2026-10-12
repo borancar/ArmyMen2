@@ -1463,6 +1463,37 @@ doubling split into a shift and an add, and `nb` held across the rule
 call with `state` read through `t` all scored worse or the same (397 or
 342 against 287).
 
+**The end-of-script block, second look (2026-10-12).** A review of the
+image found the string pushed at FOUR sites, not three: TRIGGERDELAY's
+common step, CREATETROOPER, MOVEITEM (the only one every `jge` reaches,
+falling into `default:`) and FIREWEAPON. Every private copy ends in its
+own fused `xor eax,eax; pop; pop; pop; pop; ret`, so the private copies
+are not duplicates of the shared block: they are fall-through copies of a
+`jl` whose continuation lives elsewhere (TRIGGER's uid call, the army
+lookup, `place:`). Mini-labs of a nine-arm switch showed that no `goto eos`
+spelling keeps the labelled block at MOVEITEM, and that STEP as an inline
+`if (!ActStep(ctx, at)) return 0;` at every site, with no `eos:` label,
+does: the shared block then sits at MOVEITEM exactly as in the image and
+CREATE* keeps a private fused copy. In the real function that form, with
+TRIGGER returning its uid call directly and TRIGGERDELAY ending in its own
+call or one common step-then-call tail, cuts the lab to 7 hunks (from 13
+for the label-free form with `trigger_uid`) but v3 rises from 14 to 23:
+TRIGGERDELAY's check still merges into TRIGGER's, jumping to TRIGGER's
+`cmp eax,[edi+4]` (memory form) where the image has the register form
+`mov ecx,[edi+4]; cmp eax,ecx` in both. What differs is the instruction
+before the cross-jump point, so the next thing to try is a spelling where
+the two checks begin differently, not a different placement of the block.
+Not landed.
+
+The same review of other functions: DepthInsert's append was linking the
+new node to itself (APPEND took the cursor global the macro had just
+repointed); fixed, 460 -> 468. FlowRecvMessage: inlining the two pool
+returns, `break` for the sequence mismatch and for the second FlowQ log
+all scored worse (215 -> 233 to 309). AiTrooperStep: reading the copies
+through `pos`, the store order of `moveTo`/`moveEnd`, the `into` temp and
+the BeginMoveTo store order scored the same or worse. The MpPanelScreen
+constructor's map-list counter set before the lookup: 584 -> 578.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
