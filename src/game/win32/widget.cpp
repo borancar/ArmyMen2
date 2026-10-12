@@ -9665,8 +9665,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             const AM2_NameRec *maps = ScriptListFind(
                 g_mpScriptName);
 
-            if (maps)
-                for (; i < maps->count; i++) {
+            for (; maps && i < maps->count; i++) {
                     AM2_Level *lvl = FindLevelByName(maps->maps[i]);
 
                     if (!lvl)
