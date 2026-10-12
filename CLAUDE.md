@@ -465,6 +465,7 @@ findings, measurements, and status — lives in `STATUS.md` and the topic docs:
 | the CRT reconstruction | `docs/crt.md`, `docs/crt-notes.md` |
 | analysis-tool notes, build/kill hazards | `docs/tooling.md` |
 | reconstruction pitfalls (case studies) | `docs/reconstruction-lessons.md` |
+| the byte-match loop, tools, rule catalogue | `docs/bytematching.md` |
 | how VC6 assigns registers (byte-matching) | `docs/vc6-regalloc.md` |
 | save/load, movement, combat, objects, tables | `docs/saveload.md`, `docs/movement.md`, `docs/combat.md`, `docs/objects.md`, `docs/tables.md` |
 | screens, cheats, binary patches, Lua console | `docs/screen-mpoptions.md`, `docs/screens.md`, `docs/cheats.md`, `docs/binarypatches.md`, `docs/lua.md` |

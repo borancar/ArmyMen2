@@ -339,8 +339,21 @@ def main():
     compiled = {}               # file -> (secs, symlist, names, base)
     failed_tus = []
     with tempfile.TemporaryDirectory() as od, tempfile.TemporaryDirectory() as odb:
+        # Single-unit scoring (tools/relinkscreen.py): RELINK_ONLY=<file>
+        # compiles just that translation unit, RELINK_LOAD=<pickle> takes the
+        # symbol tables an earlier full run saved with RELINK_SAVE=<pickle>
+        # instead of discovering them again. Unset, none of this does anything.
+        ONLY = os.environ.get("RELINK_ONLY")
+        LOAD = os.environ.get("RELINK_LOAD")
+        if LOAD:
+            import pickle
+            _sv, _pl = pickle.load(open(LOAD, "rb"))
+            sym_va.update(_sv)
+            placed.update(_pl)
         for f in sorted(byfile):
             if os.path.basename(f) in BM.SKIP_FILE:
+                continue
+            if ONLY and os.path.relpath(f, BM.REPO) != ONLY and f != ONLY:
                 continue
             obj = BM.compile_file(f, od, extra=["/DAM2_STANDALONE", "/DAM2_RELINK"]
                                   + os.environ.get("RELINK_CFLAGS", "").split())
@@ -359,7 +372,7 @@ def main():
                     names[s[0]] = (s[1], s[2])
             # the piecewise baseline: same TU WITHOUT the relink source form,
             # compiled into a separate dir so the .obj paths do not collide.
-            base_obj = BM.compile_file(f, odb)
+            base_obj = None if ONLY else BM.compile_file(f, odb)
             base = BM.parse_coff(base_obj) if base_obj else None
             compiled[f] = (secs, symlist, names, base)
             for fn, va in byfile[f]:
@@ -414,11 +427,22 @@ def main():
                             found += 1
             return found
         rounds = 0
-        while discover() and rounds < 8:
+        while not LOAD and discover() and rounds < 8:
             rounds += 1
+        if os.environ.get("RELINK_SAVE"):
+            import pickle
+            pickle.dump((sym_va, placed), open(os.environ["RELINK_SAVE"], "wb"))
 
         # ---- pass 2: resolve and compare, holding the .objs in memory.
         match = diff = 0
+        base_va = {}
+        if LOAD:
+            # undecorated function name -> VA, for the fallback below
+            for _k, _v in sym_va.items():
+                if _k.startswith("?") and "@@" in _k:
+                    _b = _k[1:].split("@@", 1)[0]
+                    base_va[_b] = None if _b in base_va and base_va[_b] != _v else _v
+            base_va = {k: v for k, v in base_va.items() if v is not None}
         unresolved_hist = collections.Counter()
         diffs = []
         newly = []              # relink matches that the piecewise harness misses
@@ -466,6 +490,14 @@ def main():
                         tgt_va = va - value + tgt_val
                     if tgt_va is None:
                         tgt_va = sym_va.get(tgt_name)
+                    # Under RELINK_LOAD the table came from an earlier full
+                    # compile, so a function retyped since (void * ->
+                    # AM2_Object *, packed int -> AM2_Point) no longer matches
+                    # by decorated name. The full relink compiles every unit
+                    # together, so the names agree there; scoring one unit,
+                    # fall back to the undecorated name when it is unique.
+                    if tgt_va is None and LOAD and tgt_name.startswith("?"):
+                        tgt_va = base_va.get(tgt_name[1:].split("@@", 1)[0])
                     if tgt_va is None:
                         tgt_va = data_va(tgt_name, placed)
                     if tgt_va is None:
