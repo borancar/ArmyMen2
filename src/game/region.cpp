@@ -3321,8 +3321,8 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         goto walk;
 
     if (BeginMoveTo(ob, &pt)) {
-        pt            = *dest;
         ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
+        pt            = *dest;
         /* The copies re-address the object rather than going through
          * `pos`/`dest`: the image recomputes the field address at each one. */
         ob->routeGoal = pt;
