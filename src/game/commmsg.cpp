@@ -2782,10 +2782,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
     uint32_t mask, now, seq, expected, last, lat, gap;
     int32_t  resent, any;
 
+    msg = (AM2_FlowMsg *)node->body;
+
     if (node->from == 0)
         return NoteKind31(node);
-
-    msg = (AM2_FlowMsg *)node->body;
 
     switch (msg->pkt.kind) {
     case AM2_FLOW_PULSE_ACK:
@@ -3160,8 +3160,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
 
         /* EXACTLY WHAT WE EXPECT: deliver it, time it, and then deliver
          * every queued message that now follows on. */
-        if (msg->pkt.seq != expected)
-            return 0;
+        if (msg->pkt.seq == expected) {
         MsgListAdd(g_msgListB, node);
         if (expected == 1) {
             sender->gapTotal    = 0;
@@ -3199,6 +3198,8 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
             expected++;
         }
         return 1;
+        }
+        break;
     }
     return 0;
 

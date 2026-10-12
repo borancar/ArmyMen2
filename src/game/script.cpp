@@ -2787,12 +2787,11 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         } else if (g_mapPadbitLayer) {
             int32_t i, sx, sy, n, total;
 
-            n = 0;
             g_padNumbers[number].centre = g_zeroPoint;
             sx = 0;
             sy = 0;
             total = g_mapTilesW * g_mapTilesH;
-            for (i = 0; i < total; i++) {
+            for (i = 0, n = 0; i < total; i++) {
                 if ((g_mapPadbitLayer[i] | kPadBit(number)) != 0) {
                     sx += i % g_mapTilesH;
                     sy += i / g_mapTilesH;
@@ -2825,8 +2824,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 
     /* Trigger words, until one that is not a trigger word. */
     while (1) {
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-            break;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_EVERYTHING:    g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_EVERYTHING; break;
         case AM2_TOK_SARGE:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_SARGE;      break;
@@ -2852,6 +2850,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         }
         if (++(*at) >= ctx->count)
             goto triggers_done;
+        } else
+            break;
     }
 
     /* A String here names one specific item instead, which the flags
