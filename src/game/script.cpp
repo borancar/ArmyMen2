@@ -2697,8 +2697,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 n = 0;
                 g_padNumbers[number].centre = g_zeroPoint;
                 sx = 0;
-                total = g_mapTilesW * g_mapTilesH;
                 sy = 0;
+                total = g_mapTilesW * g_mapTilesH;
                 for (i = 0; i < total; i++) {
                     if ((int32_t)g_mapPadLayer[i] == number) {
                         sx += i % g_mapTilesH;
