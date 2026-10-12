@@ -1211,8 +1211,8 @@ void __cdecl ScrollMapCache(void)
 
         src.left   = sx << TILE_SHIFT;
         src.top    = tiles.top << TILE_SHIFT;
-        dstX       = ((dx > 0) ? 0 : -dx) << TILE_SHIFT;
-        dstY       = ((dy > 0) ? 0 : -dy) << TILE_SHIFT;
+        dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
+        dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
 
@@ -1882,7 +1882,7 @@ void __cdecl ViewUpdate(void)
      * tail with the deltas unscaled, which lands exactly on the target. */
     if (!g_viewHold) {
         if (dist > step) {
-            dx = dx * (int32_t)(g_viewSpeed * g_frameDeltaSec) / dist;
+            dx = dx * step / dist;
             dy = dy * step / dist;
         }
     } else {
