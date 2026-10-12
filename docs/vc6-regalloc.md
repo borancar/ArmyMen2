@@ -1736,6 +1736,17 @@ and the own arm the index form with the pointer last). PointActionC 52 -> 30
 (`rows` re-read after the first row's stores), ScrollMapCache 204 -> 168 (the
 two src stores in the image's order).
 
+Not source-addressable, found by the last pass: the 2-byte differences in
+OnBootCamp, OnSinglePlayer, OnStartWar, StartSelectedGame, OpenTitleScreen and
+CommLobbyStart are `jmp` (image) against `jne`/`je` (ours): GOG-patched bytes
+in the image (docs/binarypatches.md), not codegen. Step3Drive's apparent "extra
+call" and the RunScriptAction/HudSquadUpdate tails are jump-table data decoded
+as instructions; RunScriptAction's 60 is frame slots only. And the
+PointerPick family's remaining difference is the object POINTER copied into
+ebp at the board arm, which no source form reaches (a plain copy, const, void *,
+uintptr_t, a helper parameter, a loop cursor, two live defs: all propagate back);
+the uid value local landed instead (256 -> 214, 138 -> 108, 110 -> 64).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
