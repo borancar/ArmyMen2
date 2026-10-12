@@ -7601,8 +7601,8 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     AM2_Object      *at;
     const AM2_Point *pos;
     int32_t  klass;
-    int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
+    int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  tries;
     int32_t  i;                /* 0 for the plain step, else the sweep's try */
     int32_t  found;            /* the facing is settled */
