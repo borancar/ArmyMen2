@@ -4871,10 +4871,10 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
          * after the rest, where a goto pulls it up behind the test. */
         if (!ObjsAreAllied(o, it, 0)) {
             if (IsKind7(it)) {
+                cand        = it;
                 candBearing = AngleBetween(&o->pos,
                                            &it->pos);
                 candRange   = AM2_SIGHT_KIND7_RANGE;
-                cand        = it;
                 if (!cand)
                     continue;
                 ++*nOther;
@@ -4951,7 +4951,6 @@ in_sight:
              * skips recording it while still revealing it below. */
             /* Cleared first and set when NOT refused: the image tests and
              * then stores `it` on the fall-through. */
-            cand = (AM2_Object *)0;
             if (!((o->aiMode == 3
                  || o->aiMode == 2)
                 && (uint32_t)(g_gameClockMs
