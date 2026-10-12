@@ -2090,15 +2090,15 @@ void __cdecl DrawSelection(void)
 
         /* The frame first, then the filled part, then the remainder -- three
          * ClearRegions over one rectangle, each narrowing it. */
-        box.right  = x + wide + 1;
-        box.top    = y + drop;
         box.left   = x - 1;
+        box.top    = y + drop;
+        box.right  = x + wide + 1;
         box.bottom = y + drop + 4;
         ClearRegion(&box, g_backgroundColour);
 
         box.left   = x;
-        box.top    = y + drop + 1;
         box.right  = x + fill;
+        box.top    = y + drop + 1;
         box.bottom = y + drop + 3;
 
         if (obj->health <= (int16_t)(obj->maxHealth >> 2))

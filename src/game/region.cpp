@@ -2024,7 +2024,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     int32_t         splitOdd;
     int32_t         k;
     int32_t         y;
-    int32_t         marked = 0;
+    int32_t         marked;
 
     m = obj->rowSet.hitMask;
     if (!m)
@@ -2109,6 +2109,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
         k        = 8 - phase;
     }
 
+    marked = 0;
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
         int32_t end = off + rowbytes;

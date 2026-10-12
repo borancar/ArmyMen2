@@ -2209,10 +2209,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         /* A facing may be `refvar <name>` instead of a literal. Anything
          * else is stepped over and leaves the field at zero. */
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED
-            || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_REFVAR) {
-            (*at)++;
-            return 1;
-        }
+            || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_REFVAR)
+            goto step_ret;
         if (!ActStep(ctx, at))
             return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
@@ -2245,10 +2243,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 1;
         }
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED
-            || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_REFVAR) {
-            (*at)++;
-            return 1;
-        }
+            || ((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_REFVAR)
+            goto step_ret;
         if (!ActStep(ctx, at))
             return 0;
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
@@ -2323,13 +2319,12 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x27;
-        goto string_arg;        /* the image shares SETBRIEFVO's tail */
+        goto string_arg;
 
     case AM2_TOK_SETBRIEFVO:
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x28;
-    string_arg:
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->text = (char *)ctx->tokens[*at].value;
@@ -2340,9 +2335,11 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x29;
+    string_arg:
         if (!ActWant(ctx, at, AM2_TOKEN_STRING))
             return 0;
         act->text = (char *)ctx->tokens[*at].value;
+    step_ret:
         (*at)++;
         return 1;
 
