@@ -1653,6 +1653,30 @@ What is left: SETSTRATMAP's shared `(*at)++; return 1` tail begins at
 has already CSE'd the load, so the jumps land one instruction later and the
 `pop edi` schedules after the `inc`.
 
+**The relink-metric lab (2026-10-12): the largest gains of the whole effort.**
+Letting a second model run experiments itself, scored by the RELINK edit
+distance rather than the shape metric, produced: SightScan 774 -> 528 (the
+kept list as the scoring cursor, `for (; keep; keep = keep->queryNext)`,
+which removes a register copy at the loop entry and gives the whole prologue
+the image's allocation; one score block inside the kind-7 arm; the image's
+store orders), ScriptPad 496 -> 280 (the trigger loop NESTED under
+`if (RESERVED) {...} else break;` -- VC6 lays a loop's exit blocks out in the
+order the exit branches are discovered, so which exit is written first decides
+the fall-through block; the second centroid's counter in the `for`),
+FlowRecvMessage 540 -> 454 (the deliver path as the `if` body so the mismatch
+is a jump into the shared epilogue instead of a private copy), AiTrooperStep
+484 -> 134 (the shared `set_move_to`/`two_waypoints` labels removed and the
+four store tails written out; VC6 cross-jumps the copies itself and the
+callee-saved allocation flips to the image's), FindPath -2 (an expression
+index compiles `[idx+table]`, a variable index `[table+idx]`), DepthInsert -4.
+The pattern across all of them: a hand-made shared label or a `goto` is
+usually what the original did not have, and removing it lets VC6 build the
+sharing itself; and loop and branch STRUCTURE (which exit is written first,
+whether the body is the `if` or the `else`) decides block layout. Three
+rules for the next function: measure on the relink, not the masked shape
+score; read the raw referrers of every identical block; and try the
+nested-else form of any loop with an early `break`.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
