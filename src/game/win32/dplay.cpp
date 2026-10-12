@@ -968,16 +968,12 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
         int32_t  index = -1;
 
         /* Only these two are reported; anything else fails silently. */
-        switch (hr) {
-        case (HRESULT)DPERR_INVALIDPLAYER:
-            orig_log("DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x\n", idTo);
-            break;
-        case E_INVALIDARG:
+        if (hr != E_INVALIDARG && hr != (HRESULT)DPERR_INVALIDPLAYER)
+            goto failed;
+        if (hr == E_INVALIDARG)
             orig_log("DPLAY ERROR: INVALID PARAMETERS IN SEND TO ID %x\n", idTo);
-            break;
-        default:
-            goto failed;        /* the one `return 0` below */
-        }
+        else
+            orig_log("DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x\n", idTo);
 
         cm = g_commObject;
         n  = (int32_t)cm->playerCount;

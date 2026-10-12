@@ -4707,7 +4707,7 @@ void __cdecl HudPostUpdate(void)
     AM2_Object    *weapon;
     int32_t  ours;         /* the context object is ours to command */
     int32_t  aiming;       /* an aim overlay was prepared this frame */
-    int32_t  repeat = 0;   /* the held weapon keeps acting while held */
+    int32_t  repeat;       /* the held weapon keeps acting while held */
     AM2_PointerPickFn   pick;
 
     if (g_charHandler)
@@ -4722,9 +4722,10 @@ void __cdecl HudPostUpdate(void)
      * a full 32-bit add of the packed dword with only the low half stored, so
      * a carry out of x is discarded; written as int16 arithmetic, which is
      * what that amounts to. */
-    ((int16_t *)&at)[0] =
-        (int16_t)(g_viewRect.left
-                  + (int32_t)*(const uint32_t *)&g_cursorPoint);
+    {
+        int32_t x = g_viewRect.left + g_cursorPoint;
+        ((int16_t *)&at)[0] = (int16_t)x;
+    }
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                   + *(const int16_t *)&g_viewRect.top);
@@ -4803,24 +4804,12 @@ void __cdecl HudPostUpdate(void)
         VehicleDismountAll((AM2_Object *)0, at);
 
     /* ---- what the leader is holding ----------------------------------- */
+    repeat = 0;
     leader = LookupOwnerObj(g_defaultOwner);
     if (leader) {
-        int32_t sel = leader->inventorySel;
-
-        {
-            uint32_t uid = leader->inventory[sel];
-
-            weapon = WeaponByUid(uid);
-        }
-        if (weapon) {
-            /* obj -> type record -> kind, then the kind's own record. Three
-             * loads, not two: OBJ_OFF_FIELD_C0 is a POINTER to the type. */
-            const AM2_ItemType *type =
-                weapon->typeRec;
-            int32_t kind = type->kind;
-
-            repeat = g_missileDefs[kind].automatic;
-        }
+        weapon = WeaponByUid(leader->inventory[leader->inventorySel]);
+        if (weapon)
+            repeat = g_missileDefs[weapon->typeRec->kind].automatic;
     }
 
     /* We command the context object when it IS our leader, or when it is the
@@ -4842,9 +4831,10 @@ void __cdecl HudPostUpdate(void)
     /* ---- the fan-out --------------------------------------------------- */
     /* The world point is built AGAIN here, the same two adds as at the top,
      * straight into the same slot. */
-    ((int16_t *)&at)[0] =
-        (int16_t)(g_viewRect.left
-                  + (int32_t)*(const uint32_t *)&g_cursorPoint);
+    {
+        int32_t x = g_viewRect.left + g_cursorPoint;
+        ((int16_t *)&at)[0] = (int16_t)x;
+    }
     ((int16_t *)&at)[1] =
         (int16_t)(*(const int16_t *)(uintptr_t)(((uintptr_t)&g_cursorPoint) + 2)
                   + *(const int16_t *)&g_viewRect.top);
@@ -6189,14 +6179,20 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             if (obj->riding)
                 goto next;
 
-            {
-                AM2_SquadRec *r = &sq->recs[slot];
-
-                r->index = 0;
-                sq->recs[slot].detailArg = (int32_t)obj->uid;
-                SQUAD_BAR(r->barW, obj);
-                SQUAD_INK(r->barColour, obj);
-                r->icons = AM2_HUD_SQUAD_PIPS_MAX;
+            sq->recs[slot].index = 0;
+            sq->recs[slot].detailArg = (int32_t)obj->uid;
+            SQUAD_BAR(sq->recs[slot].barW, obj);
+            if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 2)) {
+                sq->recs[slot].barColour = g_hudColour;
+                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
+                slot++;
+            } else if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 1)) {
+                sq->recs[slot].barColour = g_colourLagMid;
+                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
+                slot++;
+            } else {
+                sq->recs[slot].barColour = g_hiliteColour;
+                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
                 slot++;
             }
 
@@ -11422,7 +11418,6 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     AM2_Widget  *panel;
     AM2_Button  *btn;
     int32_t      i;
-    int32_t      idx;
     AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
     SetGameDir("alpine");
 
@@ -11449,11 +11444,10 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                          g_dirScratch, 1,
                          *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0x35, 0x90, 0x90),
                          kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
-    idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 0;
-    btn->row       = idx;
-    btn->spriteNormal = this->sprites[idx][1];
-    btn->spriteFocus = this->sprites[idx][0];
-    btn->spritePressed = this->sprites[idx][0];
+    btn->row       = g_moviePage * AM2_MOVIE_PAGE_SIZE + 0;
+    btn->spriteNormal = this->sprites[btn->row][1];
+    btn->spriteFocus = this->sprites[btn->row][0];
+    btn->spritePressed = this->sprites[btn->row][0];
     btn->ownsSprites = 0;
     ::WidgetAddChild(panel, btn);
     panel->focusedChild = btn;
@@ -11468,11 +11462,10 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x35, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
-        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 1;
-        btn->row       = idx;
-        btn->spriteNormal = this->sprites[idx][1];
-        btn->spriteFocus = this->sprites[idx][0];
-        btn->spritePressed = this->sprites[idx][0];
+        btn->row       = g_moviePage * AM2_MOVIE_PAGE_SIZE + 1;
+        btn->spriteNormal = this->sprites[btn->row][1];
+        btn->spriteFocus = this->sprites[btn->row][0];
+        btn->spritePressed = this->sprites[btn->row][0];
         btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
         this->buttons[1] = btn;
@@ -11483,11 +11476,10 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0xE9, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
-        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 2;
-        btn->row       = idx;
-        btn->spriteNormal = this->sprites[idx][1];
-        btn->spriteFocus = this->sprites[idx][0];
-        btn->spritePressed = this->sprites[idx][0];
+        btn->row       = g_moviePage * AM2_MOVIE_PAGE_SIZE + 2;
+        btn->spriteNormal = this->sprites[btn->row][1];
+        btn->spriteFocus = this->sprites[btn->row][0];
+        btn->spritePressed = this->sprites[btn->row][0];
         btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
         this->buttons[2] = btn;
@@ -11498,11 +11490,10 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
                              g_dirScratch, 1,
                              *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0xE9, 0x90, 0x90),
                              kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
-        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 3;
-        btn->row       = idx;
-        btn->spriteNormal = this->sprites[idx][1];
-        btn->spriteFocus = this->sprites[idx][0];
-        btn->spritePressed = this->sprites[idx][0];
+        btn->row       = g_moviePage * AM2_MOVIE_PAGE_SIZE + 3;
+        btn->spriteNormal = this->sprites[btn->row][1];
+        btn->spriteFocus = this->sprites[btn->row][0];
+        btn->spritePressed = this->sprites[btn->row][0];
         btn->ownsSprites = 0;
         ::WidgetAddChild(panel, btn);
         this->buttons[3] = btn;

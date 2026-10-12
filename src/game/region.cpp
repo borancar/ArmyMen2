@@ -2403,10 +2403,10 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
     (void)unused;
     /* The rectangle and the mask.cells are read out of the mask at each use. */
     AM2_TileMask   mask;
-    /* A byte, unlike ItemTeardown's int32: it is then a stack variable, as
-     * the image keeps it (stored at +0x1C, its low byte re-read for the add),
-     * where an int32 takes ebx from the row loop's scratch. */
-    int8_t         height;
+    /* Kept on the frame, as the image has it (stored at +0x1C, its low byte
+     * re-read for the add and the test): the test casts to a byte, because a
+     * plain int32 or uint32 takes ebx from the row loop's scratch. */
+    uint32_t       height;
     int32_t        idx;
     int32_t        row;
     int32_t        x;
@@ -2452,7 +2452,7 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
         > (int8_t)(g_tileAttrs)
               [o->tile])
         return;
-    if (!height)
+    if (!(int8_t)height)
         return;
 
     if (o->rowSet.hitMask)
