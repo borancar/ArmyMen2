@@ -1700,6 +1700,24 @@ it, otherwise it moves to just after its last predecessor in source order;
 and a block-scoped local in a `case` shares a frame slot with its sibling
 cases where a function-scope one does not.
 
+**More from the screener (2026-10-12).** Byte-identical now: CommSend (the
+guard's two tests in the image's compare order, then an `if`/`else` on
+E_INVALIDARG; a `return 0` in the guard costs 66, `goto failed` must stay),
+the MoviesScreen constructor (the index read back through the button, no
+`idx` local), VehicleUpdateAppend. VehicleUpdateAppend's key: VC6 counts a
+variable's uses BEFORE it cross-jumps identical arms, so an accumulator that
+loses its callee-saved register to a value with fewer uses (`flags` against
+`seq`) wins it back when the original's `||` guards are written as else-if
+arms with the body repeated (the three `flags |= X` copies merge afterwards);
+with the single-`|=` form it needed twelve artificial extra reads. Together
+with the action record split into its own second `if (flags & 0x80000000u)`
+and `flags = 0` placed after the `dz` abs, 328 -> 0. Also: HudPostUpdate 134
+-> 32 (`repeat` bare and zeroed before the leader lookup; the world point
+through an int32 sum), ObjAfterMove 72 -> 2 (`uint32_t height` tested through
+an `(int8_t)` cast keeps it on the frame), ObjHitMaskAction 330 -> 246
+(`marked` bare and zeroed just before the row loop), ScrollMapCache 226 -> 204
+(the cache surface in a local, loaded back for both BltFast pushes).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
