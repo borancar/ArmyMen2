@@ -4973,7 +4973,7 @@ raise_k:
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
                     out->state = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
                 else
-                    goto raise_s;
+                    out->state = AM2_POSE_RAISE_STAND;
                 break;
             }
             break;
