@@ -3322,14 +3322,14 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
 
     if (BeginMoveTo(ob, &pt)) {
         ob->moveUntil = (int32_t)g_gameClockMs + AM2_AI_TROOPER_RETRY_MS;
-        pt            = *dest;
-        /* The copies re-address the object rather than going through
-         * `pos`/`dest`: the image recomputes the field address at each one. */
+        pt            = ob->dest;
         ob->routeGoal = pt;
         ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
         ob->moveEnd   = 0;
-        goto two_waypoints;
+        ob->moveAt    = 1;
+        ob->moveCount = 2;
+        goto walk;
     }
 
     /* Still routing to this goal with waypoints left before the last: keep the
@@ -3341,7 +3341,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
      * clear it replanned a 15-waypoint path into a 2-waypoint straight move,
      * one step off from the original. Only the radar showed it -- an off-screen
      * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
-    if (PointsEqual(pt, ob->routeGoal)
+    if (PointsEqual(ob->routeGoal, pt)
         && ob->moveCount > 0
         && (int32_t)ob->moveAt
            < (int32_t)ob->moveCount - 1)
@@ -3385,16 +3385,19 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
 
             /* NearestAllowedTile writes the point, so the x half is cleared first
              * rather than the whole local -- the original's `mov word`. */
-            pt.x = 0;
-            ((AM2_NearestTile16Fn)NearestAllowedTile)(ob, kLinks(fromRegion)[link].into,
-                               &pt);
+            {
+                uint16_t into = kLinks(fromRegion)[link].into;
+
+                pt.x = 0;
+                ((AM2_NearestTile16Fn)NearestAllowedTile)(ob, into, &pt);
+            }
         }
 
 after_region:
         /* Keep the route we have when it still aims at this point AND either has
          * waypoints left or has run past its cooldown. Both arms of that second
          * test skip the re-plan; see the header. */
-        if (PointsEqual(pt, ob->routeGoal)) {
+        if (PointsEqual(ob->routeGoal, pt)) {
             if (ob->moveCount > 0 && ob->moveAt < ob->moveCount)
                 goto walk;
             if ((uint32_t)g_gameClockMs > (uint32_t)ob->moveUntil)
@@ -3406,33 +3409,33 @@ after_region:
             /* The goal it was ASKED for, not the point it is walking to. */
             ob->routeGoal = *(&ob->dest);
             ob->moveFrom  = *(&ob->pos);
-            goto set_move_to;
+            ob->moveTo    = pt;
+            ob->moveEnd   = 0;
+            ob->moveAt    = 1;
+            ob->moveCount = 2;
+            goto walk;
         }
 
         ob->routeGoal = pt;
         if (!PlanPathTo(ob, &pt, AM2_AI_PLAN_BUDGET_LONG)) {
-            ob->moveFrom  = *(&ob->pos);
             ob->routeGoal = *(&ob->dest);
-            goto set_move_to;
+            ob->moveFrom  = *(&ob->pos);
+            ob->moveTo    = pt;
+            ob->moveEnd   = 0;
+            ob->moveAt    = 1;
+            ob->moveCount = 2;
+            goto walk;
         }
         /* A route was found; PlanPathTo filled the waypoints itself. */
         ob->routeGoal = *dest;
-        goto walk;
     } else {
-        /* Its own copy of the target stores, in this order -- the shared
-         * one below has them the other way round. */
         ob->routeGoal = pt;
         ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
         ob->moveEnd   = 0;
-        goto two_waypoints;
+        ob->moveAt    = 1;
+        ob->moveCount = 2;
     }
-set_move_to:
-    ob->moveEnd = 0;
-    ob->moveTo = pt;
-two_waypoints:
-    ob->moveAt    = 1;
-    ob->moveCount = 2;
 
 walk:
     /* Advance past every waypoint already close enough to count as reached.

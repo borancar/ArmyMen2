@@ -691,7 +691,6 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     RECT           hit;
     int32_t        cmp;
     AM2_DepthNode *at;
-    AM2_DepthNode *head;
 
     if (g_depthCount >= AM2_DEPTH_MAX)
         return 0;
@@ -760,10 +759,9 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
                 goto link_after;
             }
     } else if (obj->flags & OBJ_DEPTH_FLAG_BACK) {
-        head = &g_depthNodes[g_depthHead];
-        for (at = head; at; at = at->next)
+        for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
             if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_FRONT) {
-                if (at == head)
+                if (at == &g_depthNodes[g_depthHead])
                     goto at_front;  /* at the front, and the head moves */
                 goto link_before;
             }
