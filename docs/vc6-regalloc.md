@@ -1536,6 +1536,23 @@ after `dx`/`dz` (328 -> 584); SelectFirePose's raise-kneel stores written in
 place (304 -> 614); UpdateTrooperAction's facing delta from the record
 (382 -> 390) and one `stop:` join for the four stop arms (384).
 
+**A third review round (2026-10-12): two more behaviour bugs, one more
+byte-identical function.** DamageTrooper is byte-identical: the armour scan
+stops at the FIRST EMPTY inventory slot (the image's `je` on an empty uid
+goes to the loop's exit); ours skipped empty slots and kept scanning.
+ViewUpdate 112 -> 10: both glide products written with the one `step` local
+(a second spelling of the same product made VC6 keep a second temporary in
+eax). ScrollMapCache 252 -> 230 (the shift inside the negative arm of the
+destination), HudPostUpdate 206 -> 134 (the hold arm first, unbraced, in the
+ours arm, so the three identical callbacks stay as three copies).
+Measured and not kept: PointerFriendTail with a `vehicle` copy and `o`
+reused as the loop cursor (no change in any of the four siblings);
+AddToItemList's id loaded straight into its register, ObjRemap's `y` as
+int32 and its `y`/`x` order, RowUpdate's `cols` read once (208 -> 220),
+EncodeGlyph's base-pointer cast (182 -> 196), ScrollMapCache's abs split
+(230 -> 362), ViewUpdate's dy first (10 -> 46) and its snap stores
+separately or reloaded (60, 166), DrawSelection's `top` (156 -> 178).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports

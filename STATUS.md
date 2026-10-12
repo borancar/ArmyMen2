@@ -191,8 +191,8 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 11,812 of edit
-  distance over the 57 functions that are not byte-identical (147,586
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 11,510 of edit
+  distance over the 56 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 -> 382 (the turret aim held in a local keeps `speed` in ebp; then the first block through `gun`, the gun facing straight from its RoundTo8, the approach test as one expression; docs/vc6-regalloc.md; its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
@@ -210,8 +210,9 @@ main result so far (details in `src/vc6/README.md`):
   sees twice, which puts the frame in memory and the sum in a `lea`;
   the B test on the same sum; the B point read from the array at each
   use rather than through a pointer local, which is what keeps the base
-  register every aim array shares on the A point): relink 1589 of
-  1646, 57 differ. ScriptParseActionRecon 2,336 -> 1,862 bytes and
+  register every aim array shares on the A point), and DamageTrooper
+  byte-identical (its armour scan stops at the first empty inventory slot;
+  the reconstruction skipped empty slots): relink 1590 of 1646, 56 differ. ScriptParseActionRecon 2,336 -> 1,862 bytes and
   shape 70 -> 63 from a lab clone of the whole function (ADDEXP as a
   positive test owning the shared type-error block, SETUILOCK's own
   copy, SETITEMFLAG's kind name through a local, INACTIVATEREGION's
