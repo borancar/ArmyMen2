@@ -1127,10 +1127,9 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
     budget  = (int32_t)((uint32_t)(g_pathMaxSearches * considered)
                         / elapsed);
     budget += g_pathMaxNodes / 2;
-    budget  = (int32_t)((uint32_t)budget >> 1) * 2;
-    /* Stored, then overridden: the floor is an unsigned compare. */
-    g_pathMaxNodes = budget;
-    if ((uint32_t)budget <= AM2_PATH_MIN_NODES)
+    budget  = (int32_t)((uint32_t)budget >> 1);
+    g_pathMaxNodes = budget + budget;
+    if ((uint32_t)(budget + budget) <= AM2_PATH_MIN_NODES)
         g_pathMaxNodes = AM2_PATH_MIN_NODES;
 }
 
@@ -1256,15 +1255,10 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
      * unsigned `<= 0`, the image's `jbe`) and the masked value under
      * AM2_PATH_TILES. The second can never fire after the
      * mask; reproduced because it is there. */
-    if (from <= 0)
-        return 0;
-    fromTile = from & 0xFFFF;
-    if (fromTile >= AM2_PATH_TILES)
-        return 0;
-    if ((uint16_t)to <= 0)
-        return 0;
-    toTile = to & 0xFFFF;
-    if (toTile >= AM2_PATH_TILES)
+    if (from <= 0
+        || (fromTile = from & 0xFFFF) >= AM2_PATH_TILES
+        || (uint16_t)to <= 0
+        || (toTile = to & 0xFFFF) >= AM2_PATH_TILES)
         return 0;
 
     startRegion = g_regionOfCell[from & 0xFFFF];
@@ -1297,13 +1291,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     }
 
     goalTile   = goal & 0xFFFF;
-    goalRegion = g_regionOfCell[goalTile];
+    goalRegion = g_regionOfCell[goal & 0xFFFF];
 
     /* Top-tested with a jump back, as the image has it: `while (from)`
      * rotates into an entry test plus a bottom test. */
     while (1) {
         if (!(uint16_t)from)
-            break;
+            goto fail;
         cur     = from;
         curTile = cur & 0xFFFF;
 
@@ -1313,15 +1307,25 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             g_pathNodes[from & 0xFFFF].prev = 0;
         g_pathNodes[cur & 0xFFFF].state = 2;
 
-        if (considered > g_pathMaxNodes)
-            goto budget;
+        if (considered > g_pathMaxNodes) {
+            int32_t hc;
+            hc = PathDistXY(cur & 0xFFFF, toTile);
+            hc = (int32_t)((double)hc * 1.5);
+            if ((uint16_t)hc > (uint16_t)PathHeuristic(fromTile, toTile)) {
+fail:
+                PathChargeFrameL(startTicks, considered);
+                return 0;
+            }
+            PathUnwind(cur, out, n);
+            goto ok;
+        }
 
         /* The goal, or the region shortcut, which needs BOTH guards: a goal
          * region of zero means nothing, and a start already in the goal's
          * region would make every tile an arrival. */
         if ((uint16_t)cur == (uint16_t)goal
             || (goalRegion > 0 && startRegion != goalRegion
-                && g_regionOfCell[curTile] == goalRegion))
+                && g_regionOfCell[cur & 0xFFFF] == goalRegion))
             goto found;
 
         considered += AM2_TILE_STEP8_COUNT;
@@ -1333,13 +1337,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             int32_t  h;
             uint16_t walk, before;
 
-            if (curTile + g_tileStep8[i] <= 0 || nb >= AM2_PATH_TILES)
+            if (nb <= 0 || nb >= AM2_PATH_TILES)
                 continue;
             if ((*(AM2_PointRuleFn *)&g_pointRule)(nb))
                 continue;
-            t = (curTile + g_tileStep8[i]) & 0xFFFF;
-            if (g_regionOfCell[t] > 0 && g_regionOfCell[t] != startRegion
-                && g_regionOfCell[t] != goalRegion)
+            t = nb & 0xFFFF;
+            if (g_regionOfCell[nb & 0xFFFF] > 0 && g_regionOfCell[nb & 0xFFFF] != startRegion
+                && g_regionOfCell[nb & 0xFFFF] != goalRegion)
                 continue;
 
             /* Twice the step, plus a penalty for each flag the tile LACKS.
@@ -1348,18 +1352,15 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * what VC6 does for a uint16_t. */
             g = (uint16_t)(PathDistXY(curTile, t) * 2);
             g += g_pathNodes[curTile].g;
-            {
-                uint8_t f = g_tileFlags[t];
-                if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
-                    g += 3;
-                if (!(f & AM2_TILE_LITTLE_COVER_NEAR))
-                    g += 1;
-            }
+            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
+                g += 3;
+            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR))
+                g += 1;
             h = PathHeuristic(t, goalTile);
 
             if (g_pathNodes[t].stamp == g_pathGeneration) {
                 /* Seen: improve it if it is open and cheaper now. */
-                if (g_pathNodes[(curTile + g_tileStep8[i]) & 0xFFFF].state & 1) {
+                if (g_pathNodes[t].state & 1) {
                     if ((uint16_t)g >= g_pathNodes[t].g)
                         continue;   /* already there by a cheaper route */
 
@@ -1376,7 +1377,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                         from = 0;
                     if (g_pathNodes[t].next > 0)
                         g_pathNodes[g_pathNodes[t].next].prev = g_pathNodes[t].prev;
-                } else if (g_pathNodes[(curTile + g_tileStep8[i]) & 0xFFFF].state & 2) {
+                } else if (g_pathNodes[t].state & 2) {
                     /* Closed: done with. */
                     continue;
                 }
@@ -1395,7 +1396,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             before = 0;
             if (!from) {
                 g_pathNodes[t].next = 0;
-                from = (uint16_t)t;
+                from = (uint16_t)nb;
                 g_pathNodes[t].prev = 0;
                 continue;
             }
@@ -1418,36 +1419,18 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
                 g_pathNodes[t].next = after;
                 if (after > 0)
-                    g_pathNodes[after & 0xFFFF].prev = (uint16_t)t;
-                g_pathNodes[before & 0xFFFF].next = (uint16_t)t;
+                    g_pathNodes[after & 0xFFFF].prev = (uint16_t)nb;
+                g_pathNodes[before & 0xFFFF].next = (uint16_t)nb;
                 g_pathNodes[t].prev = before;
             } else {
                 /* Cheapest so far: in front of the head. */
                 g_pathNodes[t].next = from;
                 g_pathNodes[t].prev = 0;
-                g_pathNodes[from & 0xFFFF].prev = (uint16_t)t;
-                from = (uint16_t)t;
+                g_pathNodes[from & 0xFFFF].prev = (uint16_t)nb;
+                from = (uint16_t)nb;
             }
         }
     }
-
-    goto fail;
-
-budget:
-    /* Out of budget. Keep what was found if it got closer than the start
-     * was -- `jbe` on the two heuristics as WORDS (`cmp di, ax`), so equal
-     * counts as progress. The refusal is written out here and merges with
-     * the exhausted list's copy below, which the image lays out inline. */
-    if ((uint16_t)PathHeuristic(cur & 0xFFFF, toTile)
-        > (uint16_t)PathHeuristic(fromTile, toTile)) {
-        PathChargeFrameL(startTicks, considered);
-        return 0;
-    }
-    PathUnwind(cur, out, n);
-    goto ok;
-fail:
-    PathChargeFrame(startTicks, considered);
-    return 0;
 
 found:
     PathUnwind(cur, out, n);
@@ -2128,11 +2111,10 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
-        int16_t end = off + rowbytes;          /* a word too; both fit (see the header) */
-        int16_t col = AM2_TILEMASK_MARGIN;     /* a word, as the image keeps it */
+        int32_t end = off + rowbytes;
+        int32_t col = AM2_TILEMASK_MARGIN;
         uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
-        int32_t ci  = (int32_t)(c - out->cells);
 
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
@@ -2141,25 +2123,24 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                     *c |= AM2_TILEMASK_BOX_CELL;
                     /* The ring before the flag in this arm only, which is
                      * the order the image stores them. */
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
                     marked = 1;
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
 
                 col++;
                 c++;
-                ci++;
                 if (col == span + AM2_TILEMASK_MARGIN)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
                 marked = 1;
-                MarkTileRingIdx(out, g_tilemaskNeighbours, ci);
+                MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
         } while (++off < end);
     }
