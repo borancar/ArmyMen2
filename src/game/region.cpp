@@ -1278,7 +1278,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         ++g_pathGeneration;
 
         g_pathNodes[fromTile].g      = 0;
-        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(from & 0xFFFF, toTile);
+        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(fromTile, toTile);
         g_pathNodes[fromTile].depth  = 0;
         g_pathNodes[fromTile].stamp  =
             g_pathGeneration;
