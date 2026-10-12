@@ -4112,7 +4112,6 @@ static inline void AiSightTrace(const AM2_Object *const &o,
                                 const int32_t &gen, int32_t &highest)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_BUF];   /* SightScan's 0x84C frame holds 1024 */
-    const uint8_t *attrs = g_tileAttrs;
     int32_t        n, i, reach;
 
     g_sightBlockByDir[dir].trace_stamp = gen;
