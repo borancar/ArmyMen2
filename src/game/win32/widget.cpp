@@ -9231,7 +9231,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * 0x515FE0 outright suggests. Same loop on any address below 2 GB. */
     for (points = g_armyPoints;
          (int32_t)(uintptr_t)points < (int32_t)(uintptr_t)(g_armyPoints + AM2_COMM_SLOTS);
-         points++, i++) {
+         i++, points++) {
         char       *name = this->playerNames[i];
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
