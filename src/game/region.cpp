@@ -9848,12 +9848,12 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             AM2_MapRow *turret = &o->rowSet.rows[1];
             int32_t  swing;
 
-            /* The new aim is held, stored, and used from the held copy; read
-             * back through `r` it leaves `speed` out of ebp, where the image
-             * keeps it across the whole function. */
-            uint8_t aim = (uint8_t)(r->aim + turn);
+            /* The new aim is held, stored, and used from the held copy, in
+             * one chained assignment; read back through `r` it leaves `speed`
+             * out of ebp, where the image keeps it across the function. */
+            uint8_t aim;
 
-            r->aim = aim;
+            aim = r->aim = (uint8_t)(r->aim + turn);
             swing = AngleDelta(o->turretFacing, aim);
             swing = Clamp(swing, turn - 0x0F, turn + 0x0F);
 
