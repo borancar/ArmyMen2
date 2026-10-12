@@ -1594,6 +1594,17 @@ through a local (no change), SightScan's best/slack store order (822) and
 `result` first in the alt arm (806), MpPanelScreen's `name` local dropped
 (no change).
 
+A sweep of the other 55 differing functions for the same pattern (a
+pointer local initialised from a global, a field or a parameter and used
+once to three times) inlined each candidate at its uses and relinked:
+RunScriptAction `num`, LoadMap `attrs`, Step3Drive `g`, ListMaskAction `h`,
+PausedFrameStep `o`, AirFrameDraw `hot`, StepRowAnim `want`, CommSend
+`slot`, VehicleUpdateAppend `m`, HudPostUpdate `type` changed nothing;
+RowUpdate `rc` (208 -> 248), PausedFrameStep `rec` (4 -> 52),
+OptionsDefaults `parent` (32 -> 64), EncodeGlyph `dst` (182 -> 184) and
+FlowRecvMessage `m` (540 -> 560) were worse. So MpPanelScreen's `cb`/`rows`
+pair was a one-off, not a pattern.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
