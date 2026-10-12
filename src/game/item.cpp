@@ -5104,19 +5104,22 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
 
     left   = 0;
     slot   = -1;
+    /* The scan stops at the first EMPTY slot (the image's `je` on the uid
+     * goes to the loop's exit), not at the first armour: the inventory is
+     * packed, and a gap ends it. */
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
+        AM2_Object *w;
 
-        if (((&obj->inventory[0])[i]) != 0) {
-            AM2_Object *w = WeaponByUid((int32_t)((&obj->inventory[0])[i]));
-
-            if (w != 0
-                && w->typeRec->kind
-                   == (int32_t)AM2_ITEM_TYPE_ARMOR) {
-                armour = w;
-                left   = w->ammo;
-                slot   = i;
-                break;
-            }
+        if (((&obj->inventory[0])[i]) == 0)
+            break;
+        w = WeaponByUid((int32_t)((&obj->inventory[0])[i]));
+        if (w != 0
+            && w->typeRec->kind
+               == (int32_t)AM2_ITEM_TYPE_ARMOR) {
+            armour = w;
+            left   = w->ammo;
+            slot   = i;
+            break;
         }
     }
 
