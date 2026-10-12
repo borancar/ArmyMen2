@@ -1605,6 +1605,25 @@ OptionsDefaults `parent` (32 -> 64), EncodeGlyph `dst` (182 -> 184) and
 FlowRecvMessage `m` (540 -> 560) were worse. So MpPanelScreen's `cb`/`rows`
 pair was a one-off, not a pattern.
 
+**A sixth round (2026-10-12), second passes with the raw diff.** Landed:
+FindPath's start-node `h` from `fromTile` (one web for the value, 834 ->
+800) and `goal = to` first in the fresh-search arm (800 -> 774), RowUpdate's
+rect in natural order with no pointer to it (208 -> 176), AiTrooperStep's
+`moveUntil` before the `pt` copy (486 -> 484). Measured and not kept, each on
+the relink: FlowRecvMessage's `seq != expected` as a `break` (540 -> 586),
+either pool return inline (594, 740) and `#pragma optimize("s")` around the
+function (2,244); FindPath's `nb` as the value for all five word stores
+(964), the doubled step through an int32 block local (-4, nothing on top of
+`fromTile`), the budget refusal as a `break` out of the loop with the shared
+`PathChargeFrameL` after it (1,046); Step3Drive's `aim` as the assignment's
+value passed to the call (382 -> 532); ObjHitMaskAction with a `cells` local
+and no `ci` (474), plus int32 `end`/`col` (596); ObjRemap's `cl` clamp first
+(246); HudSquadUpdate back to `recs[slot]` (278); AiTrooperStep with the
+no-region arm folded into `set_move_to` (860); VehicleUpdateAppend with
+`flags` declared bare and zeroed before the position test, with and without
+the `age` locals (562); SelectFirePose with either raise block returning in
+place (no change).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
