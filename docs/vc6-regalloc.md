@@ -1572,6 +1572,28 @@ order, Update3DAudioVolumes without the `buf` local, OptionsDefaults'
 self-reused mask, MissionEnded's two store orders (14 -> 20), AddToItemList's
 compound form.
 
+**A fifth round (2026-10-12): named locals that were not in the original.**
+The largest single gain of the review rounds was deleting two locals.
+AM2_MpPanelScreen's chat list ended `AM2_ListBox *cb = *slot; AM2_ListRows
+*rows = cb->rows; cb->selected = rows->count - 1;`; written as
+`(*slot)->selected = (*slot)->rows->count - 1;` it went 576 -> 388, because
+a named web leaves the rotation the later `topRow`/`visible` tests share.
+Worth sweeping the other big functions for the same shape (a local that
+holds a pointer already reachable through a global or a slot, used once or
+twice). Also landed: the map-list test folded into the loop condition
+(`for (; maps && i < maps->count; i++)`, 388 -> 360), LoadMap's OLAY walk by
+index with no pointer local (378 -> 318), ScriptPad's HALFTRACK as its own
+arm before CONVOY (512 -> 502: the bodies are laid out in token order and
+the identical arm is cross-jumped into GREY's) and its first centroid's
+`total` after `sy` (496), SightScan's two counts cleared allied first
+(796), the distance's x delta through `dx` (786), and `cand` set first in
+the kind-7 arm with no clear at `in_sight` (774). Not kept: ScriptPad's
+centroid body reordered (502 -> 956), its trigger loop as do-while (804),
+LoadMap's hoisted record pointer in the build loop and the reveal grid
+through a local (no change), SightScan's best/slack store order (822) and
+`result` first in the alt arm (806), MpPanelScreen's `name` local dropped
+(no change).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
