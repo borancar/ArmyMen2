@@ -1677,6 +1677,29 @@ rules for the next function: measure on the relink, not the masked shape
 score; read the raw referrers of every identical block; and try the
 nested-else form of any loop with an early `break`.
 
+**The fast screener (2026-10-12).** A per-translation-unit compile that
+reproduces the relink's byte distance exactly in under a second
+(`screen2.py` in the job scratch: apply an edit list, compile one unit with
+the hosted VC6, diff each named function against the image, restore) turned
+the search from one experiment every ninety seconds into hundreds. With it
+the structural rules above became systematic, and the results were:
+FindPath 772 -> 172 (the budget block INSIDE the loop with the shared
+refusal as its fall-through and `fail:` inside its `if`; the entry guards as
+ONE `||` condition, since separate `return 0`s each get a private epilogue;
+`nb` as the value for the stores; the heuristic split into a call and a
+multiply), FlowRecvMessage 454 -> 18 (the parameter named `node` with no copy;
+all `goto pool` sites written out; the three "Can't find FlowQ" sites `goto
+fail` into a `fail: return 0;` INSIDE the fourth's `if` -- the label's
+placement is the only thing that moves the surviving copy, break and return
+at any site are byte-identical; per-arm block-scoped locals, which is what
+packs the frame slots the image has), LoadMap -24 (the MHDR arm first),
+ObjHitMaskAction -16 (int32 `col`/`end`, no `ci`, the flag before the ring),
+SightScan and ScriptPad as above. Two properties of VC6 worth keeping: a
+labelled block stays where it is written only when no LATER `goto` targets
+it, otherwise it moves to just after its last predecessor in source order;
+and a block-scoped local in a `case` shares a frame slot with its sibling
+cases where a function-scope one does not.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
