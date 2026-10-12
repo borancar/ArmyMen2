@@ -1553,6 +1553,25 @@ EncodeGlyph's base-pointer cast (182 -> 196), ScrollMapCache's abs split
 (230 -> 362), ViewUpdate's dy first (10 -> 46) and its snap stores
 separately or reloaded (60, 166), DrawSelection's `top` (156 -> 178).
 
+**A fourth review round (2026-10-12), behaviour first.** The reviewers were
+asked to compare control flow against the image before proposing bytes. One
+more real difference: RunScriptAction's `addtovar` (0x22). The image reads
+the variable into a slot nothing reads back and pushes n0 (loaded into edi
+before the call), so the amount added is always n0; the source read the
+same local back, which VC6 compiles to the same thing by accident (it keeps
+n0 in a register across the call) and GCC does not, so the native port and
+the injected GCC build added the variable's value. The explicit form costs
+the VC6 build 326 bytes (60 -> 386: `v9` stops being address-taken and the
+frame packs differently), so it is `#ifdef _MSC_VER` split. The other 21
+functions reviewed had no behaviour difference. Byte-level: DrawMapObjects
+92 -> 68 (the subdivide stores in the order the image emits them, which
+VC6 follows in source order), and no change or worse for BoxAction's
+pointer before the guard, BlockWeightRoute's first distance in a local
+(54 -> 92), PointActionC's loop on `rows` (52 -> 72), StepRowAnim's operand
+order, Update3DAudioVolumes without the `buf` local, OptionsDefaults'
+self-reused mask, MissionEnded's two store orders (14 -> 20), AddToItemList's
+compound form.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
