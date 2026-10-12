@@ -4113,19 +4113,18 @@ static inline void AiSightTrace(const AM2_Object *const &o,
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_BUF];   /* SightScan's 0x84C frame holds 1024 */
     const uint8_t *attrs = g_tileAttrs;
-    int32_t        n = 0, i = 0, reach;
+    int32_t        n, i, reach;
 
     g_sightBlockByDir[dir].trace_stamp = gen;
     TraceTileLine(o->pos, seen->pos, buf, &n);
 
-    while (i < n) {
-        int32_t a = (int8_t)attrs[buf[i]];
+    for (i = 0; i < n; i++) {
+        int32_t a = (int8_t)g_tileAttrs[buf[i]];
 
         if (a > viewerAttr)
             highest = a;
         else if (a + AM2_SIGHT_BAND_STEP < highest)
             break;
-        i++;
     }
 
     reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
@@ -4811,8 +4810,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     orig_log_one(o);
 
     /* The rank record read at each edge, as the image re-reads it. */
-    box.right  = (int32_t)o->pos.x + (g_rankRecords[o->rank].sight_range);
     box.left   = (int32_t)o->pos.x - (g_rankRecords[o->rank].sight_range);
+    box.right  = (int32_t)o->pos.x + (g_rankRecords[o->rank].sight_range);
     box.top    = (int32_t)o->pos.y - (g_rankRecords[o->rank].sight_range);
     box.bottom = (int32_t)o->pos.y + (g_rankRecords[o->rank].sight_range);
 
