@@ -969,8 +969,13 @@ subdivide:
             sub  = deep;
             half = left + dw / 2;
 
-            a.left = left;   a.top = top;    a.right  = half;  a.bottom = bottom;
-            c.left = half + 1; c.top = top;  c.right  = right;
+            a.left = left;
+            c.right = right;
+            a.top = top;
+            a.right = half;
+            c.left = half + 1;
+            c.top = top;
+            a.bottom = bottom;
             /* c.bottom is NOT written by the original -- see above. */
         } else {
             if (dh > AM2_SUBDIVIDE_FLOOR)
@@ -978,8 +983,14 @@ subdivide:
             sub  = deep;
             half = top + dh / 2;
 
-            a.left = left; a.top = top;      a.right = right;  a.bottom = half;
-            c.left = left; c.top = half + 1; c.right = right;  c.bottom = bottom;
+            a.left = left;
+            a.bottom = half;
+            c.left = left;
+            a.right = right;
+            c.right = right;
+            a.top = top;
+            c.top = half + 1;
+            c.bottom = bottom;
         }
 
         DrawMapObjects(&a, desc, sub);
