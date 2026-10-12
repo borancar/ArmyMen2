@@ -1215,8 +1215,8 @@ void __cdecl ScrollMapCache(void)
         src.top    = tiles.top << TILE_SHIFT;
         dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
         dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;
-        src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
+        src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
 
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         /* The global for `This` and the local for the source, as the

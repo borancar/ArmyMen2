@@ -37,10 +37,11 @@
  * `height * 2` the original computes by hand. */
 typedef char am2_rle16_header_is_4_bytes[(sizeof(AM2_Rle16) == 4) ? 1 : -1];
 
-uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
+uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
                              int32_t unused)
 {
-    uint8_t       *w;
+    AM2_Rle16     *out = (AM2_Rle16 *)buf;
+    uint16_t      *offs;
     const uint8_t *p;
     uint32_t       written;
     uint8_t        key;
@@ -54,14 +55,16 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
     /* A walking pointer for the row offsets: the image keeps it in a
      * register and steps it by two per row, with `out` on the frame
      * (v3 11 -> 10). */
-    w       = (uint8_t *)&out->rowOffset[height];
     written = (uint32_t)(height * sizeof out->rowOffset[0] + sizeof *out);
+    buf    += sizeof *out;
+    offs    = (uint16_t *)buf;
+    buf    += height * sizeof offs[0];
     p       = g_frameBuf;
 
-    key = p[g_pitch * KEY_ROW];
+    key = g_frameBuf[g_pitch * KEY_ROW];
 
     for (row = 0; row < height; row++) {
-        out->rowOffset[row] = (uint16_t)(w - (uint8_t *)out);
+        *offs = (uint16_t)(buf - (uint8_t *)out);
         const uint8_t *start = p;
         const uint8_t *end   = p + width;
 
@@ -75,7 +78,7 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                 p++;
                 n++;
             }
-            *w++ = (uint8_t)n;
+            *buf++ = (uint8_t)n;
             written++;
 
             n = 0;
@@ -83,10 +86,11 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                 p++;
                 n++;
             }
-            *w++ = (uint8_t)n;
+            *buf++ = (uint8_t)n;
             written++;
         } while (p != end);
 
+        offs++;
         p = start + g_pitch;
     }
 
@@ -156,7 +160,7 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
     if (!LockSurface(g_backBuffer))
         return 0;
 
-    written = EncodeGlyph(out, size.cx, size.cy, space);
+    written = EncodeGlyph((uint8_t *)out, size.cx, size.cy, space);
     UnlockSurface();
 
     return written;

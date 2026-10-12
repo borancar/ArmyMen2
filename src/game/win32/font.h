@@ -60,7 +60,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
 void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
                               int32_t font, RECT clip, int32_t colour);
 
-uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
+uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
                              int32_t unused);
 
 /* Original: 0x00446450. The game's only CreateFontA. `style` is packed --
