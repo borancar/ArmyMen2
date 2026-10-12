@@ -1407,6 +1407,44 @@ store through `act->xvar` directly, a function-scope or `long`
 variable all still merge), and the end-of-script block above. Those
 two are the whole remaining shape difference of the function.
 
+## Step3Drive, 974 -> 382 bytes (2026-10-12)
+
+A review of the two listings by a second model, then each suggestion
+measured on the real build. Everything that moved the function was a
+change to what VC6 can keep in a register across the calls, not to the
+logic:
+
+- **The turret's new aim in a local** (974 -> 836): `r->aim = (uint8_t)
+  (r->aim + turn); swing = AngleDelta(..., r->aim)` reads the record back
+  and leaves `speed` out of ebp; held in a local `speed` takes ebp across
+  the function as the image has it. As a chained assignment
+  (`aim = r->aim = (uint8_t)(r->aim + turn)`) the temporary also stays in
+  a register instead of a stack slot (struct 50 -> 40, 402 -> 382).
+  `r->aim += turn`, an assignment inside the call, an int local and
+  `register` all measured worse or no different.
+- **The first block through `gun`** (`animRec = &gun->animPlaying`,
+  `gun->headingBias`, `gun->turnStamp = ...`): VC6 does not CSE
+  `o->rowSet.rows` across the calls, so each use through the object is a
+  fresh load and `gun`'s web ends early. Measured against the same block
+  with r in ebp this had been worse (33 against 37); with `speed` in ebp
+  it is better (v3 38 -> 19), which is the lesson: re-measure an old
+  "worse" once the competing web has moved.
+- **The gun facing assigned straight from the second `RoundTo8`** instead
+  of through `second` and a copy: the result goes straight into the
+  variable the image stores it into, frees ebx, and lets the scheduler
+  split `sub eax,[edi+0x58]` into a load and a `sub` (974 diff -> 342
+  alone).
+- **The two distances compared in one expression**: within one tree VC6
+  hoists the invariant `lea ebx,[esi+0x12]` ahead of the first call;
+  across two statements (`d1`, `d2`) it does not.
+- **The straight-ahead fire arm copies `r->spot` whole**, as the second
+  arm does.
+
+Together: 369 -> 203 bytes, and the relink 836 -> 402. Still different:
+the blocked branch's load of `o->stuckCount` ahead of `facing = o->facing`
+(five permutations of the three statements and `++`/`+ 1` spellings do
+not move it) and where `o->facing` is stored after the second AngleDelta.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
