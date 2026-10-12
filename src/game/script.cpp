@@ -2762,6 +2762,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_TROOPER:       g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TROOPER;    break;
         case AM2_TOK_TANK:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TANK;       break;
         case AM2_TOK_VEHICLE:       g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_VEHICLE;    break;
+        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         case AM2_TOK_CONVOY:        g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_CONVOY;     break;
         case AM2_TOK_BOAT:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BOAT;       break;
         case AM2_TOK_GROUNDVEHICLE: g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GROUNDVEH;  break;
@@ -2773,8 +2774,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_BLUE:
         case AM2_TOK_ARMY2:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BLUE;       break;
         case AM2_TOK_GREY:
-        case AM2_TOK_ARMY3:
-        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
+        case AM2_TOK_ARMY3:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         default:
             goto triggers_done;
         }
