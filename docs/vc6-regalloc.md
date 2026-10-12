@@ -1514,6 +1514,28 @@ changes nothing it is because VC6 canonicalises it; where it changes
 something it is worse, so these seven are at the edge of what the source
 can say and the remaining difference is allocator tie-breaking.
 
+**A review round over the mid-sized functions (2026-10-12).** Landed:
+ListMaskAction's pixel row as `int32_t` (342 -> 328; a word costs a `movsx`
+at each use), SelectFirePose's bazooka standing raise stored in place with
+one `goto` into the shared copy (304 -> 300), HudSquadUpdate's Sarge arm
+through a record pointer (278 -> 276), UpdateTrooperAction's pickup
+quantity subtracted from the weapon's own count and then copied (408 ->
+382). UpdateTrooperAction also had a behaviour bug the review found from
+the image: CanPickUpWeapon's last argument is `already` (the object at the
+point is the weapon the unit holds), which the original zeroes once after
+the null test on the first object, passes to every call, and tests after
+the walk to decide whether to clear the held weapon; with nothing at the
+point it skips all of that. The reconstruction used it as a scratch
+quantity and cleared the held weapon only when the point was empty. Fixed;
+the flag has to be BLOCK-scoped inside the `if (at)` or it takes a frame
+slot of its own (464 against 408). Not landed, each measured on the
+relink: ObjHitMaskAction's cell walk by index only (392), its word
+`end`/`col` as int32 (378), the flag before the ring (392); LoadMap's SCEN
+count before the parse (378 -> 494); VehicleUpdateAppend's `flags = 0` moved
+after `dx`/`dz` (328 -> 584); SelectFirePose's raise-kneel stores written in
+place (304 -> 614); UpdateTrooperAction's facing delta from the record
+(382 -> 390) and one `stop:` join for the four stop arms (384).
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports

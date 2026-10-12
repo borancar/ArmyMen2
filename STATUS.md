@@ -191,12 +191,12 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 11,830 of edit
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 11,812 of edit
   distance over the 57 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 -> 382 (the turret aim held in a local keeps `speed` in ebp; then the first block through `gun`, the gun facing straight from its RoundTo8, the approach test as one expression; docs/vc6-regalloc.md; its dead `step`
   initialiser dropped: the image's prologue zeroes two slots, not four),
-  SightScan 910 -> 808 (the box left edge first; AiSightTrace's walk as a `for` reading the table at each use; the result in a variable starting at zero), FindPath 834 (a second-model review of it, FlowRecvMessage, AiTrooperStep and DepthInsert found one behaviour bug, DepthInsert's append linking the new node to itself, now fixed; nothing else moved; docs/vc6-regalloc.md); MissionEnded's attempt-count store after
+  SightScan 910 -> 808 (the box left edge first; AiSightTrace's walk as a `for` reading the table at each use; the result in a variable starting at zero), FindPath 834, UpdateTrooperAction 380 -> 382 after a behaviour fix (the held weapon is dropped unless one of the things at the point IS it: CanPickUpWeapon's last argument, not a scratch quantity), ListMaskAction 342 -> 328 (the pixel row as int32), SelectFirePose 304 -> 300, HudSquadUpdate 278 -> 276 (a second-model review of it, FlowRecvMessage, AiTrooperStep and DepthInsert found one behaviour bug, DepthInsert's append linking the new node to itself, now fixed; nothing else moved; docs/vc6-regalloc.md); MissionEnded's attempt-count store after
   the close is 2 -> 4. ObjTileHook byte-identical (the mask entry read
   into a local for both tests puts it first in the `test`; found in the
   lab, docs/vc6-regalloc.md), and RefundPlacedUnit byte-identical (the
