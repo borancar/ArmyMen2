@@ -1624,6 +1624,35 @@ no-region arm folded into `set_move_to` (860); VehicleUpdateAppend with
 the `age` locals (562); SelectFirePose with either raise block returning in
 place (no change).
 
+**ScriptParseActionRecon 1,498 -> 230 (2026-10-12): no end-of-script label,
+no gotos to a shared tail.** A lab session run by a second model (the
+shape metric masks absolute addresses, so its "1 hunk" was shape only; the
+relink is what counts) found that the whole placement problem was the
+`eos:` label. With NO label and every step and end test written as an
+inline call used as an early return (`if (!ActStep(ctx, at)) return 0;`,
+`if (!ActAtEnd(ctx, at)) return 0;`), VC6 folds the eighty-odd identical
+`log; return 0` copies into the one beside `default: return 0` (MOVEITEM's)
+and keeps the fall-through ones private (CREATETROOPER, FIREWEAPON,
+TRIGGERDELAY), which is the image's layout. The pieces that make it work:
+TRIGGER returns its own uid call; TRIGGERDELAY's refvar path has its own
+step and `goto trigger_uid`, so the common step is a two-predecessor join and
+only the call merges with TRIGGER's; MOVEITEM and DROPITEM each have their
+own end test; SETFACING is back in the natural order of its two stores.
+The last 570 bytes came from one more `goto`: SUSPENDAI's `goto
+resolve_subject` into SETCAMERAFOCUS's `return ScriptResolveName` did not
+make the first copy survive (as an older comment claimed); VC6 retargeted
+its jump to UNDEPLOY's identical copy, which made two short jumps long and
+shifted the rest of the function by four bytes. Plain returns in SUSPENDAI
+and REVIVEAI point both jumps at the first copy, as the image does (800 ->
+230). Lessons: a shape score that masks addresses cannot see a jump going to
+the wrong one of several identical blocks, so check the referrers of each
+copy in the raw listing; and a `goto` into a block that has identical
+twins is retargeted by VC6, so it is not a way to choose the survivor.
+What is left: SETSTRATMAP's shared `(*at)++; return 1` tail begins at
+`mov eax,[esi]` in the image (four facing-arm jumps land on it) where ours
+has already CSE'd the load, so the jumps land one instruction later and the
+`pop edi` schedules after the `inc`.
+
 ## Running decomp-permuter against VC6
 
 [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) supports
