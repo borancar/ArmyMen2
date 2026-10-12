@@ -9495,12 +9495,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             bar->list   = *slot;
             bar->flag50 = 0;
 
-            {
-                AM2_ListBox  *cb   = *slot;
-                AM2_ListRows *rows = cb->rows;
-
-                cb->selected = rows->count - 1;
-            }
+            (*slot)->selected = (*slot)->rows->count - 1;
 
             /* AND THE LAST ROW IS SCROLLED INTO VIEW, with the thumb put
              * where that leaves it -- ArrowBarShowRow's arithmetic without
