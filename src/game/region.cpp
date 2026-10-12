@@ -7926,8 +7926,8 @@ settle_facing:
                         if (!old) {
                             want = at->ammo;
                         } else {
+                            want = cap - old->ammo;
                             had = old->ammo;
-                            want = cap - had;
                         }
                     }
 
