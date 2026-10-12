@@ -3738,13 +3738,29 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     }
 
     case 0x22: {                                /* addtovar */
-        /* Not the 0x20/0x21 shape: the value starts as n0 and the variable read
-         * writes over it, so a failed read leaves n0 rather than 0. */
+        /* Not the 0x20/0x21 shape, and not what it looks like: the amount
+         * added is ALWAYS n0. The image reads the variable into a slot nothing
+         * reads back and pushes the register n0 was loaded into, before the
+         * read (setvar, 0x20 and 0x21 all read their slot back; this one does
+         * not). VC6 compiles the first spelling to exactly that -- it keeps n0
+         * in a register across the call -- and with the write-back spelling
+         * the frame packs differently (60 bytes against 386). Any other
+         * compiler adds the value just read, so it gets the explicit form. */
+#ifdef _MSC_VER
         v9 = act->n0;
 
         if (act->xvar > 0)
             GetVarValue(act->xvar, &v9);
         AddToVar(act->subject, v9);
+#else
+        {
+            int32_t amount = act->n0;
+
+            if (act->xvar > 0)
+                GetVarValue(act->xvar, &v9);
+            AddToVar(act->subject, amount);
+        }
+#endif
         return;
     }
 
