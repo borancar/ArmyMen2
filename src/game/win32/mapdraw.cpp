@@ -762,7 +762,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
             if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_FRONT) {
                 if (at == &g_depthNodes[g_depthHead])
-                    goto at_front;  /* at the front, and the head moves */
+                    goto at_front;
                 goto link_before;
             }
     }
@@ -781,31 +781,25 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
 
     if (cmp < 0) {
         for (;;) {
-            if (!g_depthCursor->prev)
-                break;
-            g_depthCursor = g_depthCursor->prev;
-            if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
-            link_after:
+            if (!g_depthCursor->prev) {
                 at = g_depthCursor;
-                LINK_AFTER(at);
-                goto done;
+            at_front:
+                AT_FRONT(at);
             }
+            g_depthCursor = g_depthCursor->prev;
+            if (DepthCompare(obj, g_depthCursor->obj) >= 0)
+                break;
         }
         at = g_depthCursor;
-    at_front:
-        AT_FRONT(at);               /* off the front */
+    link_after:
+        LINK_AFTER(at);
+        goto done;
     }
 
-    /* The run-out arm inside the walk and the stop a `break`: written as a
-     * `while` with `goto before`, the shared tail was laid out after the
-     * append arm, where the image keeps it last. */
     for (;;) {
         if (!g_depthCursor->next) {
             at = g_depthCursor;
         append:
-            /* `at` is the old tail on both ways in. It must NOT be the
-             * cursor global: the macro points that at the new node first, and
-             * the new node would then link to itself. */
             APPEND(at);
             goto done;
         }
@@ -1162,9 +1156,7 @@ void __cdecl ScrollMapCache(void)
 {
     int32_t  dx = 0, dy = 0, adx, ady;
     AM2_Rect wide, tall, src;
-    LPDIRECTDRAWSURFACE cache = g_mapCache;
-
-    if (!cache)
+    if (!g_mapCache)
         return;
 
     if (g_viewRect.left < (g_visibleTiles.left << TILE_SHIFT)
@@ -1229,7 +1221,7 @@ void __cdecl ScrollMapCache(void)
         /* The global for `This` and the local for the source, as the
          * image pushes them. */
         IDirectDrawSurface_BltFast(g_mapCache, (DWORD)dstX, (DWORD)dstY,
-                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
+                                   g_mapCache, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
     wide.left  = g_visibleTiles.left;

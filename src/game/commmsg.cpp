@@ -2772,32 +2772,33 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq);
  *
  * Nothing here can be A/B'd: no DirectPlay session opens on this machine, so
  * it is verified by reading and by the byte comparison. */
-int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
+int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 {
-    AM2_MsgNode *node = nodev;
     AM2_FlowMsg *msg;
-    AM2_Flow *sender, *me;
-    AM2_MsgNode *sent;
-    AM2_Packet *copy;
-    uint32_t mask, now, seq, expected, last, lat, gap;
-    int32_t  resent, any;
-
-    msg = (AM2_FlowMsg *)node->body;
 
     if (node->from == 0)
         return NoteKind31(node);
 
+    msg = (AM2_FlowMsg *)node->body;
+
     switch (msg->pkt.kind) {
-    case AM2_FLOW_PULSE_ACK:
+    case AM2_FLOW_PULSE_ACK: {
+        AM2_Flow *sender;
+        AM2_Flow *me;
+        AM2_MsgNode *sent;
+        uint32_t mask;
+        uint32_t now;
+        uint32_t seq;
+        uint32_t lat;
         sender = FindPlayerById(node->from);
         me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
-            break;
+            goto fail;
         }
         if (!me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
-            break;
+            goto fail;
         }
         mask = GetPlayerMask(node->from);
         now  = orig_get_tick_count();
@@ -2872,11 +2873,21 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
          * the same pass -- the fall-through is the protocol, and the NACK
          * arm's two lookups run again. A pulse ack naming nothing simply
          * returns its buffer. */
-        if (msg->nack.first == 0)
-            goto pool;
+        if (msg->nack.first == 0) {
+            MsgListAdd(g_msgListPool, node);
+            return 1;
+        }
+    }
         /* fall through */
 
-    case AM2_FLOW_NACK:
+    case AM2_FLOW_NACK: {
+        AM2_Flow *sender;
+        AM2_Flow *me;
+        AM2_Packet *copy;
+        uint32_t mask;
+        uint32_t seq;
+        int32_t resent;
+
         /* AT MOST TWO GO OUT NOW. Past that the arm stops sending and sets
          * the send queue's flag to 1 instead, leaving the message for
          * whatever drains that queue. */
@@ -2885,13 +2896,14 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
-            break;
+            goto fail;
         }
         if (!me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
             /* The same `return 0` as the breaks above reach; written here
              * it makes this log the copy the earlier three jump into, as
              * in the image. */
+            fail:
             return 0;
         }
         if (g_commObject->verbose)
@@ -2944,9 +2956,23 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                                (int32_t)seq, 1, (int32_t)mask);
             }
         }
-        goto pool;
+        MsgListAdd(g_msgListPool, node);
+        return 1;
+    }
 
-    case AM2_FLOW_DATA:
+    case AM2_FLOW_DATA: {
+        AM2_Flow *sender;
+        AM2_Flow *me;
+        AM2_MsgNode *sent;
+        uint32_t mask;
+        uint32_t now;
+        uint32_t seq;
+        uint32_t expected;
+        uint32_t last;
+        uint32_t lat;
+        uint32_t gap;
+        int32_t any;
+
         mask   = GetPlayerMask(node->from);
         sender = FindPlayerById(node->from);
         if (!sender) {
@@ -3024,7 +3050,8 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                 am2_log("Residual Message from %x: expected  %d received %d  from %x hehas %d \n",
                         node->from, expected, msg->pkt.seq,
                         node->from, msg->pkt.ack);
-            goto pool;
+            MsgListAdd(g_msgListPool, node);
+            return 1;
         }
 
         /* The piggybacked ack: EVERY DATA MESSAGE CARRIES ONE, which is why
@@ -3115,7 +3142,8 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
                 am2_log("Duplicate: expected %d received %d  from %x hehas %d \n",
                         expected, msg->pkt.seq,
                         node->from, msg->pkt.ack);
-            goto pool;
+            MsgListAdd(g_msgListPool, node);
+            return 1;
         }
 
         /* AHEAD OF WHAT WE EXPECT: park it in the flow's sorted queue and
@@ -3199,13 +3227,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *nodev)
         }
         return 1;
         }
+    }
         break;
     }
     return 0;
-
-pool:
-    MsgListAdd(g_msgListPool, node);
-    return 1;
 }
 
 /* RecvVehicle1B -- original 0x0045EB10, one caller. Message kind 0x1B is a
