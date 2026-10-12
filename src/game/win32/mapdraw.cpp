@@ -1156,7 +1156,8 @@ void __cdecl ScrollMapCache(void)
 {
     int32_t  dx = 0, dy = 0, adx, ady;
     AM2_Rect wide, tall, src;
-    if (!g_mapCache)
+    LPDIRECTDRAWSURFACE cache = g_mapCache;
+    if (!cache)
         return;
 
     if (g_viewRect.left < (g_visibleTiles.left << TILE_SHIFT)
@@ -1220,8 +1221,8 @@ void __cdecl ScrollMapCache(void)
         orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         /* The global for `This` and the local for the source, as the
          * image pushes them. */
-        IDirectDrawSurface_BltFast(g_mapCache, (DWORD)dstX, (DWORD)dstY,
-                                   g_mapCache, (LPRECT)&src, DDBLTFAST_WAIT);
+        IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
+                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
     wide.left  = g_visibleTiles.left;

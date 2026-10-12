@@ -1744,7 +1744,7 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
 {
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out, *outStart;
-    uint32_t  seq, flags = 0, interval;
+    uint32_t  seq, flags, interval;
     int32_t   dx, dz;
     uint8_t   action;
 
@@ -1758,6 +1758,7 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
          - obj->vSentPos.y;
     if (dx < 0) dx = -dx;
     if (dz < 0) dz = -dz;
+    flags = 0;
 
     /* Sarge's vehicle is sent every frame it moves, the same forcing
      * AppendTroopState applies to Sarge himself. */
@@ -1796,22 +1797,26 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
     {
         uint32_t age = seq - obj->vSentFacingSeq;
 
-        if ((age >= interval && obj->facing != obj->vSentFacing)
-            || (age >= g_commObject->enoughChangeLimit
+        if (age >= interval && obj->facing != obj->vSentFacing)
+            flags |= 0x40000000u;
+        else if (age >= g_commObject->enoughChangeLimit
                 && (((uint32_t)obj->vSentFacing ^ (uint32_t)obj->facing) & 0xFFFFFFF0u))
-            || (age >= interval
-                && obj->facing != obj->vSentIntFacing))
+            flags |= 0x40000000u;
+        else if (age >= interval
+                && obj->facing != obj->vSentIntFacing)
             flags |= 0x40000000u;
     }
 
     {
         uint32_t age = seq - obj->vSentGunSeq;
 
-        if ((age >= interval && obj->turretFacing != obj->vSentGun)
-            || (age >= g_commObject->enoughChangeLimit
+        if (age >= interval && obj->turretFacing != obj->vSentGun)
+            flags |= 0x40000000u;
+        else if (age >= g_commObject->enoughChangeLimit
                 && (((uint32_t)obj->vSentGun ^ (uint32_t)obj->turretFacing) & 0xFFFFFFF0u))
-            || (age >= interval
-                && obj->turretFacing != obj->vSentIntGun))
+            flags |= 0x40000000u;
+        else if (age >= interval
+                && obj->turretFacing != obj->vSentIntGun)
             flags |= 0x40000000u;
     }
 
@@ -1828,9 +1833,10 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
     {
         uint32_t age = seq - obj->vSentIntGunSeq;
 
-        if ((age >= interval && obj->ctl.aim != obj->vSentIntGun)
-            || (age >= g_commObject->enoughChangeLimit
-                && (((uint32_t)obj->vSentIntGun ^ (uint32_t)obj->ctl.aim) & 0xFFFFFFF0u)))
+        if (age >= interval && obj->ctl.aim != obj->vSentIntGun)
+            flags |= 0x20000000u;
+        else if (age >= g_commObject->enoughChangeLimit
+                && (((uint32_t)obj->vSentIntGun ^ (uint32_t)obj->ctl.aim) & 0xFFFFFFF0u))
             flags |= 0x20000000u;
     }
 
@@ -1887,7 +1893,9 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
 
         obj->vSentPos    = obj->pos;
         obj->vSentPosSeq = seq;
+    }
 
+    if (flags & 0x80000000u) {
         *out++ = action;
         obj->vSentAction = action;
         obj->vSentActionSeq = seq;
