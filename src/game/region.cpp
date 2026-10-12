@@ -1275,6 +1275,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
          * generation and every other node's stamp is stale by construction --
          * which is what makes a 1 MB array usable without clearing it. It is a
          * uint16 and nothing resets it, so it wraps; the original's. */
+        goal = to;
         ++g_pathGeneration;
 
         g_pathNodes[fromTile].g      = 0;
@@ -1287,7 +1288,6 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         g_pathNodes[fromTile].next   = 0;
         g_pathNodes[fromTile].parent = 0;
 
-        goal = to;
     } else {
         /* Dead: see the header. Nothing writes either global, and the gate
          * above cannot be anything but -1. */
