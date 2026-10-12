@@ -4772,8 +4772,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
 
     *outRange   = 0;
     *outBearing = 0;
-    *nOther     = 0;
     *nAllied    = 0;
+    *nOther     = 0;
 
     keep        = (AM2_Object *)0;
     best        = (AM2_Object *)0;
