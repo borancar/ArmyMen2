@@ -1584,10 +1584,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x1D;
-        /* Six arms end in this call and VC6 keeps one copy of it. A goto
-         * from SUSPENDAI makes this first copy the one that survives, as
-         * in the image; with none it keeps a later one. */
-    resolve_subject:
+        /* Several arms end in this same call, each written out; VC6 points
+         * the jumps of SUSPENDAI and REVIVEAI at this first copy, as in the
+         * image. A goto from SUSPENDAI to a label here sends its jump to a
+         * later copy instead. */
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_RESTORECAMERAFOCUS:
@@ -1604,7 +1604,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             act->subject = g_svarId15;
             return 1;
         }
-        goto resolve_subject;
+        return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
     case AM2_TOK_REVIVEAI:
         if (!ActStep(ctx, at))
