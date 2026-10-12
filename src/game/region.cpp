@@ -4911,8 +4911,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 dx = (int32_t)it->pos.x
                      - (int32_t)o->pos.x;
                 highest     = AM2_AI_SIGHT_FLOOR;
-                candRange   = ApproxDistXY((int32_t)it->pos.x
-                                           - (int32_t)o->pos.x, dy);
+                candRange   = ApproxDistXY(dx, (int32_t)it->pos.y
+                                           - (int32_t)o->pos.y);
                 candBearing = AI_ANGLE3(dx, dy, candRange);
 
                 if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
