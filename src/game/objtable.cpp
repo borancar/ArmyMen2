@@ -114,8 +114,9 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
          * owner variable here. */
         switch (obj->type) {
         case 0: case 5: case 6: case 7:
-            owner = g_defaultOwner & 7;
-            id = (g_defaultOwner << AM2_UID_OWNER_SHIFT) | g_uidCounter[owner];
+            id = g_defaultOwner;
+            owner = id & 7;
+            id = (id * (1u << AM2_UID_OWNER_SHIFT)) | g_uidCounter[owner];
             counter = &g_uidCounter[owner];
             (*counter)++;
             break;
