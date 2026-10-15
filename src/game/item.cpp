@@ -4889,7 +4889,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
         switch (weapon->typeRec->kind) {
         case 3:                                                        /* FLAM */
             if (o->field44 > 0)
-                return 1;
+                goto ret1;
             switch (cls) {
             case 1:
                 out->state = AM2_POSE_FLAME_KNEEL;
@@ -4898,7 +4898,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 out->state = AM2_POSE_FLAME_CLASS2;
                 break;
             default:
-                goto ret1;
+                goto ret1b;
             }
             /* class 0 writes nothing at all, which no other arm does. */
             break;
@@ -4969,7 +4969,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                     out->state = AimedPick(out, ready, AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
                 else
                     goto raise_k;
-                return 1;
+                break;
             case 2:
                 out->state = AM2_POSE_KNEEL;
                 break;
@@ -5019,6 +5019,8 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
     }
     return 0;
 ret1:
+    return 1;
+ret1b:
     return 1;
 raise_s:
     out->state = AM2_POSE_RAISE_STAND;

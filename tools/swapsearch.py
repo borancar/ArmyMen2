@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(LAB, "tools"))
 import relinkscreen as rs   # REPO resolves to the lab
 
 ROUNDS = int(os.environ.get("ROUNDS", "4"))
+MAXMOVE = int(os.environ.get("MAXMOVE", "1"))   # move a statement down over up to this many simple ones
 base = rs.load(rs.BASE)
 OUT = os.path.join(LAB, "build", "swapsearch")
 os.makedirs(OUT, exist_ok=True)
@@ -102,12 +103,20 @@ for fn in sys.argv[1:]:
     applied = []
     for rnd in range(ROUNDS):
         lines = cur_text.split("\n")
-        cands = [i for i in range(a, b) if simple(lines[i]) and simple(lines[i + 1])
-                 and lines[i].strip() != lines[i + 1].strip()]
+        cands = []
+        for i in range(a, b):
+            for k in range(1, MAXMOVE + 1):
+                seg = lines[i:i + k + 1]
+                if len(seg) < k + 1 or not all(simple(x) for x in seg) or i + k > b:
+                    break
+                if lines[i].strip() == lines[i + k].strip():
+                    continue
+                cands.append((i, k))
         best = None
-        for i in cands:
+        for i, k in cands:
             l2 = lines[:]
-            l2[i], l2[i + 1] = l2[i + 1], l2[i]
+            moved = l2.pop(i)
+            l2.insert(i + k, moved)
             d = compile_unit(src_rel, "\n".join(l2))
             if d is None:
                 continue
@@ -115,13 +124,13 @@ for fn in sys.argv[1:]:
             if sc is None or worse:
                 continue
             if sc < cur_d and (best is None or sc < best[0]):
-                best = (sc, i, "\n".join(l2))
+                best = (sc, (i, k), "\n".join(l2))
         print("%s round %d: %d candidates, best %s  (%.0fs)" % (
             fn, rnd, len(cands), best[0] if best else "none", time.time() - t0), flush=True)
         if not best:
             break
-        cur_d, i, cur_text = best
-        applied.append((i, lines[i].strip(), lines[i + 1].strip()))
+        cur_d, (i, k), cur_text = best
+        applied.append((i, lines[i].strip(), "(moved down %d)" % k))
     if applied:
         diff = "".join(difflib.unified_diff(text0.splitlines(True), cur_text.splitlines(True),
                                             "a/" + src_rel, "b/" + src_rel))
