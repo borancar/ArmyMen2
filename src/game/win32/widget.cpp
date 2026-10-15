@@ -6192,8 +6192,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
                 slot++;
             } else {
-                sq->recs[slot].barColour = g_hiliteColour;
                 sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
+                sq->recs[slot].barColour = g_hiliteColour;
                 slot++;
             }
 

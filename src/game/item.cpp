@@ -11126,15 +11126,11 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     /* Off the grid in any direction is an unregister, not a clamp. The
      * grid size is read where it is compared, rows first, and the column
      * count is then held -- the walk ItemLinkCells and RowUpdate share. */
-    if (cb < 0 || ct > desc->rows - 1 || cr < 0) {
+    if (cb < 0 || cl > desc->cols - 1 || cr < 0 || ct > desc->rows - 1) {
         ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
         return;
     }
     cols = desc->cols;
-    if (cl > cols - 1) {
-        ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
-        return;
-    }
 
     ct = ct <= 0 ? 0 : ct;
     cl = cl <= 0 ? 0 : cl;
