@@ -2012,7 +2012,6 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
      * out->cells follow it, the hit rect is re-read from the object and the grid
      * width from the box at every use -- the original keeps only the record
      * pointer in a register and these few on the frame. */
-#define tab   ((const uint8_t *)(uintptr_t)(g_bitFromN))
     const AM2_ObjMask *m;
     const uint8_t  *bits;
     AM2_Rect        world;          /* the clamped world box */
@@ -2025,7 +2024,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     int32_t         splitOdd;
     int32_t         k;
     int32_t         y;
-    int32_t         marked;
+    int32_t         marked = 0;
 
     m = obj->rowSet.hitMask;
     if (!m)
@@ -2097,7 +2096,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
     rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
-    rowbytes = ((world.right - world.left) + 31 - ((world.right - world.left + 31) % 32)) >> 3;
+    rowbytes = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
@@ -2110,7 +2109,6 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
         k        = 8 - phase;
     }
 
-    marked = 0;
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
         int32_t end = off + rowbytes;
@@ -2121,7 +2119,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
             if (splitOdd == off % 2) {
-                if (bits[off] & tab[k]) {
+                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     /* The ring before the flag in this arm only, which is
                      * the order the image stores them. */
@@ -2134,7 +2132,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                 if (col == span + AM2_TILEMASK_MARGIN)
                     break;
 
-                if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     marked = 1;
                     MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
@@ -2148,7 +2146,6 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     }
 
     return marked;
-#undef tab
 }
 
 
