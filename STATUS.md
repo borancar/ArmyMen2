@@ -191,7 +191,7 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 6,402 (6,178 after the MpPanelScreen constructor 360 -> 350 by the map loop's own counter and an `if (maps)` around the loop, 6,188 after UpdateTrooperAction 378 -> 332 by the order of the stores in three stop arms, 6,234 after Step3Drive 382 -> 282 by declaring the target point inside the `state != 1` block, ListMaskAction 328 -> 322 by the phase as a mask, and SightScan 528 -> 466: every `continue` in phase two written `goto next`
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 6,402 (6,176 after DepthInsert 326 -> 324 by a byte-wide flag test, 6,178 after the MpPanelScreen constructor 360 -> 350 by the map loop's own counter and an `if (maps)` around the loop, 6,188 after UpdateTrooperAction 378 -> 332 by the order of the stores in three stop arms, 6,234 after Step3Drive 382 -> 282 by declaring the target point inside the `state != 1` block, ListMaskAction 328 -> 322 by the phase as a mask, and SightScan 528 -> 466: every `continue` in phase two written `goto next`
   to one label at the loop end, and `slack = 0` stored before `best`; the scoring block is still
   placed after the sight test, 0x5f5 against the image's 0x2b0, see docs/bytematching.md) of edit
   distance over the 52 functions that are not byte-identical (147,586

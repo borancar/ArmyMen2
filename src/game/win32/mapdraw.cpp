@@ -750,7 +750,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         return 1;                                                           \
     } while (0)
 
-    if (obj->flags & OBJ_DEPTH_FLAG_FRONT) {
+    if ((uint8_t)obj->flags & OBJ_DEPTH_FLAG_FRONT) {
         for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
             if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_BACK) {
                 g_depthCursor = at;
