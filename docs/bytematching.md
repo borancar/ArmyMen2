@@ -219,6 +219,15 @@ before applying (a store and a read of the same object, or a call with side effe
 are not interchangeable). `MAXMOVE=k` also moves a statement down over up to k others; it proposed RowUpdate 164 -> 152 by moving `spr = r->sprite;` below the statements that read `spr`, which is a bug, so that one was rejected. First run over all 49 differing functions: three swaps
 helped, 46 had none.
 
+**Clone-lab fidelity (2026-10-16).** A standalone clone only means something if it reproduces
+our relink output first: compile it with the relink's defines (`/DAM2_STANDALONE /DAM2_RELINK`)
+and path, or its register picks differ for reasons that have nothing to do with the function.
+Even then a clone's differing-line count is not a proxy for the relink distance
+(BlockWeightTroops: 47 -> 27 lines in the clone, 82 -> 98 in the relink). `relink-base.json`
+stores the original truncated to our length, so return counts read from it are wrong: read the
+image. `sweep2` prints `FUNCTION-MISSING` for a VC6 compile failure, and its replace-all hits
+every copy of the same text, so anchor each edit with unique context.
+
 ## Pitfalls
 
 - **Stale listings.** The shape tools read listings from the last relink. Rerun
