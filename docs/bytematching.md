@@ -169,6 +169,13 @@ first, struct-grouped candidate variables. The placement at the loop top
 costs about 360 bytes elsewhere. Writing every `continue` as `goto next`
 (one label at the loop end) took the function from 528 to 466.
 
+**Declined: a mode-private copy of the PointerPick friend tail.** Reading the
+uid just before the scan loop takes PointerPickMode0 from 214 to 210, but in the
+shared tail it makes Mode6 worse (64 to 124), and the only clean form is a
+60-line copy of the tail for four bytes. The image has one shared tail, so the
+copy is further from the original than the bytes suggest. The remaining
+difference there is the object copy the image keeps in `ebp`.
+
 ## Pitfalls
 
 - **Stale listings.** The shape tools read listings from the last relink. Rerun
