@@ -4898,7 +4898,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 out->state = AM2_POSE_FLAME_CLASS2;
                 break;
             default:
-                return 1;
+                goto ret1;
             }
             /* class 0 writes nothing at all, which no other arm does. */
             break;
@@ -5018,6 +5018,8 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
         return 1;
     }
     return 0;
+ret1:
+    return 1;
 raise_s:
     out->state = AM2_POSE_RAISE_STAND;
     return 1;
