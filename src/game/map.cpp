@@ -1485,6 +1485,14 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
         *(void **)&(layer) = am2_malloc(g_mapTilesW * g_mapTilesH); \
         memset((layer), 0, g_mapTilesW * g_mapTilesH);    \
     }
+static inline uint8_t *MapAllocFill(am2_FILE *f, size_t n)
+{
+    uint8_t *p = (uint8_t *)am2_malloc((size_t)n);
+    if (p != 0)
+        orig_map_fread(p, (size_t)n, 1, f);
+    return p;
+}
+
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
     char      path[0x40];
@@ -1632,13 +1640,12 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
         /* Owns nothing: a scratch buffer the parser consumes and we free. */
         case AM2_IFF_SCEN: {
-            uint8_t *tmp = (uint8_t *)am2_malloc(size);
+            uint8_t *tmp = MapAllocFill(f, size);
 
             if (tmp == 0)
                 goto skip;
-            orig_map_fread(tmp, size, 1, f);
+            consumed += (int32_t)size;
             ParseScenarios(tmp, (int32_t)size);
-            consumed += (int32_t)size;      /* counted after the parse */
             am2_free(tmp);
             break;
         }
