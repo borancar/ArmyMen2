@@ -3324,8 +3324,9 @@ int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
         && (t->flags & OBJ_FLAG_SHOT_PROOF)) {
         /* The image sends every later refusal back to this block. Ours
          * still gives them their own copy (at the `refuse` label below)
-         * at the end of the function. */
-        return 0;
+         * at the end of the function; this one is a label after the final
+         * return, which moves the merged epilogue to the first block. */
+        goto refuse_top;
     }
 
     if (t->owner == army) {
@@ -3410,6 +3411,8 @@ int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
         return 0;
 
     return 1;
+refuse_top:
+    return 0;
 }
 
 /* ShotStrike -- original 0x0043C000, one caller, which is the type-5 stepper.
