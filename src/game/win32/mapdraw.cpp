@@ -2194,9 +2194,11 @@ void __cdecl AirFrameDraw(void)
                 /* Tested as the sum rather than through `f`: VC6 then does
                  * not know f is 1 in the arm and keeps the image's `inc`
                  * instead of folding it to a constant and jumping past the
-                 * next test. */
-                if (obj->formationSlot + 1 == 1)
-                    f++;
+                 * next test. The `f >= 1 &&` guard is always true here; it is
+                 * a number win (the register choice it shifts brings the
+                 * function nearer the image), not a recovered test. */
+                if (f >= 1 && obj->formationSlot + 1 == 1)
+                    f += 1;
                 if (f > AM2_AIR_CYCLE_FRAMES)
                     f = 0;
 

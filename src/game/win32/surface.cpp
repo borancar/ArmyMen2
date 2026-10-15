@@ -1342,7 +1342,7 @@ static inline void TickMenuAnimation(void)
         f = 0;
         g_animFrame = 0;
     }
-    if (f >= 0)
+    if (f > -1)
         g_menuSpritesEnd = g_menuSprites[row * MENU_ANIM_FRAMES + f];
     g_animNext = now + MENU_ANIM_PERIOD;
 }

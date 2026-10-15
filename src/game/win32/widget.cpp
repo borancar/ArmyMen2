@@ -4881,20 +4881,22 @@ void __cdecl HudPostUpdate(void)
     goto tail;
 
 hit_ours:
-    if (!g_mouseChanged) {
-        /* The button did not change, so this is a hold. Only a weapon whose
-         * kind record allows repeating gets to act again. */
-        if (!repeat)
+    if (g_mouseChanged) {
+        if (g_mouseButton || !g_weaponFnSlot1) {
+            g_mouseClaimed = 1;
             goto tail;
-        if (!g_mouseButton)
-            goto idle;
-        if g_weaponFnSlot1
-            g_weaponFnSlot1(obj, at);
+        }
+        g_weaponFnSlot1(obj, at);
         goto tail;
     }
-    if (g_mouseButton || !g_weaponFnSlot1)
-        goto claim;
-    g_weaponFnSlot1(obj, at);
+    /* The button did not change, so this is a hold. Only a weapon whose
+     * kind record allows repeating gets to act again. */
+    if (!repeat)
+        goto tail;
+    if (!g_mouseButton)
+        goto idle;
+    if g_weaponFnSlot1
+        g_weaponFnSlot1(obj, at);
     goto tail;
 
 hit_generic:
