@@ -1350,7 +1350,7 @@ fail:
              * `g` is sixteen bits: the image adds the parent's G as a word
              * (`add di, [g]`) and the penalties to the full register, which is
              * what VC6 does for a uint16_t. */
-            g = (uint16_t)(PathDistXY(curTile, t) * 2);
+            g = (uint16_t)(PathDistXY(cur & 0xFFFF, t) * 2);
             g += g_pathNodes[curTile].g;
             if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
                 g += 3;
