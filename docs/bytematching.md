@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1595 of 1646 functions
-byte-identical, 51 differing, 5,950 bytes of total edit distance. The live
+byte-identical, 51 differing, 5,770 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -174,20 +174,13 @@ current source, and it cannot make the Kind7 arm fall into the block with the
 later arms jumping back, which is what the image does. Writing every `continue` as `goto next`
 (one label at the loop end) took the function from 528 to 466.
 
-**Declined: a mode-private copy of the PointerPick friend tail.** Reading the
-uid just before the scan loop takes PointerPickMode0 from 214 to 210, but in the
-shared tail it makes Mode6 worse (64 to 124), and the only clean form is a
-60-line copy of the tail for four bytes. The image has one shared tail, so the
-copy is further from the original than the bytes suggest. The remaining
-difference there is the object copy the image keeps in `ebp`.
-
-**A scoring artifact fixed: repeated floating-point constants.** The relink
-resolves a content-addressed constant (`__real@`, or a string literal) by
-reading the image's own pointer at the same offset as ours. After earlier code
-has shifted by a few bytes that read lands on the wrong bytes, so the second and
-later references to the same constant stayed at address 0 and counted as
-differences (FindPath: three loads, 18 bytes). A constant proven at one site of a
-function is now reused for its other sites in that function.
+**Resolved: the PointerPick friend tail takes the uid as a parameter.**
+A mode-private copy of the tail was declined (the image has one shared tail).
+What worked is a second parameter: each of the four callers reads `o->uid` at a
+spot of its own (Mode0 and Mode5 after their early refusals, Mode4 at the top,
+Mode6 at the call) and passes it in. One shared tail, four spellings of the
+read; the sum over the four went from 494 to 314. The remaining difference in
+Mode0 is the object copy the image keeps in `ebp`.
 
 ## Pitfalls
 

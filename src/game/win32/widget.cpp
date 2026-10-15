@@ -2616,13 +2616,12 @@ static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t wi
  *
  * Its OverlayPrepare force flag is 0 here where PointerPickBoard passes 1 for
  * the same row. Reproduced; nothing here says why they differ. */
-static inline int32_t PointerFriendTail(AM2_Object *o)
+static inline int32_t PointerFriendTail(AM2_Object *o, uint32_t uid)
 {
     if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
         if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
-            uint32_t uid = o->uid;
 
             if (!g_mouseButton
                 || GetTickCount()
@@ -17183,6 +17182,7 @@ void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
  * reading, and by the diff for the part that differs. */
 int32_t __cdecl PointerPickMode4(AM2_Object *o)
 {
+    uint32_t tailUid = o->uid;
     if (o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         return 0;
     if (o->health == 0)
@@ -17196,13 +17196,14 @@ int32_t __cdecl PointerPickMode4(AM2_Object *o)
         g_pointerHoverUid = o->uid;
         return 1;
     }
-    return PointerFriendTail(o);
+    return PointerFriendTail(o, tailUid);
 }
 
 int32_t __cdecl PointerPickMode5(AM2_Object *o)
 {
     if (o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         return 0;
+    uint32_t tailUid = o->uid;
     if (o->health == 0)
         return 0;
 
@@ -17214,7 +17215,7 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
         g_pointerHoverUid = o->uid;
         return 1;
     }
-    return PointerFriendTail(o);
+    return PointerFriendTail(o, tailUid);
 }
 
 /* PointerPickMode6 -- original 0x00459300, 288 bytes, mode 6's PICK.
@@ -17239,7 +17240,7 @@ int32_t __cdecl PointerPickMode6(AM2_Object *o)
 {
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         && o->health != 0)
-        return PointerFriendTail(o);
+        return PointerFriendTail(o, o->uid);
     return 0;
 }
 
@@ -17323,6 +17324,8 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
     const AM2_Object *ride;
     uint32_t          uid;
 
+    uint32_t tailUid = o->uid;
+
     if (ObjIsWatchedKind(o))
         return 0;
     if (o->owner == AM2_ARMY_NEUTRAL)
@@ -17368,7 +17371,7 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
         AIM_HINT();
 #undef AIM_HINT
     }
-    return PointerFriendTail(o);
+    return PointerFriendTail(o, tailUid);
 }
 
 /* PointerPickHeal -- original 0x004597B0, the first of the two functions in the
