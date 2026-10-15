@@ -166,7 +166,12 @@ About 150 source variants did not reproduce the image's placement while keeping
 the behaviour: inline functions at each site (VC6 merges only some copies), a
 `do`/`for`/`switch`/`while (cand)` wrapper, forward gotos, the allied arm
 first, struct-grouped candidate variables. The placement at the loop top
-costs about 360 bytes elsewhere. Writing every `continue` as `goto next`
+costs about 360 bytes elsewhere. A fuller attempt at the loop-top form (candidate state
+hoisted to function scope, the reset placed before the loop, no per-iteration
+initialisers for the bearing and range, which are only read when a candidate
+exists) reached 834 with the block at 0x250, still well above the 466 of the
+current source, and it cannot make the Kind7 arm fall into the block with the
+later arms jumping back, which is what the image does. Writing every `continue` as `goto next`
 (one label at the loop end) took the function from 528 to 466.
 
 **Declined: a mode-private copy of the PointerPick friend tail.** Reading the
