@@ -9773,10 +9773,9 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     r->approach = 1;
             }
 
-            if (r->approach != 0)
-                speed >>= 1;
-            if (r->stop != 0)
-                speed >>= 1;
+            /* Two halvings as one shift by 0, 1 or 2: a number win, the sum of byte-wide
+               flags keeps the speed out of its stack slot between the two. */
+            speed >>= (uint8_t)(r->approach != 0) + (uint8_t)(r->stop != 0);
 
             /* The acceleration limiter, and the two arms clamp from
              * OPPOSITE sides: slowing down takes the larger of the two,
