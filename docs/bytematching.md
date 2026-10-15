@@ -216,7 +216,7 @@ adjacent one-line statements in a function, keeps the best swap that lowers the
 distance and worsens no other function, repeats up to `ROUNDS` times, and writes a
 diff to `build/swapsearch/`. It only proposes: read each swap for independence
 before applying (a store and a read of the same object, or a call with side effects,
-are not interchangeable). First run over all 49 differing functions: three swaps
+are not interchangeable). `MAXMOVE=k` also moves a statement down over up to k others; it proposed RowUpdate 164 -> 152 by moving `spr = r->sprite;` below the statements that read `spr`, which is a bug, so that one was rejected. First run over all 49 differing functions: three swaps
 helped, 46 had none.
 
 ## Pitfalls
