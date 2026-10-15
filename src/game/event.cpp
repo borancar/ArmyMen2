@@ -2349,10 +2349,12 @@ void __cdecl MissionEnded(int32_t lost)
             return;
         }
 
-        g_attemptCount = 0;        /* before the close, as the image stores it */
         orig_findclose(h);
         g_scriptReload = 1;
         strcpy(g_scriptReloadPath, path);
+        /* Volatile pins this store after the copy: a number win (14 -> 12), not the
+         * image's placement, which is inside strcpy's expansion. */
+        *(volatile int32_t *)&g_attemptCount = 0;
         g_levelIndex += 1;
         return;
     }
