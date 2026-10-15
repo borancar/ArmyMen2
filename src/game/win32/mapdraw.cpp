@@ -950,8 +950,8 @@ subdivide:
         int32_t   top    = world->top;
         int32_t   left   = world->left;
         int32_t   bottom = world->bottom;
-        int32_t   right  = world->right;
         int32_t   dh     = bottom - top;
+        int32_t   right  = world->right;
         int32_t   dw     = right - left;
         int32_t   half;
         int32_t   sub;
@@ -1180,8 +1180,8 @@ void __cdecl ScrollMapCache(void)
 
     g_visibleTiles.left   = Clamp(g_visibleTiles.left,   0, g_mapTilesW - 1);
     g_visibleTiles.right  = Clamp(g_visibleTiles.right,  0, g_mapTilesW - 1);
-    g_visibleTiles.top    = Clamp(g_visibleTiles.top,    0, g_mapTilesH - 1);
     g_visibleTiles.bottom = Clamp(g_visibleTiles.bottom, 0, g_mapTilesH - 1);
+    g_visibleTiles.top    = Clamp(g_visibleTiles.top,    0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
         PaintMapTiles(&g_visibleTiles);
@@ -1252,8 +1252,8 @@ void __cdecl ScrollMapCache(void)
         wide.top    = g_visibleTiles.bottom - dy;
         wide.bottom = wide.top + dy;    /* the image adds dy back: top + dy, not the bottom again */
     } else {
-        wide.bottom = g_visibleTiles.top - dy;
         wide.top    = g_visibleTiles.top;
+        wide.bottom = g_visibleTiles.top - dy;
     }
     PaintMapTiles(&wide);
 }

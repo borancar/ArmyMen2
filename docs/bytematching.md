@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1597 of 1646 functions
-byte-identical, 49 differing, 5,308 bytes of total edit distance. The live
+byte-identical, 49 differing, 5,278 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -208,6 +208,16 @@ and ShotHitsObj both show the image using the FIRST. What worked for
 RegionFindPath was sending the one early return to a label placed after the
 function's final return (the same trick as SelectFirePose); ShotHitsObj is still
 open because a label on its first return changes that first test's shape.
+
+**An unattended search for statement order: `tools/swapsearch.py`.** The order of
+independent statements has won more than once, and trying every adjacent pair is
+cheap (about 1 s per compile). `tools/swapsearch.py FN [FN ...]` swaps each pair of
+adjacent one-line statements in a function, keeps the best swap that lowers the
+distance and worsens no other function, repeats up to `ROUNDS` times, and writes a
+diff to `build/swapsearch/`. It only proposes: read each swap for independence
+before applying (a store and a read of the same object, or a call with side effects,
+are not interchangeable). First run over all 49 differing functions: three swaps
+helped, 46 had none.
 
 ## Pitfalls
 
