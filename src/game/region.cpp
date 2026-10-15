@@ -3310,9 +3310,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
         ob->moveEnd   = 0;
-        ob->moveAt    = 1;
-        ob->moveCount = 2;
-        goto walk;
+        goto setcount;
     }
 
     /* Still routing to this goal with waypoints left before the last: keep the
@@ -3416,6 +3414,7 @@ after_region:
         ob->moveFrom  = *(&ob->pos);
         ob->moveTo    = pt;
         ob->moveEnd   = 0;
+setcount:
         ob->moveAt    = 1;
         ob->moveCount = 2;
     }
@@ -6058,7 +6057,7 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
     int32_t  h;
 
     if (!RegionAt(to)->active)
-        return 0;
+        goto nopath;
     if (!RegionAt(from)->active)
         return 0;
 
@@ -6202,6 +6201,8 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
 
     (void)edges;
     return 1;
+nopath:
+    return 0;
 }
 #undef RegionSpan
 #undef RS_TILE

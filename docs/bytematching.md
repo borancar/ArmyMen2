@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1595 of 1646 functions
-byte-identical, 51 differing, 5,494 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1597 of 1646 functions
+byte-identical, 49 differing, 5,458 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -202,6 +202,12 @@ pointer is a local taken inside the error block. Taking it after the first step
 of the case (218 to 50) removed the byte shift and the jump-table move that
 made up most of the distance. When a long sweep finds nothing, re-derive which
 source lines the differing addresses come from.
+
+**VC6 merges identical return blocks into the LAST one emitted.** RegionFindPath
+and ShotHitsObj both show the image using the FIRST. What worked for
+RegionFindPath was sending the one early return to a label placed after the
+function's final return (the same trick as SelectFirePose); ShotHitsObj is still
+open because a label on its first return changes that first test's shape.
 
 ## Pitfalls
 

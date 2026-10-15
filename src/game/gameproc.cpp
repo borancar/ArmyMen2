@@ -228,13 +228,6 @@ void __cdecl LoadOptions(void)
         orig_fflush(fp);
         orig_fclose(fp);
 
-        /* Migrate an old file's "quiet" to "silent". Only these three. */
-        if (g_volumeAtZero == AM2_VOLUME_SENTINEL)
-            g_volumeAtZero = AM2_VOLUME_SILENT;
-        if (g_streamVolume == AM2_VOLUME_SENTINEL)
-            g_streamVolume = AM2_VOLUME_SILENT;
-        if (g_voiceVolume == AM2_VOLUME_SENTINEL)
-            g_voiceVolume = AM2_VOLUME_SILENT;
     } else {
         /* BOTH failure exits land here, and it is not a bare return: the settings
          * are reset and the key bindings rebuilt from ADDR_KEY_DEFAULTS. The
@@ -252,6 +245,14 @@ void __cdecl LoadOptions(void)
             ((uint8_t (*)[2])((uintptr_t)g_keyBindings))[i][0] =
                 g_keyDefaults[i];
     }
+
+    /* Migrate an old file's "quiet" to "silent". Only these three. */
+    if (g_volumeAtZero == AM2_VOLUME_SENTINEL)
+        g_volumeAtZero = AM2_VOLUME_SILENT;
+    if (g_streamVolume == AM2_VOLUME_SENTINEL)
+        g_streamVolume = AM2_VOLUME_SILENT;
+    if (g_voiceVolume == AM2_VOLUME_SENTINEL)
+        g_voiceVolume = AM2_VOLUME_SILENT;
 }
 
 /* SaveOptions -- original 0x0044CFA0, seven callers. Write Options.cfg: every
