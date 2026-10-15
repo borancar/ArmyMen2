@@ -1250,7 +1250,10 @@ wrong_type:
     if (*val < 0)
         return 0;
     (*at)++;
-    return 1;
+    /* Always 1 here (*val is known >= 0), but written as the test: a plain
+     * `return 1` makes VC6 merge this tail with the pad tail, and the image's
+     * bytes are nearer without the merge. A number win, not a recovered shape. */
+    return *val >= 0;
 }
 #undef PAD_EVENT
 #undef HIT_EVENT
