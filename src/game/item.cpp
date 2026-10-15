@@ -4815,6 +4815,14 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
 
 
 
+/* The aimed pick: the first pose when a target is seen and the shooter is
+ * ready, the second otherwise. */
+static inline int32_t AimedPick(const AM2_SightOut *out, int32_t ready,
+                                 int32_t a, int32_t b)
+{
+    return out->seen && ready ? a : b;
+}
+
 /* SelectFirePose -- original 0x00449AB0, 1088 bytes, one caller, which is
  * TrooperFire. WHICH POSE SHOULD THIS TROOPER BE IN TO FIRE THIS WEAPON: it
  * writes SIGHTCOUT_OFF_STATE and its int32_t answer is 1 for every path that
@@ -4877,8 +4885,6 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
     /* `Braced` is the nine-pose set plus soldier kind 7, written out as a chain
      * of compares in every arm that asks it; `Aimed` is the (seen && ready)
      * pick between two poses. */
-#define AIMED(a, b) (out->seen && ready \
-                         ? (a) : (b))
 
         switch (weapon->typeRec->kind) {
         case 3:                                                        /* FLAM */
@@ -4903,9 +4909,11 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GRENADE_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else
-                    goto raise_k;
+                    out->state = AimedPick(out, ready, AM2_POSE_GRENADE_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else {
+                    out->state = AM2_POSE_RAISE_KNEEL;
+                    return 1;
+                }
                 break;
             case 2:
                 out->state = AM2_POSE_KNEEL;
@@ -4914,14 +4922,9 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
-                else {
-                    /* The two raise poses exist once each in the image, and
-                     * the other arms jump into them: standing here, kneeling
-                     * in the bazooka arm. */
-raise_s:
-                    out->state = AM2_POSE_RAISE_STAND;
-                }
+                    out->state = AimedPick(out, ready, AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
+                else
+                    goto raise_s;
                 break;
             }
             break;
@@ -4935,9 +4938,11 @@ raise_s:
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else
-                    goto raise_k;
+                    out->state = AimedPick(out, ready, AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else {
+                    out->state = AM2_POSE_RAISE_KNEEL;
+                    return 1;
+                }
                 break;
             case 2:
                 out->state = AM2_POSE_CLASS2_ARMED;
@@ -4946,9 +4951,11 @@ raise_s:
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
-                else
-                    goto raise_s;
+                    out->state = AimedPick(out, ready, AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
+                else {
+                    out->state = AM2_POSE_RAISE_STAND;
+                    return 1;
+                }
                 break;
             }
             break;
@@ -4959,11 +4966,9 @@ raise_s:
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
-                else {
-raise_k:
-                    out->state = AM2_POSE_RAISE_KNEEL;
-                }
+                    out->state = AimedPick(out, ready, AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else
+                    goto raise_k;
                 return 1;
             case 2:
                 out->state = AM2_POSE_KNEEL;
@@ -4972,9 +4977,11 @@ raise_k:
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
                     || o->pose == 0x1D || o->pose == 0x14 || o->pose == 0x06 || o->pose == 0x1E
                     || o->pose == 0x15 || o->soldierKind == AM2_SOLDIER_KIND_ACTION_A)
-                    out->state = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
-                else
+                    out->state = AimedPick(out, ready, AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
+                else {
                     out->state = AM2_POSE_RAISE_STAND;
+                    return 1;
+                }
                 break;
             }
             break;
@@ -5011,7 +5018,12 @@ raise_k:
         return 1;
     }
     return 0;
-#undef AIMED
+raise_s:
+    out->state = AM2_POSE_RAISE_STAND;
+    return 1;
+raise_k:
+    out->state = AM2_POSE_RAISE_KNEEL;
+    return 1;
 }
 
 /* DamageTrooper -- original 0x00447A40, 1040 bytes, one caller, which is

@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1595 of 1646 functions
-byte-identical, 51 differing, 5,754 bytes of total edit distance. The live
+byte-identical, 51 differing, 5,694 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -181,6 +181,14 @@ spot of its own (Mode0 and Mode5 after their early refusals, Mode4 at the top,
 Mode6 at the call) and passes it in. One shared tail, four spellings of the
 read; the sum over the four went from 494 to 314. The remaining difference in
 Mode0 is the object copy the image keeps in `ebp`.
+
+**Shared tails moved out of the switch (SelectFirePose 300 -> 240).** The image
+has one block for each raise pose. Writing the raise sites as `goto` into labels
+placed INSIDE the switch kept VC6 from sharing them; placing the two labelled
+blocks after the function's final `return 0` and giving every other raise site a
+direct store plus `return 1` took the jump table from 24 bytes too far to 8 bytes
+short. About 840 variants led to it, which is why the rule is: when a goto target
+will not stay put, try putting it after the last statement of the function.
 
 ## Pitfalls
 
