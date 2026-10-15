@@ -5003,11 +5003,13 @@ score:
             /* Asked again here, as the image does (0x004041B0). */
             if (!keep)
                 goto next;
-            if (!RegionsNear(keep, o, solve)) {
+            {
+                int32_t inRange = RegionsNear(keep, o, solve);
+
                 solve = 0;
-                goto next;
+                if (!inRange)
+                    goto next;
             }
-            solve = 0;
             {
                 int32_t n = TryTakeWeapon(keep, o);
 
