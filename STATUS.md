@@ -191,7 +191,9 @@ main result so far (details in `src/vc6/README.md`):
   what expression makes VC6 emit the image's load or store): Step3Drive
   30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
   12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
-  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 6,402 of edit
+  10 -> 9: 39 off in shape, 465 on code alone. In bytes: 6,402 (6,340 after SightScan 528 -> 466: every `continue` in phase two written `goto next`
+  to one label at the loop end, and `slack = 0` stored before `best`; the scoring block is still
+  placed after the sight test, 0x5f5 against the image's 0x2b0, see docs/bytematching.md) of edit
   distance over the 52 functions that are not byte-identical (147,586
   bytes between them; 14,622 at the day's first run), the largest
   ScriptParseActionRecon 2,336, Step3Drive 974 -> 382 (the turret aim held in a local keeps `speed` in ebp; then the first block through `gun`, the gun facing straight from its RoundTo8, the approach test as one expression; docs/vc6-regalloc.md; its dead `step`

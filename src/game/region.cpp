@@ -4865,18 +4865,18 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 candRange   = AM2_SIGHT_KIND7_RANGE;
 score:
                 if (!cand)
-                    continue;
+                    goto next;
                 ++*nOther;
                 ++o->fieldF4;
                 /* Discarded two instructions later; a call, so it counts. */
                 (void)AngleDelta(facing, candBearing);
                 if (candRange >= bestRange + slack)
-                    continue;
+                    goto next;
+                slack       = 0;
                 best        = cand;
                 bestRange   = candRange;
                 bestBearing = candBearing;
-                slack       = 0;
-                continue;
+                goto next;
             }
 
             /* The sight test, inline. It opens exactly as AM2_AI_SIGHT_TEST does:
@@ -4906,7 +4906,7 @@ score:
                 if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
                     if (candRange < g_rankRecords[o->rank].field_08)
                         goto in_sight;
-                    continue;
+                    goto next;
                 }
 
                 /* Keyed on the BEARING, not the facing -- see orig.h. */
@@ -4920,16 +4920,16 @@ score:
 
                     if (his >= mine) {
                         if (candRange > g_sightBlockByDir[dir].low)
-                            continue;
+                            goto next;
                     } else if (his + AM2_SIGHT_BAND_STEP >= mine) {
                         if (candRange > g_sightBlockByDir[dir].mid)
-                            continue;
+                            goto next;
                     } else if (candRange > g_sightBlockByDir[dir].high) {
-                        continue;
+                        goto next;
                     }
                 } else {
                     if (candRange > g_rankRecords[o->rank].sight_range)
-                        continue;
+                        goto next;
                 }
             }
 
@@ -4960,7 +4960,7 @@ in_sight:
 
                 ++*nAllied;
                 if (!keep->targetUid)
-                    continue;
+                    goto next;
                 {
                 AM2_Object *w = LookupByUID(
                     keep->targetUid);
@@ -4971,14 +4971,14 @@ in_sight:
                 }
                 if (w->health <= 0) {
                     keep->targetUid = 0;
-                    continue;
+                    goto next;
                 }
                 if ((int32_t)w->flags & 0x204) {
                     keep->targetUid = 0;
-                    continue;
+                    goto next;
                 }
                 if (ObjsAreAllied(o, w, 0))
-                    continue;
+                    goto next;
                 DistAndAngle(&o->pos,
                              &w->pos,
                              &candRange, &candBearing);
@@ -4987,35 +4987,36 @@ in_sight:
                 if (o->aiMode != 1)
                     goto score;
                 if (candRange > AM2_AI_PATROL_DETOUR)
-                    continue;
+                    goto next;
                 goto score;
             }
 
             /* Not a unit: a dropped weapon worth walking to. */
             if (!flags || !ObjIsType4(keep))
-                continue;
+                goto next;
             DistAndAngle(&o->pos,
                          &keep->pos,
                          &candRange, &candBearing);
             /* Asked again here, as the image does (0x004041B0). */
             if (!keep)
-                continue;
+                goto next;
             if (!RegionsNear(keep, o, solve)) {
                 solve = 0;
-                continue;
+                goto next;
             }
             solve = 0;
             {
                 int32_t n = TryTakeWeapon(keep, o);
 
                 if (n <= bestScore)
-                    continue;
+                    goto next;
                 alt         = keep;
                 bestScore   = n;
                 bestRange   = candRange;
                 bestBearing = candBearing;
             }
         }
+    next: ;
     }
 
 finish:

@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-12, work paused): 1594 of 1646 functions
-byte-identical, 52 differing, 6,402 bytes of total edit distance. The live
+byte-identical, 52 differing, 6,340 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -156,6 +156,18 @@ after.
 
 For a language-specific trick that does not change codegen, prefer `static
 inline` functions to macros; measure before and after.
+
+**Open: SightScan's scoring block position.** The image places the block right
+after the Kind7 arm, with the sight test and the allied arm jumping back to
+it. VC6 moves it to the end of the `if (!ObjsAreAllied)` branch whenever any
+later code jumps back with a `goto`; with every `goto score` turned into
+`continue` (behaviour broken, diagnostic only) it stays after the Kind7 arm.
+About 150 source variants did not reproduce the image's placement while keeping
+the behaviour: inline functions at each site (VC6 merges only some copies), a
+`do`/`for`/`switch`/`while (cand)` wrapper, forward gotos, the allied arm
+first, struct-grouped candidate variables. The placement at the loop top
+costs about 360 bytes elsewhere. Writing every `continue` as `goto next`
+(one label at the loop end) took the function from 528 to 466.
 
 ## Pitfalls
 
