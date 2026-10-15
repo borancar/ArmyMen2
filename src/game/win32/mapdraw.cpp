@@ -699,7 +699,10 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
                        (const RECT *)world))
         return 1;
 
-    g_depthNodes[g_depthCount].obj = obj;
+    {
+        AM2_DepthNode *slot = &g_depthNodes[g_depthCount];
+        slot->obj = obj;
+    }
 
     if (g_depthCount == 0) {
         g_depthHead            = 0;
