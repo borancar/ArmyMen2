@@ -2453,7 +2453,10 @@ void __cdecl ObjAfterMove(AM2_Object *obj, int32_t unused, int32_t damage)
         > (int8_t)(g_tileAttrs)
               [o->tile])
         return;
-    if (!(int8_t)height)
+    /* A number win: the dead byte read keeps the height's byte slot in the frame while
+       the test below is the full dword the image tests (test eax,eax). */
+    (void)(int8_t)height;
+    if (!(int32_t)height)
         return;
 
     if (o->rowSet.hitMask)
