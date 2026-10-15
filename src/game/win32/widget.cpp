@@ -17182,9 +17182,9 @@ void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
  * reading, and by the diff for the part that differs. */
 int32_t __cdecl PointerPickMode4(AM2_Object *o)
 {
-    uint32_t tailUid = o->uid;
     if (o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         return 0;
+    uint32_t tailUid = o->uid;
     if (o->health == 0)
         return 0;
     if (o->owner == AM2_ARMY_NEUTRAL)
