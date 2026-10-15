@@ -2838,9 +2838,11 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_BOAT:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BOAT;       break;
         case AM2_TOK_GROUNDVEHICLE: g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GROUNDVEH;  break;
         case AM2_TOK_NPC:           g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_NPC;        break;
-        case AM2_TOK_GREEN:
+        /* GREEN and ARMY0, TAN and ARMY1 have identical bodies but are separate
+         * arms: the image's switch has them apart, and merged labels cost 74 bytes. */
+        case AM2_TOK_GREEN:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREEN;      break;
         case AM2_TOK_ARMY0:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREEN;      break;
-        case AM2_TOK_TAN:
+        case AM2_TOK_TAN:           g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
         case AM2_TOK_ARMY1:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
         case AM2_TOK_BLUE:
         case AM2_TOK_ARMY2:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BLUE;       break;
