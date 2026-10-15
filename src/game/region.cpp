@@ -2567,7 +2567,7 @@ int32_t __cdecl ListBoxAction(AM2_Point at, const AM2_RecordList *list,
  * ObjHitMaskAction for a RECORD-LIST HEADER instead of an object, and it is
  * that function line for line: the same eight clamps, the same bottom /right/
  * top/left store order, the same zero memset, the same twenty ring deltas, the
- * same rowbits arithmetic, the same `% 16` phase and the same two half-byte
+ * same rowbits arithmetic, the same 16-wide phase (a mask here, a remainder there) and the same two half-byte
  * tables with the same one-past index. Everything written up over there
  * applies here and is not repeated.
  *
@@ -2711,7 +2711,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     if (rowbits == 0)
         return 0;
 
-    phase = world.left % (1 << AM2_TILE_SHIFT);
+    phase = world.left & ((1 << AM2_TILE_SHIFT) - 1);
     if (phase >= 8) {
         splitOdd = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
@@ -9671,7 +9671,6 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
     if ((uint16_t)o->health != 0) {
         AM2_MapRow *gun;
-        AM2_Point target;
         int32_t   turn;
         int32_t   noTarget;
         uint8_t   first;
@@ -9718,6 +9717,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
         /* State 1 skips target selection and the speed ramp entirely and
          * goes straight to the step below. */
         if (r->state != 1) {
+            AM2_Point target;
             /* The frame's target: the next waypoint if one is pending,
              * otherwise the standing destination at +0xC0. */
             if (o->moveAt
