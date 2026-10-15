@@ -4950,10 +4950,10 @@ score:
                 (void)AngleDelta(facing, candBearing);
                 if (candRange >= bestRange + slack)
                     goto next;
-                slack       = 0;
                 best        = cand;
                 bestRange   = candRange;
                 bestBearing = candBearing;
+                slack       = 0;
                 goto next;
         } else {
             if (ObjIsTypeIn238(keep)) {
