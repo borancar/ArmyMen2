@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1595 of 1646 functions
-byte-identical, 51 differing, 5,522 bytes of total edit distance. The live
+byte-identical, 51 differing, 5,494 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -166,7 +166,12 @@ About 150 source variants did not reproduce the image's placement while keeping
 the behaviour: inline functions at each site (VC6 merges only some copies), a
 `do`/`for`/`switch`/`while (cand)` wrapper, forward gotos, the allied arm
 first, struct-grouped candidate variables. The placement at the loop top
-costs about 360 bytes elsewhere. A fuller attempt at the loop-top form (candidate state
+costs about 360 bytes elsewhere. Writing the scoring block as the join after an
+if/else (the Kind7 arm and the sight arm both fall into it, no `goto score`) took
+the function from 466 to 438 but leaves the block at 0x5e4: VC6 puts the sight arm
+directly after the Kind7 test in every form tried and the block after it. The one
+form that places the block at the image's offset is a duplicated tail (606), which is
+not the image's code. A fuller attempt at the loop-top form (candidate state
 hoisted to function scope, the reset placed before the loop, no per-iteration
 initialisers for the bearing and range, which are only read when a candidate
 exists) reached 834 with the block at 0x250, still well above the 466 of the

@@ -4856,29 +4856,16 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
         /* An if/else, not `goto allied`: the image lays the allied arm out
-         * after the rest, where a goto pulls it up behind the test. */
+         * after the rest, where a goto pulls it up behind the test. Both
+         * candidates, the Kind7 one and the one the sight test accepts, fall
+         * into the scoring block that follows the if/else. */
         if (!ObjsAreAllied(o, keep, 0)) {
             if (IsKind7(keep)) {
                 cand        = keep;
                 candBearing = AngleBetween(&o->pos,
                                            &keep->pos);
                 candRange   = AM2_SIGHT_KIND7_RANGE;
-score:
-                if (!cand)
-                    goto next;
-                ++*nOther;
-                ++o->fieldF4;
-                /* Discarded two instructions later; a call, so it counts. */
-                (void)AngleDelta(facing, candBearing);
-                if (candRange >= bestRange + slack)
-                    goto next;
-                slack       = 0;
-                best        = cand;
-                bestRange   = candRange;
-                bestBearing = candBearing;
-                goto next;
-            }
-
+            } else {
             /* The sight test, inline. It opens exactly as AM2_AI_SIGHT_TEST does:
              * the trace's height floor set first, the distance from the two
              * deltas, AngleOfDelta handed that distance as its unread third
@@ -4954,7 +4941,21 @@ in_sight:
                     + AM2_SIGHT_REVEAL_MS;
             }
 
-            goto score;
+            }
+score:
+                if (!cand)
+                    goto next;
+                ++*nOther;
+                ++o->fieldF4;
+                /* Discarded two instructions later; a call, so it counts. */
+                (void)AngleDelta(facing, candBearing);
+                if (candRange >= bestRange + slack)
+                    goto next;
+                slack       = 0;
+                best        = cand;
+                bestRange   = candRange;
+                bestBearing = candBearing;
+                goto next;
         } else {
             if (ObjIsTypeIn238(keep)) {
 
