@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-12, work paused): 1594 of 1646 functions
-byte-identical, 52 differing, 6,056 bytes of total edit distance. The live
+byte-identical, 52 differing, 6,038 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -175,6 +175,14 @@ shared tail it makes Mode6 worse (64 to 124), and the only clean form is a
 60-line copy of the tail for four bytes. The image has one shared tail, so the
 copy is further from the original than the bytes suggest. The remaining
 difference there is the object copy the image keeps in `ebp`.
+
+**A scoring artifact fixed: repeated floating-point constants.** The relink
+resolves a content-addressed constant (`__real@`, or a string literal) by
+reading the image's own pointer at the same offset as ours. After earlier code
+has shifted by a few bytes that read lands on the wrong bytes, so the second and
+later references to the same constant stayed at address 0 and counted as
+differences (FindPath: three loads, 18 bytes). A constant proven at one site of a
+function is now reused for its other sites in that function.
 
 ## Pitfalls
 

@@ -473,6 +473,11 @@ def main():
                     continue
                 cur = bytearray(data[value:value + n])
                 wildcard = [False] * n
+                # A content-addressed constant (__real@) proven at one site of
+                # this function is the same address at its other sites: the
+                # image's own pointer is read at the OUR site's offset, which
+                # misses once earlier code has shifted by a few bytes.
+                content_memo = {}
                 # apply this function's relocations
                 for off, symidx, typ in sec["rels"]:
                     roff = off - value
@@ -509,6 +514,10 @@ def main():
                         tgt_va = content_va(tgt_name, secs, symlist, symidx,
                                             img, va + roff,
                                             struct.unpack_from("<i", cur, roff)[0])
+                        if tgt_va is not None:
+                            content_memo[tgt_name] = tgt_va
+                        elif tgt_name.startswith("__real@"):
+                            tgt_va = content_memo.get(tgt_name)
                     if tgt_va is None and tgt_name.startswith("__ehhandler$") \
                             and typ == IMAGE_REL_I386_DIR32:
                         tgt_va = ehhandler_va(img, va + roff)
