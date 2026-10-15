@@ -9657,20 +9657,21 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         rows = new AM2_Rec(0);
 
-        i = 0;
+        int32_t k;
+        k = 0;
         {
             const AM2_NameRec *maps = ScriptListFind(
                 g_mpScriptName);
 
-            for (; maps && i < maps->count; i++) {
-                    AM2_Level *lvl = FindLevelByName(maps->maps[i]);
+            if (maps) for (; k < maps->count; k++) {
+                    AM2_Level *lvl = FindLevelByName(maps->maps[k]);
 
                     if (!lvl)
                         continue;
                     ((AM2_Rec *)rows)->ListAdd(lvl->name, lvl);
                     if (strcmp(lvl->mapName,
                                g_mapName_) == 0)
-                        sel = i;
+                        sel = k;
                 }
 
             /* OUTSIDE THE TEST: both the null-record `je` and the empty-list
