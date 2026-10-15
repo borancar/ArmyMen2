@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-12, work paused): 1594 of 1646 functions
-byte-identical, 52 differing, 6,038 bytes of total edit distance. The live
+byte-identical, 52 differing, 6,018 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric

@@ -7591,6 +7591,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     int32_t  i;                /* 0 for the plain step, else the sweep's try */
     int32_t  found;            /* the facing is settled */
     int32_t  pose;
+    AM2_MapRow *rows;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
     AM2_Point stepPoint;
@@ -7598,6 +7599,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
 
     klass = ClassifyByCode74(o);
     pos = &o->pos;
+    rows = o->rowSet.rows;
     stepPoint = *pos;
     if (!o->health)
         goto pose;
@@ -7615,8 +7617,8 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
 
     /* A row still mid-animation, or one whose animation says so, stops the
      * whole step: take whatever is under the trooper and go to the tail. */
-    if (o->rowSet.rows->field3C <= 0
-        && RowAnimField4(o->rowSet.rows,
+    if (rows->field3C <= 0
+        && RowAnimField4(rows,
                          (uint16_t)*(const int16_t *)
                              &g_weaponPoseFrames[out->state]) <= 0) {
         o->fieldD6     = 0;
@@ -7833,11 +7835,11 @@ settle_facing:
     if (at) {
         int32_t holding = 0;   /* CanPickUpWeapon's `already`: a weapon here is the one held */
 
-        do {
+        while (at) {
             int32_t slot;   /* only read once CanPickUpWeapon fills it */
 
             if (at == o)
-                continue;
+                goto next_item;
 
             /* THE STEP-UP, and it shares its slot with the move value -- see
              * orig.h. Only an item, only one flagged by a negative
@@ -7947,7 +7949,9 @@ settle_facing:
                 HealObject(o, AM2_TROOPER_HEAL, at);
                 o->field5B0 = g_gameClockMs;
             }
-        } while ((at = at->queryNext) != 0);
+    next_item:
+            at = at->queryNext;
+        }
 
         if (!holding)
             o->heldWeaponUid = 0;
