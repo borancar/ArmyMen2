@@ -7751,8 +7751,8 @@ sweep:
          * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
         if (ObjKind538In10To17(o)) {
             turned = 1;
-            out->bearing = facing;
             speed  = 0;
+            out->bearing = facing;
         } else if (out->hit) {
             /* Three arms with one body, written out three times as the
              * image has them -- one `||` test gives one copy and moves the
@@ -7760,9 +7760,9 @@ sweep:
              * different order in each: written alike, VC6 merges the
              * first two into one copy, which the image keeps apart. */
             out->state   = 1;
-            speed        = 0;
             turned       = 1;
             out->bearing = facing;
+            speed        = 0;
         } else if (!found) {
             out->state   = 1;
             turned       = 1;
@@ -7772,9 +7772,9 @@ sweep:
                    && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
                    && ObjType2Field548(o)) {
             out->state   = 1;
-            speed        = 0;
             turned       = 1;
             out->bearing = facing;
+            speed        = 0;
         } else {
             goto sweep;
         }
