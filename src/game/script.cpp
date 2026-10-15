@@ -2417,36 +2417,37 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         goto name_then_int;     /* the image shares ADDEXP's tail */
 
     case AM2_TOK_SETITEMFLAG:
-        if (!ActStep(ctx, at))
-            return 0;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (!ActAtEnd(ctx, at))
-            return 0;
-        /* ActTypeErr written out with the kind name in a local: the local is a web and
-         * takes edx, where the inlined function's temporary takes eax here, and with
-         * edx the error's tail is the one the shared block has, so it
-         * joins that block after the pushes instead of keeping a copy. */
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+        {
+            if (!ActStep(ctx, at))
+                return 0;
             const char *kn = kKindName(AM2_TOKEN_RESERVED);
 
-            am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-                    ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kn);
-            return 0;
+            if (!ScriptResolveName(ctx, at, &act->subject, 0))
+                return 0;
+            if (!ActAtEnd(ctx, at))
+                return 0;
+            /* ActTypeErr written out with the kind name in a local taken right
+             * after the first step: hoisting it from the error block into the
+             * case's own block moves the web the image has here (218 -> 50). */
+            if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+                am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                        ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kn);
+                return 0;
+            }
+            if (((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_STRATEGIC) {
+                am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
+                        ctx->tokens[*at].line);
+                return 0;
+            }
+            if (!ActStep(ctx, at))
+                return 0;
+            act->code = 0x33;
+            if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
+                return 0;
+            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+            return 1;
         }
-        if (((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_STRATEGIC) {
-            am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
-                    ctx->tokens[*at].line);
-            return 0;
-        }
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x33;
-        if (!ActWant(ctx, at, AM2_TOKEN_INTEGER))
-            return 0;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
-        return 1;
 
     case AM2_TOK_SETUILOCK:
         if (!ActStep(ctx, at))

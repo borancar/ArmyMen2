@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1595 of 1646 functions
-byte-identical, 51 differing, 5,690 bytes of total edit distance. The live
+byte-identical, 51 differing, 5,522 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -189,6 +189,14 @@ blocks after the function's final `return 0` and giving every other raise site a
 direct store plus `return 1` took the jump table from 24 bytes too far to 8 bytes
 short. About 840 variants led to it, which is why the rule is: when a goto target
 will not stay put, try putting it after the last statement of the function.
+
+**Check which block a hunk belongs to.** ScriptParseActionRecon was diagnosed as
+a register choice in the ADDEXP tail. A second agent matched the hunk addresses
+to the source and found they were in the SETITEMFLAG case, where the kind-name
+pointer is a local taken inside the error block. Taking it after the first step
+of the case (218 to 50) removed the byte shift and the jump-table move that
+made up most of the distance. When a long sweep finds nothing, re-derive which
+source lines the differing addresses come from.
 
 ## Pitfalls
 
