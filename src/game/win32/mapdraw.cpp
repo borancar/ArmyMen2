@@ -872,9 +872,18 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     const AM2_MapDesc *d    = desc;
     int32_t        cols = 0;
     int32_t        last;
-    int32_t        l, t, r, b, l0, t0;
-    int32_t        row, col, stride;
-    AM2_CellEntry *const *cell;
+    int32_t        l, t;
+    int32_t        row, col;
+    /* The six values the image spills, in the slot order it gives them. */
+    struct {
+        AM2_CellEntry *const *cell;
+        int32_t        stride;
+        int32_t        l0;
+        int32_t        t0;
+        int32_t        r;
+        int32_t        b;
+    } fr;
+    AM2_Rect       halves[2];       /* one object: it sits above fr */
 
     g_depthCount = 0;
     g_depthHead  = -1;
@@ -882,14 +891,14 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
 
     l = world->left   >> AM2_CELL_SHIFT;
     t = world->top    >> AM2_CELL_SHIFT;
-    r = world->right  >> AM2_CELL_SHIFT;
-    b = world->bottom >> AM2_CELL_SHIFT;
+    fr.r = world->right  >> AM2_CELL_SHIFT;
+    fr.b = world->bottom >> AM2_CELL_SHIFT;
 
-    if (b < 0)
+    if (fr.b < 0)
         return;
     if (t > d->rows - 1)
         return;
-    if (r < 0)
+    if (fr.r < 0)
         return;
 
     cols = d->cols;
@@ -897,20 +906,20 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
     if (l > last)
         return;
 
-    l0 = (l <= 0) ? 0 : l;
-    t0 = (t <= 0) ? 0 : t;
-    if (r >= last)
-        r = last;
-    if (b >= last)          /* cols - 1, as the original has it */
-        b = last;
+    fr.l0 = (l <= 0) ? 0 : l;
+    fr.t0 = (t <= 0) ? 0 : t;
+    if (fr.r >= last)
+        fr.r = last;
+    if (fr.b >= last)       /* cols - 1, as the original has it */
+        fr.b = last;
 
-    cell = d->cells
-           + ((t0 << d->shift) + l0);
-    stride = d->cols - r + l0 - 1;
+    fr.cell = d->cells
+           + ((fr.t0 << d->shift) + fr.l0);
+    fr.stride = d->cols - fr.r + fr.l0 - 1;
 
-    for (row = t0; row <= b; row++) {
-        for (col = l0; col <= r; col++) {
-            const AM2_CellEntry *node = *cell++;
+    for (row = fr.t0; row <= fr.b; row++) {
+        for (col = fr.l0; col <= fr.r; col++) {
+            const AM2_CellEntry *node = *fr.cell++;
 
             while (node) {
                 AM2_MapRow *obj = node->obj;
@@ -924,11 +933,11 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
 
                 if (obj->rect.top
                         >> AM2_CELL_SHIFT < row
-                    && row > t0)
+                    && row > fr.t0)
                     goto nextNode;
                 if (obj->rect.left
                         >> AM2_CELL_SHIFT < col
-                    && col > l0)
+                    && col > fr.l0)
                     goto nextNode;
 
                 if (!DepthInsert(obj, world)) {
@@ -940,7 +949,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, const AM2_MapDesc *desc,
                 node = node->next;
             }
         }
-        cell += stride;
+        fr.cell += fr.stride;
     }
 
     if (g_depthHead != -1) {
@@ -963,8 +972,6 @@ subdivide:
         int32_t   dw     = right - left;
         int32_t   half;
         int32_t   sub;
-        AM2_Rect  a;
-        AM2_Rect  c;
 
         if (right - left > dh) {
             if (dw > AM2_SUBDIVIDE_FLOOR)
@@ -972,32 +979,32 @@ subdivide:
             sub  = deep;
             half = left + dw / 2;
 
-            a.left = left;
-            c.right = right;
-            a.top = top;
-            a.right = half;
-            c.left = half + 1;
-            c.top = top;
-            a.bottom = bottom;
-            /* c.bottom is NOT written by the original -- see above. */
+            halves[0].left = left;
+            halves[1].right = right;
+            halves[0].top = top;
+            halves[0].right = half;
+            halves[1].left = half + 1;
+            halves[1].top = top;
+            halves[0].bottom = bottom;
+            /* halves[1].bottom is NOT written by the original -- see above. */
         } else {
             if (dh > AM2_SUBDIVIDE_FLOOR)
                 deep = 1;
             sub  = deep;
             half = top + dh / 2;
 
-            a.left = left;
-            a.bottom = half;
-            c.left = left;
-            a.right = right;
-            c.right = right;
-            a.top = top;
-            c.top = half + 1;
-            c.bottom = bottom;
+            halves[0].left = left;
+            halves[0].bottom = half;
+            halves[1].left = left;
+            halves[0].right = right;
+            halves[1].right = right;
+            halves[0].top = top;
+            halves[1].top = half + 1;
+            halves[1].bottom = bottom;
         }
 
-        DrawMapObjects(&a, desc, sub);
-        DrawMapObjects(&c, desc, sub);
+        DrawMapObjects(&halves[0], desc, sub);
+        DrawMapObjects(&halves[1], desc, sub);
     }
 }
 
