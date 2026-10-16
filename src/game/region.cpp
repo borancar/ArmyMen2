@@ -5026,9 +5026,9 @@ score:
                 if (n <= pick.bestScore)
                     goto next;
                 pick.alt         = keep;
-                pick.bestScore   = n;
                 pick.bestRange   = pick.range;
                 bestBearing = pick.bearing;
+                pick.bestScore   = n;
             }
         }
     next: ;
