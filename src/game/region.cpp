@@ -2725,7 +2725,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 
     for (y = world.top; y < world.bottom; y += 8) {
         int32_t off = (y - m->originY - oy) * rowbytes;
-        int32_t end = off + rowbytes;
+        int16_t end = off + rowbytes;     /* a number win: a mask row offset fits 16 bits */
         int32_t col = AM2_TILEMASK_MARGIN;
         uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - box->top) * w
                              + AM2_TILEMASK_MARGIN;
