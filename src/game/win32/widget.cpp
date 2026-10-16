@@ -9192,7 +9192,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_MpPanelScreen   *p = (AM2_MpPanelScreen *)w;
-    AM2_Rect   r;
     int32_t    i;
     int32_t   *points;
     /* The game box's rules path. Function scope: the image's 0x1a4 frame
@@ -9314,7 +9313,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * ::MpPanelUpdate prints back into each row, so the constructor seeds
          * what the update displays. */
         last = i == 3;
-        spin = new AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
+        spin = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
                               *points,
                               0, 0x1388, 0x64, w, MpCommitPoints,
                               g_hiliteColour,
@@ -9381,7 +9380,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * ADDR_MAP_NAME, so the original comes up on alpine3_mp. */
         rows = new AM2_Rec(0);
 
-        *slot = new AM2_ListBox(*RectSet(&r, 0x16, 0xC8, 0xFA, 0x5A),
+        *slot = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x16, 0xC8, 0xFA, 0x5A),
                                 rows, 0, 0, 1);
         /* UNGUARDED, and that is the original: it stores the result -- null
          * or not -- and then writes three fields THROUGH it. On an
@@ -9393,7 +9392,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         (*slot)->flag50   = 0;
         ::WidgetAddChild(w, *slot);
 
-        child = new AM2_ArrowBar(*RectSet(&r, 0x121, 0xC2, 0x13, 0x68), w,
+        child = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x121, 0xC2, 0x13, 0x68), w,
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                               0x40, 1);
@@ -9413,7 +9412,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         child = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
                                 (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)),
-                                1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
+                                1, *RectSet(AM2_TEMP(AM2_Rect), 0xA0, 0x139, 0x11, 0x10));
         p->blinker0 = child;
         ::WidgetAddChild(w, child);
         p->blinker0->flag50 = 0;
@@ -9422,7 +9421,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget *child = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
                                             (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)),
-                                            1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
+                                            1, *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x139, 0x11, 0x10));
         p->blinker1 = child;
         ::WidgetAddChild(w, child);
         p->blinker1->flag50 = 0;
@@ -9433,7 +9432,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     strcpy(p->chatText, g_dirScratch);
     {
         AM2_Edit *child = new AM2_Edit(p->chatText, 0x3C,
-                                         *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
+                                         *RectSet(AM2_TEMP(AM2_Rect), 0x17, 0x153, 0xF7, 0x10), 1,
                                          g_hiliteColour,
                                          g_colourBelowBg,
                                          g_backgroundColour,
@@ -9456,7 +9455,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_ListBox **slot = &p->chatBox;
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
-        *slot = new AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
+        *slot = new AM2_TextList(*RectSet(AM2_TEMP(AM2_Rect), 0x14, 0x17B, 0xFC, 0x43),
                                  g_menuMsgList,
                                  (int32_t)ADDR_LOG, 0);
 
@@ -9483,7 +9482,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * On an empty log that is -1, which is what "no row" is elsewhere in
          * this tree. */
         {
-            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
+            AM2_ArrowBar *bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x121, 0x172, 0x13, 0x55), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2C, 1);
@@ -9499,10 +9498,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
              * where that leaves it -- ArrowBarShowRow's arithmetic without
              * its repaint, written out here. Without it a reopened lobby
              * showed the OLDEST chat lines and a thumb at the top. */
-            if (((AM2_ListBox *)*slot)->selected
-                >= ((AM2_ListBox *)*slot)->topRow + ((AM2_ListBox *)*slot)->visible)
-                (((AM2_ListBox *)*slot)->topRow) =
-                    (((AM2_ListBox *)*slot)->selected) - (((AM2_ListBox *)*slot)->visible) + 1;
+            {
+                int32_t visible = ((AM2_ListBox *)*slot)->visible;
+
+                if (((AM2_ListBox *)*slot)->selected
+                    >= ((AM2_ListBox *)*slot)->topRow + visible)
+                    (((AM2_ListBox *)*slot)->topRow) =
+                        (((AM2_ListBox *)*slot)->selected) - visible + 1;
+            }
             /* The span read at its use: a local read ahead of the thumb call
              * had VC6 load the sprite bottom to a register (v3 18 -> 11). */
             bar->shift =
@@ -9579,7 +9582,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * is a harmless empty name rather than stack garbage. */
         FillListFromRules(path, p);
 
-        *slot = new AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
+        *slot = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0x35, 0x97, 0x42), rows,
                                 (int32_t)(uintptr_t)OnMpGameType,
                                 0, 1);
         ::WidgetAddChild(w, *slot);
@@ -9598,7 +9601,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * was added. The links are made through the panel's fields, which
          * the original reads back for every store; the bar's +0x50 is
          * cleared like every other fixed child's. */
-        p->gameBar = new AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
+        p->gameBar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x1FA, 0x2E, 0x13, 0x50), w,
                                       (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                       (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                       0x2A, 1);
@@ -9618,7 +9621,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child;
 
         if (g_commObject->isHost)
-            child = new AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
+            child = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0x22B, 0x2F, 0x4A, 0x18),
                                    g_scoreLimit,
                                    0x64, 0x2706, 0x64, w,
                                    MpCommitScore,
@@ -9631,7 +9634,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                         "%i",
                         g_scoreLimit);
             child = new AM2_Label(p->scoreText,
-                                  *RectSet(&r, 0x22B, 0x35, 0x21, 0x0E), 2,
+                                  *RectSet(AM2_TEMP(AM2_Rect), 0x22B, 0x35, 0x21, 0x0E), 2,
                                   g_colourBelowBg,
                                   g_backgroundColour);
         }
@@ -9688,7 +9691,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             }
         }
 
-        *slot = new AM2_ListBox(*RectSet(&r, 0x154, 0xAD, 0xF6, 0x48), rows,
+        *slot = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x154, 0xAD, 0xF6, 0x48), rows,
                                 (int32_t)(uintptr_t)OnMpMapPick, 0, 1);
         ::WidgetAddChild(w, *slot);
 
@@ -9699,7 +9702,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         /* AND ITS SCROLLBAR, at 0x214 immediately after the box, linked and
          * cleared the same way as the game box's. */
-        p->mapBar = new AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
+        p->mapBar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x25B, 0xA6, 0x13, 0x57), w,
                                      (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                      (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                      0x2F, 1);
@@ -9725,7 +9728,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             strcpy(path, "bad_mp_prev.bmp");
         }
 
-        child = new AM2_Panel(path, 1, *RectSet(&r, 0x152, 0x110, 0xBA, 0xBA));
+        child = new AM2_Panel(path, 1, *RectSet(AM2_TEMP(AM2_Rect), 0x152, 0x110, 0xBA, 0xBA));
         p->preview = child;
         ::WidgetAddChild(w, child);
         *(int32_t *)((uint8_t *)p->preview
@@ -9743,14 +9746,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             child = new AM2_Button("03_016_00_start.bmp",
                                    "03_016_01_start.bmp",
                                    "03_016_02_start.bmp", 1,
-                                   *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                   *RectSet(AM2_TEMP(AM2_Rect), 0x21F, 0x11A, 0x51, 0x20),
                                    (void (__cdecl *)(AM2_Widget *))OnMpLaunch,
                                    (void (__cdecl *)(AM2_Widget *))0);
         else
             child = new AM2_Button("03_030_00_ready.bmp",
                                    "03_030_01_ready.bmp",
                                    "03_030_02_ready.bmp", 1,
-                                   *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                   *RectSet(AM2_TEMP(AM2_Rect), 0x21F, 0x11A, 0x51, 0x20),
                                    (void (__cdecl *)(AM2_Widget *))MpReadyToLoad,
                                    (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
@@ -9763,14 +9766,14 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child = new AM2_Button("03_015_00_options.bmp",
                                            "03_015_01_options.bmp",
                                            "03_015_02_options.bmp", 1,
-                                           *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
+                                           *RectSet(AM2_TEMP(AM2_Rect), 0x21F, 0x142, 0x51, 0x20),
                                            (void (__cdecl *)(AM2_Widget *))MpRequestOptions,
                                            (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
 
         child = new AM2_Button(0, "03_018_01_cancel.bmp",
                                "03_018_02_cancel.bmp", 1,
-                               *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
+                               *RectSet(AM2_TEMP(AM2_Rect), 0x21F, 0x16B, 0x51, 0x20),
                                (void (__cdecl *)(AM2_Widget *))MpLeaveSession,
                                (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
