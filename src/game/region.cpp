@@ -4734,17 +4734,17 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                               int32_t *nOther, int32_t flags)
 {
     AM2_Object *keep;
-    AM2_Object *best;
-    AM2_Object *alt;
     AM2_Object *result;
     AM2_Object *it;
-    int32_t  bestRange;
-    int32_t  bestScore;
     uint8_t  bestBearing;
-    uint8_t  slack;
-    int32_t  solve;
     uint8_t  facing;
-    AM2_Rect box;
+    /* The scan state sits in three local structs, one of whose members has its
+     * address taken (DistAndAngle): that makes VC6 reload the candidate in the
+     * kind-7 arm, so the scoring block written out there is identical to the
+     * labelled one and the two merge, as the image's layout needs. */
+    struct { int32_t solve; AM2_Object *best; int32_t highest; } hold;
+    struct { uint8_t slack; AM2_Rect box; } win;
+    struct { int32_t range; uint8_t bearing; int32_t bestRange; AM2_Object *cand; int32_t bestScore; AM2_Object *alt; } pick;
 
     if (g_perframeCountA
         > AM2_SIGHT_SCANS_PER_FRAME)
@@ -4763,13 +4763,13 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     *nOther     = 0;
 
     keep        = (AM2_Object *)0;
-    best        = (AM2_Object *)0;
-    bestRange   = AM2_SIGHT_SCAN_FAR;
+    hold.best        = (AM2_Object *)0;
+    pick.bestRange   = AM2_SIGHT_SCAN_FAR;
     bestBearing = 0x80;
-    slack       = 0x80;
-    alt         = (AM2_Object *)0;
-    bestScore   = 0;
-    solve       = 1;
+    win.slack       = 0x80;
+    pick.alt         = (AM2_Object *)0;
+    pick.bestScore   = 0;
+    hold.solve       = 1;
 
     /* A weapon already earmarked stays the fallback while it is still there,
      * not flagged gone, reachable, and worth taking. */
@@ -4783,8 +4783,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
             int32_t n = TryTakeWeapon(w, o);
 
             if (n) {
-                alt       = w;
-                bestScore = n;
+                pick.alt       = w;
+                pick.bestScore = n;
             }
         }
     }
@@ -4797,16 +4797,16 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     orig_log_one(o);
 
     /* The rank record read at each edge, as the image re-reads it. */
-    box.left   = (int32_t)o->pos.x - (g_rankRecords[o->rank].sight_range);
-    box.right  = (int32_t)o->pos.x + (g_rankRecords[o->rank].sight_range);
-    box.top    = (int32_t)o->pos.y - (g_rankRecords[o->rank].sight_range);
-    box.bottom = (int32_t)o->pos.y + (g_rankRecords[o->rank].sight_range);
+    win.box.left   = (int32_t)o->pos.x - (g_rankRecords[o->rank].sight_range);
+    win.box.right  = (int32_t)o->pos.x + (g_rankRecords[o->rank].sight_range);
+    win.box.top    = (int32_t)o->pos.y - (g_rankRecords[o->rank].sight_range);
+    win.box.bottom = (int32_t)o->pos.y + (g_rankRecords[o->rank].sight_range);
 
     if (flags)
-        it = ObjectsInRect(&box, g_objMapDesc,
+        it = ObjectsInRect(&win.box, g_objMapDesc,
                                       ObjIsHittable);
     else
-        it = ObjectsInRect(&box, g_objMapDesc,
+        it = ObjectsInRect(&win.box, g_objMapDesc,
                                       ObjIsLiveTarget);
     if (!it)
         goto finish;
@@ -4852,9 +4852,9 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
      * copy at the loop entry that the image does not have. */
     for (; keep;
          keep = keep->queryNext) {
-        AM2_Object *cand       = (AM2_Object *)0;
-        uint8_t  candBearing = 0x80;
-        int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
+        pick.cand = (AM2_Object *)0;
+        pick.bearing = 0x80;
+        pick.range = AM2_SIGHT_SCAN_FAR;
 
         /* An if/else, not `goto allied`: the image lays the allied arm out
          * after the rest, where a goto pulls it up behind the test. Both
@@ -4862,10 +4862,22 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
          * into the scoring block that follows the if/else. */
         if (!ObjsAreAllied(o, keep, 0)) {
             if (IsKind7(keep)) {
-                cand        = keep;
-                candBearing = AngleBetween(&o->pos,
+                pick.cand        = keep;
+                pick.bearing = AngleBetween(&o->pos,
                                            &keep->pos);
-                candRange   = AM2_SIGHT_KIND7_RANGE;
+                pick.range   = AM2_SIGHT_KIND7_RANGE;
+                if (!pick.cand)
+                    goto next;
+                ++*nOther;
+                ++o->fieldF4;
+                (void)AngleDelta(facing, pick.bearing);
+                if (pick.range >= pick.bestRange + win.slack)
+                    goto next;
+                hold.best        = pick.cand;
+                pick.bestRange   = pick.range;
+                bestBearing = pick.bearing;
+                win.slack       = 0;
+                goto next;
             } else {
             /* The sight test, inline. It opens exactly as AM2_AI_SIGHT_TEST does:
              * the trace's height floor set first, the distance from the two
@@ -4875,7 +4887,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
              * `continue`). */
             {
                 uint8_t  look = o->facing;
-                int32_t  viewerAttr, dx, dy, highest;
+                int32_t  viewerAttr, dx, dy;
                 uint32_t dir;
 
                 if (ObjIsType3(o)
@@ -4887,36 +4899,36 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                      - (int32_t)o->pos.x;
                 dy = (int32_t)keep->pos.y
                      - (int32_t)o->pos.y;
-                highest     = AM2_AI_SIGHT_FLOOR;
-                candRange   = ApproxDistXY(dx, dy);
-                candBearing = AI_ANGLE3(dx, dy, candRange);
+                hold.highest     = AM2_AI_SIGHT_FLOOR;
+                pick.range   = ApproxDistXY(dx, dy);
+                pick.bearing = AI_ANGLE3(dx, dy, pick.range);
 
-                if (abs(AngleDelta(look, candBearing)) > g_rankRecords[o->rank].field_04) {
-                    if (candRange < g_rankRecords[o->rank].field_08)
+                if (abs(AngleDelta(look, pick.bearing)) > g_rankRecords[o->rank].field_04) {
+                    if (pick.range < g_rankRecords[o->rank].field_08)
                         goto in_sight;
                     goto next;
                 }
 
                 /* Keyed on the BEARING, not the facing -- see orig.h. */
-                dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
+                dir = (uint32_t)pick.bearing / AM2_SIGHT_DIR_STEP;
                 if (g_sightBlockByDir[dir].trace_stamp != g_sightGeneration)
-                    AiSightTrace(o, keep, dir, viewerAttr, g_sightGeneration, highest);
+                    AiSightTrace(o, keep, dir, viewerAttr, g_sightGeneration, hold.highest);
 
                 if (!(g_sightBlockByDir[dir].stamp != g_sightGeneration)) {
                     int32_t mine = ObjHeight(o);
                     int32_t his  = ObjHeight(keep);
 
                     if (his >= mine) {
-                        if (candRange > g_sightBlockByDir[dir].low)
+                        if (pick.range > g_sightBlockByDir[dir].low)
                             goto next;
                     } else if (his + AM2_SIGHT_BAND_STEP >= mine) {
-                        if (candRange > g_sightBlockByDir[dir].mid)
+                        if (pick.range > g_sightBlockByDir[dir].mid)
                             goto next;
-                    } else if (candRange > g_sightBlockByDir[dir].high) {
+                    } else if (pick.range > g_sightBlockByDir[dir].high) {
                         goto next;
                     }
                 } else {
-                    if (candRange > g_rankRecords[o->rank].sight_range)
+                    if (pick.range > g_rankRecords[o->rank].sight_range)
                         goto next;
                 }
             }
@@ -4933,7 +4945,7 @@ in_sight:
                               - o->hitTime)
                        > AM2_SIGHT_KIND7_RANGE
                 && ObjsAreAllied(keep, o, 0)))
-                cand = keep;
+                pick.cand = keep;
 
             if (ObjIsOurs(o, 0)) {
                 RevealObj(keep);
@@ -4944,18 +4956,18 @@ in_sight:
 
             }
 score:
-                if (!cand)
+                if (!pick.cand)
                     goto next;
                 ++*nOther;
                 ++o->fieldF4;
                 /* Discarded two instructions later; a call, so it counts. */
-                (void)AngleDelta(facing, candBearing);
-                if (candRange >= bestRange + slack)
+                (void)AngleDelta(facing, pick.bearing);
+                if (pick.range >= pick.bestRange + win.slack)
                     goto next;
-                best        = cand;
-                bestRange   = candRange;
-                bestBearing = candBearing;
-                slack       = 0;
+                hold.best        = pick.cand;
+                pick.bestRange   = pick.range;
+                bestBearing = pick.bearing;
+                win.slack       = 0;
                 goto next;
         } else {
             if (ObjIsTypeIn238(keep)) {
@@ -4966,7 +4978,7 @@ score:
                 {
                 AM2_Object *w = LookupByUID(
                     keep->targetUid);
-                cand = w;
+                pick.cand = w;
                 if (!w) {
                     keep->targetUid = 0;
                     goto score;                 /* cand is null; score refuses */
@@ -4983,12 +4995,12 @@ score:
                     goto next;
                 DistAndAngle(&o->pos,
                              &w->pos,
-                             &candRange, &candBearing);
+                             &pick.range, &pick.bearing);
                 }
                 /* Only mode 1 adopts an ally's target, and only close by. */
                 if (o->aiMode != 1)
                     goto score;
-                if (candRange > AM2_AI_PATROL_DETOUR)
+                if (pick.range > AM2_AI_PATROL_DETOUR)
                     goto next;
                 goto score;
             }
@@ -4998,26 +5010,26 @@ score:
                 goto next;
             DistAndAngle(&o->pos,
                          &keep->pos,
-                         &candRange, &candBearing);
+                         &pick.range, &pick.bearing);
             /* Asked again here, as the image does (0x004041B0). */
             if (!keep)
                 goto next;
             {
-                int32_t inRange = RegionsNear(keep, o, solve);
+                int32_t inRange = RegionsNear(keep, o, hold.solve);
 
-                solve = 0;
+                hold.solve = 0;
                 if (!inRange)
                     goto next;
             }
             {
                 int32_t n = TryTakeWeapon(keep, o);
 
-                if (n <= bestScore)
+                if (n <= pick.bestScore)
                     goto next;
-                alt         = keep;
-                bestScore   = n;
-                bestRange   = candRange;
-                bestBearing = candBearing;
+                pick.alt         = keep;
+                pick.bestScore   = n;
+                pick.bestRange   = pick.range;
+                bestBearing = pick.bearing;
             }
         }
     next: ;
@@ -5032,18 +5044,18 @@ finish:
      * (null when there is neither); the image returns it from two
      * epilogues. */
     result = 0;
-    if (best) {
+    if (hold.best) {
         AM2_Point anchor;
 
-        *outRange   = bestRange;
-        result      = best;
+        *outRange   = pick.bestRange;
+        result      = hold.best;
         *outBearing = bestBearing;
         anchor      = ObjAnchorPoint(o);
         /* Overwrites the store above, and measures from the ANCHOR. */
-        *outBearing = AngleBetween(&anchor, &best->pos);
-    } else if (alt) {
-        *outRange   = bestRange;
-        result      = alt;
+        *outBearing = AngleBetween(&anchor, &hold.best->pos);
+    } else if (pick.alt) {
+        *outRange   = pick.bestRange;
+        result      = pick.alt;
         *outBearing = bestBearing;
     }
     return result;
