@@ -2093,12 +2093,13 @@ void __cdecl DrawSelection(void)
             }
         }
 
-        if (obj->maxHealth / 2 < wide)
-            wide = obj->maxHealth / 2;
+        int16_t mh = obj->maxHealth;
 
-        fill = obj->health > 0 ? obj->health * wide / obj->maxHealth : wide;
+        if (mh / 2 < wide)
+            wide = mh / 2;
 
         x -= wide / 2;
+        fill = obj->health > 0 ? obj->health * wide / mh : wide;
 
         /* The frame first, then the filled part, then the remainder -- three
          * ClearRegions over one rectangle, each narrowing it. */
