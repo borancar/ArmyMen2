@@ -3760,7 +3760,7 @@ int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *ch
     uint32_t tile;
 
     for (o = (AM2_Object *)chain; o; o = o->queryNext) {
-        int32_t w = TroopBlockWeight(f, o, ref);
+        int16_t w = TroopBlockWeight(f, o, ref);     /* 0, AM2_BLOCK_FULL or a byte item flag */
 
         total += w;
         if (total >= AM2_BLOCK_FULL)
