@@ -4935,7 +4935,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
         case 1:  case 7:  case 8:  case 9:  case 10:
         case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
             if (o->field44 > 0)
-                return 1;
+                goto ret1c;
             switch (cls) {
             case 1:
                 if (o->pose == 0x19 || o->pose == 0x1C || o->pose == 0x13 || o->pose == 0x1A
@@ -5024,6 +5024,8 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
 ret1:
     return 1;
 ret1b:
+    return 1;
+ret1c:
     return 1;
 raise_s:
     out->state = AM2_POSE_RAISE_STAND;
