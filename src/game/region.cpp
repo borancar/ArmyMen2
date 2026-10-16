@@ -2006,64 +2006,71 @@ static inline void MarkTileRingIdx(AM2_TileMask *m, const int32_t *ring, int32_t
     }
 }
 
+static inline void MarkTileRingFlag(AM2_TileMask *m, const int32_t *ring, int32_t idx, int32_t *flag)
+{
+    int32_t i;
+
+    *flag = 1;
+    for (i = 0; i < AM2_TILEMASK_RING; i++) {
+        if (ring[i] + idx < 0)
+            return;
+        m->cells[ring[i] + idx] |= AM2_TILEMASK_PAD_CELL;
+    }
+}
+
 int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 {
     /* No locals for the record's parts: the box is the record itself, the
      * out->cells follow it, the hit rect is re-read from the object and the grid
      * width from the box at every use -- the original keeps only the record
      * pointer in a register and these few on the frame. */
-    const AM2_ObjMask *m;
-    const uint8_t  *bits;
-    AM2_Rect        world;          /* the clamped world box */
-    AM2_Rect        tile;           /* and in tiles */
+    /* The frame as one struct in the image's slot order (world and tile last), with
+     * the flag's address passed to the ring helper: a number win, the image keeps
+     * `marked` in memory. */
+    struct { int32_t marked; const uint8_t *bits; int32_t splitOdd; int32_t col; int32_t y; int32_t rowbytes; const AM2_ObjMask *m; int32_t span; int32_t end; AM2_Rect world; AM2_Rect tile; } f;
     int32_t         w;
-    int32_t         span;
     int32_t         rowbits;
-    int32_t         rowbytes;
     int32_t         phase;
-    int32_t         splitOdd;
     int32_t         k;
-    int32_t         y;
-    /* An array of two: a number win, the image's frame has one more 4-byte slot. */
-    int32_t         marked[2] = { 0, 0 };
 
-    m = obj->rowSet.hitMask;
-    if (!m)
+    f.marked = 0;
+    f.m = obj->rowSet.hitMask;
+    if (!f.m)
         return 0;
-    bits = m->bits;
-    if (!bits)
+    f.bits = f.m->bits;
+    if (!f.bits)
         return 0;
 
     /* The world clamp, x pair then y pair, with a margin of one tile. */
-    world.left = Clamp(m->originX + obj->hit.left, 1 << AM2_TILE_SHIFT,
+    f.world.left = Clamp(f.m->originX + obj->hit.left, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.right = Clamp(m->width + m->originX + obj->hit.left - 1,
+    f.world.right = Clamp(f.m->width + f.m->originX + obj->hit.left - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.top = Clamp(m->originY + obj->hit.top, 1 << AM2_TILE_SHIFT,
+    f.world.top = Clamp(f.m->originY + obj->hit.top, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    world.bottom = Clamp(m->height + m->originY + obj->hit.top - 1,
+    f.world.bottom = Clamp(f.m->height + f.m->originY + obj->hit.top - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
     /* and the tile clamp over the same four, kept raw: the margin goes on
      * as the box is written, and the row width below is taken from these. */
-    tile.left = Clamp(world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.left = Clamp(f.world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tile.right = Clamp(world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.right = Clamp(f.world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tile.top = Clamp(world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.top = Clamp(f.world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.bottom = Clamp(f.world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    out->box.left = tile.left - AM2_TILEMASK_MARGIN;
-    out->box.right = tile.right + AM2_TILEMASK_MARGIN;
-    out->box.top = tile.top - AM2_TILEMASK_MARGIN;
-    out->box.bottom = tile.bottom + AM2_TILEMASK_MARGIN;
+    out->box.left = f.tile.left - AM2_TILEMASK_MARGIN;
+    out->box.right = f.tile.right + AM2_TILEMASK_MARGIN;
+    out->box.top = f.tile.top - AM2_TILEMASK_MARGIN;
+    out->box.bottom = f.tile.bottom + AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0, (size_t)((out->box.bottom - out->box.top + 1) * (out->box.right - out->box.left + 1)));
     w = out->box.right - out->box.left + 1;
@@ -2092,61 +2099,58 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     g_tilemaskNeighbours[18] = 2 * w;
     g_tilemaskNeighbours[19] = 2 * w + 1;
 
-    span = tile.right - tile.left + 1;
+    f.span = f.tile.right - f.tile.left + 1;
 
     /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
      * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
-    rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
-    rowbytes = rowbits >> 3;
+    rowbits  = (f.world.right - f.world.left) + 31 - ((f.world.right - f.world.left + 31) % 32);
+    f.rowbytes = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
-    phase = world.left % (1 << AM2_TILE_SHIFT);
+    phase = f.world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
-        splitOdd = 0;
+        f.splitOdd = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
     } else {
-        splitOdd = 1;
+        f.splitOdd = 1;
         k        = 8 - phase;
     }
 
-    for (y = world.top; y < world.bottom; y += 8) {
-        int32_t off = (y - m->originY - obj->hit.top) * rowbytes;
-        int32_t end = off + rowbytes;
-        int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c  = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
+    for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
+        int32_t off = (f.y - f.m->originY - obj->hit.top) * f.rowbytes;
+        f.end = off + f.rowbytes;
+        f.col = AM2_TILEMASK_MARGIN;
+        uint8_t *c  = out->cells + ((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
 
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
-            if (splitOdd == off % 2) {
-                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k]) {
+            if (f.splitOdd == off % 2) {
+                if (f.bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
                     /* The ring before the flag in this arm only, which is
                      * the order the image stores them. */
-                    marked[0] = 1;
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
                 }
 
-                col++;
+                f.col++;
                 c++;
-                if (col == span + AM2_TILEMASK_MARGIN)
+                if (f.col == f.span + AM2_TILEMASK_MARGIN)
                     break;
 
-                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
+                if (f.bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    marked[0] = 1;
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
                 }
-            } else if (bits[off]) {
+            } else if (f.bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
-                marked[0] = 1;
-                MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
             }
-        } while (++off < end);
+        } while (++off < f.end);
     }
 
-    return marked[0];
+    return f.marked;
 }
 
 
@@ -4736,12 +4740,13 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
     AM2_Object *result;
     AM2_Object *it;
     uint8_t  bestBearing;
-    uint8_t  facing;
     /* The scan state sits in three local structs, one of whose members has its
      * address taken (DistAndAngle): that makes VC6 reload the candidate in the
      * kind-7 arm, so the scoring block written out there is identical to the
      * labelled one and the two merge, as the image's layout needs. */
-    struct { int32_t solve; AM2_Object *best; int32_t highest; } hold;
+    /* facing and look live in the hold struct, after best, with a gap before look:
+     * the image's frame has them there. */
+    struct { int32_t highest; int32_t solve; AM2_Object *best; uint8_t facing; uint8_t pad[3]; uint8_t look; } hold;
     struct { uint8_t slack; AM2_Rect box; } win;
     struct { int32_t range; uint8_t bearing; int32_t bestRange; AM2_Object *cand; int32_t bestScore; AM2_Object *alt; } pick;
 
@@ -4751,10 +4756,10 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
 
     /* One slot written twice: a type 3 with more than one row aims with its
      * turret. Two displacements four apart, one dword. */
-    facing = o->facing;
+    hold.facing = o->facing;
     if (ObjIsType3(o)
         && o->rowSet.count > 1)
-        facing = o->turretFacing;
+        hold.facing = o->turretFacing;
 
     *outRange   = 0;
     *outBearing = 0;
@@ -4869,7 +4874,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                     goto next;
                 ++*nOther;
                 ++o->fieldF4;
-                (void)AngleDelta(facing, pick.bearing);
+                (void)AngleDelta(hold.facing, pick.bearing);
                 if (pick.range >= pick.bestRange + win.slack)
                     goto next;
                 hold.best        = pick.cand;
@@ -4885,13 +4890,13 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
              * arc. The rest differs (the trace is AiSightTrace, the arms
              * `continue`). */
             {
-                uint8_t  look = o->facing;
                 int32_t  viewerAttr, dx, dy;
                 uint32_t dir;
 
+                hold.look = o->facing;
                 if (ObjIsType3(o)
                     && o->rowSet.count > 1)
-                    look = o->turretFacing;
+                    hold.look = o->turretFacing;
 
                 viewerAttr = ObjTileAttr(o);
                 dx = (int32_t)keep->pos.x
@@ -4902,7 +4907,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 pick.range   = ApproxDistXY(dx, dy);
                 pick.bearing = AI_ANGLE3(dx, dy, pick.range);
 
-                if (abs(AngleDelta(look, pick.bearing)) > g_rankRecords[o->rank].field_04) {
+                if (abs(AngleDelta(hold.look, pick.bearing)) > g_rankRecords[o->rank].field_04) {
                     if (pick.range < g_rankRecords[o->rank].field_08)
                         goto in_sight;
                     goto next;
@@ -4960,7 +4965,7 @@ score:
                 ++*nOther;
                 ++o->fieldF4;
                 /* Discarded two instructions later; a call, so it counts. */
-                (void)AngleDelta(facing, pick.bearing);
+                (void)AngleDelta(hold.facing, pick.bearing);
                 if (pick.range >= pick.bestRange + win.slack)
                     goto next;
                 hold.best        = pick.cand;
