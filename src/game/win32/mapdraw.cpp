@@ -690,7 +690,10 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
 {
     RECT           hit;
     int32_t        cmp;
+    int32_t        n;
+    uint32_t       f;
     AM2_DepthNode *at;
+    AM2_DepthNode *p;
 
     if (g_depthCount >= AM2_DEPTH_MAX)
         return 0;
@@ -699,12 +702,10 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
                        (const RECT *)world))
         return 1;
 
-    {
-        AM2_DepthNode *slot = &g_depthNodes[g_depthCount];
-        slot->obj = obj;
-    }
+    n = g_depthCount;
+    g_depthNodes[n].obj = obj;
 
-    if (g_depthCount == 0) {
+    if (n == 0) {
         g_depthHead            = 0;
         g_depthNodes[0].prev   = (AM2_DepthNode *)0;
         g_depthNodes[0].next   = (AM2_DepthNode *)0;
@@ -719,7 +720,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
      * past their loads, so they are labels here that both reach. */
 #define LINK_AFTER(at)                                                      \
     do {                                                                    \
-        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
+        g_depthCursor = (&g_depthNodes[n]);                                 \
         g_depthCursor->prev = (at);                                         \
         g_depthCursor->next = (at)->next;                                   \
         (at)->next = g_depthCursor;                                         \
@@ -727,14 +728,14 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     } while (0)
 #define APPEND(at)                                                          \
     do {                                                                    \
-        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
+        g_depthCursor = (&g_depthNodes[n]);                                 \
         (at)->next = g_depthCursor;                                         \
         g_depthCursor->prev = (at);                                         \
         g_depthCursor->next = (AM2_DepthNode *)0;                           \
     } while (0)
 #define LINK_BEFORE(at)                                                     \
     do {                                                                    \
-        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
+        g_depthCursor = (&g_depthNodes[n]);                                 \
         g_depthCursor->prev = (at)->prev;                                   \
         g_depthCursor->next = (at);                                         \
         (at)->prev = g_depthCursor;                                         \
@@ -745,7 +746,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     } while (0)
 #define AT_FRONT(at)                                                        \
     do {                                                                    \
-        g_depthCursor = (&g_depthNodes[g_depthCount]);                      \
+        g_depthCursor = (&g_depthNodes[n]);                                 \
         (at)->prev = g_depthCursor;                                         \
         g_depthCursor->prev = (AM2_DepthNode *)0;                           \
         g_depthCursor->next = (at);                                         \
@@ -753,18 +754,21 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         return 1;                                                           \
     } while (0)
 
-    if ((uint8_t)obj->flags & OBJ_DEPTH_FLAG_FRONT) {
-        for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
-            if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_BACK) {
-                g_depthCursor = at;
-                if (!at->next)
+    f = obj->flags;
+    if ((uint8_t)f & OBJ_DEPTH_FLAG_FRONT) {
+        for (p = &g_depthNodes[g_depthHead]; p; p = p->next)
+            if ((uint8_t)p->obj->flags & OBJ_DEPTH_FLAG_BACK) {
+                g_depthCursor = p;
+                at = p;
+                if (!p->next)
                     goto append;
                 goto link_after;
             }
-    } else if (obj->flags & OBJ_DEPTH_FLAG_BACK) {
-        for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
-            if ((uint8_t)at->obj->flags & OBJ_DEPTH_FLAG_FRONT) {
-                if (at == &g_depthNodes[g_depthHead])
+    } else if (f & OBJ_DEPTH_FLAG_BACK) {
+        for (p = &g_depthNodes[g_depthHead]; p; p = p->next)
+            if ((uint8_t)p->obj->flags & OBJ_DEPTH_FLAG_FRONT) {
+                at = p;
+                if (p == &g_depthNodes[g_depthHead])
                     goto at_front;
                 goto link_before;
             }
@@ -785,6 +789,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
     if (cmp < 0) {
         for (;;) {
             if (!g_depthCursor->prev) {
+                n = g_depthCount;
                 at = g_depthCursor;
             at_front:
                 AT_FRONT(at);
@@ -793,6 +798,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
             if (DepthCompare(obj, g_depthCursor->obj) >= 0)
                 break;
         }
+        n = g_depthCount;
         at = g_depthCursor;
     link_after:
         LINK_AFTER(at);
@@ -801,6 +807,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
 
     for (;;) {
         if (!g_depthCursor->next) {
+            n = g_depthCount;
             at = g_depthCursor;
         append:
             APPEND(at);
@@ -810,6 +817,7 @@ int32_t __cdecl DepthInsert(AM2_MapRow *obj, const AM2_Rect *world)
         if (DepthCompare(obj, g_depthCursor->obj) <= 0)
             break;
     }
+    n = g_depthCount;
     at = g_depthCursor;
 link_before:
     LINK_BEFORE(at);

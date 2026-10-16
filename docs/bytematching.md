@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1600 of 1646 functions
-byte-identical, 46 differing, 5,034 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1601 of 1646 functions
+byte-identical, 45 differing, 4,712 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -238,6 +238,14 @@ is `m = g; if (g) { g->~T(); operator delete(m); }`. Editing the IL until the co
 tells you the shape; then find the spelling. Every single-value spelling (local copy, two
 locals, `if (g) delete g`, casts, volatile) compiles to the same code. The IL format notes are
 in the memory file `vc6-il-override`.
+
+**Separate the walk pointer from the tail pointer (DepthInsert 322 -> 0, 2026-10-16).** When a scratch
+register pair is swapped through a whole function, look at which variable owns the loops: if the loop
+pointer is the same variable as a pointer used after the loops, its in-loop uses give that one web
+the loops' weight (2^depth) and it takes the first register. Declaring a distinct loop local (`p`)
+and assigning the shared one only when the loop finds its match gives two webs. DepthInsert also
+needed a count local read once at the top and re-read after each compare call, and a flags local
+read once (`f = obj->flags`), which is what puts the flags dword in ecx.
 
 ## Pitfalls
 
