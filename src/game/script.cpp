@@ -1140,13 +1140,15 @@ fail:
 /* ScriptParseEvent: one `case` per event keyword, each written out in full
  * as the image has them -- the five `<verb> <target> [by <target>]` events and
  * the two pad events differ only in the kind they record and the messages
- * they print, which is what the macros carry. */
+ * they print, which is what the macros carry. The pad macro tests the token
+ * kind as a difference, not a `!=`: a number win, it makes VC6 load the kind
+ * into a register first, as the image does. */
 #define PAD_EVENT(K, NO_NAME, NOT_A_PAD)                                    \
     *kind = (K);                                                            \
     if (!ScriptStep(ctx, at))                                               \
         return 0;                                                           \
     tok = &ctx->tokens[*at];                                                \
-    if (tok->kind != AM2_TOKEN_STRING)                                      \
+    if (tok->kind - AM2_TOKEN_STRING)                                       \
         goto wrong_type;                                                    \
     idx = ScriptFindName((const char *)tok->value);                         \
     if (idx < 0) {                                                          \
@@ -1250,10 +1252,7 @@ wrong_type:
     if (*val < 0)
         return 0;
     (*at)++;
-    /* Always 1 here (*val is known >= 0), but written as the test: a plain
-     * `return 1` makes VC6 merge this tail with the pad tail, and the image's
-     * bytes are nearer without the merge. A number win, not a recovered shape. */
-    return *val >= 0;
+    return 1;
 }
 #undef PAD_EVENT
 #undef HIT_EVENT
@@ -1540,6 +1539,24 @@ static inline int32_t ActVarNameEq(const AM2_ScriptCtx *ctx, int32_t *at, AM2_Sc
     return 1;
 }
 
+
+/* The trailing damage-kind word of `damage` and `setdamagepad`. Inline in
+ * the image: two expansions, so the early exits of the second land on the
+ * last bare return-1 copy instead of the first. */
+static inline int32_t ActDamageKind(AM2_ScriptCtx *ctx, int32_t *at,
+                                    AM2_ScriptAction *act)
+{
+    act->extra = 0;
+    if (*at >= ctx->count || ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+        return 1;
+    switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
+    case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
+    case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
+    case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
+    case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
+    }
+    return 1;
+}
 
 /* 0x00440D70. One act, into a 0x48-byte record.
  *
@@ -2059,16 +2076,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
-        act->extra = 0;
-        if (*at >= ctx->count || ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-            return 1;
-        switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
-        case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
-        case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
-        case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
-        case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
-        }
-        return 1;
+        return ActDamageKind(ctx, at, act);
 
     case AM2_TOK_DEPLOY:
         if (!ActStep(ctx, at))
@@ -2498,16 +2506,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             (*at)++;
         }
-        act->extra = 0;
-        if (*at >= ctx->count || ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-            return 1;
-        switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
-        case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
-        case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
-        case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
-        case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
-        }
-        return 1;
+        return ActDamageKind(ctx, at, act);
 
     case AM2_TOK_SETITEMOWNER:
         if (!ActStep(ctx, at))
