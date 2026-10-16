@@ -2024,7 +2024,8 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
     int32_t         splitOdd;
     int32_t         k;
     int32_t         y;
-    int32_t         marked = 0;
+    /* An array of two: a number win, the image's frame has one more 4-byte slot. */
+    int32_t         marked[2] = { 0, 0 };
 
     m = obj->rowSet.hitMask;
     if (!m)
@@ -2123,7 +2124,7 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                     *c |= AM2_TILEMASK_BOX_CELL;
                     /* The ring before the flag in this arm only, which is
                      * the order the image stores them. */
-                    marked = 1;
+                    marked[0] = 1;
                     MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
 
@@ -2134,18 +2135,18 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
                 if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    marked = 1;
+                    marked[0] = 1;
                     MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
-                marked = 1;
+                marked[0] = 1;
                 MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
             }
         } while (++off < end);
     }
 
-    return marked;
+    return marked[0];
 }
 
 
