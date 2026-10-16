@@ -2775,6 +2775,15 @@ int32_t __cdecl PeerShouldNack(AM2_Flow *peer, uint32_t seq);
 int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 {
     AM2_FlowMsg *msg;
+    /* The spilled locals of all three arms, in the image's slot order (frame
+     * +0x14, +0x18, +0x1c): the arms are disjoint, so each slot is shared by
+     * whatever that arm keeps there. PULSE ACK: mask, now, me. NACK: resent,
+     * peer mask, me. DATA: mask, then sent/any, me. */
+    struct {
+        union { uint32_t mask; int32_t resent; };
+        union { uint32_t now; uint32_t peerMask; AM2_MsgNode *sent; int32_t any; };
+        AM2_Flow *me;
+    } f;
 
     if (node->from == 0)
         return NoteKind31(node);
@@ -2784,24 +2793,21 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
     switch (msg->pkt.kind) {
     case AM2_FLOW_PULSE_ACK: {
         AM2_Flow *sender;
-        AM2_Flow *me;
         AM2_MsgNode *sent;
-        uint32_t mask;
-        uint32_t now;
         uint32_t seq;
         uint32_t lat;
         sender = FindPlayerById(node->from);
-        me     = FindPlayerById(g_commObject->selfId);
+        f.me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
             goto fail;
         }
-        if (!me) {
+        if (!f.me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
             goto fail;
         }
-        mask = GetPlayerMask(node->from);
-        now  = orig_get_tick_count();
+        f.mask = GetPlayerMask(node->from);
+        f.now  = orig_get_tick_count();
 
         /* THE ACK IS CUMULATIVE: one message retires every sequence from
          * the peer's last acknowledged up to the one it carries. HE_HAS is
@@ -2809,7 +2815,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
         if (msg->pkt.ack
                 > sender->heHas
             && msg->pkt.ack
-                < me->sequence) {
+                < f.me->sequence) {
             for (seq = sender->heHas + 1;
                  seq <= msg->pkt.ack; seq++) {
                 /* Not behind COMM_OFF_VERBOSE, unlike most of these. */
@@ -2817,11 +2823,11 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
                 sent = MsgListSetFlag(
                     g_msgListSendq, (int32_t)seq, 0,
-                    (int32_t)mask);
+                    (int32_t)f.mask);
                 if (!sent) {
                     if (g_commObject->verbose)
                         am2_log("Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x  \n",
-                                seq, node->from, node->from, mask);
+                                seq, node->from, node->from, f.mask);
                     if (g_commObject->verbose)
                         am2_log("Remote %d is acking %d, I had thru %d \n",
                                 node->from, msg->pkt.ack,
@@ -2831,7 +2837,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
                 MsgSlotA0(sender, seq);
                 sender->acksSeen += 1;
-                lat = now - sent->stamp;
+                lat = f.now - sent->stamp;
                 if (lat > AM2_FLOW_RTT_CAP
                     && seq == sender->heHas + 1)
                     am2_log("??? PULSE seq %6d latency %d acks for %d msgs %d thru %d  nxtSeq = %d \n",
@@ -2840,7 +2846,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                                 - sender->heHas,
                             sender->heHas,
                             msg->pkt.ack,
-                            me->sequence);
+                            f.me->sequence);
 
                 /* The minimum is taken BEFORE the 10,000 ms clamp and the
                  * maximum after, so a long stall moves the max to exactly
@@ -2882,23 +2888,20 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
     case AM2_FLOW_NACK: {
         AM2_Flow *sender;
-        AM2_Flow *me;
         AM2_Packet *copy;
-        uint32_t mask;
         uint32_t seq;
-        int32_t resent;
 
         /* AT MOST TWO GO OUT NOW. Past that the arm stops sending and sets
          * the send queue's flag to 1 instead, leaving the message for
          * whatever drains that queue. */
-        resent = 0;
+        f.resent = 0;
         sender = FindPlayerById(node->from);
-        me     = FindPlayerById(g_commObject->selfId);
+        f.me     = FindPlayerById(g_commObject->selfId);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", node->from);
             goto fail;
         }
-        if (!me) {
+        if (!f.me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", g_commObject->selfId);
             /* The same `return 0` as the breaks above reach; written here
              * it makes this log the copy the earlier three jump into, as
@@ -2910,9 +2913,9 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
             am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
                     msg->nack.first,
                     msg->nack.last,
-                    node->from, node->from, me->sequence);
+                    node->from, node->from, f.me->sequence);
 
-        mask = sender->wantBit;
+        f.peerMask = sender->wantBit;
         for (seq = msg->nack.first;
              seq <= msg->nack.last; seq++) {
             copy = (AM2_Packet *)MsgListCopyByKey(
@@ -2924,8 +2927,8 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                         seq, sender->heHas);
                 continue;
             }
-            if (resent < AM2_FLOW_RESEND_BURST) {
-                /* The resent copy carries our CURRENT ack, not the one it was
+            if (f.resent < AM2_FLOW_RESEND_BURST) {
+                /* The f.resent copy carries our CURRENT ack, not the one it was
                  * first sent with, and is re-checksummed for it. */
                 copy->ack =
                     sender->nextExpected;
@@ -2943,17 +2946,17 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                 if (g_commObject->verbose)
                     am2_log("Resend: seq %d to %d (%x)  nxtSeq = %d\n",
                             seq, node->from, node->from,
-                            me->sequence);
+                            f.me->sequence);
                 sender->resends += 1;
-                resent++;
+                f.resent++;
                 MsgListSetFlag(g_msgListSendq,
-                               (int32_t)seq, 0, (int32_t)mask);
+                               (int32_t)seq, 0, (int32_t)f.peerMask);
             } else {
                 if (g_commObject->verbose)
                     am2_log("ADDING to Resend Queue seq %d to id %x  mask %x\n",
-                            seq, node->from, mask);
+                            seq, node->from, f.peerMask);
                 MsgListSetFlag(g_msgListSendq,
-                               (int32_t)seq, 1, (int32_t)mask);
+                               (int32_t)seq, 1, (int32_t)f.peerMask);
             }
         }
         MsgListAdd(g_msgListPool, node);
@@ -2962,26 +2965,22 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
     case AM2_FLOW_DATA: {
         AM2_Flow *sender;
-        AM2_Flow *me;
-        AM2_MsgNode *sent;
-        uint32_t mask;
         uint32_t now;
         uint32_t seq;
         uint32_t expected;
         uint32_t last;
         uint32_t lat;
         uint32_t gap;
-        int32_t any;
 
-        mask   = GetPlayerMask(node->from);
+        f.mask   = GetPlayerMask(node->from);
         sender = FindPlayerById(node->from);
         if (!sender) {
             am2_log("Can't Find FlowQ for id %x  seq \n",
                     node->from, msg->pkt.seq);
             return 1;
         }
-        me = FindPlayerById(g_commObject->selfId);
-        if (!me) {
+        f.me = FindPlayerById(g_commObject->selfId);
+        if (!f.me) {
             am2_log("Can't Find my FlowQ for id %x\n", g_commObject->selfId);
             return 1;
         }
@@ -3006,26 +3005,26 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
          * is still 1, our next-expected is 0 and the flow is not ready, and
          * ONLY when we are not the host -- "Starting Slave Session". */
         expected = sender->nextExpected + 1;
-        if (me->sequence == 1 && expected == 1
-            && me->ready == 0) {
+        if (f.me->sequence == 1 && expected == 1
+            && f.me->ready == 0) {
             if (g_commObject->isHost == 0) {
                 if (g_commObject->verbose)
                     am2_log("Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d\n",
                             node->from, msg->pkt.seq,
                             sender->nextExpected,
                             sender->heHas,
-                            me->ready);
+                            f.me->ready);
                 sender->nextExpected =
                     msg->pkt.seq - 1;
                 expected = msg->pkt.seq;
-                me->ready = 1;
-                me->readyAt = orig_get_tick_count();
+                f.me->ready = 1;
+                f.me->readyAt = orig_get_tick_count();
                 /* A SECOND read, deliberately: this one has half a round
                  * trip taken off it, so it estimates the PEER's clock base.
                  * +0x68 has one toucher in this image and stays unnamed. */
-                me->peerClock =
+                f.me->peerClock =
                     orig_get_tick_count()
-                    - (me->field68 >> 1);
+                    - (f.me->field68 >> 1);
             }
         } else if (sender->nextExpected == 0) {
             if (g_commObject->verbose)
@@ -3059,7 +3058,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
         if (msg->pkt.ack
                 > sender->heHas
             && msg->pkt.ack
-                < me->sequence) {
+                < f.me->sequence) {
             if (msg->pkt.seq == 1) {
                 if (g_commObject->verbose)
                     am2_log("New Player joining flow he first got my seq %d hehas was %d  \n",
@@ -3078,13 +3077,13 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
             for (seq = sender->heHas + 1;
                  seq <= msg->pkt.ack; seq++) {
-                sent = MsgListSetFlag(
+                f.sent = MsgListSetFlag(
                     g_msgListSendq, (int32_t)seq, 0,
-                    (int32_t)mask);
-                if (!sent) {
+                    (int32_t)f.mask);
+                if (!f.sent) {
                     if (g_commObject->verbose)
                         am2_log("Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x  \n",
-                                seq, node->from, node->from, mask);
+                                seq, node->from, node->from, f.mask);
                     /* %x here where the PULSE ACK arm prints %d. */
                     if (g_commObject->verbose)
                         am2_log("Remote %x is acking %d, I had thru %d \n",
@@ -3095,7 +3094,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
 
                 MsgSlotA0(sender, seq);
                 sender->acksSeen += 1;
-                lat = now - sent->stamp;
+                lat = now - f.sent->stamp;
                 if (lat > AM2_FLOW_RTT_CAP
                     && seq == sender->heHas + 1)
                     am2_log("??? seq %6d from %x latency %d acks for %d msgs %d thru %d  nxtSeq = %d \n",
@@ -3104,7 +3103,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                                 - sender->heHas,
                             sender->heHas,
                             msg->pkt.ack,
-                            me->sequence);
+                            f.me->sequence);
 
                 if (sender->rttMin == 0
                     || lat < sender->rttMin)
@@ -3117,10 +3116,10 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                 RingPush32(sender, lat);
 
                 /* No "Adding to freelist" line in this copy. */
-                if ((sent->flags
+                if ((f.sent->flags
                      & g_playerSlotMask) == 0) {
-                    MsgListRemove(g_msgListSendq, sent);
-                    MsgListAdd(g_msgListPool, sent);
+                    MsgListRemove(g_msgListSendq, f.sent);
+                    MsgListAdd(g_msgListPool, f.sent);
                 }
             }
         }
@@ -3168,11 +3167,11 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                 g_msgKind0c->last = expected + 10;
             }
 
-            any = 0;
+            f.any = 0;
             for (seq = expected; seq <= last; seq++)
                 if (PeerShouldNack(sender, seq))
-                    any = 1;
-            if (any) {
+                    f.any = 1;
+            if (f.any) {
                 sender->nacksSent +=
                     last - expected + 1;
                 if (g_commObject->verbose)

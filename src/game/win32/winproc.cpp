@@ -341,7 +341,7 @@ static inline void FlipToGDI(void)
 static inline LRESULT OnPaint(void)
 {
     LPDIRECTDRAWSURFACE gdi;
-    PAINTSTRUCT         ps;
+    struct { uint8_t pad[36]; PAINTSTRUCT ps; } p;
     RECT                damage;
 
     IDirectDraw_FlipToGDISurface(g_ddraw);
@@ -354,10 +354,10 @@ static inline LRESULT OnPaint(void)
     RedrawWindow(NULL, NULL, NULL,
                  RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
-    BeginPaint((HWND)g_hWnd, &ps);
+    BeginPaint((HWND)g_hWnd, &p.ps);
     /* thiscall on the screen object (`mov ecx, [0x0065A058]` at 0x0040A86B). */
     ObjVPaint((*(AM2_PaintObject * *)&g_paintObject), *(const AM2_Rect *)&damage);
-    EndPaint((HWND)g_hWnd, &ps);
+    EndPaint((HWND)g_hWnd, &p.ps);
     return 0;
 }
 

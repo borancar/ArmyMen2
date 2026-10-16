@@ -40,31 +40,32 @@ typedef char am2_rle16_header_is_4_bytes[(sizeof(AM2_Rle16) == 4) ? 1 : -1];
 uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
                              int32_t unused)
 {
-    AM2_Rle16     *out = (AM2_Rle16 *)buf;
+    /* The three frame-resident values in the image's slot order (row
+     * counter lowest, then `out`, then the key). */
+    struct { int32_t row; AM2_Rle16 *out; uint8_t key; } f;
     uint16_t      *offs;
     const uint8_t *p;
     uint32_t       written;
-    uint8_t        key;
-    int32_t        row;
 
     (void)unused;                       /* pushed by the caller, never read */
 
-    out->width  = (uint16_t)width;
-    out->height = (uint16_t)height;
+    f.out = (AM2_Rle16 *)buf;
+    f.out->width  = (uint16_t)width;
+    f.out->height = (uint16_t)height;
 
     /* A walking pointer for the row offsets: the image keeps it in a
      * register and steps it by two per row, with `out` on the frame
      * (v3 11 -> 10). */
-    written = (uint32_t)(height * sizeof out->rowOffset[0] + sizeof *out);
-    buf    += sizeof *out;
+    written = (uint32_t)(height * sizeof f.out->rowOffset[0] + sizeof *f.out);
+    buf    += sizeof *f.out;
     offs    = (uint16_t *)buf;
     buf    += height * sizeof offs[0];
     p       = g_frameBuf;
 
-    key = g_frameBuf[g_pitch * KEY_ROW];
+    f.key = g_frameBuf[g_pitch * KEY_ROW];
 
-    for (row = 0; row < height; row++) {
-        *offs = (uint16_t)(buf - (uint8_t *)out);
+    for (f.row = 0; f.row < height; f.row++) {
+        *offs = (uint16_t)(buf - (uint8_t *)f.out);
         const uint8_t *start = p;
         const uint8_t *end   = p + width;
 
@@ -74,7 +75,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
         do {
             int32_t n = 0;
 
-            while (p < end && *p == key && n < RUN_MAX) {
+            while (p < end && *p == f.key && n < RUN_MAX) {
                 p++;
                 n++;
             }
@@ -82,7 +83,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
             written++;
 
             n = 0;
-            while (p < end && *p != key && n < RUN_MAX) {
+            while (p < end && *p != f.key && n < RUN_MAX) {
                 p++;
                 n++;
             }
@@ -103,7 +104,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
         int32_t  i;
 
         for (i = 0; i < SCRATCH_SIDE; i++) {
-            memset(dst, key, SCRATCH_SIDE);
+            memset(dst, f.key, SCRATCH_SIDE);
             dst += g_pitch;
         }
     }
