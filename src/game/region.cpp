@@ -1334,7 +1334,7 @@ fail:
             int32_t  nb = curTile + g_tileStep8[i];
             uint32_t t;
             uint16_t g;
-            int32_t  h;
+            uint16_t h;
             uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
@@ -1415,7 +1415,7 @@ fail:
             }
 
             if (before > 0) {
-                uint16_t after = g_pathNodes[before & 0xFFFF].next;
+                uint32_t after = g_pathNodes[before & 0xFFFF].next;
 
                 g_pathNodes[t].next = after;
                 if (after > 0)
@@ -9789,7 +9789,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
             /* Two halvings as one shift by 0, 1 or 2: a number win, the sum of byte-wide
                flags keeps the speed out of its stack slot between the two. */
-            speed >>= (uint8_t)(r->approach != 0) + (uint8_t)(r->stop != 0);
+            speed >>= (uint8_t)(r->approach != 0) + (uint8_t)(r->stop);
 
             /* The acceleration limiter, and the two arms clamp from
              * OPPOSITE sides: slowing down takes the larger of the two,
@@ -9944,7 +9944,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 }
 
                 {
-                    int32_t army = o->owner;
+                    int16_t army = o->owner;
 
                     if (AM2_THE_COMM->CommMustBroadcast((int16_t)army))
                         SendVehicleFire(o);
