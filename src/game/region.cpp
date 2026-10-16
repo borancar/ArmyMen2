@@ -2633,7 +2633,6 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     int32_t         phase;
     int32_t         k;
     int32_t         tilew;
-    int32_t         colEnd;
     int32_t         y;              /* a pixel row; as a word it costs a movsx the image does not have */
     int32_t         marked = 0;
 
@@ -2707,7 +2706,6 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     g_tilemaskNeighbours[19] = 2 * w + 1;
 
     tilew = tile.right - tile.left + 1;
-    colEnd = tilew + AM2_TILEMASK_MARGIN;
 
     rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
     rowbytes = rowbits >> 3;
@@ -2742,7 +2740,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 
                 col++;
                 c++;
-                if (col == colEnd)
+                if (col - AM2_TILEMASK_MARGIN == tilew)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {

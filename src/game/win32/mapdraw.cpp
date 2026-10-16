@@ -2052,7 +2052,8 @@ void __cdecl DrawSelection(void)
     for (i = 0; i < g_selectedCount; ) {
         AM2_Object *obj = LookupByUID(
             g_selectedItems[i]);
-        int32_t  x, y, wide, drop, fill;
+        int32_t  x, y, wide, drop;
+        int16_t  fill;       /* a number win: |fill| <= maxHealth / 2 fits 16 bits */
         RECT     box;
         uint8_t  ink;
 
