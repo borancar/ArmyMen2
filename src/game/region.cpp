@@ -7771,7 +7771,9 @@ sweep:
         if (ObjKind538In10To17(o)) {
             turned = 1;
             speed  = 0;
-            out->bearing = facing;
+            /* A number win: the image reloads `out` from its argument slot for the
+             * bearing stores while state and hit go through a register. */
+            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
         } else if (out->hit) {
             /* Three arms with one body, written out three times as the
              * image has them -- one `||` test gives one copy and moves the
@@ -7792,7 +7794,7 @@ sweep:
                    && ObjType2Field548(o)) {
             out->state   = 1;
             turned       = 1;
-            out->bearing = facing;
+            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
             speed        = 0;
         } else {
             goto sweep;
