@@ -1485,13 +1485,6 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
         *(void **)&(layer) = am2_malloc(g_mapTilesW * g_mapTilesH); \
         memset((layer), 0, g_mapTilesW * g_mapTilesH);    \
     }
-static inline uint8_t *MapAllocFill(am2_FILE *f, size_t n)
-{
-    uint8_t *p = (uint8_t *)am2_malloc((size_t)n);
-    if (p != 0)
-        orig_map_fread(p, (size_t)n, 1, f);
-    return p;
-}
 
 int32_t __cdecl LoadMap(const char *base, const char *folder)
 {
@@ -1618,7 +1611,9 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             break;
         case AM2_IFF_TRIG:
             plane = g_mapTilesW * g_mapTilesH;
-            if ((int32_t)size != plane) MISMATCH();
+            /* A difference, not a compare: a number win, the image has one more
+             * scratch temporary in the rotation here. */
+            if (size - (uint32_t)plane) MISMATCH();
             g_tileFlags = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_tileFlags, plane, 1, f);
             consumed += plane;
@@ -1640,10 +1635,11 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
         /* Owns nothing: a scratch buffer the parser consumes and we free. */
         case AM2_IFF_SCEN: {
-            uint8_t *tmp = MapAllocFill(f, size);
+            uint8_t *tmp = (uint8_t *)am2_malloc((size_t)size);
 
             if (tmp == 0)
                 goto skip;
+            orig_map_fread(tmp, (size_t)size, 1, f);
             consumed += (int32_t)size;
             ParseScenarios(tmp, (int32_t)size);
             am2_free(tmp);

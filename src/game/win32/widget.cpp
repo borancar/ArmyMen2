@@ -6219,17 +6219,20 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             goto next;
 
         if (ObjType2Field548(obj)) {
+            int16_t mh;
+
             if (obj->riding)
                 goto next;
 
             sq->recs[slot].index = 0;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
+            mh = SQUAD_MAXHP(obj);
             SQUAD_BAR(sq->recs[slot].barW, obj);
             if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 2)) {
                 sq->recs[slot].barColour = g_hudColour;
                 sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
                 slot++;
-            } else if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 1)) {
+            } else if (SQUAD_HP(obj) <= (int16_t)(mh >> 1)) {
                 sq->recs[slot].barColour = g_colourLagMid;
                 sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
                 slot++;
