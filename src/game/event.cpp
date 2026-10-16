@@ -3371,20 +3371,15 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
      * 0x60 frame), not one shared block-local packed into a dead argument
      * slot: function-scope locals, one per use, the coordinate arms sharing
      * a point. */
-    int32_t v1;
-    int32_t v2;
-    int32_t v3;
-    AM2_Point p1;
-    int32_t v4;
-    AM2_Point p3;
-    int32_t v6;
-    int32_t v7;
-    int32_t v8;
-    int32_t v9;
+    /* The frame is laid out by hand: v is shared by showvar, 0x20 and 0x21,
+     * whose arms never overlap; the rest of the single-use temporaries are
+     * block-scoped below and fall into the dead argument slots. */
+    struct { int32_t v; int32_t v3; int32_t v9; int32_t v8; char text[0x40]; int32_t pad[4]; } fr;
     AM2_Point at;
 
     if (act->uid != -2 && act->code != 0x1A) {
         if (act->xvar > 0) {
+            int32_t v1;
 
             GetVarValue(act->xvar, &v1);
             EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
@@ -3463,12 +3458,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x09: {                                /* showvar */
-        char    text[0x40];
 
-        if (GetVarValue(act->xvar, &v2) == 0)
+        if (GetVarValue(act->xvar, &fr.v) == 0)
             return;
-        am2_sprintf(text, "%d", v2);
-        HudMessage(text, 0);
+        am2_sprintf(fr.text, "%d", fr.v);
+        HudMessage(fr.text, 0);
         return;
     }
 
@@ -3480,11 +3474,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * to SELECT rather than to refuse. */
         /* The subject is resolved afresh at each call, as the image does. */
         if (act->xvar > 0) {
+            AM2_Point p1;
 
-            GetVarValue(act->xvar, &v3);
-            p1.x = (int16_t)v3;
-            GetVarValue(act->yvar, &v3);
-            p1.y = (int16_t)v3;
+            GetVarValue(act->xvar, &fr.v3);
+            p1.x = (int16_t)fr.v3;
+            GetVarValue(act->yvar, &fr.v3);
+            p1.y = (int16_t)fr.v3;
             EvtAtPointC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), p1, act->relative);
             return;
         }
@@ -3650,6 +3645,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                              act->n0);
             /* The same three paths as `moveto`, in the A variants. */
             if (act->xvar > 0) {
+                AM2_Point p1;
+                int32_t v4;
 
                 GetVarValue(act->xvar, &v4);
                 p1.x = (int16_t)v4;
@@ -3673,6 +3670,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->n0 >= 0)
             EvtArmySetField(act->army, act->subject, act->n0);
         if (act->xvar != 0) {
+            AM2_Point p3;
+            int32_t v4;
 
             GetVarValue(act->xvar, &v4);
             p3.x = (int16_t)v4;
@@ -3701,9 +3700,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x20: {
 
         if (act->xvar > 0) {
-            GetVarValue(act->xvar, &v6);
+            GetVarValue(act->xvar, &fr.v);
             EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                         (int8_t)v6);
+                         (int8_t)fr.v);
             return;
         }
         EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3714,9 +3713,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x21: {
 
         if (act->xvar > 0) {
-            GetVarValue(act->xvar, &v7);
+            GetVarValue(act->xvar, &fr.v);
             EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                          (int8_t)v7);
+                          (int8_t)fr.v);
             break;      /* out of the switch, not `return` -- the layout */
         }
         EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3730,9 +3729,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * read fails rather than falling back to n0. */
 
         if (act->xvar != 0) {
-            if (GetVarValue(act->xvar, &v8) == 0)
+            if (GetVarValue(act->xvar, &fr.v8) == 0)
                 return;
-            SetVarValue(act->subject, v8);
+            SetVarValue(act->subject, fr.v8);
             return;
         }
         SetVarValue(act->subject, act->n0);
@@ -3749,17 +3748,17 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * the frame packs differently (60 bytes against 386). Any other
          * compiler adds the value just read, so it gets the explicit form. */
 #ifdef _MSC_VER
-        v9 = act->n0;
+        fr.v9 = act->n0;
 
         if (act->xvar > 0)
-            GetVarValue(act->xvar, &v9);
-        AddToVar(act->subject, v9);
+            GetVarValue(act->xvar, &fr.v9);
+        AddToVar(act->subject, fr.v9);
 #else
         {
             int32_t amount = act->n0;
 
             if (act->xvar > 0)
-                GetVarValue(act->xvar, &v9);
+                GetVarValue(act->xvar, &fr.v9);
             AddToVar(act->subject, amount);
         }
 #endif
@@ -3798,11 +3797,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * act->n0; the only difference is that a positive xvar gets a
          * GetVarValue call whose answer nothing uses. Second arm in this
          * function to discard a call's result, after playsoundon. */
-        int32_t ignored;                /* never cleared: nothing reads it */
         int32_t frame = act->n0;
 
         if (act->xvar > 0)
-            GetVarValue(act->xvar, &ignored);
+            GetVarValue(act->xvar, &fr.v9);       /* never read: shares v9's slot */
         ScriptSetObjBitmap(act->subject, frame);
         return;
     }

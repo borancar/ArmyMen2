@@ -1210,19 +1210,18 @@ void __cdecl ScrollMapCache(void)
      * always zero, which is what makes this one expression for both
      * directions. */
     {
-        int32_t  sx = (dx > 0) ? dx : 0;
         AM2_Rect tiles;
         /* The positive part of dy is recomputed at each use. */
         int32_t  dstX, dstY;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather
          * than the view -- built only to be handed to the stubbed log. */
-        tiles.left   = sx;
+        tiles.left   = (dx > 0) ? dx : 0;
         tiles.top    = (dy > 0) ? dy : 0;
-        tiles.right  = g_visibleTiles.right - adx - g_visibleTiles.left + sx;
+        tiles.right  = g_visibleTiles.right - adx - g_visibleTiles.left + ((dx > 0) ? dx : 0);
         tiles.bottom = g_visibleTiles.bottom - ady - g_visibleTiles.top + tiles.top;
 
-        src.left   = sx << TILE_SHIFT;
+        src.left   = ((dx > 0) ? dx : 0) << TILE_SHIFT;
         src.top    = tiles.top << TILE_SHIFT;
         dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
         dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;

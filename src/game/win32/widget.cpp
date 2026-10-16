@@ -2621,8 +2621,10 @@ static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t wi
  * the top. */
 static inline int32_t PointerFriendTailLate(AM2_Object *o)
 {
+    uint32_t u;
+
     if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
+        if (ObjIsType3Inline(o) && (u = o->uid, !o->field94) && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
 
@@ -2640,7 +2642,7 @@ static inline int32_t PointerFriendTailLate(AM2_Object *o)
                 }
                 if (none) {
                     OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-                    g_pointerHoverUid = o->uid;
+                    g_pointerHoverUid = u;
                 }
             }
             return 0;
@@ -17278,10 +17280,6 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
  * register first. Same bit.
  *
  * Not exercised -- no drive installs a pointer mode above 0. */
-/* Compiled for size: the image's copy of this function is the /Os shape (a number win, 50 -> 34). */
-#ifdef _MSC_VER
-#pragma optimize("s", on)
-#endif
 int32_t __cdecl PointerPickMode6(AM2_Object *o)
 {
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
@@ -17416,8 +17414,23 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
             AIM_HINT();
         }
 
+        /* The second copy of the hint is written out rather than expanded:
+         * VC6 gives the image's return after it an epilogue of its own
+         * only when that statement is a label, and the label is used by
+         * nothing (so it is VC6's alone, not GCC's -Wunused-label). */
         weapon = WeaponByUid(leader->inventory[leader->inventorySel]);
-        AIM_HINT();
+        if (!weapon)
+            return 0;
+        if (ApproxDist(&leader->pos, &o->pos)
+            > weapon->typeRec->range
+              * g_weaponRangeK3)
+            return 0;
+        OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
+        g_pointerHoverUid = o->uid;
+#ifdef _MSC_VER
+    hintEnd:
+#endif
+        return 0;
 #undef AIM_HINT
     }
     return PointerFriendTail(o, tailUid);
