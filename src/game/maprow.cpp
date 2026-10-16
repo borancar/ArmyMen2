@@ -1121,7 +1121,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
      * emits setl and still lowers the function's distance through the registers
      * and slots it shifts, so it is a number win and not a recovered shape. */
     cl = cl < 0 ? 0 : cl;
-    ct = ct <= 0 ? 0 : ct;
+    ct = ct < 1 ? 0 : ct;
     if (cr >= desc->cols - 1)
         cr = desc->cols - 1;
     if (cb >= desc->cols - 1)          /* COLS, not ROWS -- see above */

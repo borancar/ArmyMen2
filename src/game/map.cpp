@@ -1847,7 +1847,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
      * sight scan then iterated in a different order and diverged. */
     if (objCount > 0 && objs != 0) {
     if (g_loadPending == 0)
-        for (i = 0; i < objCount; i++) {
+        for (i = 0; objCount > i; i++) {
             AM2_MapRec *r     = &objs[i];
             int32_t   army;
             int32_t   flags = 0;
@@ -1878,7 +1878,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                                  at, flags, 1, 0);
                 /* No null test of its own: ObjIsWatchedKind answers 0 for one. */
                 if (ObjIsWatchedKind((const AM2_Object *)obj)
-                    && (int32_t)g_defaultOwner != army)
+                    && (int32_t)(g_defaultOwner - army))
                     ObjConceal((AM2_Object *)obj, 1);
                 /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL
                  * below, exactly as the original does (0x0042D1C3 jmps to the
