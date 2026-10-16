@@ -2616,6 +2616,45 @@ static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t wi
  *
  * Its OverlayPrepare force flag is 0 here where PointerPickBoard passes 1 for
  * the same row. Reproduced; nothing here says why they differ. */
+/* Mode 6's copy of the friend tail: the image reads the hover uid from the
+ * object after the board-hint call instead of taking it as a value read at
+ * the top. */
+static inline int32_t PointerFriendTailLate(AM2_Object *o)
+{
+    if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
+        if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
+            int32_t i;
+            int32_t none = 1;
+
+            if (!g_mouseButton
+                || GetTickCount()
+                       - g_mousePressMs
+                   < AM2_CLICK_MS) {
+                for (i = 0; i < g_selectedCount;
+                     i++) {
+                    const AM2_Object *sel = LookupByUID(g_selectedItems[i]);
+
+                    if (ObjIsType3Inline(sel)
+                        && (sel->flags & OBJ_FLAG_SELECTED))
+                        none = 0;
+                }
+                if (none) {
+                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                    g_pointerHoverUid = o->uid;
+                }
+            }
+            return 0;
+        }
+
+        if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
+            && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
+                || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
+            && !o->field94)
+            return 1;
+    }
+    return 0;
+}
+
 static inline int32_t PointerFriendTail(AM2_Object *o, uint32_t uid)
 {
     if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
@@ -17247,7 +17286,7 @@ int32_t __cdecl PointerPickMode6(AM2_Object *o)
 {
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         && o->health != 0)
-        return PointerFriendTail(o, o->uid);
+        return PointerFriendTailLate(o);
     return 0;
 }
 #ifdef _MSC_VER

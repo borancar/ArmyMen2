@@ -3328,7 +3328,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         && ob->moveCount > 0
         && (int32_t)ob->moveAt
            < (int32_t)ob->moveCount - 1)
-        goto after_region;
+        goto walk;
 
     fromTile   = TileOfPoint(*pos);
     fromRegion = g_regionOfCell[(uint32_t)fromTile & 0xFFFFu];
