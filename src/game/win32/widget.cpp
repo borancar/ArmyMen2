@@ -17236,6 +17236,10 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
  * register first. Same bit.
  *
  * Not exercised -- no drive installs a pointer mode above 0. */
+/* Compiled for size: the image's copy of this function is the /Os shape (a number win, 50 -> 34). */
+#ifdef _MSC_VER
+#pragma optimize("s", on)
+#endif
 int32_t __cdecl PointerPickMode6(AM2_Object *o)
 {
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
@@ -17243,6 +17247,9 @@ int32_t __cdecl PointerPickMode6(AM2_Object *o)
         return PointerFriendTail(o, o->uid);
     return 0;
 }
+#ifdef _MSC_VER
+#pragma optimize("", on)
+#endif
 
 /* PointerPickMode0 -- original 0x00459420, 912 bytes, the PICK of pointer mode
  * 0 -- the DEFAULT mode, and the only one in this family a drive reaches.
