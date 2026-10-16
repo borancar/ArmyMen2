@@ -2623,28 +2623,21 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     AM2_Rect       *box   = &out->box;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 g_bitFromN;
-    const AM2_ObjMask *m;
     const uint8_t  *bits;
     const AM2_Sprite *spr;
     int32_t         ox;
-    int32_t         oy;
-    AM2_Rect        world;          /* the clamped world box */
-    AM2_Rect        tile;           /* the same in tiles, before the margin */
+    struct { int32_t marked; int32_t col; int32_t y; int32_t rowbytes; const AM2_ObjMask *m; int32_t oy; int32_t tilew; int32_t end; AM2_Rect world; AM2_Rect tile; } f;
     int32_t         w;
-    int32_t         rowbits;
-    int32_t         rowbytes;
+    int16_t         rowbits;
     int32_t         splitOdd;
     int32_t         phase;
     int32_t         k;
-    int32_t         tilew;
-    int32_t         y;              /* a pixel row; as a word it costs a movsx the image does not have */
-    int32_t         marked = 0;
 
-    /* The address-of that cannot be null -- see above. */
-    m = &h->mask;
-    if (!m)
+    f.marked = 0;
+    f.m = &h->mask;
+    if (!f.m)
         return 0;
-    bits = m->bits;
+    bits = f.m->bits;
     if (!bits)
         return 0;
 
@@ -2652,37 +2645,37 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 
     ox = at.x
          - spr->hotX;
-    oy = at.y
+    f.oy = at.y
          - spr->hotY;
 
 
-    world.left = Clamp(m->originX + ox, 1 << AM2_TILE_SHIFT,
+    f.world.left = Clamp(f.m->originX + ox, 1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.right = Clamp(m->width + m->originX + ox - 1,
+    f.world.right = Clamp(f.m->width + f.m->originX + ox - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentX
                    - (1 << AM2_TILE_SHIFT));
-    world.top = Clamp(m->originY + oy, 1 << AM2_TILE_SHIFT,
+    f.world.top = Clamp(f.m->originY + f.oy, 1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
-    world.bottom = Clamp(m->height + m->originY + oy - 1,
+    f.world.bottom = Clamp(f.m->height + f.m->originY + f.oy - 1,
                1 << AM2_TILE_SHIFT,
                g_mapExtentY
                    - (1 << AM2_TILE_SHIFT));
 
-    tile.left = Clamp(world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.left = Clamp(f.world.left >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tile.right = Clamp(world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.right = Clamp(f.world.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesW - AM2_TILEMASK_MARGIN);
-    tile.top = Clamp(world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.top = Clamp(f.world.top >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    tile.bottom = Clamp(world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    f.tile.bottom = Clamp(f.world.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
                g_mapTilesH - AM2_TILEMASK_MARGIN);
-    box->right = tile.right + AM2_TILEMASK_MARGIN;
-    box->left = tile.left - AM2_TILEMASK_MARGIN;
-    box->bottom = tile.bottom + AM2_TILEMASK_MARGIN;   /* right, left, bottom, top: the image's order */
-    box->top = tile.top - AM2_TILEMASK_MARGIN;
+    box->right = f.tile.right + AM2_TILEMASK_MARGIN;
+    box->left = f.tile.left - AM2_TILEMASK_MARGIN;
+    box->bottom = f.tile.bottom + AM2_TILEMASK_MARGIN;   /* right, left, bottom, top: the image's order */
+    box->top = f.tile.top - AM2_TILEMASK_MARGIN;
 
     memset(out->cells, 0,
            (size_t)((box->bottom - box->top + 1) * (box->right - box->left + 1)));
@@ -2691,9 +2684,9 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     g_tilemaskNeighbours[8]  = -2;
     g_tilemaskNeighbours[14] = w;
     g_tilemaskNeighbours[9]  = -1;
-    g_tilemaskNeighbours[10] = 1;
     g_tilemaskNeighbours[18] = 2 * w;
     g_tilemaskNeighbours[0]  = -2 * w - 1;
+    g_tilemaskNeighbours[10] = 1;
     g_tilemaskNeighbours[1]  = -2 * w;
     g_tilemaskNeighbours[11] = 2;
     g_tilemaskNeighbours[2]  = -2 * w + 1;
@@ -2709,14 +2702,14 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     g_tilemaskNeighbours[17] = 2 * w - 1;
     g_tilemaskNeighbours[19] = 2 * w + 1;
 
-    tilew = tile.right - tile.left + 1;
+    f.tilew = f.tile.right - f.tile.left + 1;
 
-    rowbits  = (world.right - world.left) + 31 - ((world.right - world.left + 31) % 32);
-    rowbytes = rowbits >> 3;
+    rowbits  = (f.world.right - f.world.left) + 31 - ((f.world.right - f.world.left + 31) % 32);
+    f.rowbytes = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
-    phase = world.left & ((1 << AM2_TILE_SHIFT) - 1);
+    phase = f.world.left % (1 << AM2_TILE_SHIFT);
     if (phase >= 8) {
         splitOdd = 0;
         k        = (1 << AM2_TILE_SHIFT) - phase;
@@ -2725,11 +2718,11 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         k        = 8 - phase;
     }
 
-    for (y = world.top; y < world.bottom; y += 8) {
-        int32_t off = (y - m->originY - oy) * rowbytes;
-        int16_t end = off + rowbytes;     /* a number win: a mask row offset fits 16 bits */
-        int32_t col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - box->top) * w
+    for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
+        int32_t off = (f.y - f.m->originY - f.oy) * f.rowbytes;
+        f.end = off + f.rowbytes;
+        f.col = AM2_TILEMASK_MARGIN;
+        uint8_t *c   = out->cells + ((f.y >> AM2_TILE_SHIFT) - box->top) * (box->right - box->left + 1)
                              + AM2_TILEMASK_MARGIN;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
@@ -2738,29 +2731,26 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
             if (splitOdd == off % 2) {
                 if (bits[off] & tab[k]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    marked = 1;
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
                 }
 
-                col++;
+                f.col++;
                 c++;
-                if (col - AM2_TILEMASK_MARGIN == tilew)
+                if (f.col == f.tilew + AM2_TILEMASK_MARGIN)
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    marked = 1;
-                    MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
                 }
             } else if (bits[off]) {
                 *c |= AM2_TILEMASK_BOX_CELL;
-                marked = 1;
-                MarkTileRingIdx(out, g_tilemaskNeighbours, (int32_t)(c - out->cells));
+                MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
             }
-        } while (++off < end);
+        } while (++off < f.end);
     }
 
-    return marked;
+    return f.marked;
 }
 
 /* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
