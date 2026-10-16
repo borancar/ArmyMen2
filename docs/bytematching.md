@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1599 of 1646 functions
-byte-identical, 47 differing, 5,044 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1600 of 1646 functions
+byte-identical, 46 differing, 5,034 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -227,6 +227,17 @@ Even then a clone's differing-line count is not a proxy for the relink distance
 stores the original truncated to our length, so return counts read from it are wrong: read the
 image. `sweep2` prints `FUNCTION-MISSING` for a VC6 compile failure, and its replace-all hits
 every copy of the same text, so anchor each edit with unique context.
+
+**The IL probe found its first win (2026-10-16, MovieStart 10 -> 0).** `VC6_KEEPTMP=1` keeps c1xx's
+IL and `VC6_IL_OVERRIDE=DIR` feeds c2 edited IL. Reading the kept IL shows which temporaries
+c1xx made and which c2 then coalesced: for `delete g` it makes `e2 = g; e3 = e2; (e3 != 0) &&
+??_G(e3, 1)`, and c2 folds the three into one callee-saved web (`mov esi,[g]; test esi,esi;
+je; mov ecx,esi`). The image instead has the destructor argument as a scratch CSE of the
+global read and the free argument as a separate temp copied BEFORE the test, which in source
+is `m = g; if (g) { g->~T(); operator delete(m); }`. Editing the IL until the code matches
+tells you the shape; then find the spelling. Every single-value spelling (local copy, two
+locals, `if (g) delete g`, casts, volatile) compiles to the same code. The IL format notes are
+in the memory file `vc6-il-override`.
 
 ## Pitfalls
 

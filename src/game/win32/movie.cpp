@@ -301,7 +301,17 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
         if (!movie->timerId) {
             /* No timer, so no movie. Tear it down and let the game carry
              * on. */
-            delete g_movieCurrent;
+            {
+                /* A number win: the image copies the pointer for the free
+                 * before the test and calls the destructor on a second read
+                 * of the global, which is what `delete` alone does not give. */
+                AM2_Movie *m = g_movieCurrent;
+
+                if (g_movieCurrent) {
+                    g_movieCurrent->~AM2_Movie();
+                    operator delete(m);
+                }
+            }
             g_movieCurrent = NULL;
             PostMessageA((HWND)g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
             return 0;
