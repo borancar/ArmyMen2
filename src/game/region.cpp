@@ -2119,19 +2119,26 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
     for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
         int32_t off = (f.y - f.m->originY - obj->hit.top) * f.rowbytes;
-        f.end = off + f.rowbytes;
-        f.col = AM2_TILEMASK_MARGIN;
         uint8_t *c  = out->cells + ((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                             + AM2_TILEMASK_MARGIN;
+        f.col = AM2_TILEMASK_MARGIN;
+        f.end = off + f.rowbytes;
+        if (rowbits == 0)
+            return 0;
 
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
+            /* A number win: a named local defined inside the do-loop is hoisted by VC6 to the loop's
+             * preheader (the image's per-row `-0x10 - out` in ebx) without becoming an induction
+             * variable, which leaves `marked` in memory; the redundant `rowbits == 0` guard in the row
+             * body is what keeps the hoist from leaving the row loop. */
+            int32_t bias = (int32_t)(0xFFFFFFF0u - (uint32_t)(uintptr_t)out);
             if (f.splitOdd == off % 2) {
                 if (f.bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k]) {
+                    f.marked = 1;
+                    int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    /* The ring before the flag in this arm only, which is
-                     * the order the image stores them. */
-                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
 
                 f.col++;
@@ -2140,12 +2147,16 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
                     break;
 
                 if (f.bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
+                    f.marked = 1;
+                    int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
             } else if (f.bits[off]) {
+                f.marked = 1;
+                int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                 *c |= AM2_TILEMASK_BOX_CELL;
-                MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                MarkTileRingIdx(out, g_tilemaskNeighbours, at);
             }
         } while (++off < f.end);
     }
@@ -2628,7 +2639,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     int32_t         ox;
     struct { int32_t marked; int32_t col; int32_t y; int32_t rowbytes; const AM2_ObjMask *m; int32_t oy; int32_t tilew; int32_t end; AM2_Rect world; AM2_Rect tile; } f;
     int32_t         w;
-    int16_t         rowbits;
+    int32_t         rowbits;
     int32_t         splitOdd;
     int32_t         phase;
     int32_t         k;
@@ -2718,20 +2729,26 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         k        = 8 - phase;
     }
 
-    for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
+    const AM2_Rect *wr = &f.world;
+    for (f.y = wr->top; f.y < f.world.bottom; f.y += 8) {
         int32_t off = (f.y - f.m->originY - f.oy) * f.rowbytes;
-        f.end = off + f.rowbytes;
         f.col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = out->cells + ((f.y >> AM2_TILE_SHIFT) - box->top) * (box->right - box->left + 1)
+        uint8_t *c   = out->cells + ((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                              + AM2_TILEMASK_MARGIN;
+        f.end = off + f.rowbytes;
+        if (rowbits == 0)
+            return 0;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
          * multiple of 32 here, so every row has bytes to walk. */
         do {
+            int32_t bias = (int32_t)(0xFFFFFFF0u - (uint32_t)(uintptr_t)out);
             if (splitOdd == off % 2) {
                 if (bits[off] & tab[k]) {
+                    f.marked = 1;
+                    int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
 
                 f.col++;
@@ -2740,12 +2757,16 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                     break;
 
                 if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                    f.marked = 1;
+                    int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
-                    MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                    MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
             } else if (bits[off]) {
+                f.marked = 1;
+                int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                 *c |= AM2_TILEMASK_BOX_CELL;
-                MarkTileRingFlag(out, g_tilemaskNeighbours, (int32_t)(c - out->cells), &f.marked);
+                MarkTileRingIdx(out, g_tilemaskNeighbours, at);
             }
         } while (++off < f.end);
     }
