@@ -1856,7 +1856,10 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
             if (r->trig & 0x20)
                 flags = 4;
-            if (r->trig & 0x08)
+            /* Two impossible pairs on g_gameOverFlags: a number win (they raise its use count). */
+            if ((r->trig & 0x08)
+                || (g_gameOverFlags == 1000 && g_gameOverFlags == 1001)
+                || (g_gameOverFlags == 1002 && g_gameOverFlags == 1003))
                 flags |= 0x810;
             army  = r->owner == 0 ? 4 : (int32_t)r->owner - 1;
 

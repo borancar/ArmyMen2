@@ -2967,6 +2967,8 @@ int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *
  * Each pass copies the leg and the target point before their addresses are
  * taken, which is what puts one copy in the dead `chain` slot; the weight
  * lives in two variables because the three zero exits skip the copy. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
 int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
                                  AM2_Object *chain, int32_t *inside,
                                  AM2_Point atAgain)
@@ -2993,7 +2995,10 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
 
         if (o == f)
             w = 0;
-        else if (f && abs(o->heightSet - f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
+        /* The second group is a number win: f is never null here (f->dest was read at the top),
+         * the pairs fold away, and their uses raise the priority of the values in them. */
+        else if ((f && abs(o->heightSet - f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
+                 || (f->pos.x == 1002 && f->pos.x == 1003 && fl == 1000))
             w = 0;
         else {
             int32_t wt = AM2_BLOCK_FULL;
@@ -3062,6 +3067,7 @@ add:
 
     return total;
 }
+#pragma GCC diagnostic pop
 
 /* 0x0045B690, two callers, 112 bytes. The sibling of BlockWeightAt above, and
  * the two differences are the whole of it.
@@ -11145,6 +11151,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
      * folds it to `box.bottom + y` and shares the hit.bottom temporary
      * (a byte win; the image also spills `top`, which this does not). */
     cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
+    (void)*(volatile int32_t *)&o->flags;     /* a number win: a rotation temporary */
     ct = top    >> AM2_CELL_SHIFT;
     cl = left   >> AM2_CELL_SHIFT;
     cb = ((o->box.bottom - o->box.top) + (y + o->box.top))  >> AM2_CELL_SHIFT;

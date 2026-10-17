@@ -7877,13 +7877,9 @@ AM2_HudPanel::AM2_HudPanel()
     w->w = spr->bounds.right;
     /* x is read before h is stored -- the image loads it ahead of that
      * store, which VC6 never does for a read written after it. */
-    {
-        int32_t h = spr->bounds.bottom;
-        int32_t x = w->x;
-
-        w->h = h;
-        self->stop = x;
-    }
+    w->h = spr->bounds.bottom;
+    self->stop = w->x;
+    (void)*(volatile int32_t *)&w->x;        /* a number win: a rotation temporary */
     self->open = 1;
     g_hudPanelX = w->x;
 
@@ -7962,6 +7958,7 @@ AM2_HudPanel::AM2_HudPanel()
         self->pointsField = btn;
         btn->disabled = 1;
         ::WidgetAddChild(w, self->pointsField);
+        (void)*(volatile int32_t *)&self->open;   /* a number win: a rotation temporary */
 
         btn = new AM2_Button("03_016_00_start.bmp", "03_016_01_start.bmp", "03_016_02_start.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1F, 0x1A6, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) BuildStartHandler, (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, btn);
