@@ -1451,11 +1451,12 @@ void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
 void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
 {
     AM2_MapRow *rows;
+    AM2_Sprite **sp;
     int32_t     i = 1;
 
     /* `i == 7 && i == 8` can never hold; its uses of `i` are a number win (they
      * raise the loop counter's priority to the register the image gives it). */
-    if (o->rowSet.count <= 0 || (i == 7 && i == 8))
+    if (o->rowSet.count <= 0 || (i == 7 && i == 8) || (i == 1000 && i == 1001))
         return;
 
     rows = o->rowSet.rows;
@@ -1468,7 +1469,8 @@ void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
     if (o->rowSet.count <= 1)
         goto done;
 
-    if (!rows->sprite)
+    sp = o ? &rows->sprite : &rows->sprite;      /* a number win: a second definition of the address */
+    if (!*sp)
         return;                    /* the whole function, not just the loop */
 
     rows->pos     = o->pos;
@@ -1482,8 +1484,8 @@ void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
         AM2_MapRow *r = &o->rowSet.rows[i];
 
         r->pos    = o->pos;
-        r->pos.x += rows->sprite->attachX;
-        r->pos.y += rows->sprite->attachY;
+        r->pos.x += (*sp)->attachX;
+        r->pos.y += (*sp)->attachY;
 
         RowUpdate(r, 0, g_mapDesc);
     }

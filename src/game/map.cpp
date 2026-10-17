@@ -1769,7 +1769,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     }
                     r->trig = (uint8_t)trig;
                     r->field11 = 0;
-                    r->numb = (int8_t)numb;
+                    *(volatile int8_t *)&r->numb = (int8_t)numb;   /* a number win */
 
                     if (strlen(scri) != 0) {
                         r->script =
@@ -1811,7 +1811,12 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         uint8_t **slot = g_tileRevealGrids;
 
         while ((intptr_t)slot < (intptr_t)&g_tileCover) {
-            DEFAULT_LAYER(*slot);
+            /* DEFAULT_LAYER written out with a volatile pointer store: a number win (the image
+             * stores the pointer before it reloads the map size). */
+            if (*slot == 0) {
+                *(void *volatile *)slot = am2_malloc(g_mapTilesW * g_mapTilesH);
+                memset(*slot, 0, g_mapTilesW * g_mapTilesH);
+            }
             slot++;
         }
     }
