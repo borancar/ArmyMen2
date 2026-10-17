@@ -1648,6 +1648,7 @@ void __cdecl Update3DAudioVolumes(void)
         IDirectSoundBuffer_GetStatus(buf, &status);
         if (status & DSBSTATUS_PLAYING) {
             where = g_zeroPoint;
+            (void)*(volatile int32_t *)&g_dynamic[i]->buffer;   /* a number win: a rotation temporary */
             if (g_dynamic[i]->owner) {
                 obj = LookupByUID(g_dynamic[i]->owner);
                 if (!obj) {
