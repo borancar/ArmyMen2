@@ -2877,7 +2877,7 @@ triggers_done:
      * control character -- goes straight to binding the name and is never
      * finalised: both of those paths land on 0x00444842, past the call. */
     if (*at != ctx->count &&
-        ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR) {
+        (ctx->tokens[*at].kind - AM2_TOKEN_CONTROL_CHAR) == 0) {
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_GT: g_pads[g_padCount].compare = AM2_PADCMP_GT; break;       /* '>' */
         case AM2_TOK_EQ: g_pads[g_padCount].compare = AM2_PADCMP_EQ; break;       /* '=' */

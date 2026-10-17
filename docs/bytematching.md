@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1609 of 1646 functions
-byte-identical, 37 differing, 3,264 bytes of total edit distance. The live
+byte-identical, 37 differing, 3,258 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -246,6 +246,13 @@ the loops' weight (2^depth) and it takes the first register. Declaring a distinc
 and assigning the shared one only when the loop finds its match gives two webs. DepthInsert also
 needed a count local read once at the top and re-read after each compare call, and a flags local
 read once (`f = obj->flags`), which is what puts the flags dword in ecx.
+
+**Jump tables flatter the metric.** A function with a jump table after its `ret` (Step3Drive, HudSquadUpdate)
+holds absolute label addresses there, so a 4-byte change in the function's length shifts about 70 bytes of table
+data and a few displacement bytes. An edit that lengthens the function can print a lower distance and score the
+same or worse against the full image (HudSquadUpdate 176 -> 172, 181 -> 181). Judge any length-changing edit against
+the full image, and never accept a narrowing of a 32-bit uid or of a field (`approach` holds 2 for a roach) because
+it scores well.
 
 ## Pitfalls
 
