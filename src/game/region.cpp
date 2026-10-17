@@ -4856,12 +4856,12 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
          * into the scoring block that follows the if/else. */
         if (!ObjsAreAllied(o, keep, 0)) {
             if (IsKind7(keep)) {
+                pick.cand        = keep;
                 pick.bearing = AngleBetween(&o->pos,
                                            &keep->pos);
-                pick.range   = AM2_SIGHT_KIND7_RANGE;
-                pick.cand        = keep;
-                if (!pick.cand)
+                if (!keep)
                     goto next;
+                pick.range   = AM2_SIGHT_KIND7_RANGE;
                 ++*nOther;
                 ++o->fieldF4;
                 (void)AngleDelta(hold.facing, pick.bearing);
