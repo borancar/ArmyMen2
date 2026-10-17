@@ -3111,7 +3111,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, na, nb, nc);
-            if (ctx->count <= *at) {
+            if (*at - ctx->count >= 0) {
                 am2_log("Unexpected end of script.\n");
                 return 0;
             }
