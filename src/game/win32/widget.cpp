@@ -6107,6 +6107,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
         if (obj->flags & OBJ_FLAG_DESTROYED)
             goto next;
+        (void)*(volatile int32_t *)&i;    /* a number win: a dead read that takes the loop counter's address */
 
         if (ObjIsTypeIn238(obj) && obj->field94)
             goto next;
@@ -9624,6 +9625,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                     SelectLevel(lvl);
             }
         }
+        (void)*(volatile int32_t *)&g_nameTableCount;   /* a number win: a rotation temporary */
 
         *slot = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x154, 0xAD, 0xF6, 0x48), rows,
                                 (int32_t)(uintptr_t)OnMpMapPick, 0, 1);
