@@ -1140,17 +1140,19 @@ fail:
 /* ScriptParseEvent: one `case` per event keyword, each written out in full
  * as the image has them -- the five `<verb> <target> [by <target>]` events and
  * the two pad events differ only in the kind they record and the messages
- * they print, which is what the macros carry. The pad macro tests the token
- * kind as a difference, not a `!=`: a number win, it makes VC6 load the kind
- * into a register first, as the image does. */
-#define PAD_EVENT(K, NO_NAME, NOT_A_PAD)                                    \
+ * they print, which is what the macros carry. The pad macro takes its token
+ * kind test as an argument: PADON writes `!=` and PADOFF a difference, a
+ * number win per arm (the difference makes VC6 load the kind into a register
+ * first, as the image does; `!=` in both arms makes PADOFF a memory compare). */
+#define PAD_EVENT(K, NO_NAME, NOT_A_PAD, KTEST)                             \
     *kind = (K);                                                            \
     if (!ScriptStep(ctx, at))                                               \
         return 0;                                                           \
     tok = &ctx->tokens[*at];                                                \
-    if (tok->kind - AM2_TOKEN_STRING)                                       \
+    if (KTEST)                                                              \
         goto wrong_type;                                                    \
-    idx = ScriptFindName((const char *)tok->value);                         \
+    name = (const char *)tok->value;                                        \
+    idx = ScriptFindName(name);                                             \
     if (idx < 0) {                                                          \
         am2_log(NO_NAME, ctx->tokens[*at].line);                            \
         return 0;                                                           \
@@ -1187,6 +1189,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
 {
     AM2_ScriptTok *tok;
     int32_t        idx;
+    const char    *name;
 
     *val2 = 0;
 
@@ -1196,7 +1199,8 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
         case AM2_TOK_PADON:
             PAD_EVENT(AM2_EVT_PADON,
                       "Line [%4d]:  Name required after PADON\n",
-                      "Line [%4d]:  PADON name was not a pad\n");
+                      "Line [%4d]:  PADON name was not a pad\n",
+                      tok->kind != AM2_TOKEN_STRING);
         pad_found:
             /* The two pad events share this tail. */
             *val = kScriptNames[idx].value;
@@ -1205,7 +1209,8 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
         case AM2_TOK_PADOFF:
             PAD_EVENT(AM2_EVT_PADOFF,
                       "Line [%4d]:  Name required after PADOFF\n",
-                      "Line [%4d]:  PADOFF name was not a pad\n");
+                      "Line [%4d]:  PADOFF name was not a pad\n",
+                      tok->kind - AM2_TOKEN_STRING);
             goto pad_found;
         case AM2_TOK_KILLED:
             HIT_EVENT(AM2_EVT_KILLED,

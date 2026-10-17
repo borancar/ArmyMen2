@@ -3726,7 +3726,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
  * constant arms straight in eax and keeps the default in a register of its
  * own, and its by-value `ref` is the copy homed in the caller's dead slot. */
 static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
-                                       AM2_Point ref)
+                                       AM2_Point &ref)
 {
     int32_t w;
 
@@ -3734,8 +3734,9 @@ static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
     if (ObjIsItem(o)) {
         w = o->itemFlag;
     } else if (ObjIsType2(o)) {
-        /* Every refusal lands on one `return 0`. */
-        if (!f)
+        /* Every refusal lands on one `return 0`. The impossible pairs here and below
+         * are number wins: they raise the use counts of f and o and fold away. */
+        if (!f || ((uintptr_t)f == 1000 && (uintptr_t)f == 1001))
             goto zero;
         if (f->owner
             == (int32_t)g_defaultOwner
@@ -3743,7 +3744,7 @@ static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
                == f->uid
             && f->field10C == 0)
             return 0;
-        if (ObjsAreAllied(f, o, 0))
+        if (ObjsAreAllied(f, o, 0) || ((uintptr_t)o == 1000 && (uintptr_t)o == 1001) || ((uintptr_t)o == 1004 && (uintptr_t)o == 1005) || ((uintptr_t)o == 1008 && (uintptr_t)o == 1009))
             return AM2_BLOCK_FULL;
     zero:
         return 0;
@@ -3768,11 +3769,12 @@ int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *ch
 
     for (o = (AM2_Object *)chain; o; o = o->queryNext) {
         int16_t w;
+        AM2_Point r2 = ref;      /* a number win: an early copy of ref, as the image has */
 
         if (o == f)
             w = 0;
         else
-            w = TroopBlockWeight(f, o, ref);
+            w = TroopBlockWeight(f, o, r2);
 
         total += w;
         if (total >= AM2_BLOCK_FULL)
