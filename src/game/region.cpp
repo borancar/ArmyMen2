@@ -7780,30 +7780,25 @@ sweep:
          * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
         if (ObjKind538In10To17(o)) {
             /* A number win: the image reloads `out` from its argument slot for the
-             * bearing stores while state and hit go through a register. */
-            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
+             * bearing stores while state and hit go through a register. The three
+             * later arms have identical bodies, as the image has them. */
+            AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
+            s->bearing = facing;
             turned = 1;
         } else if (out->hit) {
-            /* Three arms with one body, written out three times as the
-             * image has them -- one `||` test gives one copy and moves the
-             * whole chain ahead of the sweep. The statements are in a
-             * different order in each: written alike, VC6 merges the
-             * first two into one copy, which the image keeps apart. */
-            AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
             out->state = 1;
             turned = 1;
-            s->bearing = facing;
+            (*(AM2_SightOut *volatile *)&out)->bearing = facing;
         } else if (!found) {
-            out->state   = 1;
-            turned       = 1;
-            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
+            out->state = 1;
+            turned = 1;
+            (*(AM2_SightOut *volatile *)&out)->bearing = facing;
         } else if (g_mpSession
                    && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
                    && ObjType2Field548(o)) {
-            AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
             out->state = 1;
-            s->bearing = facing;
             turned = 1;
+            (*(AM2_SightOut *volatile *)&out)->bearing = facing;
         } else {
             goto sweep;
         }
@@ -7930,8 +7925,8 @@ settle_facing:
                         if (!old) {
                             want = at->ammo;
                         } else {
-                            had = old->ammo;
                             want = cap - old->ammo;
+                            had = old->ammo;
                         }
                     }
 
