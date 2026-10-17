@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1609 of 1646 functions
-byte-identical, 37 differing, 3,242 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1612 of 1646 functions
+byte-identical, 34 differing, 3,164 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -253,6 +253,15 @@ data and a few displacement bytes. An edit that lengthens the function can print
 same or worse against the full image (HudSquadUpdate 176 -> 172, 181 -> 181). Judge any length-changing edit against
 the full image, and never accept a narrowing of a 32-bit uid or of a field (`approach` holds 2 for a roach) because
 it scores well.
+
+**Impossible disjuncts as a register-priority lever (2026-10-17).** VC6 orders callee-saved registers by a
+weighted use count taken BEFORE common-subexpression elimination. `|| (v == 7 && v == 8)` on a variable `v` in a
+live condition adds uses of `v` and folds away entirely, so it changes which variable gets which register without
+changing the code. Use distinct constants in each pair (identical pairs are merged and add nothing), keep it in a
+condition that is really evaluated (a standalone dead `if` is removed before counting), and give the variable an
+initialiser if the extra uses would otherwise read it unassigned. DrawMapObjects (18 -> 0) needed four pairs on
+`bottom`; AirFrameDraw (44 -> 0) replaced a guard that was itself a number win; PointActionC (30 -> 24) used the loop
+counter. Every use is a number win and is commented as one in the source.
 
 ## Pitfalls
 

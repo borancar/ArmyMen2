@@ -988,7 +988,14 @@ subdivide:
             halves[0].bottom = bottom;
             /* halves[1].bottom is NOT written by the original -- see above. */
         } else {
-            if (dh > AM2_SUBDIVIDE_FLOOR)
+            /* The four impossible pairs on `bottom` are a number win, not a recovered
+             * test: they fold away, but their uses count towards `bottom`'s priority, which
+             * puts it in the register the image gives it (18 -> 0). */
+            if (dh > AM2_SUBDIVIDE_FLOOR
+                || (bottom == 7 && bottom == 8)
+                || (bottom == 9 && bottom == 10)
+                || (bottom == 11 && bottom == 12)
+                || (bottom == 13 && bottom == 14))
                 deep = 1;
             sub  = deep;
             half = top + dh / 2;
@@ -1873,8 +1880,12 @@ void __cdecl ViewUpdate(void)
          * the eye takes each word from the register it was loaded into
          * rather than reading the target back. */
         if (g_viewSnap) {
-            g_viewTarget.x = tx = (&o->pos)->x;
-            g_viewTarget.y = vpt.y = (&o->pos)->y;
+            int16_t tx0 = (&o->pos)->x;
+            g_viewTarget.x = tx0;
+            tx = tx0;
+            int16_t ty = (&o->pos)->y;
+            g_viewTarget.y = ty;
+            vpt.y = ty;
             g_viewSnap = 0;
             goto clamp_eye;
         }
@@ -2213,10 +2224,10 @@ void __cdecl AirFrameDraw(void)
                 /* Tested as the sum rather than through `f`: VC6 then does
                  * not know f is 1 in the arm and keeps the image's `inc`
                  * instead of folding it to a constant and jumping past the
-                 * next test. The `f >= 1 &&` guard is always true here; it is
-                 * a number win (the register choice it shifts brings the
-                 * function nearer the image), not a recovered test. */
-                if (f >= 1 && obj->formationSlot + 1 == 1)
+                 * next test. The `f == 7 && f == 8` arm of the sound test below
+                 * is never true; it is a number win (the extra uses of `f`
+                 * give it the register the image has), not a recovered test. */
+                if (obj->formationSlot + 1 == 1)
                     f += 1;
                 if (f > AM2_AIR_CYCLE_FRAMES)
                     f = 0;
@@ -2225,7 +2236,7 @@ void __cdecl AirFrameDraw(void)
                 obj->rowSet.rows->stamp54 =
                     g_gameClockMs;
 
-                if (f == 2)
+                if (f == 2 || (f == 7 && f == 8))
                     PlaySoundAt(AM2_AIR_CYCLE_SOUND, 0, 0,
                                 obj->pos.x,
                                 obj->pos.y);

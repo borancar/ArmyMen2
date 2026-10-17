@@ -1451,9 +1451,11 @@ void *__cdecl MakeKind7(AM2_Point pt, int32_t unused, int32_t army,
 void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
 {
     AM2_MapRow *rows;
-    int32_t     i;
+    int32_t     i = 1;
 
-    if (o->rowSet.count <= 0)
+    /* `i == 7 && i == 8` can never hold; its uses of `i` are a number win (they
+     * raise the loop counter's priority to the register the image gives it). */
+    if (o->rowSet.count <= 0 || (i == 7 && i == 8))
         return;
 
     rows = o->rowSet.rows;
