@@ -9761,6 +9761,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
          * goes straight to the step below. */
         if (r->state != 1) {
             AM2_Point target;
+            /* The speed the ramp wants, before the limiter below settles
+             * what `speed` itself becomes: a separate variable, so only
+             * the limiter's join and the stuck arms write the frame slot. */
+            int32_t want;
             /* The frame's target: the next waypoint if one is pending,
              * otherwise the standing destination at +0xC0. */
             if (o->moveAt
@@ -9781,7 +9785,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     r->field0C = 1;
             }
 
-            speed = r->field0C != 0
+            want = r->field0C != 0
                         ? o->field55C
                         : o->field558;
 
@@ -9793,7 +9797,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             else
                 r->stop = 0;
 
-            MoveStepPoint(o, facing, 0, speed, 0, 0, &step);
+            MoveStepPoint(o, facing, 0, want, 0, 0, &step);
 
             if (!noTarget
                 && (uint16_t)o->fieldC0 == (uint16_t)target.x
@@ -9807,9 +9811,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                     r->approach = 1;
             }
 
-            /* Two halvings as one shift by 0, 1 or 2: a number win, the sum of byte-wide
-               flags keeps the speed out of its stack slot between the two. */
-            speed >>= (uint8_t)(r->approach != 0) + (uint8_t)(r->stop);
+            if (r->approach != 0)
+                want >>= 1;
+            if (r->stop != 0)
+                want >>= 1;
 
             /* The acceleration limiter, and the two arms clamp from
              * OPPOSITE sides: slowing down takes the larger of the two,
@@ -9818,14 +9823,18 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 int32_t v = (int32_t)((float)o->field44
                                       - (float)o->accelRate
                                         * g_frameDeltaSec);
-                if (speed <= v)
+                if (want <= v)
                     speed = v;
+                else
+                    speed = want;
             } else {
                 int32_t v = (int32_t)((float)o->accelRate
                                         * g_frameDeltaSec
                                       + (float)o->field44);
-                if (speed >= v)
+                if (want >= v)
                     speed = v;
+                else
+                    speed = want;
             }
 
             /* +0xD8 counts consecutive blocked frames and scales the speed
@@ -9866,13 +9875,12 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             AM2_MapRow *turret = &o->rowSet.rows[1];
             int32_t  swing;
 
-            /* The new aim is held, stored, and used from the held copy, in
-             * one chained assignment; read back through `r` it leaves `speed`
-             * out of ebp, where the image keeps it across the function. */
-            uint8_t aim;
-
-            aim = r->aim = (uint8_t)(r->aim + turn);
-            swing = AngleDelta(o->turretFacing, aim);
+            /* The new aim is stored and passed in one chained assignment:
+             * a named local for it is spilled to a byte slot and reloaded,
+             * and read back through `r` it leaves `speed` out of ebp, where
+             * the image keeps it across the function. */
+            swing = AngleDelta(o->turretFacing,
+                               r->aim = (uint8_t)(r->aim + turn));
             swing = Clamp(swing, turn - 0x0F, turn + 0x0F);
 
             animRec = &turret->animPlaying;
