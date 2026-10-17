@@ -6107,7 +6107,6 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
         if (obj->flags & OBJ_FLAG_DESTROYED)
             goto next;
-        (void)*(volatile int32_t *)&i;    /* a number win: a dead read that takes the loop counter's address */
 
         if (ObjIsTypeIn238(obj) && obj->field94)
             goto next;
@@ -6121,6 +6120,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             sq->recs[slot].index = 0;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
             mh = SQUAD_MAXHP(obj);
+            (void)*(volatile int16_t *)&i;   /* a number win: a dead read that takes the loop counter's address */
             SQUAD_BAR(sq->recs[slot].barW, obj);
             if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 2)) {
                 sq->recs[slot].barColour = g_hudColour;

@@ -4988,7 +4988,7 @@ score:
                 stt.cand = w;
                 if (!w) {
                     keep->targetUid = 0;
-                    goto next;
+                    goto score;
                 }
                 if (w->health <= 0) {
                     keep->targetUid = 0;
@@ -5008,7 +5008,6 @@ score:
                 if (o->aiMode == 1
                     && pick.range > AM2_AI_PATROL_DETOUR)
                     goto next;
-                (void)*(volatile int32_t *)&stt.cand;
                 if (!stt.cand)
                     goto next;
                 goto score;
@@ -5053,6 +5052,7 @@ finish:
      * (null when there is neither); the image returns it from two
      * epilogues. */
     result = 0;
+    (void)*(volatile int32_t *)&stt.cand;   /* a number win: takes the candidate's address */
     if (hold.best) {
         AM2_Point anchor;
 
@@ -7626,8 +7626,10 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
 
     klass = ClassifyByCode74(o);
     /* A number win: two reaching definitions keep `pos` from being propagated away,
-     * which is how the image holds it in a register (one dead compare). */
-    pos = klass ? &o->pos : &o->pos;
+     * which is how the image holds it in a register. The second takes `pos`
+     * itself on one arm, so the branch folds and leaves no compare behind. */
+    pos = &o->pos;
+    pos = klass ? pos : &o->pos;
     stepPoint = *pos;
     if (!o->health)
         goto pose;
