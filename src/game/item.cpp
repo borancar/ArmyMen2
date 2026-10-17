@@ -2980,6 +2980,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
     int32_t     total = 0;
     AM2_Point   leg;
     int32_t     tile;
+    volatile int32_t d1;      /* a number win: stores the first distance straight to its slot */
     uint8_t     fl;
 
     *inside = 0;
@@ -2997,7 +2998,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
             w = 0;
         /* The second group is a number win: f is never null here (f->dest was read at the top),
          * the pairs fold away, and their uses raise the priority of the values in them. */
-        else if ((f && abs(o->heightSet - f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
+        else if ((f && abs(o->heightSet - (int8_t)*(volatile int8_t *)&f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
                  || (f->pos.x == 1002 && f->pos.x == 1003 && fl == 1000))
             w = 0;
         else {
@@ -3009,7 +3010,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
                     goto ask;
                 goto skip;
             } else if (f && ObjIsTypeIn238(o)
-                       && ApproxDist(&ap, &o->pos) > ApproxDist(&f->pos, &o->pos)) {
+                       && ApproxDist(&ap, &o->pos) > (d1 = ApproxDist(&f->pos, &o->pos))) {
                 w = 0;
                 goto add;
             }
