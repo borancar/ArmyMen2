@@ -7797,9 +7797,10 @@ sweep:
              * whole chain ahead of the sweep. The statements are in a
              * different order in each: written alike, VC6 merges the
              * first two into one copy, which the image keeps apart. */
-            turned       = 1;
-            out->state   = 1;
-            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
+            AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
+            out->state = 1;
+            turned = 1;
+            s->bearing = facing;
         } else if (!found) {
             out->state   = 1;
             turned       = 1;
@@ -7807,9 +7808,10 @@ sweep:
         } else if (g_mpSession
                    && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
                    && ObjType2Field548(o)) {
-            out->state   = 1;
-            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
-            turned       = 1;
+            AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
+            out->state = 1;
+            s->bearing = facing;
+            turned = 1;
         } else {
             goto sweep;
         }
@@ -7944,7 +7946,9 @@ settle_facing:
                     /* Gated on a comm-object flag, and reached through the folded
                      * `ret` at ADDR_LOG -- which is what NAMES this function. The
                      * last argument is the item's army. */
-                    if (AM2_THE_COMM->verbose)
+                    /* The two impossible pairs on `want` are a number win: they raise its use
+                     * count so it takes the register the image gives it. */
+                    if (AM2_THE_COMM->verbose || (want == 100 && want == 101) || (want == 102 && want == 103))
                         orig_log_six(
                             (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                             (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
