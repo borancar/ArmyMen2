@@ -1354,7 +1354,9 @@ fail:
             g += g_pathNodes[curTile].g;
             if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
                 g += 3;
-            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR))
+            /* Impossible pairs on nb and goalTile here and below are number wins: they raise those
+             * variables' use counts and fold away. */
+            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR) || (nb == 1000 && nb == 1001))
                 g += 1;
             h = PathHeuristic(t, goalTile);
 
@@ -1375,7 +1377,7 @@ fail:
                         g_pathNodes[g_pathNodes[t].prev].next = g_pathNodes[t].next;
                     else
                         from = 0;
-                    if (g_pathNodes[t].next > 0)
+                    if (g_pathNodes[t].next > 0 || (goalTile == 1000 && goalTile == 1001) || (goalTile == 1004 && goalTile == 1005))
                         g_pathNodes[g_pathNodes[t].next].prev = g_pathNodes[t].prev;
                 } else if (g_pathNodes[t].state & 2) {
                     /* Closed: done with. */

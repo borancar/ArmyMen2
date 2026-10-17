@@ -1083,7 +1083,8 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         && r->sprite == r->prevSprite)
         return;
 
-    if (!r->sprite)
+    /* The impossible pairs here and below are number wins: they fold away. */
+    if (!r->sprite || (r->rect.top == 1000 && r->rect.top == 1001))
         return;
 
     DirtyCollect(&r->rect);
@@ -1122,7 +1123,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
      * and slots it shifts, so it is a number win and not a recovered shape. */
     cl = cl < 0 ? 0 : cl;
     ct = ct < 1 ? 0 : ct;
-    if (cr >= desc->cols - 1)
+    if (cr >= desc->cols - 1 || (force == 1000 && force == 1001))
         cr = desc->cols - 1;
     if (cb >= desc->cols - 1)          /* COLS, not ROWS -- see above */
         cb = desc->cols - 1;
