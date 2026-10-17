@@ -7597,8 +7597,8 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     AM2_Object      *at;
     const AM2_Point *pos;
     int32_t  klass;
-    int32_t  speed   = 0;
     int32_t  turned  = 0;      /* a turn was enforced this step */
+    int32_t  speed   = 0;
     int32_t  tries;
     int32_t  i;                /* 0 for the plain step, else the sweep's try */
     int32_t  found;            /* the facing is settled */
@@ -7610,8 +7610,9 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     int32_t  d;                /* the enforced turn's delta, taken first */
 
     klass = ClassifyByCode74(o);
-    pos = &o->pos;
-    rows = o->rowSet.rows;
+    /* A number win: two reaching definitions keep `pos` from being propagated away,
+     * which is how the image holds it in a register (one dead compare). */
+    pos = klass ? &o->pos : &o->pos;
     stepPoint = *pos;
     if (!o->health)
         goto pose;
@@ -7629,6 +7630,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
 
     /* A row still mid-animation, or one whose animation says so, stops the
      * whole step: take whatever is under the trooper and go to the tail. */
+    rows = o->rowSet.rows;
     if (rows->field3C <= 0
         && RowAnimField4(rows,
                          (uint16_t)*(const int16_t *)
@@ -7661,7 +7663,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     /* An enforced turn, at most one a second and only so far: the delta
      * between where the trooper faces and where it is being sent decides
      * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
-    d = AngleDelta(o->facing, facing);
+    d = AngleDelta(o->facing, out->bearing);
     if ((uint32_t)o->stuckCount > (uint32_t)g_gameClockMs) {
         if (d > AM2_TROOPER_TURN_ARC) {
             facing = (uint8_t)(o->facing + AM2_TROOPER_TURN_STEP);
@@ -7764,36 +7766,35 @@ sweep:
          * both sides being driven the same, and it was found by bisecting
          * AM2_NOPATCH_NAMES against a walk into Boot Camp's hut. */
         if (ObjKind538In10To17(o)) {
-            turned = 1;
-            speed  = 0;
             /* A number win: the image reloads `out` from its argument slot for the
              * bearing stores while state and hit go through a register. */
             { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
+            turned = 1;
         } else if (out->hit) {
             /* Three arms with one body, written out three times as the
              * image has them -- one `||` test gives one copy and moves the
              * whole chain ahead of the sweep. The statements are in a
              * different order in each: written alike, VC6 merges the
              * first two into one copy, which the image keeps apart. */
-            out->state   = 1;
             turned       = 1;
-            out->bearing = facing;
-            speed        = 0;
+            out->state   = 1;
+            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
         } else if (!found) {
             out->state   = 1;
             turned       = 1;
-            speed        = 0;
-            out->bearing = facing;
+            { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
         } else if (g_mpSession
                    && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
                    && ObjType2Field548(o)) {
             out->state   = 1;
-            turned       = 1;
             { AM2_SightOut *s = *(AM2_SightOut *volatile *)&out; s->bearing = facing; }
-            speed        = 0;
+            turned       = 1;
         } else {
             goto sweep;
         }
+    tail0:
+        /* The stop arms share this one store (the image tail-duplicates it into each). */
+        speed = 0;
         goto settle_facing;
     }
 
@@ -7806,8 +7807,7 @@ swept:
     /* One dispatch for every way out of the step and the sweep. */
     if (i == 0) {
         out->bearing = facing;
-        speed = 0;
-        goto settle_facing;
+        goto tail0;
     }
     if (i < tries) {
         /* A heading was found: turn toward it and STOP this frame
@@ -7915,8 +7915,8 @@ settle_facing:
                         if (!old) {
                             want = at->ammo;
                         } else {
-                            want = cap - old->ammo;
                             had = old->ammo;
+                            want = cap - old->ammo;
                         }
                     }
 
@@ -8023,7 +8023,7 @@ pose:
             AM2_Object *held = WeaponByUid(o->inventory[i]);
 
             if (held)
-                held->pos = *pos;
+                held->pos = o->pos;
         }
     }
 
