@@ -2885,6 +2885,7 @@ triggers_done:
         default:
             am2_log("Line [%4d]:  Unexpected symbol in pad definition "
                     "should be '<=>'\n", ctx->tokens[*at].line);
+            (void)*(volatile int32_t *)&name;
             return 0;
         }
 
