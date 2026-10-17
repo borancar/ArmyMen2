@@ -4759,7 +4759,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
      * the image's frame has them there. */
     struct { int32_t highest; int32_t solve; AM2_Object *best; uint8_t facing; uint8_t pad[3]; uint8_t look; } hold;
     struct { uint8_t slack; AM2_Rect box; } win;
-    struct { int32_t range; uint8_t bearing; int32_t bestRange; AM2_Object *cand; int32_t bestScore; AM2_Object *alt; } pick;
+    struct { int32_t range; uint8_t bearing; } pick;
+    struct { int32_t bestRange; AM2_Object *cand; int32_t bestScore; AM2_Object *alt; } stt;
 
     if (g_perframeCountA
         > AM2_SIGHT_SCANS_PER_FRAME)
@@ -4779,11 +4780,11 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
 
     keep        = (AM2_Object *)0;
     hold.best        = (AM2_Object *)0;
-    pick.bestRange   = AM2_SIGHT_SCAN_FAR;
+    stt.bestRange   = AM2_SIGHT_SCAN_FAR;
     bestBearing = 0x80;
     win.slack       = 0x80;
-    pick.alt         = (AM2_Object *)0;
-    pick.bestScore   = 0;
+    stt.alt         = (AM2_Object *)0;
+    stt.bestScore   = 0;
     hold.solve       = 1;
 
     /* A weapon already earmarked stays the fallback while it is still there,
@@ -4798,8 +4799,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
             int32_t n = TryTakeWeapon(w, o);
 
             if (n) {
-                pick.alt       = w;
-                pick.bestScore = n;
+                stt.alt       = w;
+                stt.bestScore = n;
             }
         }
     }
@@ -4867,7 +4868,7 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
      * copy at the loop entry that the image does not have. */
     for (; keep;
          keep = keep->queryNext) {
-        pick.cand = (AM2_Object *)0;
+        stt.cand = (AM2_Object *)0;
         pick.bearing = 0x80;
         pick.range = AM2_SIGHT_SCAN_FAR;
 
@@ -4877,22 +4878,11 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
          * into the scoring block that follows the if/else. */
         if (!ObjsAreAllied(o, keep, 0)) {
             if (IsKind7(keep)) {
-                pick.cand        = keep;
+                stt.cand        = keep;
                 pick.bearing = AngleBetween(&o->pos,
                                            &keep->pos);
-                if (!keep)
-                    goto next;
                 pick.range   = AM2_SIGHT_KIND7_RANGE;
-                ++*nOther;
-                ++o->fieldF4;
-                (void)AngleDelta(hold.facing, pick.bearing);
-                if (pick.range >= pick.bestRange + win.slack)
-                    goto next;
-                hold.best        = pick.cand;
-                pick.bestRange   = pick.range;
-                bestBearing = pick.bearing;
-                win.slack       = 0;
-                goto next;
+                goto score;
             } else {
             /* The sight test, inline. It opens exactly as AM2_AI_SIGHT_TEST does:
              * the trace's height floor set first, the distance from the two
@@ -4960,7 +4950,7 @@ in_sight:
                               - o->hitTime)
                        > AM2_SIGHT_KIND7_RANGE
                 && ObjsAreAllied(keep, o, 0)))
-                pick.cand = keep;
+                stt.cand = keep;
 
             if (ObjIsOurs(o, 0)) {
                 RevealObj(keep);
@@ -4971,16 +4961,16 @@ in_sight:
 
             }
 score:
-                if (!pick.cand)
+                if (!stt.cand)
                     goto next;
-                ++*nOther;
                 ++o->fieldF4;
+                ++*nOther;
                 /* Discarded two instructions later; a call, so it counts. */
                 (void)AngleDelta(hold.facing, pick.bearing);
-                if (pick.range >= pick.bestRange + win.slack)
+                if (pick.range >= stt.bestRange + win.slack)
                     goto next;
-                hold.best        = pick.cand;
-                pick.bestRange   = pick.range;
+                hold.best        = stt.cand;
+                stt.bestRange   = pick.range;
                 bestBearing = pick.bearing;
                 win.slack       = 0;
                 goto next;
@@ -4993,10 +4983,10 @@ score:
                 {
                 AM2_Object *w = LookupByUID(
                     keep->targetUid);
-                pick.cand = w;
+                stt.cand = w;
                 if (!w) {
                     keep->targetUid = 0;
-                    goto score;                 /* cand is null; score refuses */
+                    goto next;
                 }
                 if (w->health <= 0) {
                     keep->targetUid = 0;
@@ -5013,9 +5003,11 @@ score:
                              &pick.range, &pick.bearing);
                 }
                 /* Only mode 1 adopts an ally's target, and only close by. */
-                if (o->aiMode != 1)
-                    goto score;
-                if (pick.range > AM2_AI_PATROL_DETOUR)
+                if (o->aiMode == 1
+                    && pick.range > AM2_AI_PATROL_DETOUR)
+                    goto next;
+                (void)*(volatile int32_t *)&stt.cand;
+                if (!stt.cand)
                     goto next;
                 goto score;
             }
@@ -5039,12 +5031,12 @@ score:
             {
                 int32_t n = TryTakeWeapon(keep, o);
 
-                if ((pick.bestScore - n) >= 0)
+                if ((stt.bestScore - n) >= 0)
                     goto next;
-                pick.alt         = keep;
-                pick.bestRange   = pick.range;
+                stt.alt         = keep;
+                stt.bestRange   = pick.range;
                 bestBearing = pick.bearing;
-                pick.bestScore   = n;
+                stt.bestScore   = n;
             }
         }
     next: ;
@@ -5062,15 +5054,15 @@ finish:
     if (hold.best) {
         AM2_Point anchor;
 
-        *outRange   = pick.bestRange;
+        *outRange   = stt.bestRange;
         result      = hold.best;
         *outBearing = bestBearing;
         anchor      = ObjAnchorPoint(o);
         /* Overwrites the store above, and measures from the ANCHOR. */
         *outBearing = AngleBetween(&anchor, &hold.best->pos);
-    } else if (pick.alt) {
-        *outRange   = pick.bestRange;
-        result      = pick.alt;
+    } else if (stt.alt) {
+        *outRange   = stt.bestRange;
+        result      = stt.alt;
         *outBearing = bestBearing;
     }
     return result;
