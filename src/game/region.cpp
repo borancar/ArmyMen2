@@ -5018,7 +5018,7 @@ score:
             {
                 int32_t n = TryTakeWeapon(keep, o);
 
-                if (n <= pick.bestScore)
+                if ((pick.bestScore - n) >= 0)
                     goto next;
                 pick.alt         = keep;
                 pick.bestRange   = pick.range;
