@@ -2605,113 +2605,6 @@ static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t wi
 
 
 
-/* The tail modes 4 and 5 share once the object is known to be a FRIEND: it must
- * be ours, and then either a vehicle with a free seat -- which shows a hint and
- * answers 0, exactly as PointerPickBoard does -- or a trooper, vehicle or roach
- * that is not already busy, which answers 1.
- *
- * The vehicle arm has a guard the others do not: it scans the SELECTION for a
- * type-3 that is already selected, and refuses if it finds one. So the board
- * hint is suppressed while a vehicle is under selection.
- *
- * Its OverlayPrepare force flag is 0 here where PointerPickBoard passes 1 for
- * the same row. Reproduced; nothing here says why they differ. */
-/* Mode 6's copy of the friend tail: the image reads the hover uid from the
- * object after the board-hint call instead of taking it as a value read at
- * the top. */
-static inline int32_t PointerFriendTailLate(AM2_Object *o)
-{
-    uint32_t u;
-
-    if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && (u = o->uid, !o->field94) && o->riders.count < o->seats) {
-            int32_t i;
-            int32_t none = 1;
-
-            if (!g_mouseButton
-                || GetTickCount()
-                       - g_mousePressMs
-                   < AM2_CLICK_MS) {
-                for (i = 0; i < g_selectedCount;
-                     i++) {
-                    const AM2_Object *sel = LookupByUID(g_selectedItems[i]);
-
-                    if (ObjIsType3Inline(sel)
-                        && (sel->flags & OBJ_FLAG_SELECTED))
-                        none = 0;
-                }
-                if (none) {
-                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-                    g_pointerHoverUid = u;
-                }
-            }
-            return 0;
-        }
-
-        if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
-            && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
-                || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-            && !o->field94)
-            return 1;
-    }
-    return 0;
-}
-
-static inline int32_t PointerFriendTail(AM2_Object *o, uint32_t uid)
-{
-    if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && !o->field94 && o->riders.count < o->seats) {
-            int32_t i;
-            int32_t none = 1;
-
-            if (!g_mouseButton
-                || GetTickCount()
-                       - g_mousePressMs
-                   < AM2_CLICK_MS) {
-                for (i = 0; i < g_selectedCount;
-                     i++) {
-                    const AM2_Object *sel = LookupByUID(g_selectedItems[i]);
-
-                    if (ObjIsType3Inline(sel)
-                        && (sel->flags & OBJ_FLAG_SELECTED))
-                        none = 0;
-                }
-                if (none) {
-                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-                    g_pointerHoverUid = uid;
-                }
-            }
-            return 0;
-        }
-
-        if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
-            && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
-                || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-            && !o->field94)
-            return 1;
-    }
-    return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* Rewrite the panel's points readout and repaint the widget that draws it --
  * the tail both arms of PlacementScreenClick share, written out twice in the
  * original and once here. The rect goes into the paint slot BY VALUE, the
@@ -17219,7 +17112,7 @@ void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
  * OBJ_OFF_FIELD_530 test, which is the arm ArmyAlliedWithObj takes for 0.
  *
  * A FOE gets the enemy overlay row and answers 1. A FRIEND falls into the
- * shared tail above. The foe arm is written first, under the negated test:
+ * tail written out below (see PointerPickMode6). The foe arm is written first, under the negated test:
  * that is the image's layout, and it lets the opening refusals share the
  * tail's `return 0`. The opening refusals are the same in both: destroyed or
  * concealed -- one `test` against OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED --
@@ -17229,40 +17122,100 @@ void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
  * reading, and by the diff for the part that differs. */
 int32_t __cdecl PointerPickMode4(AM2_Object *o)
 {
-    if (o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
-        return 0;
-    uint32_t tailUid = o->uid;
-    if (o->health == 0)
-        return 0;
-    if (o->owner == AM2_ARMY_NEUTRAL)
-        return 0;   /* hoisted above the alliance test -- see above */
+    AM2_Object *keep;   /* the board hint's object: `o` is reused as the loop's
+                         * temporary below, so this keeps the original */
+    if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        && o->health != 0
+        && o->owner != AM2_ARMY_NEUTRAL) {
+        if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
+                               o, 0)) {
+            OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+            g_pointerHoverUid = o->uid;
+            return 1;
+        }
+        if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
+            if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+                int32_t i;
+                int32_t none = 1;
 
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0)) {
-        OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-        g_pointerHoverUid = o->uid;
-        return 1;
+                if (!g_mouseButton
+                    || GetTickCount()
+                           - g_mousePressMs
+                       < AM2_CLICK_MS) {
+                    for (i = 0; i < g_selectedCount;
+                         i++) {
+                        o = LookupByUID(g_selectedItems[i]);
+
+                        if (ObjIsType3Inline(o)
+                            && (o->flags & OBJ_FLAG_SELECTED))
+                            none = 0;
+                    }
+                    if (none) {
+                        OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                        g_pointerHoverUid = keep->uid;
+                    }
+                }
+                return 0;
+            }
+
+            if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
+                && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
+                    || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
+                && !o->field94)
+                return 1;
+        }
     }
-    return PointerFriendTail(o, tailUid);
+    return 0;
 }
 
 int32_t __cdecl PointerPickMode5(AM2_Object *o)
 {
-    if (o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
-        return 0;
-    uint32_t tailUid = o->uid;
-    if (o->health == 0)
-        return 0;
+    AM2_Object *keep;   /* the board hint's object: `o` is reused as the loop's
+                         * temporary below, so this keeps the original */
+    if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        && o->health != 0) {
 
-    /* No hoisted refusal: a neutral object reaches the alliance test, which
-     * answers ALLIED for army 4. That is the whole difference from mode 4. */
-    if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
-                           o, 0)) {
-        OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-        g_pointerHoverUid = o->uid;
-        return 1;
+        /* No hoisted refusal: a neutral object reaches the alliance test, which
+         * answers ALLIED for army 4. That is the whole difference from mode 4. */
+        if (!ArmyAlliedWithObjInline(*(const int32_t *)&g_defaultOwner,
+                               o, 0)) {
+            OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+            g_pointerHoverUid = o->uid;
+            return 1;
+        }
+        if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
+            if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+                int32_t i;
+                int32_t none = 1;
+
+                if (!g_mouseButton
+                    || GetTickCount()
+                           - g_mousePressMs
+                       < AM2_CLICK_MS) {
+                    for (i = 0; i < g_selectedCount;
+                         i++) {
+                        o = LookupByUID(g_selectedItems[i]);
+
+                        if (ObjIsType3Inline(o)
+                            && (o->flags & OBJ_FLAG_SELECTED))
+                            none = 0;
+                    }
+                    if (none) {
+                        OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                        g_pointerHoverUid = keep->uid;
+                    }
+                }
+                return 0;
+            }
+
+            if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
+                && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
+                    || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
+                && !o->field94)
+                return 1;
+        }
     }
-    return PointerFriendTail(o, tailUid);
+    return 0;
 }
 
 /* PointerPickMode6 -- original 0x00459300, 288 bytes, mode 6's PICK.
@@ -17272,10 +17225,30 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
  * object be OURS. So mode 6 offers nothing on an enemy, where modes 4 and 5
  * show the enemy overlay and answer 1.
  *
- * The original writes the whole tail out again here -- inlined, with every
- * refusal converging on one `return 0` -- which is why the tail is `static
- * inline` and nested positively. Its register allocation still differs: the
- * image keeps the object in eax and copies it to ebp for the vehicle arm.
+ * THE FRIEND TAIL IS WRITTEN OUT IN FULL IN EACH OF MODES 0, 4, 5 AND 6, as
+ * the image has it, and it needed three things at once to come out
+ * byte-identical (a shared inline copy never did):
+ *
+ *   - ONE `return 0`: every refusal is a failed `&&` in a single positive
+ *     condition, so the early exits share the function's one epilogue and the
+ *     prologue pushes sit at the top, where an inline helper with its own
+ *     `return`s gave the early exits private epilogues;
+ *   - the board hint's object in `keep`, copied from `o` where the tail first
+ *     proves the object is a vehicle, and read for its uid only AFTER the hint
+ *     call: the image copies the object (`mov ebp, eax`) and reads through the
+ *     copy;
+ *   - `o` itself REUSED as the selection loop's temporary
+ *     (`o = LookupByUID(...)`). That redefinition is what keeps `keep` a web of
+ *     its own: with the loop on a separate variable VC6 propagates the copy
+ *     away and holds the object in a callee-saved register from the prologue.
+ *
+ * The tail: the object must be ours, and then either a vehicle with a free
+ * seat -- which shows a hint and answers 0, exactly as PointerPickBoard does
+ * -- or a trooper, vehicle or roach that is not already busy, which answers 1.
+ * The vehicle arm scans the SELECTION for a type-3 that is already selected
+ * and refuses if it finds one, so the hint is suppressed while a vehicle is
+ * under selection. Its OverlayPrepare force flag is 0 here where
+ * PointerPickBoard passes 1 for the same row; nothing says why they differ.
  *
  * The one encoding difference is cosmetic and worth noting so a reader diffing
  * against the others does not stop on it: this tests OBJ_FLAG_SELECTED as
@@ -17285,9 +17258,41 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
  * Not exercised -- no drive installs a pointer mode above 0. */
 int32_t __cdecl PointerPickMode6(AM2_Object *o)
 {
+    AM2_Object *keep;   /* the board hint's object: `o` is reused as the loop's
+                         * temporary below, so this keeps the original */
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
-        && o->health != 0)
-        return PointerFriendTailLate(o);
+        && o->health != 0
+        && o->owner == *(const int32_t *)&g_defaultOwner && o) {
+        if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+            int32_t i;
+            int32_t none = 1;
+
+            if (!g_mouseButton
+                || GetTickCount()
+                       - g_mousePressMs
+                   < AM2_CLICK_MS) {
+                for (i = 0; i < g_selectedCount;
+                     i++) {
+                    o = LookupByUID(g_selectedItems[i]);
+
+                    if (ObjIsType3Inline(o)
+                        && (o->flags & OBJ_FLAG_SELECTED))
+                        none = 0;
+                }
+                if (none) {
+                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                    g_pointerHoverUid = keep->uid;
+                }
+            }
+            return 0;
+        }
+
+        if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
+            && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
+                || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
+            && !o->field94)
+            return 1;
+    }
     return 0;
 }
 #ifdef _MSC_VER
@@ -17374,7 +17379,8 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
     const AM2_Object *ride;
     uint32_t          uid;
 
-    uint32_t tailUid = o->uid;
+    AM2_Object *keep;   /* the board hint's object: `o` is reused as the loop's
+                         * temporary below, so this keeps the original */
 
     if (ObjIsWatchedKind(o))
         return 0;
@@ -17436,7 +17442,38 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
         return 0;
 #undef AIM_HINT
     }
-    return PointerFriendTail(o, tailUid);
+    if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
+        if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+            int32_t i;
+            int32_t none = 1;
+
+            if (!g_mouseButton
+                || GetTickCount()
+                       - g_mousePressMs
+                   < AM2_CLICK_MS) {
+                for (i = 0; i < g_selectedCount;
+                     i++) {
+                    o = LookupByUID(g_selectedItems[i]);
+
+                    if (ObjIsType3Inline(o)
+                        && (o->flags & OBJ_FLAG_SELECTED))
+                        none = 0;
+                }
+                if (none) {
+                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                    g_pointerHoverUid = keep->uid;
+                }
+            }
+            return 0;
+        }
+
+        if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
+            && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
+                || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
+            && !o->field94)
+            return 1;
+    }
+    return 0;
 }
 
 /* PointerPickHeal -- original 0x004597B0, the first of the two functions in the
