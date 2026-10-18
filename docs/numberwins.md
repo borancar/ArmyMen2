@@ -44,3 +44,9 @@ was unused, macro expansions that re-tested a value, and leftovers from edits.
 Where several pairs were needed (DrawMapObjects: four on `bottom`; BlockWeightTroops:
 three on `o`), one stripped macro could account for all of them. Treat each stand-in as a
 marker that the original touched that variable at that point in some way not yet found.
+
+## When to revisit
+
+Boran (2026-10-18): the stand-ins are fine for now; revisit them once the binary matches 100%.
+That is the point where each can be traded against a real source shape without losing a
+match: replace one, run `tools/relinkscreen.py`, keep whichever form keeps the function at 0.
