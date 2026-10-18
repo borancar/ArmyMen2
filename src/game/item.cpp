@@ -3003,8 +3003,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
             w = 0;
         /* The second group is a number win: f is never null here (f->dest was read at the top),
          * the pairs fold away, and their uses raise the priority of the values in them. */
-        else if ((f && abs(o->heightSet - (int8_t)*(volatile int8_t *)&f->heightSet) > AM2_BLOCK_HEIGHT_STEP)
-                 || (f->pos.x == 1002 && f->pos.x == 1003 && fl == 1000))
+        else if ((f && abs(o->heightSet - (int8_t)*(volatile int8_t *)&f->heightSet) > AM2_BLOCK_HEIGHT_STEP))
             w = 0;
         else {
             int32_t wt = AM2_BLOCK_FULL;
