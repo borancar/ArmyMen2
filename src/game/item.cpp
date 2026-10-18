@@ -11132,7 +11132,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
 void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
 {
     int32_t        x, left, top;
-    int16_t        y;              /* the position's own width */
+    int32_t        y;
     int32_t        cl, ct, cr, cb, col, idx;
     int32_t        cols, cell, stride;
 
@@ -11149,6 +11149,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     o->hit.top    = top;
     o->hit.right  = x + o->box.right;
     o->hit.bottom = y + o->box.bottom;
+    (void)*(volatile int32_t *)&y;
 
     if (!(o->flags & OBJ_FLAG_BIT0))
         return;
@@ -11156,16 +11157,15 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     /* The right edge first, and the bottom through `y + box.top` again: VC6
      * folds it to `box.bottom + y` and shares the hit.bottom temporary
      * (a byte win; the image also spills `top`, which this does not). */
-    ct = top    >> AM2_CELL_SHIFT;
     cl = left   >> AM2_CELL_SHIFT;
-    (void)*(volatile int32_t *)&desc->cols;   /* a number win: a rotation temporary */
+    ct = top    >> AM2_CELL_SHIFT;
     cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
-    (void)*(volatile int32_t *)&o->flags;     /* a number win: a rotation temporary */
-    cb = ((o->box.bottom - o->box.top) + (y + o->box.top))  >> AM2_CELL_SHIFT;
+    cb = ((o->box.bottom - o->box.top) + top)  >> AM2_CELL_SHIFT;
 
     /* Off the grid in any direction is an unregister, not a clamp. The
      * grid size is read where it is compared, rows first, and the column
      * count is then held -- the walk ItemLinkCells and RowUpdate share. */
+    (void)*(volatile int32_t *)&o->pos.y;
     if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
         ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
         return;
