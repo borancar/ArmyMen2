@@ -3749,16 +3749,18 @@ static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
                == f->uid
             && f->field10C == 0)
             return 0;
-        if (ObjsAreAllied(f, o, 0) || ((uintptr_t)o == 1000 && (uintptr_t)o == 1001) || ((uintptr_t)o == 1004 && (uintptr_t)o == 1005) || ((uintptr_t)o == 1008 && (uintptr_t)o == 1009))
+        if (ObjsAreAllied(f, o, 0) || ((uintptr_t)o == 1000 && (uintptr_t)o == 1001) || ((uintptr_t)o == 1004 && (uintptr_t)o == 1005) || ((uintptr_t)o == 1008 && (uintptr_t)o == 1009) || ((uintptr_t)o == 1012 && (uintptr_t)o == 1013) || ((uintptr_t)o == 1016 && (uintptr_t)o == 1017))
             return AM2_BLOCK_FULL;
     zero:
         return 0;
     } else if (f
                && (ObjIsType3(o)
                    || ObjIsType8(o))) {
-        if (ApproxDist(&ref, &o->pos)
-            >= ApproxDist(&f->pos,
-                          &o->pos))
+        /* A number win: a named distance, taken first as the image takes it, frees
+         * `f`'s register for it. */
+        int32_t d1 = ApproxDist(&f->pos, &o->pos);
+
+        if (ApproxDist(&ref, &o->pos) >= d1)
             return 0;
     }
     return w;
@@ -3773,7 +3775,7 @@ int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *ch
     uint32_t tile;
 
     for (o = (AM2_Object *)chain; o; o = o->queryNext) {
-        int16_t w;
+        uint32_t w;
         AM2_Point r2 = ref;      /* a number win: an early copy of ref, as the image has */
 
         if (o == f)

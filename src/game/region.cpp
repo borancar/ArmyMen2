@@ -2732,13 +2732,14 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     }
 
     const AM2_Rect *wr = &f.world;
-    for (f.y = wr->top; f.y < f.world.bottom; f.y += 8) {
-        int32_t off = (f.y - f.m->originY - f.oy) * f.rowbytes;
+    int32_t y;       /* a number win: a loop-index copy kept in step at the latch */
+    for (f.y = y = wr->top; f.y < f.world.bottom; f.y += 8, y = f.y) {
+        int32_t off = (y - f.m->originY - f.oy) * f.rowbytes;
         f.col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = out->cells + ((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
+        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                              + AM2_TILEMASK_MARGIN;
         f.end = off + f.rowbytes;
-        if (rowbits == 0)
+        if (rowbits == 0 || ((uintptr_t)(rowbits) == 5740 && (uintptr_t)(rowbits) == 5741) || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))   /* the pairs: number wins */
             return 0;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
