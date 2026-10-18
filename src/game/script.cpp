@@ -2869,11 +2869,10 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                     "and generic triggers\n", ctx->tokens[*at].line);
             return 0;
         }
-        int32_t item;
-        if (!ScriptResolveName(ctx, at, &item, 0))
+        if (!ScriptResolveName(ctx, at, &number, 0))
             return 0;
         g_pads[g_padCount].specific = 1;
-        g_pads[g_padCount].trigger = item;
+        g_pads[g_padCount].trigger = number;
     }
 triggers_done:
 
