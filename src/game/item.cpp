@@ -4944,7 +4944,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 return 1;
             case 2:
                 out->state = AM2_POSE_KNEEL;
-                break;
+                return 1;
             default:
                 if (BracedPose(o))
                     out->state = AimedPick(out, ready, AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
@@ -4985,17 +4985,20 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
                 if (BracedPose(o))
                     out->state = AimedPick(out, ready, AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
                 else
-                    goto raise_k;
+                {
+                    out->state = AM2_POSE_RAISE_KNEEL;
+                    return 1;
+                }
                 break;
             case 2:
                 out->state = AM2_POSE_KNEEL;
-                break;
+                return 1;
             default:
                 if (BracedPose(o))
                     out->state = AimedPick(out, ready, AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
                 else
                     out->state = AM2_POSE_RAISE_STAND;
-                break;
+                return 1;
             }
             break;
 
@@ -5026,7 +5029,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
         case 38: case 41: case 42:
         default:
             /* Twenty-four kinds and everything out of range: no pose at all. */
-            break;
+            return 1;
         }
         return 1;
     }
@@ -5042,9 +5045,6 @@ raise_s:
     return 1;
 raise_s2:
     out->state = AM2_POSE_RAISE_STAND;
-    return 1;
-raise_k:
-    out->state = AM2_POSE_RAISE_KNEEL;
     return 1;
 }
 
