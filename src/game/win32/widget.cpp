@@ -9324,8 +9324,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * like LockSurface's descriptor defect, rather than repaired. */
         (*slot)->chosen   = -1;
         (*slot)->disabled = 1;
-        (*slot)->flag50   = 0;
-        ::WidgetAddChild(w, *slot);
+        p->typeBox->flag50   = 0;
+        ::WidgetAddChild(w, p->typeBox);
 
         child = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x121, 0xC2, 0x13, 0x68), w,
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
@@ -9336,7 +9336,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         /* The list and its bar point at each other -- the list's +0x7C is the
          * bar and the bar's +0x58 is the list. A scrollbar built without that
          * back-link scrolls nothing and looks perfectly constructed. */
-        (*slot)->arrowBar = child;
+        p->typeBox->arrowBar = child;
         ((AM2_ArrowBar *)child)->list = *slot;
         child->flag50 = 0;
     }
@@ -9403,7 +9403,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * The original stores BEFORE the AddChild and then writes flag50
          * THROUGH the stored field, which is the same shape as the spin's
          * three children and unguarded for the same reason. */
-        ::WidgetAddChild(w, *slot);
+        ::WidgetAddChild(w, p->chatBox);
         (*slot)->flag50 = 0;
 
         /* AND ITS SCROLLBAR, which the list is useless without. MenuMessage
@@ -9555,7 +9555,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     {
         AM2_Widget *child;
 
-        if (g_commObject->isHost)
+        if (g_commObject->isHost) {
             child = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0x22B, 0x2F, 0x4A, 0x18),
                                    g_scoreLimit,
                                    0x64, 0x2706, 0x64, w,
@@ -9564,7 +9564,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                    g_colourBelowBg,
                                    g_backgroundColour,
                                    0);
-        else {
+            ::WidgetAddChild(w, child);
+            child->flag50 = 0;
+        } else {
             am2_sprintf(p->scoreText,
                         "%i",
                         g_scoreLimit);
@@ -9572,9 +9574,9 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                                   *RectSet(AM2_TEMP(AM2_Rect), 0x22B, 0x35, 0x21, 0x0E), 2,
                                   g_colourBelowBg,
                                   g_backgroundColour);
+            ::WidgetAddChild(w, child);
+            child->flag50 = 0;
         }
-        ::WidgetAddChild(w, child);
-        child->flag50 = 0;
     }
 
     /* THE MAP LIST, in the field that actually holds it. It has to come AFTER
@@ -9625,7 +9627,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                     SelectLevel(lvl);
             }
         }
-        (void)*(volatile int32_t *)&g_nameTableCount;   /* a number win: a rotation temporary */
 
         *slot = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x154, 0xAD, 0xF6, 0x48), rows,
                                 (int32_t)(uintptr_t)OnMpMapPick, 0, 1);

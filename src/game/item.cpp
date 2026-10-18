@@ -11154,23 +11154,24 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     /* The right edge first, and the bottom through `y + box.top` again: VC6
      * folds it to `box.bottom + y` and shares the hit.bottom temporary
      * (a byte win; the image also spills `top`, which this does not). */
-    cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
-    (void)*(volatile int32_t *)&o->flags;     /* a number win: a rotation temporary */
     ct = top    >> AM2_CELL_SHIFT;
     cl = left   >> AM2_CELL_SHIFT;
+    (void)*(volatile int32_t *)&desc->cols;   /* a number win: a rotation temporary */
+    cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
+    (void)*(volatile int32_t *)&o->flags;     /* a number win: a rotation temporary */
     cb = ((o->box.bottom - o->box.top) + (y + o->box.top))  >> AM2_CELL_SHIFT;
 
     /* Off the grid in any direction is an unregister, not a clamp. The
      * grid size is read where it is compared, rows first, and the column
      * count is then held -- the walk ItemLinkCells and RowUpdate share. */
-    if (cb < 0 || cl > desc->cols - 1 || cr < 0 || ct > desc->rows - 1) {
+    if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
         ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
         return;
     }
     cols = desc->cols;
 
-    ct = ct <= 0 ? 0 : ct;
     cl = cl <= 0 ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
