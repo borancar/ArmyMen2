@@ -30,3 +30,17 @@ The kinds, and why each works (all measured; the mechanism notes are in
 None of these should change what the program does. Before removing one, run
 `tools/relinkscreen.py` to see what it costs. Each comes with the distance it
 bought in the commit that added it (`git log -S"number win"`).
+
+## What they probably stand in for
+
+Boran's reading (2026-10-18): the original source referred to conditions or reads that
+the compiler optimized away. The measurements agree that the original's variables had
+more uses, at the point where VC6 ranks registers, than our source gives them; they do
+not say what those uses were, and the constants in the pairs are arbitrary. Candidates:
+debug-only code compiled out of the release build (asserts, traces, consistency checks),
+conditions the compiler proved constant from earlier code, inlined helpers whose result
+was unused, macro expansions that re-tested a value, and leftovers from edits.
+
+Where several pairs were needed (DrawMapObjects: four on `bottom`; BlockWeightTroops:
+three on `o`), one stripped macro could account for all of them. Treat each stand-in as a
+marker that the original touched that variable at that point in some way not yet found.
