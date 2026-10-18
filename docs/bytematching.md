@@ -299,3 +299,32 @@ The largest wins of the stretch above came from this arrangement, mostly by
 trying many variants of one function quickly. Variants that stall are usually
 register-priority ties and frame-slot order, where the rules in
 `docs/vc6-regalloc.md` are the next place to look.
+
+## Where the last 31 stand (2026-10-18)
+
+Random annealing over dead reads, impossible pairs, compare respellings and
+statement swaps found nothing in 15 runs of Round Q, after finding seven wins in
+Rounds N to P. What worked in those rounds was a hand-built seed that is closer
+to the image in register-blind instruction shape but worse in bytes, followed by
+a search that may also delete the older hacks (ObjRemap 124 -> 108, RowUpdate
+154 -> 138, BlockWeightRoute 26 -> 16 by dropping a pair that had gone stale).
+
+Measured facts from Round R, for whoever tries next:
+
+- Impossible pairs are quantised steps, not use counts: a single `&&` chain on
+  one variable is inert, two separate `||` pairs can flip a colouring, and a
+  pair on a pointer or on a far-ahead variable does nothing.
+- Colouring is not monotone: extra uses of `drop` in DrawSelection pushed `wide`
+  below `mh` instead of just raising `drop`.
+- Several residues share one shape: the image gives the scratch register to the
+  short temporaries and a callee-saved one to the long-lived pointer, ours the
+  reverse (HudSquadUpdate, DrawSelection, ScrollMapCache). Unverified on a toy.
+- VC6 sinks trailing byte stores into the inline strlen/strcpy expansion, so a
+  store's place relative to it is a scheduling effect (MissionEnded, LoadMap).
+- A dead computation such as `(void)(a - b)` does not shift the temporary
+  rotation; only a live test does. Local-copy spellings never induced the
+  `mov ecx,eax` copy in HudPanel.
+- Structurally right but byte-worse seeds waiting for a colour flip:
+  DrawSelection with `int32_t fill` (68 -> 78, shape 21 -> 8), ParseScenarios
+  with the parameter used in place (38 -> 106, shape 3), UpdateTrooperAction
+  arm 1 as `turned = 1; speed = 0; s->bearing = facing;` (22 -> 46).
