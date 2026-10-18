@@ -2997,10 +2997,6 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                      && (int32_t)(uintptr_t)(&ctx->tokens[*at])->value == (w))
 #define STEP_EOS()  if (++(*at) >= ctx->count) goto end_of_script
 #define STEP_LATE() if (++(*at) >= ctx->count) { am2_log("Unexpected end of script.\n"); return 0; }
-/* The same step with the comparison written the other way round. VC6 keeps
- * the operand order, and the allof and inorder arms have it reversed (their
- * two steps are tail-merged into one block). */
-#define STEP_LATE_R() if (ctx->count <= ++(*at)) { am2_log("Unexpected end of script.\n"); return 0; }
 #define STEP_OWN()  if (!ScriptStep(ctx, at)) return 0
 /* A wrong token kind logs and returns WITHOUT freeing the record -- another
  * of the original's leaks. */
@@ -3071,11 +3067,17 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_ALLOF:
             cond->kind = AM2_IF_ALLOF;
-            STEP_LATE_R();
+            if ((uint32_t)++(*at) >= (uint32_t)ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
             break;
         case AM2_TOK_INORDER:
             cond->kind = AM2_IF_INORDER;
-            STEP_LATE_R();
+            if ((uint32_t)++(*at) >= (uint32_t)ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
             break;
         case AM2_TOK_REPEAT:
             cond->kind = AM2_IF_REPEAT;
@@ -3117,7 +3119,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, na, nb, nc);
-            if (*at - ctx->count >= 0) {
+            if ((uint32_t)*at >= (uint32_t)ctx->count) {
                 am2_log("Unexpected end of script.\n");
                 return 0;
             }
@@ -3290,7 +3292,6 @@ fail_nofree:
 #undef IS_WORD
 #undef STEP_EOS
 #undef STEP_LATE
-#undef STEP_LATE_R
 #undef STEP_OWN
 #undef WANT_KIND
 }
