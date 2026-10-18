@@ -21,6 +21,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Volatile stores and locals**, `*(volatile int8_t *)&r->numb = ...`,
   `d1 = ApproxDist(...)` through a volatile local, a volatile pointer store in a written-out
   DEFAULT_LAYER.
+- **Frame struct sharing** `struct { int32_t d1; AM2_Point lp; } fs;` in BlockWeightRoute replaces the old volatile `d1`; a second load `y = f.world.top` in ListMaskAction; a pair on `i` in UpdateTrooperAction; revisit.
 - **Dead reads** of `rect.left` (RowUpdate), `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
 - **Self-referential ternary** `buf = buf ? buf : g_dynamic[i]->buffer;` in Update3DAudioVolumes (16 -> 12); revisit.

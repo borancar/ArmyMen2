@@ -7879,10 +7879,11 @@ AM2_HudPanel::AM2_HudPanel()
     /* x is read before h is stored -- the image loads it ahead of that
      * store, which VC6 never does for a read written after it. */
     w->h = spr->bounds.bottom;
-    self->stop = w->x;
+    int32_t px = w->x;
     (void)*(volatile int32_t *)&w->x;        /* a number win: a rotation temporary */
+    self->stop = px;
     self->open = 1;
-    g_hudPanelX = w->x;
+    g_hudPanelX = px;
 
     ::WidgetAddChild(w, new AM2_HudRadar);
 

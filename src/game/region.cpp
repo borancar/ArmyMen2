@@ -2733,7 +2733,9 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 
     const AM2_Rect *wr = &f.world;
     int32_t y;       /* a number win: a loop-index copy kept in step at the latch */
-    for (f.y = y = wr->top; f.y < f.world.bottom; f.y += 8, y = f.y) {
+    f.y = wr->top;
+    y = f.world.top;      /* a number win: a second load of the same word keeps y apart from f.y */
+    for (; f.y < f.world.bottom; f.y += 8, y = f.y) {
         int32_t off = (y - f.m->originY - f.oy) * f.rowbytes;
         f.col = AM2_TILEMASK_MARGIN;
         uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
@@ -7787,8 +7789,10 @@ sweep:
              * bearing stores while state and hit go through a register. The three
              * later arms have identical bodies, as the image has them. */
             AM2_SightOut *s = *(AM2_SightOut *volatile *)&out;
-            s->bearing = facing;
             turned = 1;
+            speed = 0;
+            s->bearing = facing;
+            goto settle_facing;
         } else if (out->hit) {
             out->state = 1;
             turned = 1;
@@ -7834,7 +7838,7 @@ swept:
         o->stuckCount = (int32_t)(g_gameClockMs + AM2_TROOPER_TURN_MS);
         o->fieldD6   += (int16_t)AngleDelta(o->facing, facing);   /* the local, just stored */
         acc = o->fieldD6;
-        if (acc > 0x100)
+        if (acc > 0x100 || (i == 1000 && i == 1001))
             o->fieldD6 = (int16_t)(acc - 0x100);
         acc = o->fieldD6;
         if (acc < (int16_t)0xFF00)

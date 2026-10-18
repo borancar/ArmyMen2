@@ -2985,7 +2985,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
     int32_t     total = 0;
     AM2_Point   leg;
     int32_t     tile;
-    volatile int32_t d1;      /* a number win: stores the first distance straight to its slot */
+    struct { int32_t d1; AM2_Point lp; } fs;     /* a number win: the distance shares the escaping leg copy's frame object, so it stays in memory with plain accesses */
     uint8_t     fl;
 
     *inside = 0;
@@ -2995,7 +2995,7 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
         leg = f->waypoints[f->moveAt];
 
     for (o = chain; o; o = o->queryNext) {
-        AM2_Point lp = leg;
+        fs.lp = leg;
         AM2_Point ap = at;
         int32_t   w;
 
@@ -3014,12 +3014,12 @@ int32_t __cdecl BlockWeightRoute(AM2_Object *f, AM2_Point at,
                     goto ask;
                 goto skip;
             } else if (f && ObjIsTypeIn238(o)
-                       && ApproxDist(&ap, &o->pos) > (d1 = ApproxDist(&f->pos, &o->pos))) {
+                       && ApproxDist(&ap, &o->pos) > (fs.d1 = ApproxDist(&f->pos, &o->pos))) {
                 w = 0;
                 goto add;
             }
 ask:
-            *inside = PointInRect(&o->hit, &lp);
+            *inside = PointInRect(&o->hit, &fs.lp);
 skip:
             w = wt;
 
