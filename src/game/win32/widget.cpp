@@ -7957,8 +7957,8 @@ AM2_HudPanel::AM2_HudPanel()
                            g_hiliteColour,
                            g_backgroundColour,
                            (void (__cdecl *)(AM2_Widget *))0, 0, 0);
-        self->pointsField = btn;
         btn->disabled = 1;
+        self->pointsField = btn;
         ::WidgetAddChild(w, self->pointsField);
         (void)*(volatile int32_t *)&self->open;   /* a number win: a rotation temporary */
 
