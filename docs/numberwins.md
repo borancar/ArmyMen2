@@ -21,6 +21,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Volatile stores and locals**, `*(volatile int8_t *)&r->numb = ...`,
   `d1 = ApproxDist(...)` through a volatile local, a volatile pointer store in a written-out
   DEFAULT_LAYER.
+- **Self-referential ternary** `buf = buf ? buf : g_dynamic[i]->buffer;` in Update3DAudioVolumes (16 -> 12); revisit.
 - **Dead read after a return**, `(void)*(volatile int32_t *)&g_menuRow;` in TickMenuAnimation (DrawMenuCursor 30 -> 0); revisit.
 - **Negated tests**, `(-r->which) ? a : b` in OptionsDefaults, which is `x != 0` with a real `neg` the image does not have; revisit.
 - **Difference tests**, `a - b` for `a != b` (and `x - y >= 0`), which change which scratch
