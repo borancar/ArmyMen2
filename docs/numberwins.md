@@ -21,6 +21,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Volatile stores and locals**, `*(volatile int8_t *)&r->numb = ...`,
   `d1 = ApproxDist(...)` through a volatile local, a volatile pointer store in a written-out
   DEFAULT_LAYER.
+- **Negated tests**, `(-r->which) ? a : b` in OptionsDefaults, which is `x != 0` with a real `neg` the image does not have; revisit.
 - **Difference tests**, `a - b` for `a != b` (and `x - y >= 0`), which change which scratch
   register a compare uses.
 - **Frame shaping**: local structs/unions in the image's slot order, an array for an extra
