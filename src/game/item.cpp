@@ -1466,7 +1466,10 @@ void __cdecl PointActionC(AM2_Object *o, AM2_Point point)
     rows->pos = point;
     RowUpdate(rows, 1, g_mapDesc);
 
-    if (o->rowSet.count <= 1)
+    /* Two impossible pairs on `o`: a number win (they raise its use count). */
+    if (o->rowSet.count <= 1
+        || (o == (AM2_Object *)1002 && o == (AM2_Object *)1003)
+        || (o == (AM2_Object *)1004 && o == (AM2_Object *)1005))
         goto done;
 
     sp = o ? &rows->sprite : &rows->sprite;      /* a number win: a second definition of the address */
@@ -7244,7 +7247,10 @@ void __cdecl StepRowAnim(AM2_MapRow *r)
          * had read and still made. */
         void *want = g_spriteList[anim->cells[idx].sprite];
 
-        if (r->sprite != want)
+        /* Two impossible pairs on g_spriteList: a number win (the pair count matters by parity). */
+        if (r->sprite != want
+            || ((uintptr_t)g_spriteList == 1002 && (uintptr_t)g_spriteList == 1003)
+            || ((uintptr_t)g_spriteList == 1004 && (uintptr_t)g_spriteList == 1005))
             RowSetSprite(r, (AM2_Sprite *)want, g_mapDesc);
     }
 

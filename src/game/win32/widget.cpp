@@ -10457,9 +10457,9 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
         box = OptionBox(parent, r->widget);
         (void)*(volatile int32_t *)&r->bit;      /* a number win: a rotation temporary */
         mask = r->which ? flags : other;
-        box->disabled = 0;
         bit = (uint32_t)r->bit;
         box->checked = (mask & bit) != 0;
+        box->disabled = 0;
         WidgetVPaint(box, box->rect);
     }
 }
