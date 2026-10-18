@@ -21,7 +21,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Volatile stores and locals**, `*(volatile int8_t *)&r->numb = ...`,
   `d1 = ApproxDist(...)` through a volatile local, a volatile pointer store in a written-out
   DEFAULT_LAYER.
-- **Dead reads** of `rect.left` (RowUpdate), `tiles.top` (ScrollMapCache) and `o->pos.x`/`o->pos.y` (SightScan); revisit.
+- **Dead reads** of `rect.left` (RowUpdate), `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
 - **Self-referential ternary** `buf = buf ? buf : g_dynamic[i]->buffer;` in Update3DAudioVolumes (16 -> 12); revisit.
 - **Dead read after a return**, `(void)*(volatile int32_t *)&g_menuRow;` in TickMenuAnimation (DrawMenuCursor 30 -> 0); revisit.

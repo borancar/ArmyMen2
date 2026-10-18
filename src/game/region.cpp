@@ -5052,10 +5052,7 @@ finish:
     /* The result starts at zero and takes `best`, or the fallback `alt`
      * (null when there is neither); the image returns it from two
      * epilogues. */
-    (void)*(volatile int32_t *)&o->pos.x;
-    (void)*(volatile int32_t *)&o->pos.y;
     result = 0;
-    (void)*(volatile int32_t *)&stt.cand;   /* a number win: takes the candidate's address */
     if (hold.best) {
         AM2_Point anchor;
 
