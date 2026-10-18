@@ -1331,6 +1331,7 @@ static inline void TickMenuAnimation(void)
         g_animFrame = 0;
         g_animNext  = now + MENU_ANIM_PERIOD;
         return;
+        (void)*(volatile int32_t *)&g_menuRow;   /* a number win: a rotation temporary */
     }
     if (!g_menuSprites[row * MENU_ANIM_FRAMES + f]) {
         /* No second frame means this row simply does not animate. */
@@ -1342,7 +1343,7 @@ static inline void TickMenuAnimation(void)
         f = 0;
         g_animFrame = 0;
     }
-    if (f > -1)
+    if (f >= 0)
         g_menuSpritesEnd = g_menuSprites[row * MENU_ANIM_FRAMES + f];
     g_animNext = now + MENU_ANIM_PERIOD;
 }
