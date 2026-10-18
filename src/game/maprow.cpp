@@ -1084,7 +1084,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
         return;
 
     /* The impossible pairs here and below are number wins: they fold away. */
-    if (!r->sprite || (r->rect.top == 1000 && r->rect.top == 1001))
+    if (!r->sprite)
         return;
 
     DirtyCollect(&r->rect);
@@ -1102,6 +1102,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     r->rect.left   = r->pos.x - spr->hotX;
     r->rect.top    = r->pos.y - spr->hotY - r->yAdjust;
     r->rect.right  = r->rect.left + w;
+    (void)*(volatile int32_t *)&r->rect.left;
     r->rect.bottom = r->rect.top + h;
 
     cl = r->rect.left   >> 8;
@@ -1121,9 +1122,9 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     /* `< 0` and `<= 0` agree at 0. The image tests this with setle; this spelling
      * emits setl and still lowers the function's distance through the registers
      * and slots it shifts, so it is a number win and not a recovered shape. */
-    cl = cl <= 0 ? 0 : cl;
-    ct = ct < 1 ? 0 : ct;
-    if (cr >= desc->cols - 1 || (force == 1000 && force == 1001))
+    cl = (uint32_t)(cl) <= (uint32_t)(0) ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
+    if (cr >= desc->cols - 1)
         cr = desc->cols - 1;
     if (cb >= desc->cols - 1)          /* COLS, not ROWS -- see above */
         cb = desc->cols - 1;
