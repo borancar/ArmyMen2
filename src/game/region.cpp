@@ -1104,6 +1104,24 @@ static inline int32_t PathHeuristic(uint32_t fromTile, uint32_t toTile)
     return (int32_t)((double)PathDistXY(fromTile, toTile) * 1.5);
 }
 
+/* The same distance with the column mask held in a local, which makes the two
+ * masking ands consume it in the order the image does. */
+static inline int32_t PathDistXYM(uint32_t fromTile, uint32_t toTile)
+{
+    uint32_t m = *(const uint32_t *)&g_mapTilesW - 1;
+
+    return ApproxDistXY((int32_t)((toTile & m) - (fromTile & m)),
+                        (int32_t)((toTile
+                                   >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))
+                                  - (fromTile
+                                     >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))));
+}
+
+static inline int32_t PathHeuristicM(uint32_t fromTile, uint32_t toTile)
+{
+    return (int32_t)((double)PathDistXYM(fromTile, toTile) * 1.5);
+}
+
 /* Both exits end the same way: charge the search to the frame and, when it
  * took long enough to measure, move the node budget toward what this machine
  * actually managed. The two epilogues in the original are
@@ -1230,11 +1248,12 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 {
     uint32_t startTicks;
     int32_t  considered = 0;
-    int32_t  fromTile, toTile, goal, goalTile;
+    int32_t  fromTile, goal, goalTile;
+    uint16_t toTile;
     int32_t  startRegion, goalRegion;
     uint16_t cur;
     int32_t  curTile;
-    int32_t  i;
+    const int32_t *sp;
 
     (void)unused;
     *n = 0;
@@ -1273,7 +1292,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         ++g_pathGeneration;
 
         g_pathNodes[fromTile].g      = 0;
-        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(fromTile, toTile);
+        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristicM(fromTile, toTile);
         g_pathNodes[fromTile].depth  = 0;
         g_pathNodes[fromTile].stamp  =
             g_pathGeneration;
@@ -1309,9 +1328,9 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
         if (considered > g_pathMaxNodes) {
             int32_t hc;
-            hc = PathDistXY(cur & 0xFFFF, toTile);
+            hc = PathDistXYM(cur & 0xFFFF, toTile);
             hc = (int32_t)((double)hc * 1.5);
-            if ((uint16_t)hc > (uint16_t)PathHeuristic(fromTile, toTile)) {
+            if ((uint16_t)hc > (uint16_t)PathHeuristicM(fromTile, toTile)) {
 fail:
                 PathChargeFrameL(startTicks, considered);
                 return 0;
@@ -1328,13 +1347,14 @@ fail:
                 && g_regionOfCell[cur & 0xFFFF] == goalRegion))
             goto found;
 
+        sp = g_tileStep8;
         considered += AM2_TILE_STEP8_COUNT;
 
-        for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
-            int32_t  nb = curTile + g_tileStep8[i];
+        for (; sp < g_tileStep8 + AM2_TILE_STEP8_COUNT; sp++) {
+            int32_t  nb = curTile + *sp;
             uint32_t t;
             uint16_t g;
-            uint16_t h;
+            int32_t  h;
             uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
@@ -1350,7 +1370,8 @@ fail:
              * `g` is sixteen bits: the image adds the parent's G as a word
              * (`add di, [g]`) and the penalties to the full register, which is
              * what VC6 does for a uint16_t. */
-            g = (uint16_t)(PathDistXY(cur & 0xFFFF, t) * 2);
+            uint32_t dd = PathDistXYM(cur & 0xFFFF, t);
+            g = (uint16_t)(dd * 2);
             g += g_pathNodes[curTile].g;
             if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
                 g += 3;
