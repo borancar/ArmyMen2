@@ -11143,13 +11143,12 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     x = o->pos.x;
     y = o->pos.y;
 
-    left   = x + o->box.left;
-    top    = y + o->box.top;
-    o->hit.left   = left;
-    o->hit.top    = top;
     o->hit.right  = x + o->box.right;
     o->hit.bottom = y + o->box.bottom;
-    (void)*(volatile int32_t *)&y;
+    top    = y + o->box.top;
+    left   = x + o->box.left;
+    o->hit.top    = top;
+    o->hit.left   = left;
 
     if (!(o->flags & OBJ_FLAG_BIT0))
         return;
@@ -11169,6 +11168,7 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
     if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
         ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
         return;
+        (void)*(volatile int32_t *)&y;
     }
     cols = desc->cols;
 

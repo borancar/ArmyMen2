@@ -1103,6 +1103,7 @@ void __cdecl RowUpdate(AM2_MapRow *r, int32_t force, AM2_MapDesc *desc)
     r->rect.top    = r->pos.y - spr->hotY - r->yAdjust;
     r->rect.right  = r->rect.left + w;
     r->rect.bottom = r->rect.top + h;
+    (void)*(volatile int32_t *)&r->rect.left;
 
     cl = r->rect.left   >> 8;
     ct = r->rect.top    >> 8;
