@@ -176,7 +176,7 @@ def webs(src,fn,ids=None,reg=1):
 def image_ins(fn):
     import vc6lab
     key=fn[1:] if fn.startswith('=') else fn
-    key=key.lstrip('_?').split('@')[0]
+    if not key.startswith('??'): key=key.lstrip('_?').split('@')[0]
     va,b=vc6lab.image_function(key); b=b.rstrip(b'\xcc')
     while b.endswith(b'\x90'): b=b[:-1]
     out=[]

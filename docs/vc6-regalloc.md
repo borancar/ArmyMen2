@@ -1964,3 +1964,20 @@ compensate with pairs until the cursor realigns; `c2rot oracle2` predicted the
 shape (bump at event 15 plus freeze at event 21 -> 8 instructions) before the
 source form was found. Two `lea` temporaries are hoisted above the first `push`
 only if they have different registers.
+
+Practical notes for the tools (Round AJ): `c2rot.py` takes a constructor as
+`c2rot.py diag src/game/win32/widget.cpp 0AM2_HudPanel '??0AM2_HudPanel'` (FN without
+the leading `??`, the image name with it); `diag` and `oracle` take 2 to 4 minutes per
+mid-size function, `oracle2` over a wide window thousands of compiles. `c2rot.py web
+SRC FN ID:REG` forces a web into a register and diffs against the image in seconds,
+which is the quickest way to learn the target colouring. In zsh quote `'=_Name'` and
+do not `echo ====`. Do not run c2rot and sweep2 in the same `src/` at once.
+
+State of the unsolved residues, each with the colouring the oracle names: AddToItemList
+(arm-1 load web into ecx; `owner` dies first because c1 hoists `&g_uidCounter[owner]`),
+SelectionClick (ctrl-arm `pt` web into ecx), HudPanel ctor (the `pointsField` reload web
+into ecx after the store swap; a reg-reg copy of `px` that no spelling keeps),
+UpdateTrooperAction (events 14..16 do not advance the cursor in the image; arm 3 differs
+from arms 2 and 4 though the source is identical), TrooperFire (bump at 23, freeze at 25
+or 26), EncodeGlyph (the row counter coalesces with the dead `height` argument slot;
+untried: keep `height` live after the loop without extra code).
