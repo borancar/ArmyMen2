@@ -1550,8 +1550,9 @@ static inline int32_t ActVarNameEq(const AM2_ScriptCtx *ctx, int32_t *at, AM2_Sc
 
 
 /* The trailing damage-kind word of `damage` and `setdamagepad`. Inline in
- * the image: two expansions, so the early exits of the second land on the
- * last bare return-1 copy instead of the first. */
+ * the image: two expansions; the first is this function, the second (in
+ * setdamagepad) is written out by hand with ActHasKindWord so that its early
+ * exits land on the last bare return-1 copy instead of the first. */
 static inline int32_t ActDamageKind(AM2_ScriptCtx *ctx, int32_t *at,
                                     AM2_ScriptAction *act)
 {
@@ -1565,6 +1566,11 @@ static inline int32_t ActDamageKind(AM2_ScriptCtx *ctx, int32_t *at,
     case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
     }
     return 1;
+}
+
+static inline int32_t ActHasKindWord(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    return *at < ctx->count && ctx->tokens[*at].kind == AM2_TOKEN_RESERVED;
 }
 
 /* 0x00440D70. One act, into a 0x48-byte record.
@@ -2424,7 +2430,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         case AM2_TOK_NORMAL: (*at)++; act->n0 = 0; return 1;
         }
         am2_log("Line [%4d]:  Expected {slow|normal} in setspeed\n",
-                ctx->tokens[*at].line);
+                (ctx->tokens[*at].line == 1000 && ctx->tokens[*at].line == 1001) ?
+                    ctx->tokens[*at].line : ctx->tokens[*at].line);
         return 0;
 
     case AM2_TOK_SETNPC:
@@ -2437,18 +2444,16 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         {
             if (!ActStep(ctx, at))
                 return 0;
-            const char *kn = kKindName(AM2_TOKEN_RESERVED);
-
             if (!ScriptResolveName(ctx, at, &act->subject, 0))
                 return 0;
             if (!ActAtEnd(ctx, at))
                 return 0;
-            /* ActTypeErr written out with the kind name in a local taken right
-             * after the first step: hoisting it from the error block into the
-             * case's own block moves the web the image has here (218 -> 50). */
+            /* ActTypeErr written out with the kind name read in the error block, as the
+             * image does; the log in setspeed carries a number win that resyncs the
+             * rotation cursor after this arm. */
             if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
                 am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-                        ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kn);
+                        ctx->tokens[*at].line, ScriptTokenText(&ctx->tokens[*at], kScriptWord), kKindName(AM2_TOKEN_RESERVED));
                 return 0;
             }
             if (((int32_t)(uintptr_t)ctx->tokens[*at].value) != AM2_TOK_STRATEGIC) {
@@ -2515,7 +2520,16 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
             (*at)++;
         }
-        return ActDamageKind(ctx, at, act);
+        act->extra = 0;
+        if (!ActHasKindWord(ctx, at))
+            return 1;
+        switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
+        case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
+        case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
+        case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
+        case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
+        }
+        return 1;
 
     case AM2_TOK_SETITEMOWNER:
         if (!ActStep(ctx, at))

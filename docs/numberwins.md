@@ -25,6 +25,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Two impossible pairs on `drop`** in DrawSelection's `mh / 2 < wide` test (the `hp` injection it replaced is gone); revisit.
 - **Pairs on `anim->cells` / `r->sprite`** (StepRowAnim) and **a pair inside a call-argument ternary** (ScriptParseEvent) make a load a web instead of a rotation temporary; revisit.
 - **Pairs on `o->facing`** (two, in TrooperFire's conditions) and **on `f.world.top`** (ListMaskAction) resync the rotation cursor; revisit.
+- **A pair in a call-argument ternary** in ScriptParseActionRecon's setspeed log (resyncs the rotation cursor); revisit.
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
 - **Dead reads** of `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
