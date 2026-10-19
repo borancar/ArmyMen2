@@ -1398,7 +1398,7 @@ fail:
                         g_pathNodes[g_pathNodes[t].prev].next = g_pathNodes[t].next;
                     else
                         from = 0;
-                    if (g_pathNodes[t].next > 0 || (goalTile == 1000 && goalTile == 1001) || (goalTile == 1004 && goalTile == 1005))
+                    if (g_pathNodes[t].next > 0)
                         g_pathNodes[g_pathNodes[t].next].prev = g_pathNodes[t].prev;
                 } else if (g_pathNodes[t].state & 2) {
                     /* Closed: done with. */

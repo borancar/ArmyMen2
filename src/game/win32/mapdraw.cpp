@@ -2072,7 +2072,6 @@ void __cdecl DrawSelection(void)
         AM2_Object *obj = LookupByUID(
             g_selectedItems[i]);
         int32_t  x, y, wide, drop;
-        int32_t  hp;
         int32_t  fill;
         RECT     box;
         uint8_t  ink;
@@ -2100,29 +2099,26 @@ void __cdecl DrawSelection(void)
         if (ObjIsType2(obj)) {
             wide = AM2_MARK_TROOPER_W;
             drop = AM2_MARK_TROOPER_DY;
-            hp = obj->health;
         } else {
             wide = AM2_MARK_WIDE_W;
 
             if (obj->vehicleKind == 5) {
                 drop = AM2_MARK_BIG_DY;
-                hp = obj->health;
             } else {
                 const AM2_Sprite *spr = obj->rowSet.rows->sprite;
 
                 drop = (int32_t)(((uint32_t)spr->bounds.bottom
                                   - (uint32_t)(uint16_t)spr->hotY)
                                  & AM2_MARK_DY_MASK) + AM2_MARK_DY_BIAS;
-                hp = obj->health;
             }
         }
 
         int16_t mh = obj->maxHealth;
 
-        if (mh / 2 < wide)
+        if (mh / 2 < wide || (drop == 1000 && drop == 1001) || (drop == 1002 && drop == 1003))
             wide = mh / 2;
 
-        fill = hp > 0 ? obj->health * wide / mh : wide;
+        fill = obj->health > 0 ? obj->health * wide / mh : wide;
         x -= wide / 2;
 
         /* The frame first, then the filled part, then the remainder -- three

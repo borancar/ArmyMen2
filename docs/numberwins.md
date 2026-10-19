@@ -22,7 +22,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
   `d1 = ApproxDist(...)` through a volatile local, a volatile pointer store in a written-out
   DEFAULT_LAYER.
 - **Frame struct sharing** `struct { int32_t d1; AM2_Point lp; } fs;` in BlockWeightRoute replaces the old volatile `d1`; a second load `y = f.world.top` in ListMaskAction; a pair on `i` in UpdateTrooperAction; revisit.
-- **health read in each arm** (`hp` in DrawSelection) only to add a live web that moves a key; revisit.
+- **Two impossible pairs on `drop`** in DrawSelection's `mh / 2 < wide` test (the `hp` injection it replaced is gone); revisit.
 - **Pairs on `anim->cells` / `r->sprite`** (StepRowAnim) and **a pair inside a call-argument ternary** (ScriptParseEvent) make a load a web instead of a rotation temporary; revisit.
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
 - **Dead reads** of `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
