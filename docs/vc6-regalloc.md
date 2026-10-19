@@ -1889,3 +1889,67 @@ Two more levers from Round AD (2026-10-19):
   merge back by cross-jumping. Whether two webs interfere is decided by IL
   (source) order of definitions, not by the scheduled code, which is why the
   order of the RECT stores mattered too.
+
+## The scratch-register rotation (Round AF, 2026-10-19)
+
+Verified in the C2.DLL 8168 code and by running it under gdb. `tools/c2rot.py`
+(same harness as `c2webs.py`, needs a writable `src/`) prints it per function:
+`atr SRC FN` lists every rotation event (cursor 0/1/2 = eax/ecx/edx, chosen
+register, busy set, conflict set, hint); `map` shows which instruction changes if
+event K takes another register; `diag SRC FN IMG` prints ours beside the image;
+`oracle`/`oracle2` leave the cursor in place or advance it one extra slot at each
+event (or pair of events) and report the diff against the image, which tells you
+which event the image treats differently before you search for a source lever.
+Never run it, or sweep2, while another compile uses the same `src/`.
+
+- **Two allocators.** Webs (named locals, parameters, CSE temporaries) are
+  coloured by the pass `c2webs.py` prints. Everything else, the single-use
+  expression temporaries (most loads, leas, movsx, spill reloads), gets a
+  register in a later pass; that is why `c2webs`' register column looks wrong
+  for short temporaries. A value is a web only if referenced at least twice;
+  loads are common-subexpressed only within one basic block, pure address
+  arithmetic across blocks.
+- **The pass** (0x107335c3, once per function). The cursor starts at the head of
+  {eax, ecx, edx, esi, edi, ebx, ebp}, walks blocks in layout order (not source
+  order) and tuples in order, and is never reset between blocks. For each tuple
+  it retires its sources' registers (0x10733d44), then assigns results
+  (0x10733ddf; AssignTemp at 0x10734e4b for a result with no register).
+- **AssignTemp.** (a) Hint: a copy whose source is already in a register, or a
+  lea with a single base and no index, hints that register; taken if free and not
+  in conflict, and a hint never moves the cursor (this is how `add edi,0x12` and
+  `mov eax,[eax+8]` appear). (b) Rotation: scan eax, ecx, edx from the cursor,
+  wrapping once; take the first free, non-conflicting one and set the cursor to
+  the slot after it. (c) Fallback: scan the whole list from the head, cursor
+  unchanged; the only way esi/edi/ebx appear for temporaries.
+- **Consequence.** Every rotation temp advances the cursor one slot (two if a
+  conflict skips one); hint-assigned temps do not. Adding or removing one
+  slot-consuming temp shifts every later temp by one register until a skip or
+  hint resyncs. The usual change is a temp turning from rotation temp into a web
+  or back. The scheduler afterwards reorders around the chosen registers (two lea
+  temps in different registers can be hoisted above the first push; in the same
+  register they cannot).
+
+Levers, all used:
+
+- **L1** un-share a common subexpression so its temp becomes a rotation temp
+  (DirtyCollect 10 -> 0: `at = recs[at].next` shared `at*20` with `e = &recs[at]`
+  and made it a web; `at = e->next` makes it a rotation temp).
+- **L2** an impossible pair on a memory expression in the same block turns its
+  load into a web with no rotation slot (StepRowAnim 12 -> 0: pairs on
+  `anim->cells` and `r->sprite`). Parity matters. Pairs on a byte local fold in
+  c1xx; pairs on a pointer-sized compare of a frame address survive.
+- **L3** the same pair inside a call-argument ternary
+  `((L==K1 && L==K2) ? 0 : L)` shares a load that sits in a block with no
+  condition (ScriptParseEvent 30 -> 24).
+- **L4** duplicate an assignment into both arms of an if/else to raise a web's key
+  and flip colour order (OptionsDefaults 12 -> 10).
+- **L5** a dead volatile read adds one consumer, at a cost in bytes.
+
+Diagnosed and unsolved: SelectionClick (the ctrl-arm `pt` is a web; colouring it
+ecx reproduces the image, nothing in its penalties favours ecx); TrooperFire
+(`&target->pos` is a web because it shares `target+0x12` with the first position
+load, the image has a rotation temp one slot in front of the second lea);
+SightScan (the image's `add edi,0x12` follows from `cand` living in the same
+escaped object as `pick`; merging `pick` and `stt` into one struct fixes both lea
+sites but reloads `cand` after AngleDelta, 246, and needs re-tuning from there);
+UpdateTrooperAction (the image's arms all reload `out` into edx).

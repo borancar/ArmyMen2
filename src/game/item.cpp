@@ -7248,10 +7248,11 @@ void __cdecl StepRowAnim(AM2_MapRow *r)
          * had read and still made. */
         void *want = g_spriteList[anim->cells[idx].sprite];
 
-        /* Two impossible pairs on g_spriteList: a number win (the pair count matters by parity). */
+        /* Two impossible pairs, on anim->cells and r->sprite: a number win. Each makes that
+         * load a common subexpression (a web) instead of a rotation temporary. */
         if (r->sprite != want
-            || ((uintptr_t)g_spriteList == 1002 && (uintptr_t)g_spriteList == 1003)
-            || ((uintptr_t)g_spriteList == 1004 && (uintptr_t)g_spriteList == 1005))
+            || ((uintptr_t)anim->cells == 2000 && (uintptr_t)anim->cells == 2001)
+            || ((uintptr_t)r->sprite == 2002 && (uintptr_t)r->sprite == 2003))
             RowSetSprite(r, (AM2_Sprite *)want, g_mapDesc);
     }
 

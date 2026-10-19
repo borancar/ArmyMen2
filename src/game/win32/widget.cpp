@@ -10457,8 +10457,13 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
 
         const AM2_OptionRec *r = &g_optionTable[i];
         box = OptionBox(parent, r->widget);
-        mask = (-r->which) ? flags : other;      /* a number win: -x != 0 is x != 0 */
-        bit = (uint32_t)r->bit;
+        if (-r->which) {                          /* a number win: -x != 0 is x != 0 */
+            mask = flags;
+            bit = (uint32_t)r->bit;
+        } else {
+            mask = other;
+            bit = (uint32_t)r->bit;
+        }
         box->disabled = 0;
         box->checked = (mask & bit) != 0;
         WidgetVPaint(box, box->rect);

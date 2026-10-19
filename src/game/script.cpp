@@ -1144,7 +1144,7 @@ fail:
  * kind test as an argument: PADON writes `!=` and PADOFF a difference, a
  * number win per arm (the difference makes VC6 load the kind into a register
  * first, as the image does; `!=` in both arms makes PADOFF a memory compare). */
-#define PAD_EVENT(K, NO_NAME, NOT_A_PAD, KTEST)                             \
+#define PAD_EVENT(K, NO_NAME, NOT_A_PAD, KTEST, LA, LB)                     \
     *kind = (K);                                                            \
     if (!ScriptStep(ctx, at))                                               \
         return 0;                                                           \
@@ -1154,12 +1154,12 @@ fail:
     name = (const char *)tok->value;                                        \
     idx = ScriptFindName(name);                                             \
     if (idx < 0) {                                                          \
-        am2_log(NO_NAME, ctx->tokens[*at].line);                            \
+        am2_log(NO_NAME, LA);                                               \
         return 0;                                                           \
     }                                                                       \
     /* Type 1 is what `pad` declares. */                                    \
     if (kScriptNames[idx].type != AM2_NAME_TYPE_PAD) {                      \
-        am2_log(NOT_A_PAD, ctx->tokens[*at].line);                          \
+        am2_log(NOT_A_PAD, LB);                                             \
         return 0;                                                           \
     }
 /* `by <target>` is optional; without it *val2 keeps the zero written on
@@ -1200,7 +1200,9 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
             PAD_EVENT(AM2_EVT_PADON,
                       "Line [%4d]:  Name required after PADON\n",
                       "Line [%4d]:  PADON name was not a pad\n",
-                      tok->kind != AM2_TOKEN_STRING);
+                      tok->kind != AM2_TOKEN_STRING,
+                      ctx->tokens[*at].line,
+                      ((ctx->tokens[*at].line == 1000 && ctx->tokens[*at].line == 1001) ? 0 : ctx->tokens[*at].line));
         pad_found:
             /* The two pad events share this tail. */
             *val = kScriptNames[idx].value;
@@ -1210,7 +1212,9 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
             PAD_EVENT(AM2_EVT_PADOFF,
                       "Line [%4d]:  Name required after PADOFF\n",
                       "Line [%4d]:  PADOFF name was not a pad\n",
-                      tok->kind - AM2_TOKEN_STRING);
+                      tok->kind - AM2_TOKEN_STRING,
+                      ((ctx->tokens[*at].line == 1000 && ctx->tokens[*at].line == 1001) ? 0 : ctx->tokens[*at].line),
+                      ctx->tokens[*at].line);
             goto pad_found;
         case AM2_TOK_KILLED:
             HIT_EVENT(AM2_EVT_KILLED,

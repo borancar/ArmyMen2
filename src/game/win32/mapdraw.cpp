@@ -3033,6 +3033,7 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
     AM2_Rect  cur;
     AM2_Rect  hit;
     int32_t   at;
+    AM2_DirtyRec *e;
 
     if (!IntersectRect((LPRECT)&cur, (const RECT *)r,
                        (const RECT *)&g_viewRectPrev))
@@ -3046,9 +3047,10 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
         return;
     }
 
-    for (at = g_dirtyHead; at; at = recs[at].next) {
-        AM2_DirtyRec *e = &recs[at];
+    for (at = g_dirtyHead; at; at = e->next) {
         int32_t       code;
+
+        e = &recs[at];
 
         if (!IntersectRect((LPRECT)&hit, (const RECT *)&cur, (const RECT *)e))
             continue;
