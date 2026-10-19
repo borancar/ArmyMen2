@@ -2788,7 +2788,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                     *c |= AM2_TILEMASK_BOX_CELL;
                     MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
-            } else if (bits[off]) {
+            } else if ((bits[off] || (f.world.top == 1000 && f.world.top == 1001))) {
                 f.marked = 1;
                 int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                 *c |= AM2_TILEMASK_BOX_CELL;
@@ -7538,23 +7538,22 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
         o->sight.spot.ground = z;
         spot.ground = z;
 
-        def = w->typeRec;
         /* One jitter after the optional turn: both kind tests branch to the
          * same JitterFacing at 0x0044A1C2. */
-        if (def->kind != AM2_ITEM_KIND_MEDI && def->kind != AM2_ITEM_KIND_WREN)
+        if (w->typeRec->kind != AM2_ITEM_KIND_MEDI && w->typeRec->kind != AM2_ITEM_KIND_WREN)
             TrooperFaceTo(o, &target->pos);
         heading = JitterFacing(w, o->facing);
         fired = FireWeaponB(w, o, ObjHeight(o), heading, spot, target);
     } else {
         const AM2_FireSpot *at = &out->spot;
 
-        if (at->at.x != 0 && ObjCodeUnmapped(w)) {
+        if (at->at.x != 0 && (ObjCodeUnmapped(w) || (o->facing == 2000 && o->facing == 2001))) {
             /* Turned to face it only when it is somewhere else: a point
              * we are standing on still gets fired at, unturned. The
              * image's PointsDiffer `je` lands on the jitter below, not on
              * the no-point arm -- this was once one condition, which sent
              * that case one weapon-range down the heading instead. */
-            if (PointsDiffer(o->pos, at->at))
+            if (PointsDiffer(o->pos, at->at) || (o->facing == 3000 && o->facing == 3001))
                 TrooperFaceTo(o, &at->at);
             heading = JitterFacing(w, o->facing);
             fired = FireWeaponB(w, o, ObjHeight(o), heading, *at, 0);

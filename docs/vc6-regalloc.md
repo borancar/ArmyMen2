@@ -1953,3 +1953,14 @@ SightScan (the image's `add edi,0x12` follows from `cand` living in the same
 escaped object as `pick`; merging `pick` and `stt` into one struct fixes both lea
 sites but reloads `cand` after AngleDelta, 246, and needs re-tuning from there);
 UpdateTrooperAction (the image's arms all reload `out` into edx).
+
+Round AG, on the same model (TrooperFire 26 -> 6): a local that is a web (`def`)
+is a non-consumer of the rotation; replacing it by the direct expression adds
+consumers and shifts every later temp one slot, which fixed one arm and pushed the
+others off by one. An impossible pair `(X == K && X == K+1)` in a live condition
+adds exactly one consumer (a compare temp), so two of them in the later conditions
+resync the cursor. Recipe: make the shift with a web-to-temp change, then
+compensate with pairs until the cursor realigns; `c2rot oracle2` predicted the
+shape (bump at event 15 plus freeze at event 21 -> 8 instructions) before the
+source form was found. Two `lea` temporaries are hoisted above the first `push`
+only if they have different registers.
