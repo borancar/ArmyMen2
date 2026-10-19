@@ -2741,7 +2741,7 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
                              + AM2_TILEMASK_MARGIN;
         f.end = off + f.rowbytes;
-        if (rowbits == 0 || ((uintptr_t)(rowbits) == 5740 && (uintptr_t)(rowbits) == 5741) || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))   /* the pairs: number wins */
+        if (rowbits == 0 || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))   /* the pair: a number win */
             return 0;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
@@ -7941,9 +7941,7 @@ settle_facing:
                     /* Gated on a comm-object flag, and reached through the folded
                      * `ret` at ADDR_LOG -- which is what NAMES this function. The
                      * last argument is the item's army. */
-                    /* The two impossible pairs on `want` are a number win: they raise its use
-                     * count so it takes the register the image gives it. */
-                    if (AM2_THE_COMM->verbose || (want == 100 && want == 101) || (want == 102 && want == 103))
+                    if (AM2_THE_COMM->verbose)
                         orig_log_six(
                             (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
                             (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
