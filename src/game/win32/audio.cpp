@@ -1641,10 +1641,11 @@ void __cdecl Update3DAudioVolumes(void)
     for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
         if (!g_dynamic[i])
             continue;
-        buf = g_dynamic[i]->buffer;
-        buf = buf ? buf : g_dynamic[i]->buffer;   /* number win: second reaching definition */
-        if (!buf)
+        /* number win: a volatile test of the field, then a plain read of it; the image tests a
+         * load temporary and copies it into the argument register. */
+        if (!*(LPDIRECTSOUNDBUFFER volatile *)&g_dynamic[i]->buffer)
             continue;
+        buf = g_dynamic[i]->buffer;
 
         IDirectSoundBuffer_GetStatus(buf, &status);
         if (status & DSBSTATUS_PLAYING) {

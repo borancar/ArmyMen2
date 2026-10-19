@@ -1141,9 +1141,9 @@ fail:
  * as the image has them -- the five `<verb> <target> [by <target>]` events and
  * the two pad events differ only in the kind they record and the messages
  * they print, which is what the macros carry. The pad macro takes its token
- * kind test as an argument: PADON writes `!=` and PADOFF a difference, a
- * number win per arm (the difference makes VC6 load the kind into a register
- * first, as the image does; `!=` in both arms makes PADOFF a memory compare). */
+ * kind test as an argument; both arms write `!=` now that the argument-list
+ * pairs below put the line loads where the image has them (before that, PADOFF
+ * wrote a difference to make VC6 load the kind into a register first). */
 #define PAD_EVENT(K, NO_NAME, NOT_A_PAD, KTEST, LA, LB)                     \
     *kind = (K);                                                            \
     if (!ScriptStep(ctx, at))                                               \
@@ -1212,7 +1212,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
             PAD_EVENT(AM2_EVT_PADOFF,
                       "Line [%4d]:  Name required after PADOFF\n",
                       "Line [%4d]:  PADOFF name was not a pad\n",
-                      tok->kind - AM2_TOKEN_STRING,
+                      tok->kind != AM2_TOKEN_STRING,
                       ((ctx->tokens[*at].line == 1000 && ctx->tokens[*at].line == 1001) ? 0 : ctx->tokens[*at].line),
                       ctx->tokens[*at].line);
             goto pad_found;

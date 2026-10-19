@@ -28,7 +28,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
 - **Dead reads** of `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
-- **Self-referential ternary** `buf = buf ? buf : g_dynamic[i]->buffer;` in Update3DAudioVolumes (16 -> 12); revisit.
+- **Volatile test then plain read** of `g_dynamic[i]->buffer` in Update3DAudioVolumes (replaces the self-referential ternary; 12 -> 2); revisit.
 - **Dead read after a return**, `(void)*(volatile int32_t *)&g_menuRow;` in TickMenuAnimation (DrawMenuCursor 30 -> 0); revisit.
 - **Negated tests**, `(-r->which) ? a : b` in OptionsDefaults, which is `x != 0` with a real `neg` the image does not have; revisit.
 - **Difference tests**, `a - b` for `a != b` (and `x - y >= 0`), which change which scratch
