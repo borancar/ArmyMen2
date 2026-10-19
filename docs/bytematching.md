@@ -335,3 +335,20 @@ for 16 bytes. That is true only for `cl == 0`, so a negative `cl` (a rect
 hanging off the left edge) went unclamped. The unsigned-cast compares in
 ScriptIf are safe because both sides are a token index and a count; check each
 one for the domain it is used on, not for the bytes it saves.
+
+### Census of the last 28 (2026-10-19, 1,220 bytes)
+
+Differing instruction pairs by class (jump and call targets masked): register-only
+swaps 122 across 18 functions; a store or load placed one or two instructions off
+about 50 (16 functions); argument-materialising `lea`/`add` about 30; mov operand
+form 18; one structural block 13 (RowUpdate); `lea` against `add` 5; signed against
+unsigned jump 2 (ScriptIf); `test` against `cmp` 2; `sub` against `cmp` (the
+difference-test trick) 4; width 1 (DrawSelection `int16_t fill`); push order 0.
+About 80% is register colouring or single-instruction scheduling; only about 12
+pairs belong to opcode-level levers. Open leads, each needing a colour lever and
+not a spelling: SightScan (swap the two increments, 64, and sink the argument
+loads after the stores); DrawSelection (`int32_t fill`, then raise `drop`'s key by
+about 16); ParseScenarios (`test al,al` without the {ebx} singleton, e.g. a second
+byte-restricted web); ScriptIf (a signed compare with distinct continuation targets
+so the shared tails do not merge); AddToItemList (needs both the counter value in
+ecx and the counter web's key above uid's).
