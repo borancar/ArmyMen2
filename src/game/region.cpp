@@ -1350,7 +1350,7 @@ fail:
         sp = g_tileStep8;
         considered += AM2_TILE_STEP8_COUNT;
 
-        for (; sp < g_tileStep8 + AM2_TILE_STEP8_COUNT; sp++) {
+        for (; (intptr_t)sp < (intptr_t)(g_tileStep8 + AM2_TILE_STEP8_COUNT); sp++) {   /* signed, as the image's jl; both are in one table */
             int32_t  nb = curTile + *sp;
             uint32_t t;
             uint16_t g;
