@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1617 of 1646 functions
-byte-identical, 29 differing, 1,290 bytes of total edit distance. The live
+byte-identical, 29 differing, 1,316 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -328,3 +328,10 @@ Measured facts from Round R, for whoever tries next:
   DrawSelection with `int32_t fill` (68 -> 78, shape 21 -> 8), ParseScenarios
   with the parameter used in place (38 -> 106, shape 3), UpdateTrooperAction
   arm 1 as `turned = 1; speed = 0; s->bearing = facing;` (22 -> 46).
+
+**A respelling is only a respelling if it is equal for every input.** RowUpdate's
+`cl <= 0 ? 0 : cl` was once written `(uint32_t)(cl) <= (uint32_t)(0) ? 0 : cl`
+for 16 bytes. That is true only for `cl == 0`, so a negative `cl` (a rect
+hanging off the left edge) went unclamped. The unsigned-cast compares in
+ScriptIf are safe because both sides are a token index and a count; check each
+one for the domain it is used on, not for the bytes it saves.
