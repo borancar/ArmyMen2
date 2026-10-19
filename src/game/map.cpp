@@ -875,17 +875,15 @@ done:
  */
 int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
 {
-    int32_t        remaining = remaining_in;
     int32_t        count;
     AM2_Scenario  *table;
     int32_t        i;
 
-    g_scenarioUnread = 0;
-    g_scenarios      = (AM2_Scenario *)0;
+    memset((void *)&g_scenarioUnread, 0, 8);
 
     count = *(const int32_t *)at;
     at += 4;
-    remaining -= 4;
+    remaining_in -= 4;
 
     table = (AM2_Scenario *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
     g_scenarios = table;
@@ -899,7 +897,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
 
         hdr = *(const AM2_ScenHdr *)at;
         at += AM2_SCENARIO_HDR_BYTES;
-        remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
+        remaining_in -= (int32_t)AM2_SCENARIO_HDR_BYTES;
 
         if (strncmp(hdr.tag, "Scenario",
                     AM2_SCENARIO_TAG_BYTES) != 0)
@@ -909,7 +907,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
         {
             uint8_t digit = (uint8_t)hdr.digit;
 
-            which = digit < 1 ? 0 : (int32_t)(int8_t)digit - '1';   /* digit is uint8_t: the same as !digit, minus a byte use of the zero web */
+            which = !digit ? 0 : (int32_t)(int8_t)digit - '1';
 
         }
 
@@ -920,13 +918,13 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
             int32_t took = ParseScenarioPart(&rec->parts[part], at);
 
             at += took;
-            remaining -= took;
+            remaining_in -= took;
         }
     }
 
     /* Kept, and said out loud: GCC's own "set but not used" on this parameter
      * is the same finding the disassembly gives, arrived at independently. */
-    (void)remaining;
+    (void)remaining_in;
     return count;
 }
 

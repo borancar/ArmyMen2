@@ -2072,7 +2072,8 @@ void __cdecl DrawSelection(void)
         AM2_Object *obj = LookupByUID(
             g_selectedItems[i]);
         int32_t  x, y, wide, drop;
-        int16_t  fill;       /* a number win: |fill| <= maxHealth / 2 fits 16 bits */
+        int32_t  mw;
+        int32_t  fill;
         RECT     box;
         uint8_t  ink;
 
@@ -2099,21 +2100,24 @@ void __cdecl DrawSelection(void)
         if (ObjIsType2(obj)) {
             wide = AM2_MARK_TROOPER_W;
             drop = AM2_MARK_TROOPER_DY;
+            mw = obj->maxHealth;
         } else {
             wide = AM2_MARK_WIDE_W;
 
             if (obj->vehicleKind == 5) {
                 drop = AM2_MARK_BIG_DY;
+                mw = obj->maxHealth;
             } else {
                 const AM2_Sprite *spr = obj->rowSet.rows->sprite;
 
                 drop = (int32_t)(((uint32_t)spr->bounds.bottom
                                   - (uint32_t)(uint16_t)spr->hotY)
                                  & AM2_MARK_DY_MASK) + AM2_MARK_DY_BIAS;
+                mw = obj->maxHealth;
             }
         }
 
-        int16_t mh = obj->maxHealth;
+        int16_t mh = (int16_t)mw;
 
         if (mh / 2 < wide)
             wide = mh / 2;
@@ -2123,10 +2127,10 @@ void __cdecl DrawSelection(void)
 
         /* The frame first, then the filled part, then the remainder -- three
          * ClearRegions over one rectangle, each narrowing it. */
-        box.top    = y + drop;
-        box.bottom = y + drop + 4;
         box.left   = x - 1;
         box.right  = x + wide + 1;
+        box.top    = y + drop;
+        box.bottom = y + drop + 4;
         ClearRegion(&box, g_backgroundColour);
 
         box.left   = x;

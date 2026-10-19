@@ -1874,3 +1874,18 @@ What this explained, and fixed:
   `lea` temporaries, which the table does not show; DrawSelection needs
   `drop >= wide` (about -16 on `wide`) and the moves that flip it change the code;
   ScrollMapCache needs `dy` above 100 or temporary `a` below 62.
+
+Two more levers from Round AD (2026-10-19):
+
+- **Zero stores.** The shared constant-0 web gets cost from its stores of 0.
+  ParseScenarios' two entry stores (`g_scenarioUnread = 0; g_scenarios = 0;`)
+  made it a cost-1 singleton {ebx} under `test al,al`; one adjacent 8-byte
+  `memset` (as FreeScenarios already does) leaves it a cost of -1 or less, so no
+  penalty. Check `tools/c2allow.py --all-pops` for a singleton with cost > 0.
+- **Raising a key without changing code.** Assigning a later-used value in each
+  arm of an earlier branch (DrawSelection `mw = obj->maxHealth;`) adds a live web
+  to the arm blocks (N+1), which raises the key of whatever is referenced there
+  (`drop`, weight 10 in the sprite arm, about +20 against `wide`'s -2). The loads
+  merge back by cross-jumping. Whether two webs interfere is decided by IL
+  (source) order of definitions, not by the scheduled code, which is why the
+  order of the RECT stores mattered too.
