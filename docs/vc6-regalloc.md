@@ -1784,3 +1784,55 @@ keeps `mask` live and fixes `setne dl`. That took the clone from 26 lines
 off the image to 10, of which 4 are relocated constants and 6 are the `box`
 load's registers. No natural source with that effect has been found, so
 nothing is applied yet.
+
+## What C2.DLL does when it colours (observed live, 2026-10-19)
+
+Measured with gdb on C2.DLL build 8168 (loaded at 0x10700000), following the
+compiler child process; `tools/c2webs.py SRC FUNCTION` prints the table for one
+function in about a second (needs gdb, `build/vc6host`, VC6_ROOT, and a writable
+`src/` because it compiles a sibling temp copy). The earlier sections of this
+file are rules measured from outside; this is the algorithm they approximate.
+
+- **Order.** The driver at 0x10720610 runs once per function and colours in
+  rounds. A round pops webs (live ranges) in DESCENDING `key` (web+0x0c;
+  insertion sort at 0x10715922). A tie goes to the larger web+0x40, the
+  position of the last reference. When a web cannot be coloured c2 splits or
+  spills, recomputes the costs (0x1071431d) and starts another round.
+- **Key.** Sum over blocks of `N_b * 2^depth_b * k_b`, with some negative credit
+  terms. `N_b` is the popcount of the block's live-web set plus the webs listed
+  in the block; `k_b` is the sum of per-reference costs (1 or 2 per reference,
+  by final tree shape, e.g. whether the instruction can take a memory operand).
+  It is computed on the post-optimisation tree, so a use that folds away before
+  cost time adds nothing.
+- **Register choice** (0x10716715). Candidates in the order eax, ecx, edx, esi,
+  edi, ebx, ebp; among those still allowed for the web, take the lowest
+  penalty, ties to the earlier candidate. Penalty: minus a bonus for registers
+  the web hints at (copies, call results), plus hint weights of other
+  uncoloured webs, plus **cost x 100 on the single register of any uncoloured
+  web whose allowed set has exactly one element**. That last term is why a
+  byte-register web (a `char` from a digit test) forced to ebx makes every
+  earlier pick avoid ebx.
+- **What does not move a key.** Symbol numbering in the IL, operand order,
+  copies, `x = x - y` against `x -= y`, loop spelling (for/while/do-while),
+  casts, dead loads inserted in the IL, and the helper's signature (inlining
+  happens inside c2, not c1xx). Impossible pairs count only when the variable
+  is a pointer tested in a condition that really executes; pairs on int
+  variables, and after a call-result test, were dropped before cost time in
+  ParseScenarios, so "pairs raise a use count" cannot be assumed everywhere.
+- **What does.** The number and shape of surviving references (an extra `lea`
+  or memory operand raises `k`), block structure and live-web counts, loop
+  depth, and statement placement across blocks (moved a key by up to +22).
+
+How to use it: print the table before spending search time on a colour tie, and
+only search when the gap between the two competing keys is small.
+
+- ParseScenarios: ours colours `counter` (72) before `remaining` (47), so
+  `remaining` gets ebx; the image needs key(remaining) >= 72. Moving
+  `remaining -= 16` after the digit block gives 69 with identical code but also
+  lifts the counter to 84. Forms that do flip it change the instruction count.
+- BlockWeightTroops: `d1` (32) is coloured before `w` (10), so `w` gets ebp; the
+  image has `w` in ebx. Extra live pointers lower a key (a negative credit
+  term). Calling ApproxDist in the compare gives the image's colours but a
+  stack temporary costs two instructions.
+- DrawSelection: needs key(drop) >= key(wide) and `y` coloured below about 96,
+  both at once. Pairs on `drop` achieve the first and then `y` takes edi.
