@@ -1836,3 +1836,41 @@ only search when the gap between the two competing keys is small.
   stack temporary costs two instructions.
 - DrawSelection: needs key(drop) >= key(wide) and `y` coloured below about 96,
   both at once. Pairs on `drop` achieve the first and then `y` takes edi.
+
+### The singleton-register penalty (Round Z, 2026-10-19)
+
+`tools/c2blk.py SRC FN` prints the per-block rows behind each key (N, 2^depth,
+referenced and live-through webs) and `tools/c2allow.py SRC FN --all-pops` prints
+each web's allowed-register set; together they show why a tie goes the way it
+does. Two corrections to the model above:
+
+- **Key.** `key = sum over blocks of N_b * 2^depth_b * S_b` if the web is
+  referenced in the block, `-1 * N_b * 2^depth_b` if it is only live through it.
+  `S_b` is the sum of per-reference weights: a read-modify-write operand counts
+  1, a plain def or a `lea` counts 2. `N_b` is the popcount of the live set plus
+  the distinct webs referenced in the block. Summing the instrumented rows
+  reproduced the table exactly, and a predicted +22 for one extra `remaining -= 4`
+  in the outer-latch block was observed as +22.
+- **Penalty.** `pen[reg] += 100 * cost` for every uncoloured web with cost > 0
+  whose allowed set is exactly one register. Webs 1..3 are not hard registers.
+
+What this explained, and fixed:
+
+- **ParseScenarios 38 -> 26.** The shared constant-0 web (two entry stores, the
+  `test` compares, the zero arm) is live across calls, so only callee-saved
+  registers are allowed; `test al,al` on the digit byte gave it a byte use, which
+  left {ebx} and charged ebx 100 for every web coloured before it. `digit < 1` in
+  place of `!digit` removes that byte use. The gap was never in the keys.
+- **BlockWeightTroops 30 -> 0.** The reverse: byte-restrict a long-lived web that
+  crosses calls so it becomes a singleton {ebx}, and every web coloured before it
+  avoids ebx. `return (int8_t)w == 0 ? w : w;` does it; the cast survives c1xx
+  because it is a CFG at the return, and c2 folds the identical arms only after
+  cost time. The same cast in an assignment, an expression statement or a helper
+  argument folds early and does nothing; the web must be the returned variable.
+- **Where else to look.** The first table rows of SightScan (id3), ListMaskAction
+  and ObjHitMaskAction (id3), UpdateTrooperAction (id5), MissionEnded, HudPanel
+  ctor and FindPath show the same big singleton zero web or cost-24 web.
+- **Not reachable this way.** TrooperFire is the post-allocation order of two
+  `lea` temporaries, which the table does not show; DrawSelection needs
+  `drop >= wide` (about -16 on `wide`) and the moves that flip it change the code;
+  ScrollMapCache needs `dy` above 100 or temporary `a` below 62.

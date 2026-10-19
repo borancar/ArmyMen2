@@ -3762,7 +3762,7 @@ static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
         if (ApproxDist(&ref, &o->pos) >= d1)
             return 0;
     }
-    return w;
+    return (int8_t)w == 0 ? w : w;   /* a number win: byte-restricts w so it takes ebx */
 }
 
 int32_t __cdecl BlockWeightTroops(AM2_Object *from, AM2_Point at, AM2_Object *chain,

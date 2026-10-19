@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""c2webs.py SRC FUNCTION [--edits EDITS.py] [--all-pops]
+
+Print the VC6 code generator's (C2.DLL build 8168) register-allocation table for
+one function: every web (live range) in the order c2 colours it, with the key it
+is sorted by, its reference count and weighted cost, the penalty vector in force
+when it chose, and the register it got.  The point is to see WHY a register tie
+goes the way it does, instead of guessing at spellings.
+
+    SRC       a game source file relative to the repo (src/game/item.cpp)
+    FUNCTION  substring of the decorated name (BlockWeightTroops)
+    --edits   EDITS.py defining E=[(old,new),...], applied to a temp copy
+              of SRC exactly as relinkscreen.py does (so you can compare tables)
+
+How it works: it compiles SRC (a sibling temp copy, with the relink defines)
+under gdb with detach-on-fork off, follows the c2 child, and breakpoints the
+allocator at fixed addresses of C2.DLL 8168 (loaded at 0x10700000):
+
+    0x10720610  per-function driver (name: [[ctx+0]+0x18])
+    0x107208b7  pop of the next web from the colouring list
+    0x1071689a  register chosen (penalty vector at 0x1079d868, 9 dwords)
+    0x1071431d  cost/key computation (re-run after every split/spill round)
+
+Web record fields used: +0x0c key, +0x14 next, +0x1c id, +0x24 refs, +0x3c cost,
++0x40 tie-break (k40), +0x10 chosen register descriptor.  See the model in
+docs/vc6-regalloc.md ("What C2.DLL does when it colours").
+
+Needs gdb, build/vc6host, VC6_ROOT as for relinkscreen.py.  Takes about a second.
+"""
+import os, re, runpy, subprocess, sys, tempfile
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(REPO, "src", "vc6"))
+import bytematch as BM  # noqa: E402
+
+GDB_PY = r'''
+import gdb, struct, os
+log = open(os.environ['C2W_OUT'], 'w')
+FN = os.environ.get('C2W_FN', '')
+ALL = os.environ.get('C2W_ALL') == '1'
+def rd(a, n): return gdb.selected_inferior().read_memory(a, n).tobytes()
+def u32(a): return struct.unpack('<I', rd(a, 4))[0]
+def s32(x): return x - 2**32 if x >= 2**31 else x
+def w(m): log.write(m + '\n'); log.flush()
+active = [False]
+class Drv(gdb.Breakpoint):
+    def __init__(s): super().__init__('*0x10720610')
+    def stop(s):
+        try:
+            ecx = int(gdb.parse_and_eval('$ecx')) & 0xffffffff
+            nm = rd(u32(u32(ecx) + 0x18), 80).split(b'\0')[0].decode('latin1')
+            active[0] = FN in nm
+            if active[0]: w('DRIVER ' + nm)
+        except Exception: active[0] = False
+        return False
+class Blk(gdb.Breakpoint):
+    def __init__(s): super().__init__('*0x10714465')
+    def stop(s):
+        if not active[0]: return False
+        esi = int(gdb.parse_and_eval('$esi')) & 0xffffffff
+        esp = int(gdb.parse_and_eval('$esp')) & 0xffffffff
+        ecx = int(gdb.parse_and_eval('$ecx')) & 0xffffffff
+        edi = int(gdb.parse_and_eval('$edi')) & 0xffffffff
+        d2 = u32(esp + 0x24)
+        l1 = []; p = edi; n = 0
+        while p and n < 60:
+            l1.append('%x:w%d%s' % (u32(p + 0x1c), s32(u32(p + 0x18)), '' if u32(p + 0x10) == 0 else '*')); p = u32(p + 0x14); n += 1
+        l2 = []; p = ecx; n = 0
+        while p and n < 60:
+            fl = rd(p + 6, 1)[0]
+            l2.append('%x:%s%d' % (u32(p + 0x1c), 'R' if fl & 0x10 else 'L', s32(u32(p + 0x18)))); p = u32(p + 0x14); n += 1
+        w('BLK N=%d x%d  ref/list1=[%s]  list2=[%s]' % (esi, d2, ' '.join(l1), ' '.join(l2)))
+        return False
+class Cst(gdb.Breakpoint):
+    def __init__(s): super().__init__('*0x1071431d')
+    def stop(s):
+        if active[0]: w('COSTS (new round)')
+        return False
+class Pick(gdb.Breakpoint):
+    def __init__(s): super().__init__('*0x1071689a')
+    def stop(s):
+        if not active[0]: return False
+        ebx = int(gdb.parse_and_eval('$ebx')) & 0xffffffff
+        edi = int(gdb.parse_and_eval('$edi')) & 0xffffffff
+        f = struct.unpack('<18I', rd(ebx, 0x48))
+        pen = struct.unpack('<9i', rd(0x1079d868, 36))
+        w('PICK id%x key=%d k40=%x refs=%d cost=%d pen=%s chosen=%d' % (f[7], f[3], f[0x10], f[9], s32(f[15]), list(pen), edi))
+        return False
+Drv(); Blk(); Cst(); Pick()
+gdb.execute('continue')
+'''
+GDB_CMDS = '''set pagination off
+set debuginfod enabled off
+set breakpoint pending on
+set detach-on-fork off
+set follow-fork-mode parent
+set schedule-multiple on
+break c2_override_pass
+run
+inferior 1
+continue
+source %s
+'''
+REG = {1: 'eax', 2: 'ecx', 3: 'edx', 4: 'ebx', 6: 'ebp', 7: 'esi', 8: 'edi'}
+
+def main():
+    args = sys.argv[1:]
+    if len(args) < 2: sys.exit(__doc__)
+    src, fn = args[0], args[1]
+    edits = None; allpops = '--all-pops' in args
+    if '--edits' in args: edits = runpy.run_path(args[args.index('--edits') + 1])['E']
+    path = os.path.join(REPO, src); d = os.path.dirname(path)
+    text = open(path).read()
+    for o, n in (edits or []):
+        if o not in text: sys.exit('edit does not apply: %r' % o[:60])
+        text = text.replace(o, n)
+    tmp = os.path.join(d, 'c2w_tmp.cpp'); open(tmp, 'w').write(text)
+    work = tempfile.mkdtemp(prefix='c2w-')
+    py = os.path.join(work, 't.py'); open(py, 'w').write(GDB_PY)
+    gc = os.path.join(work, 'g.gdb'); open(gc, 'w').write(GDB_CMDS % py)
+    out = os.path.join(work, 'out.txt')
+    env = dict(os.environ, INCLUDE=BM.SHIM + ';' + os.path.join(BM.VC6_ROOT, 'VC98', 'INCLUDE'),
+               VC6_IL_LOG='1', C2W_OUT=out, C2W_FN=fn, C2W_ALL='1' if allpops else '0')
+    try:
+        subprocess.run(['gdb', '-q', '-batch', '-x', gc, '--args', BM.HOST, BM.CL, '/O2', '/GX', '/c',
+                        '/DAM2_STANDALONE', '/DAM2_RELINK', '/Foc2w_tmp.obj', 'c2w_tmp.cpp'],
+                       cwd=d, env=env, capture_output=True, timeout=900)
+    finally:
+        for x in ('c2w_tmp.cpp', 'c2w_tmp.obj'):
+            try: os.remove(os.path.join(d, x))
+            except OSError: pass
+    if not os.path.exists(out): sys.exit('no output (is the function name right? is gdb installed?)')
+    for l in open(out):
+        m = re.match(r'PICK id(\w+) key=(-?\d+) k40=(\w+) refs=(\d+) cost=(-?\d+) pen=(\[.*?\]) chosen=(\d+)', l)
+        if m:
+            key = int(m.group(2)) & 0xffffffff
+            key = key - 2**32 if key >= 2**31 else key
+            print('web %-3s key %-6d refs %-3s cost %-4s -> %-4s pen %s' % (
+                m.group(1), key, m.group(4), m.group(5), REG.get(int(m.group(7)), m.group(7)), m.group(6)))
+        else:
+            print(l.rstrip())
+
+if __name__ == '__main__':
+    main()

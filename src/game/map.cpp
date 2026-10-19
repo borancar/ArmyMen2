@@ -909,7 +909,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
         {
             uint8_t digit = (uint8_t)hdr.digit;
 
-            which = !digit ? 0 : (int32_t)(int8_t)digit - '1';
+            which = digit < 1 ? 0 : (int32_t)(int8_t)digit - '1';   /* digit is uint8_t: the same as !digit, minus a byte use of the zero web */
 
         }
 
