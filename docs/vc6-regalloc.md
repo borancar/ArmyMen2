@@ -2046,3 +2046,12 @@ jump table (about 100 bytes of distance in a jump-table function): judge such ed
 dispatch offset (lab `swoff.py`). A byte compare `g_mapPadLayer[i] == (uint8_t)number`
 would shrink the loop and cut that shift from 6 to 1, but byte-restricts `number` and the
 singleton rule then pushes ctx to ebp (356).
+
+Metric caution (Round AR): `build/relink-base.json` truncates the original to OUR length, so
+an edit that shortens a function is flattered. ScriptPad's 158 -> 156 `total >= 1` plus
+`i - total < 0` latch was a loss against the full image (150 -> 152) and was rejected; judge
+any length-changing edit against the full image with trailing padding stripped. Today only
+ScriptPad (relink 158, full 150, ours 2080 against the image's 2072) and ObjRemap (relink
+96, full 88, 544 against 536) differ between the two measures. Mechanism for the latch: a
+`cmp eax,1` references a constant web in the guard block (adds 1 to N_b there), moving the
+counter's key 84 -> 86 and ctx's 86 -> 85; the image's `test eax,eax` form does not.
