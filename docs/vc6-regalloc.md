@@ -2079,3 +2079,9 @@ another induction variable; the original read it as a lone global, so the loop k
 that. In isolated tests a symbolic global array stays a separate induction variable while an
 absolute-constant or aggregate view merges away. Look for this in any loop whose image keeps a
 pointer or index in a frame slot where ours merges it.
+
+Round AW lever: read a memory-resident variable ONCE through a volatile into a named temporary,
+then use or write it plain (`{ T t = *(volatile T *)&X; X = t + K; }`, `mask = t;`). The
+volatile read is a scheduling barrier, so independent plain stores land where the image has them
+(MissionEnded: inside strcpy's expansion), and it is a rotation consumer on an address-taken
+local. Remove the old volatile-store hack at the same time: the pair is one unit.

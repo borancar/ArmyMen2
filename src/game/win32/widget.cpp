@@ -10458,7 +10458,7 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
         const AM2_OptionRec *r = &g_optionTable[i];
         box = OptionBox(parent, r->widget);
         if (-r->which) {                          /* a number win: -x != 0 is x != 0 */
-            mask = flags;
+            { uint32_t t = *(volatile uint32_t *)&flags; mask = t; }   /* a number win */
             bit = (uint32_t)r->bit;
         } else {
             mask = other;

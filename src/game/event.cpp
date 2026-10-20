@@ -2352,10 +2352,10 @@ void __cdecl MissionEnded(int32_t lost)
         orig_findclose(h);
         g_scriptReload = 1;
         strcpy(g_scriptReloadPath, path);
-        /* Volatile pins this store after the copy: a number win (14 -> 12), not the
-         * image's placement, which is inside strcpy's expansion. */
-        *(volatile int32_t *)&g_attemptCount = 0;
-        g_levelIndex += 1;
+        g_attemptCount = 0;
+        /* number win: a volatile read of the level index, then a plain write; the store
+         * of g_attemptCount lands inside strcpy's expansion as in the image. */
+        { int32_t t = *(volatile int32_t *)&g_levelIndex; g_levelIndex = t + 1; }
         return;
     }
 

@@ -69,3 +69,10 @@ match: replace one, run `tools/relinkscreen.py`, keep whichever form keeps the f
 
 `am2_rl_army_points` in `MpPanelScreen` (relink builds only; the other builds read `g_armyPoints`).
 Same storage, same behaviour; it exists because the original's loop reads the array as a lone global.
+
+## Volatile read into a temporary, then a plain use (Round AW)
+
+`{ int32_t t = *(volatile int32_t *)&g_levelIndex; g_levelIndex = t + 1; }` in MissionEnded
+(12 -> 0, replacing the volatile store of `g_attemptCount`) and
+`{ uint32_t t = *(volatile uint32_t *)&flags; mask = t; }` in OptionsDefaults (10 -> 4). The
+direct volatile forms (`*(volatile T *)&X += 1`) give 62. Revisit.
