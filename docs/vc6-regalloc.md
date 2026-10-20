@@ -1981,3 +1981,40 @@ UpdateTrooperAction (events 14..16 do not advance the cursor in the image; arm 3
 from arms 2 and 4 though the source is identical), TrooperFire (bump at 23, freeze at 25
 or 26), EncodeGlyph (the row counter coalesces with the dead `height` argument slot;
 untried: keep `height` live after the loop without extra code).
+
+### Allowed sets, measured (Round AO, 2026-10-19)
+
+The allowed set of a web (web+0x20) is measured with `tools/c2allow.py --all-pops`,
+not read out of C2.DLL (the register-choice routine 0x10716715 tests it per candidate
+and applies the singleton penalty through a popcount at 0x10714FFD). A web live across:
+a call (including a 64-bit multiply, which is a helper call) is {ebx, ebp, esi, edi};
+cdq/idiv loses eax and edx; a variable shift by cl loses ecx; a struct copy by `rep movs`
+is {eax, edx, ebx, ebp}; byte stores/uses of the web {eax, ecx, edx, ebx}; movzx from
+memory, setcc into a temp and a constant memset restrict nothing. The image and ours have
+the same multiset of fixed-register instructions in ObjRemap, HudSquadUpdate,
+ScrollMapCache, AddToItemList, SelectionClick, MpPanelScreen ctor, ScriptPad and RowUpdate,
+so those residues are colour order and interference, not missing shifts or divisions: a
+web avoids ecx only because an interfering web with a higher key took it first, or its own
+key is lower.
+
+**Key lever: share store tails to lower a key.** Three sibling arms that each store the
+same constant give the pointer web about 2.3x the key of the same pointer in an arm with
+one shared store tail (HudSquadUpdate's Sarge arm, 136 against 58); a high key is coloured
+first and takes ecx. Writing the arms with only the differing store and the common stores
+once afterwards drops the key; VC6 re-duplicates the tail, so the instruction shape keeps
+the copies. In the real TU the edit made HudSquadUpdate 110 to 132 against 86 because the
+code became about 2 bytes shorter and shifted the jump tables, so it is only a base for a
+further fix of the hp/divisor registers.
+
+Tools: `tools/c2force.py SRC FN IMGKEY [--fix id:reg,...]` forces every web into every
+register and scores the relocation-resolved instruction diff (8 s timeout: forcing a
+register a web cannot take hangs c2); `tools/c2lines.py` maps a web to its source line
+(web+0x38 is a tuple list; the first tuple's line is u32(tuple+0x10) & 0xffff, relative to
+the function's declaration line); `tools/c2fixed.py` lists the fixed-register
+instructions. Never run them while sweep2 or another c2 tool is active in the same lab.
+
+Open leads: AddToItemList needs a use of `owner` that c2 deletes only after allocation
+(`(cv+1)|(owner&16)` is nearly that but leaves an `and`/`or`); SelectionClick's ctrl-arm
+point is a rotation temp in the image and a local-copy web in ours; ScrollMapCache's image
+clamp order is left, right, top, bottom (170 bytes with that order, the residue being
+`px` and the forwarded bottom swapped between ecx and ebp).
