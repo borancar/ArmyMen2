@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1625 of 1646 functions
-byte-identical, 21 differing, 864 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1626 of 1646 functions
+byte-identical, 20 differing, 726 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -352,3 +352,16 @@ about 16); ParseScenarios (`test al,al` without the {ebx} singleton, e.g. a seco
 byte-restricted web); ScriptIf (a signed compare with distinct continuation targets
 so the shared tails do not merge); AddToItemList (needs both the counter value in
 ecx and the counter web's key above uid's).
+
+### Re-deriving from the disassembly (2026-10-20)
+
+ScrollMapCache 138 -> 0 came from writing the function again from the image's disassembly
+BEFORE reading the old source, then comparing: after months of single-lever tuning the
+old source had become a local optimum (a hoisted `px`, a volatile `tt`, bottom-before-top
+clamps), while the image's layout was structurally different: the full repaint is the last
+block and three forward jumps reach it, `abs()` is evaluated at each use, and the camera
+blocks hold `nx`/`ny`. The same re-derivation did NOT beat the current source for ObjRemap,
+RowUpdate or FindPath (fresh versions 195, 220 and 1,356 bytes against 88, 154 and 66), so
+the method pays when a function's CONTROL-FLOW layout is off, not when its residue is
+colour. Order of work: derive the block order and exits from the jump targets first, then
+the locals from the frame layout, then compile and compare.

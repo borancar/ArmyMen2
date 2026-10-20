@@ -1179,106 +1179,101 @@ void __cdecl RepaintDirtyList(const AM2_Rect *region)
 
 void __cdecl ScrollMapCache(void)
 {
-    int32_t  dx = 0, dy = 0, adx, ady;
-    AM2_Rect wide, tall, src;
-    LPDIRECTDRAWSURFACE cache = g_mapCache;
+    LPDIRECTDRAWSURFACE cache;
+    int32_t  dx, dy;
+    int32_t  nx, ny;
+    int32_t  dstX, dstY;
+    AM2_Rect wide, tall, tiles, src;
+
+    dx = 0;
+    dy = 0;
+    cache = g_mapCache;
     if (!cache)
         return;
 
     if (g_viewRect.left < (g_visibleTiles.left << TILE_SHIFT)
         || g_viewRect.left > ((g_visibleTiles.left + CAMERA_MARGIN) << TILE_SHIFT)) {
-        int32_t now = g_viewRect.left >> TILE_SHIFT;
-        dx = now - g_visibleTiles.left;
-        g_visibleTiles.left  = now;
-        g_visibleTiles.right = g_viewTilesW + now;
+        nx = g_viewRect.left >> TILE_SHIFT;
+        dx = nx - g_visibleTiles.left;
+        g_visibleTiles.left  = nx;
+        g_visibleTiles.right = g_viewTilesW + nx;
     }
     if (g_viewRect.top < (g_visibleTiles.top << TILE_SHIFT)
         || g_viewRect.top > ((g_visibleTiles.top + CAMERA_MARGIN) << TILE_SHIFT)) {
-        int32_t now = g_viewRect.top >> TILE_SHIFT;
-        dy = now - g_visibleTiles.top;
-        g_visibleTiles.top    = now;
-        g_visibleTiles.bottom = g_viewTilesH + now;
+        ny = g_viewRect.top >> TILE_SHIFT;
+        dy = ny - g_visibleTiles.top;
+        g_visibleTiles.top    = ny;
+        g_visibleTiles.bottom = g_viewTilesH + ny;
     }
 
     g_visibleTiles.left   = Clamp(g_visibleTiles.left,   0, g_mapTilesW - 1);
     g_visibleTiles.right  = Clamp(g_visibleTiles.right,  0, g_mapTilesW - 1);
-    g_visibleTiles.bottom = Clamp(g_visibleTiles.bottom, 0, g_mapTilesH - 1);
     g_visibleTiles.top    = Clamp(g_visibleTiles.top,    0, g_mapTilesH - 1);
+    g_visibleTiles.bottom = Clamp(g_visibleTiles.bottom, 0, g_mapTilesH - 1);
 
-    if (g_fullRedraw) {
-        PaintMapTiles(&g_visibleTiles);
-        return;
-    }
-    if (dx == 0 && dy == 0) {
-        orig_log((const char *)&g_visibleTiles);   /* stubbed to `ret` */
-        return;
-    }
-
-    if ((adx = abs(dx)) >= g_viewTilesW || (ady = abs(dy)) >= g_viewTilesH) {
-        PaintMapTiles(&g_visibleTiles);
-        return;
-    }
-
-    /* Move the tiles that are still good. Source measured from the positive
-     * part of the delta, destination from the negative -- one of the two is
-     * always zero, which is what makes this one expression for both
-     * directions. */
-    {
-        AM2_Rect tiles;
-        /* The positive part of dy is recomputed at each use. */
-        int32_t  dstX, dstY;
-
-        /* The same rectangle in tiles, sized from the CLAMPED camera rather
-         * than the view -- built only to be handed to the stubbed log. */
-        int32_t  px = (dx > 0) ? dx : 0;
-        tiles.left   = px;
-        tiles.top    = (dy > 0) ? dy : 0;
-        int32_t  tt = *(volatile int32_t *)&tiles.top;
-        tiles.right  = g_visibleTiles.right - adx - g_visibleTiles.left + px;
-        tiles.bottom = g_visibleTiles.bottom - ady - g_visibleTiles.top + tt;
-
-        src.left   = px << TILE_SHIFT;
-        src.top    = tt << TILE_SHIFT;
-        dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
-        dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;
-        src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
-        src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
-
-        orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
-        /* The global for `This` and the local for the source, as the
-         * image pushes them. */
-        IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
-                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
-    }
-
-    wide.left  = g_visibleTiles.left;
-    wide.right = g_visibleTiles.right;
-
-    if (dx != 0) {
-        if (dx > 0) {
-            tall.left  = g_visibleTiles.right - dx;
-            tall.right = tall.left + dx;
-            wide.right = tall.left;
-        } else {
-            tall.left  = g_visibleTiles.left;
-            tall.right = g_visibleTiles.left - dx;
-            wide.left  = tall.right;
+    if (!g_fullRedraw) {
+        if (dx == 0 && dy == 0) {
+            orig_log((const char *)&g_visibleTiles);   /* stubbed to `ret` */
+            return;
         }
-        tall.top    = g_visibleTiles.top;
-        tall.bottom = g_visibleTiles.bottom;
-        PaintMapTiles(&tall);
-    }
+        /* The scroll is smaller than the view: move the tiles that are still
+         * good and paint only the strips that came in. The full repaint at
+         * the bottom is the other way out. abs(dx) and abs(dy) are written
+         * out at each use, which is the one expression the image keeps in
+         * memory (a named local takes ebp for it and the layout moves). */
+        if (abs(dx) < g_viewTilesW && abs(dy) < g_viewTilesH) {
+            /* Source measured from the positive part of the delta,
+             * destination from the negative -- one of the two is always
+             * zero, which is what makes this one expression for both
+             * directions. */
+            tiles.left   = (dx > 0) ? dx : 0;
+            tiles.top    = (dy > 0) ? dy : 0;
+            tiles.right  = g_visibleTiles.right - abs(dx) - g_visibleTiles.left + tiles.left;
+            tiles.bottom = g_visibleTiles.bottom - abs(dy) - g_visibleTiles.top + tiles.top;
 
-    if (dy == 0)
-        return;
-    if (dy > 0) {
-        wide.top    = g_visibleTiles.bottom - dy;
-        wide.bottom = wide.top + dy;    /* the image adds dy back: top + dy, not the bottom again */
-    } else {
-        wide.top    = g_visibleTiles.top;
-        wide.bottom = g_visibleTiles.top - dy;
+            src.left   = tiles.left << TILE_SHIFT;
+            src.top    = tiles.top << TILE_SHIFT;
+            dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
+            dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;
+            src.right  = ((g_viewTilesW - abs(dx)) << TILE_SHIFT) + src.left;
+            src.bottom = ((g_viewTilesH - abs(dy)) << TILE_SHIFT) + src.top;
+
+            orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
+            IDirectDrawSurface_BltFast(cache, (DWORD)dstX, (DWORD)dstY,
+                                       cache, (LPRECT)&src, DDBLTFAST_WAIT);
+
+            wide.left  = g_visibleTiles.left;
+            wide.right = g_visibleTiles.right;
+
+            if (dx != 0) {
+                if (dx > 0) {
+                    tall.left  = g_visibleTiles.right - dx;
+                    tall.right = tall.left + dx;
+                    wide.right = tall.left;
+                } else {
+                    tall.left  = g_visibleTiles.left;
+                    tall.right = g_visibleTiles.left - dx;
+                    wide.left  = tall.right;
+                }
+                tall.top    = g_visibleTiles.top;
+                tall.bottom = g_visibleTiles.bottom;
+                PaintMapTiles(&tall);
+            }
+
+            if (dy != 0) {
+                if (dy > 0) {
+                    wide.top    = g_visibleTiles.bottom - dy;
+                    wide.bottom = wide.top + dy;
+                } else {
+                    wide.top    = g_visibleTiles.top;
+                    wide.bottom = wide.top - dy;
+                }
+                PaintMapTiles(&wide);
+            }
+            return;
+        }
     }
-    PaintMapTiles(&wide);
+    PaintMapTiles(&g_visibleTiles);
 }
 
 void __cdecl ScrollView(void)
