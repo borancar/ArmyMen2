@@ -2794,12 +2794,20 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 sx = 0;
                 sy = 0;
                 total = g_mapTilesW * g_mapTilesH;
-                for (i = 0; i < total; i++) {
-                    if ((int32_t)g_mapPadLayer[i] == number) {
-                        sx += i % g_mapTilesH;
-                        n++;
-                        sy += i / g_mapTilesH;
-                    }
+                /* A number win: the for loop as a guarded do-while with a difference latch
+                 * (`i - total + 1 < 1` is `i < total`: after i++ , 1 <= i <= total, no overflow).
+                 * The latch compares a temporary with an immediate, which is a web that raises
+                 * the counter's key above ctx's, so the counter gets edi and ctx ebx. */
+                i = 0;
+                if (i < total) {
+                    do {
+                        if ((int32_t)g_mapPadLayer[i] == number) {
+                            sx += i % g_mapTilesH;
+                            n++;
+                            sy += i / g_mapTilesH;
+                        }
+                        i++;
+                    } while (i - total + 1 < 1);
                 }
                 if (n > 0) {
                     /* Sixteenths, rounded. */
@@ -2855,7 +2863,6 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_TROOPER:       g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TROOPER;    break;
         case AM2_TOK_TANK:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TANK;       break;
         case AM2_TOK_VEHICLE:       g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_VEHICLE;    break;
-        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         case AM2_TOK_CONVOY:        g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_CONVOY;     break;
         case AM2_TOK_BOAT:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BOAT;       break;
         case AM2_TOK_GROUNDVEHICLE: g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GROUNDVEH;  break;
@@ -2866,6 +2873,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_ARMY0:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREEN;      break;
         case AM2_TOK_TAN:           g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
         case AM2_TOK_ARMY1:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
+        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         case AM2_TOK_BLUE:
         case AM2_TOK_ARMY2:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BLUE;       break;
         case AM2_TOK_GREY:
@@ -2899,7 +2907,7 @@ triggers_done:
      * control character -- goes straight to binding the name and is never
      * finalised: both of those paths land on 0x00444842, past the call. */
     if (*at != ctx->count &&
-        (ctx->tokens[*at].kind - AM2_TOKEN_CONTROL_CHAR) == 0) {
+        ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR) {
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_GT: g_pads[g_padCount].compare = AM2_PADCMP_GT; break;       /* '>' */
         case AM2_TOK_EQ: g_pads[g_padCount].compare = AM2_PADCMP_EQ; break;       /* '=' */
@@ -2907,7 +2915,6 @@ triggers_done:
         default:
             am2_log("Line [%4d]:  Unexpected symbol in pad definition "
                     "should be '<=>'\n", ctx->tokens[*at].line);
-            (void)*(volatile int32_t *)&number;
             return 0;
         }
 

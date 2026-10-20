@@ -2036,3 +2036,13 @@ the image's 16-bit forms; `hp - X < 1` and `X - hp > -1` also keep the colour bu
 more instructions. `c2fast` one-function clones differ from the real TU in rotation and
 colour state (the weapon-switch tail matched in the clone and not in widget.cpp): always
 confirm with sweep2.
+
+Round AQ, ScriptPad 178 -> 158: a key can be RAISED by making a loop latch compare a
+temporary against an immediate (`i - total + 1 < 1` for `i < total`, after `i++`): that
+temporary is itself a web, and the loop counter's key rises from 84 to 92 while ctx's
+falls from 86 to 84, so the counter is coloured first (edi) and ctx gets ebx as in the
+image. The edit cost 6 bytes of code before the switch, which shifts the dispatch and the
+jump table (about 100 bytes of distance in a jump-table function): judge such edits by the
+dispatch offset (lab `swoff.py`). A byte compare `g_mapPadLayer[i] == (uint8_t)number`
+would shrink the loop and cut that shift from 6 to 1, but byte-restricts `number` and the
+singleton rule then pushes ctx to ebp (356).
