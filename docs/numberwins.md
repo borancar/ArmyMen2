@@ -28,7 +28,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **A pair in a call-argument ternary** in ScriptParseActionRecon's setspeed log (resyncs the rotation cursor); revisit.
 - **Plain-click path first, with its own tail copy** in SelectionClick (arm order decides the rotation walk); revisit.
 - **Volatile increments** of `*nOther` and `o->fieldF4` in SightScan's score block (52 -> 38); revisit.
-- **Do-while with a difference latch** in ScriptPad's first scan loop (178 -> 158); revisit.
+- **`n` stepped through a volatile read into a temporary and a volatile store** in ScriptPad's first scan loop (replaces the do-while with a difference latch; 158 -> 84); revisit.
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
 - **A pair on `obj->uid`** inside SQUAD_BAR's clamp test (HudSquadUpdate, 20 -> 0; replaces the `hp < X + 1` spelling) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.

@@ -2085,3 +2085,14 @@ then use or write it plain (`{ T t = *(volatile T *)&X; X = t + K; }`, `mask = t
 volatile read is a scheduling barrier, so independent plain stores land where the image has them
 (MissionEnded: inside strcpy's expansion), and it is a rotation consumer on an address-taken
 local. Remove the old volatile-store hack at the same time: the pair is one unit.
+
+Round AY, ScriptPad 158 -> 84: a volatile read of a frame-resident local through a named
+temporary, plus a volatile store, adds a web in the loop body without moving any code (it is the
+same load/inc/store) and raises the loop counter's key: the counter takes edi and ctx ebx with
+the PLAIN compare, which removes the 6-byte difference latch that shifted the jump table. Both
+halves matter (read only: 90; plain `n++` or a plain temporary: 200 or more). Pair-based colour
+flips in ScriptPad always broke the zero hoist (`xor edi,edi` at the top becomes `push 0`); only
+a CFG-free key change keeps it. Left (84): the `cmp eax,edi` against `test eax,eax` byte, the
+sy-store and number-reload swap, the sx zero-store position in the second scan, and the post-loop
+g_padCount/name swap (about 40 bytes: ours has g_padCount in edi and name in ebp, the image the
+reverse; g_padCount's web, key 72, is coloured before name's late piece, key 36).

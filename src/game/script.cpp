@@ -2794,20 +2794,16 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 sx = 0;
                 sy = 0;
                 total = g_mapTilesW * g_mapTilesH;
-                /* A number win: the for loop as a guarded do-while with a difference latch
-                 * (`i - total + 1 < 1` is `i < total`: after i++ , 1 <= i <= total, no overflow).
-                 * The latch compares a temporary with an immediate, which is a web that raises
-                 * the counter's key above ctx's, so the counter gets edi and ctx ebx. */
-                i = 0;
-                if (i < total) {
-                    do {
-                        if ((int32_t)g_mapPadLayer[i] == number) {
-                            sx += i % g_mapTilesH;
-                            n++;
-                            sy += i / g_mapTilesH;
-                        }
-                        i++;
-                    } while (i - total + 1 < 1);
+                /* A number win: n is stepped as a volatile read into a named temporary and a
+                 * volatile store, after sy as in the image. The temporary is a web of its own
+                 * in the loop body (the load/inc/store is the same code), which raises the
+                 * counter's key above ctx's, so the counter takes edi and ctx ebx. */
+                for (i = 0; i < total; i++) {
+                    if ((int32_t)g_mapPadLayer[i] == number) {
+                        sx += i % g_mapTilesH;
+                        sy += i / g_mapTilesH;
+                        { int32_t t_n = *(volatile int32_t *)&n; *(volatile int32_t *)&n = t_n + 1; }
+                    }
                 }
                 if (n > 0) {
                     /* Sixteenths, rounded. */
