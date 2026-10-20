@@ -76,3 +76,5 @@ Same storage, same behaviour; it exists because the original's loop reads the ar
 (12 -> 0, replacing the volatile store of `g_attemptCount`) and
 `{ uint32_t t = *(volatile uint32_t *)&flags; mask = t; }` in OptionsDefaults (10 -> 4). The
 direct volatile forms (`*(volatile T *)&X += 1`) give 62. Revisit.
+
+ObjRemap: `{ int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }` and `{ int16_t t = *(volatile int16_t *)&o->pos.y; y = t; }` (96 -> 92). FindPath no longer carries any impossible pair. Revisit.

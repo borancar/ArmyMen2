@@ -1377,7 +1377,7 @@ fail:
                 g += 3;
             /* Impossible pairs on nb and goalTile here and below are number wins: they raise those
              * variables' use counts and fold away. */
-            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR) || (nb == 1000 && nb == 1001))
+            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR))
                 g += 1;
             h = PathHeuristic(t, goalTile);
 

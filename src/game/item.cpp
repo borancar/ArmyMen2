@@ -11145,8 +11145,9 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
         && PointsEqual(o->prevPos, o->pos))
         return;
 
-    x = o->pos.x;
-    y = o->pos.y;
+    /* A number win: volatile reads of the position, the x through its dword. */
+    { int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }
+    { int16_t t = *(volatile int16_t *)&o->pos.y; y = t; }
 
     o->hit.right  = x + o->box.right;
     o->hit.bottom = y + o->box.bottom;
