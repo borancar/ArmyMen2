@@ -4989,8 +4989,8 @@ in_sight:
 score:
                 if (!stt.cand)
                     goto next;
-                ++o->fieldF4;
-                ++*nOther;
+                ++*(volatile int32_t *)nOther;       /* a number win: volatile read-modify-writes in the image's order */
+                ++*(volatile int32_t *)&o->fieldF4;
                 /* Discarded two instructions later; a call, so it counts. */
                 (void)AngleDelta(hold.facing, pick.bearing);
                 if (pick.range >= stt.bestRange + win.slack)
