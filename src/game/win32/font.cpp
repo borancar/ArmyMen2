@@ -64,7 +64,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
 
     f.key = g_frameBuf[g_pitch * KEY_ROW];
 
-    for (f.row = 0; f.row < height; f.row++) {
+    if (height > 0) for (f.row = height; ; ) {
         *offs = (uint16_t)(buf - (uint8_t *)f.out);
         const uint8_t *start = p;
         const uint8_t *end   = p + width;
@@ -93,6 +93,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *buf, int32_t width, int32_t height,
 
         offs++;
         p = start + g_pitch;
+        if (--f.row == 0) break;
     }
 
     /* Wipe the scratch square back to the background colour so the next
