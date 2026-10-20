@@ -2096,3 +2096,17 @@ a CFG-free key change keeps it. Left (84): the `cmp eax,edi` against `test eax,e
 sy-store and number-reload swap, the sx zero-store position in the second scan, and the post-loop
 g_padCount/name swap (about 40 bytes: ours has g_padCount in edi and name in ebp, the image the
 reverse; g_padCount's web, key 72, is coloured before name's late piece, key 36).
+
+### The penalty vector, spelled out (Round BA, ScriptPad 84 -> 12)
+
+Instrumenting the register-choice function (0x10716715) shows its penalty vector is built from the
+web's own hint bonuses, the hints of every uncoloured NEIGHBOUR with cost > 0 (a hint counts only if
+its register is in that neighbour's allowed set), and 100 x cost on the one allowed register of any
+single-register neighbour. A neighbour with cost <= 0 contributes nothing. With the candidate order
+eax, ecx, edx, esi, edi, ebx, ebp, a tie goes to the earlier candidate (edi before ebp). Lever: make a
+neighbour's cost positive and widen its allowed set so its hints count: the shared zero web (21 refs)
+had cost -1 and allowed {ebp}, inert; with `n = 0` ahead of `i = 0` in IL order it gets cost +1,
+allowed {ebp, edi}, hints (ebp,1) and (edi,2), and the web under decision takes ebp. Hoist order of
+constants follows first use in the IL; ties go to the higher web id; key = minus the sum of N x 2^depth
+over blocks where the web is live but not referenced, so a web referenced in more arm blocks has a
+higher key (merging case labels removes a referencing block, splitting adds one).

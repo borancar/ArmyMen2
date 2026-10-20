@@ -2815,10 +2815,12 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
             int32_t i, sx, sy, n;
 
             g_padNumbers[number].centre = g_zeroPoint;
+            n = 0;
             sx = 0;
             sy = 0;
+            i = 0;
             total = g_mapTilesW * g_mapTilesH;
-            for (i = 0, n = 0; i < total; i++) {
+            for (; i < total; i++) {
                 if ((g_mapPadbitLayer[i] | kPadBit(number)) != 0) {
                     sx += i % g_mapTilesH;
                     sy += i / g_mapTilesH;
@@ -2863,16 +2865,18 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         case AM2_TOK_BOAT:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BOAT;       break;
         case AM2_TOK_GROUNDVEHICLE: g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GROUNDVEH;  break;
         case AM2_TOK_NPC:           g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_NPC;        break;
-        /* GREEN and ARMY0, TAN and ARMY1 have identical bodies but are separate
-         * arms: the image's switch has them apart, and merged labels cost 74 bytes. */
-        case AM2_TOK_GREEN:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREEN;      break;
+        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
+        /* GREEN and ARMY0 share one label group; TAN and ARMY1, GREY and ARMY3 are
+         * separate arms with identical bodies. The arm order and the label groups
+         * decide the order VC6 hoists the flag constants in and the registers they
+         * take (HALFTRACK first, GREEN/ARMY0 together, GREY/ARMY3 apart). */
+        case AM2_TOK_GREEN:
         case AM2_TOK_ARMY0:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREEN;      break;
         case AM2_TOK_TAN:           g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
         case AM2_TOK_ARMY1:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_TAN;        break;
-        case AM2_TOK_HALFTRACK:     g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         case AM2_TOK_BLUE:
         case AM2_TOK_ARMY2:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_BLUE;       break;
-        case AM2_TOK_GREY:
+        case AM2_TOK_GREY:          g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         case AM2_TOK_ARMY3:         g_pads[g_padCount].trigger |= (int32_t)AM2_PADTRIG_GREY;       break;
         default:
             goto triggers_done;
