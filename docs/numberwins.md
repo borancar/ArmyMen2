@@ -30,7 +30,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **Volatile increments** of `*nOther` and `o->fieldF4` in SightScan's score block (52 -> 38); revisit.
 - **Do-while with a difference latch** in ScriptPad's first scan loop (178 -> 158); revisit.
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
-- **`tt = *(volatile int32_t *)&tiles.top`** (ScrollMapCache, replaces the dead read) and **`hp < X + 1` for `hp <= X`** (HudSquadUpdate, key tie-break) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
+- **`tt = *(volatile int32_t *)&tiles.top`** (ScrollMapCache, replaces the dead read) and **a pair on `obj->uid`** inside SQUAD_BAR's clamp test (HudSquadUpdate, 20 -> 0; replaces the `hp < X + 1` spelling) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
 - **Volatile test then plain read** of `g_dynamic[i]->buffer` in Update3DAudioVolumes (replaces the self-referential ternary; 12 -> 2); revisit.
 - **Dead read after a return**, `(void)*(volatile int32_t *)&g_menuRow;` in TickMenuAnimation (DrawMenuCursor 30 -> 0); revisit.

@@ -2055,3 +2055,18 @@ ScriptPad (relink 158, full 150, ours 2080 against the image's 2072) and ObjRema
 96, full 88, 544 against 536) differ between the two measures. Mechanism for the latch: a
 `cmp eax,1` references a constant web in the guard block (adds 1 to N_b there), moving the
 counter's key 84 -> 86 and ctx's 86 -> 85; the image's `test eax,eax` form does not.
+
+Round AS, HudSquadUpdate 20 -> 0: the true 16-bit compares give image-identical code except
+one colour (the record pointer ties the SQUAD_BAR divisor temporary at key 68 and takes
+ecx). An impossible pair on a plain MEMORY field that c2 CSEs with a load already needed in
+that block (`obj->uid == 1000 && obj->uid == 1001` inside the `bw > 41` clamp) adds a web
+that lowers the pointer's key to 64 and leaves no instruction behind, because c2 deletes
+the compares only after cost time. Rule of thumb: a pair or extra read helps only if its
+operand is a non-volatile memory location shared with a load the block needs anyway;
+register or local operands fold in c1 and change no key, and a pair whose load is not
+shared leaves a load and a spill behind (128). The picks `c2lines.py` prints are
+first-round colours; a web can be recoloured in a later round, so the final code is the
+ground truth. Mutation classes measured on ScriptPad's ctx/i keys: `total >= 1` guard
+85/86; latch temp `i - total + 1 < 1` 84/92 (the shipped fix, 6 bytes); a pre-loop read used
+after the loop 83/88 (adds 3 instructions); function-scope `i = 0` 91 with i merged into
+the zero web (wrong register).

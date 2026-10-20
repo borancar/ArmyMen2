@@ -3806,7 +3806,7 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
 #define SQUAD_BAR(field, o)                                                   \
     if (SQUAD_MAXHP(o) > 0) {                                                 \
         int32_t bw = SQUAD_HP(o) * AM2_HUD_SQUAD_BAR_MAX / SQUAD_MAXHP(o);    \
-        if (bw > AM2_HUD_SQUAD_BAR_MAX)                                       \
+        if (bw > AM2_HUD_SQUAD_BAR_MAX || (((const AM2_Object *)(o))->uid == 1000 && ((const AM2_Object *)(o))->uid == 1001)) \
             bw = AM2_HUD_SQUAD_BAR_MAX;                                       \
         (field) = bw;                                                         \
     } else                                                                    \
@@ -6123,9 +6123,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             SQUAD_BAR(sq->recs[slot].barW, obj);
             hp = SQUAD_HP(obj);
             mh = SQUAD_MAXHP(obj);
-            if (hp < (int16_t)(mh >> 2) + 1) {
+            if (hp <= (int16_t)(mh >> 2)) {
                 sq->recs[slot].barColour = g_hudColour;
-            } else if (hp < (int16_t)(mh >> 1) + 1) {
+            } else if (hp <= (int16_t)(mh >> 1)) {
                 sq->recs[slot].barColour = g_colourLagMid;
             } else {
                 sq->recs[slot].barColour = g_hiliteColour;
