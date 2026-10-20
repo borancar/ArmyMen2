@@ -2070,3 +2070,12 @@ ground truth. Mutation classes measured on ScriptPad's ctx/i keys: `total >= 1` 
 85/86; latch temp `i - total + 1 < 1` 84/92 (the shipped fix, 6 bytes); a pre-loop read used
 after the loop 83/88 (adds 3 instructions); function-scope `i = 0` 91 with i merged into
 the zero web (wrong register).
+
+Round AT (MpPanelScreen ctor 60 -> 30): a global that is a VIEW into a bigger aggregate
+(`g_armyPoints` inside the 0x00515FD8 settings block) lets VC6 fold its element pointer into
+another induction variable; the original read it as a lone global, so the loop keeps
+`&army_points[i]` in a frame slot and tests against its end. Declaring a symbol of its own
+(`am2_rl_army_points; /* 0x00515FE0 */`, which relink.py maps by the address comment) restores
+that. In isolated tests a symbolic global array stays a separate induction variable while an
+absolute-constant or aggregate view merges away. Look for this in any loop whose image keeps a
+pointer or index in a frame slot where ours merges it.

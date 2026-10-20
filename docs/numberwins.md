@@ -64,3 +64,8 @@ marker that the original touched that variable at that point in some way not yet
 Boran (2026-10-18): the stand-ins are fine for now; revisit them once the binary matches 100%.
 That is the point where each can be traded against a real source shape without losing a
 match: replace one, run `tools/relinkscreen.py`, keep whichever form keeps the function at 0.
+
+## Relink-only symbols (not number wins, but per-build seams)
+
+`am2_rl_army_points` in `MpPanelScreen` (relink builds only; the other builds read `g_armyPoints`).
+Same storage, same behaviour; it exists because the original's loop reads the array as a lone global.

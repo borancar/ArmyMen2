@@ -9115,6 +9115,20 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelDelete(int32_t flags)
  * The children go into THREE PARALLEL ARRAYS -- names, colours and teams,
  * four of each, contiguous by kind rather than by slot.  MpPanelDestruct
  * walks them that way. */
+/* The army points as a symbol of their own. The original reads this array
+ * as a lone global -- the loop below keeps its element pointer in a frame
+ * slot and tests the loop against its end -- where g_armyPoints, a view into
+ * the settings block the other builds share, lets VC6 fold the pointer into
+ * the panel's own induction variable. relink.py maps am2_rl_* by the address
+ * in the comment. */
+#if defined(AM2_RELINK)
+typedef int32_t AM2_ArmyPointsView[AM2_COMM_SLOTS];
+extern "C" AM2_ArmyPointsView am2_rl_army_points;  /* 0x00515FE0 */
+#define g_mpPanelPoints am2_rl_army_points
+#else
+#define g_mpPanelPoints g_armyPoints
+#endif
+
 AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
@@ -9122,7 +9136,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
     AM2_MpPanelScreen   *p = (AM2_MpPanelScreen *)w;
     int32_t    i;
-    int32_t   *points;
     /* The game box's rules path. Function scope: the image's 0x1a4 frame
      * gives it a slot of its own, where a block-scoped one shares. */
     char       path[0x40];
@@ -9151,13 +9164,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     /* FOUR PLAYER ROWS, three widgets each, into three PARALLEL arrays.  The
      * original's y coordinates are a constant minus `this` plus the name
      * buffer pointer, which cancels to `base + slot * 32`. */
-    i = 0;
-    /* A SIGNED compare against the end address (`jl`, not `jb`): the
-     * original holds the address as an integer, as the slot loaded with
-     * 0x515FE0 outright suggests. Same loop on any address below 2 GB. */
-    for (points = g_armyPoints;
-         (int32_t)(uintptr_t)points < (int32_t)(uintptr_t)(g_armyPoints + AM2_COMM_SLOTS);
-         i++, points++) {
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
         char       *name = this->playerNames[i];
         AM2_MpSpin  *spin;
         int32_t      last;        /* the image takes (i == 3) before the new */
@@ -9243,7 +9250,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * what the update displays. */
         last = i == 3;
         spin = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
-                              *points,
+                              g_mpPanelPoints[i],
                               0, 0x1388, 0x64, w, MpCommitPoints,
                               g_hiliteColour,
                               g_colourBelowBg,
