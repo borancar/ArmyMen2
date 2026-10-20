@@ -9334,7 +9334,21 @@ void __cdecl SelectionClick(void)
     if (!e)
         return;
 
-    if (IsKeyDown(AM2_DIK_LCONTROL) || IsKeyDown(AM2_DIK_RCONTROL)) {
+    /* Plain click first, with its own copy of the tail, and the ctrl path after
+     * it: the register rotation walks blocks in source order, so the ctrl arm's
+     * zero-point load (a temp) is reached after the first tail's and lands on
+     * ecx as in the image; the two tails cross-jump back into one. Same
+     * evaluation of IsKeyDown as the || form. Number win. */
+    if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL)) {
+        DeselectAll();
+        SetObjContext(e);
+        ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->PtrListPush(
+                    (void *)(uintptr_t)(e)->uid);
+        e->flags |= OBJ_FLAG_SELECTED;
+        OnSelectionChanged(g_zeroPoint);
+        return;
+    }
+    {
         int32_t n = g_selectedCount;
         int32_t i;
 
@@ -9356,18 +9370,9 @@ void __cdecl SelectionClick(void)
              * attached with nothing selecting it, which the A/B would show
              * only if something later walked that list. */
             ObjAttachTo(e, (AM2_Object *)0);
-            /* Through a local: the image loads the zero point into ecx
-             * here and eax at the tail's call, and a copy is what moves it. */
-            {
-                AM2_Point pt = g_zeroPoint;
-
-                OnSelectionChanged(pt);
-            }
+            OnSelectionChanged(g_zeroPoint);
             return;
         }
-    } else {
-        DeselectAll();
-        SetObjContext(e);
     }
 
     ((AM2_Rec *)(void *)((uintptr_t)g_selectedUids))->PtrListPush(

@@ -2018,3 +2018,11 @@ Open leads: AddToItemList needs a use of `owner` that c2 deletes only after allo
 point is a rotation temp in the image and a local-copy web in ours; ScrollMapCache's image
 clamp order is left, right, top, bottom (170 bytes with that order, the residue being
 `px` and the forwarded bottom swapped between ecx and ebp).
+
+Rotation, a corollary (Round AP, SelectionClick 8 -> 0): the rotation pass walks blocks
+in SOURCE order, before final layout, so the order of the arms in the source decides which
+temporary reaches the cursor first. SelectionClick's ctrl-click arm loaded the zero point
+before the shared tail, putting it on eax; writing the plain-click path first, with its
+own copy of the tail, and the ctrl path after it moved that load to ecx. The two tails
+cross-jump back into one block, so the code shape is unchanged. Earlier "direct call"
+spellings failed only because the ctrl arm was still walked first.
