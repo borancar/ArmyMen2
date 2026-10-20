@@ -1233,12 +1233,12 @@ void __cdecl ScrollMapCache(void)
         int32_t  px = (dx > 0) ? dx : 0;
         tiles.left   = px;
         tiles.top    = (dy > 0) ? dy : 0;
-        (void)*(volatile int32_t *)&tiles.top;
+        int32_t  tt = *(volatile int32_t *)&tiles.top;
         tiles.right  = g_visibleTiles.right - adx - g_visibleTiles.left + px;
-        tiles.bottom = g_visibleTiles.bottom - ady - g_visibleTiles.top + tiles.top;
+        tiles.bottom = g_visibleTiles.bottom - ady - g_visibleTiles.top + tt;
 
         src.left   = px << TILE_SHIFT;
-        src.top    = tiles.top << TILE_SHIFT;
+        src.top    = tt << TILE_SHIFT;
         dstX       = (dx > 0) ? 0 : (-dx) << TILE_SHIFT;
         dstY       = (dy > 0) ? 0 : (-dy) << TILE_SHIFT;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;

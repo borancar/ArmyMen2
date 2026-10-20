@@ -6113,28 +6113,25 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
         if (ObjType2Field548(obj)) {
             int16_t mh;
+            int16_t hp;
 
             if (obj->riding)
                 goto next;
 
             sq->recs[slot].index = 0;
             sq->recs[slot].detailArg = (int32_t)obj->uid;
-            mh = SQUAD_MAXHP(obj);
-            (void)*(volatile int16_t *)&i;   /* a number win: a dead read that takes the loop counter's address */
             SQUAD_BAR(sq->recs[slot].barW, obj);
-            if (SQUAD_HP(obj) <= (int16_t)(SQUAD_MAXHP(obj) >> 2)) {
+            hp = SQUAD_HP(obj);
+            mh = SQUAD_MAXHP(obj);
+            if (hp < (int16_t)(mh >> 2) + 1) {
                 sq->recs[slot].barColour = g_hudColour;
-                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
-                slot++;
-            } else if (SQUAD_HP(obj) <= (int16_t)(mh >> 1)) {
+            } else if (hp < (int16_t)(mh >> 1) + 1) {
                 sq->recs[slot].barColour = g_colourLagMid;
-                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
-                slot++;
             } else {
-                sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
                 sq->recs[slot].barColour = g_hiliteColour;
-                slot++;
             }
+            sq->recs[slot].icons = AM2_HUD_SQUAD_PIPS_MAX;
+            slot++;
 
         } else if (ObjIsType2(obj)) {
             const AM2_Object *weapon;
@@ -6144,11 +6141,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
             /* NO WEAPON STILL FILLS THE SLOT, with icon 1 -- where the
              * passenger loop below SKIPS such a unit outright. */
-            {
-                uint32_t uid = obj->inventory[0];
-
-                weapon = WeaponByUid(uid);
-            }
+            weapon = WeaponByUid(obj->inventory[0]);
             /* An if/else, not a default overwritten: the image stores
              * each value in its own arm. */
             if (weapon)

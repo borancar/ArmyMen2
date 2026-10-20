@@ -2026,3 +2026,13 @@ before the shared tail, putting it on eax; writing the plain-click path first, w
 own copy of the tail, and the ctrl path after it moved that load to ecx. The two tails
 cross-jump back into one block, so the code shape is unchanged. Earlier "direct call"
 spellings failed only because the ctrl arm was still walked first.
+
+Key tie-break by compare width (Round AP, HudSquadUpdate 86 -> 20): the record pointer and
+`hp` tied at key 68 and the pointer took ecx. Writing the compare `hp < X + 1` instead of
+`hp <= X` makes the machine compare 32-bit (an `inc` is added), which lowers the pointer's
+key to 64, so `hp` is coloured first and takes ecx and the pointer gets esi as in the image.
+The residue (about 20 bytes) is the two compare groups, `movsx`/`inc`/32-bit `cmp` against
+the image's 16-bit forms; `hp - X < 1` and `X - hp > -1` also keep the colour but cost two
+more instructions. `c2fast` one-function clones differ from the real TU in rotation and
+colour state (the weapon-switch tail matched in the clone and not in widget.cpp): always
+confirm with sweep2.

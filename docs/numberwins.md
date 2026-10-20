@@ -28,7 +28,7 @@ The kinds, and why each works (all measured; the mechanism notes are in
 - **A pair in a call-argument ternary** in ScriptParseActionRecon's setspeed log (resyncs the rotation cursor); revisit.
 - **Plain-click path first, with its own tail copy** in SelectionClick (arm order decides the rotation walk); revisit.
 - **Byte-restricted return** `return (int8_t)w == 0 ? w : w;` in the TroopBlockWeight inline (BlockWeightTroops 30 -> 0); revisit.
-- **Dead reads** of `tiles.top` (ScrollMapCache) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
+- **`tt = *(volatile int32_t *)&tiles.top`** (ScrollMapCache, replaces the dead read) and **`hp < X + 1` for `hp <= X`** (HudSquadUpdate, key tie-break) (SightScan's pair of `o->pos` reads was removed again in the next round); revisit.
 - **ObjRemap dead reads** of `y` and `o->pos.y` (124 -> 108); revisit.
 - **Volatile test then plain read** of `g_dynamic[i]->buffer` in Update3DAudioVolumes (replaces the self-referential ternary; 12 -> 2); revisit.
 - **Dead read after a return**, `(void)*(volatile int32_t *)&g_menuRow;` in TickMenuAnimation (DrawMenuCursor 30 -> 0); revisit.
