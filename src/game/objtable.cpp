@@ -116,9 +116,15 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
         case 0: case 5: case 6: case 7:
             id = g_defaultOwner;
             owner = id & 7;
-            id = (id * (1u << AM2_UID_OWNER_SHIFT)) | g_uidCounter[owner];
+            n = g_uidCounter[owner];
             counter = &g_uidCounter[owner];
-            (*counter)++;
+            id = (id * (1u << AM2_UID_OWNER_SHIFT)) | n;
+            *counter = n + 1;
+            /* A number win: owner is id & 7, so this never leaves. It keeps owner live past the
+             * counter load (the image's load lands in ecx, not in owner's register), which stops
+             * VC6 sharing this arm's store with the overflow-path tail. */
+            if (owner > 7)
+                break;
             break;
         case 1: case 2: case 3: case 4: case 8:
         own:

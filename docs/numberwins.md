@@ -78,3 +78,5 @@ Same storage, same behaviour; it exists because the original's loop reads the ar
 direct volatile forms (`*(volatile T *)&X += 1`) give 62. Revisit.
 
 ObjRemap: `{ int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }` and `{ int16_t t = *(volatile int16_t *)&o->pos.y; y = t; }` (96 -> 92). FindPath no longer carries any impossible pair. Revisit.
+
+AddToItemList (objtable.cpp): `if (owner > 7) break;` after the counter store, where `owner = id & 7`; never taken, keeps `owner` live past the load. Revisit.
