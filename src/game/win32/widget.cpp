@@ -7950,10 +7950,9 @@ AM2_HudPanel::AM2_HudPanel()
                            g_hiliteColour,
                            g_backgroundColour,
                            (void (__cdecl *)(AM2_Widget *))0, 0, 0);
-        btn->disabled = 1;
         self->pointsField = btn;
-        ::WidgetAddChild(w, self->pointsField);
-        (void)*(volatile int32_t *)&self->open;   /* a number win: a rotation temporary */
+        btn->disabled = 1;
+        w->WidgetAddChild(self->pointsField);
 
         btn = new AM2_Button("03_016_00_start.bmp", "03_016_01_start.bmp", "03_016_02_start.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1F, 0x1A6, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) BuildStartHandler, (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, btn);
@@ -9326,7 +9325,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         (*slot)->chosen   = -1;
         (*slot)->disabled = 1;
         p->typeBox->flag50   = 0;
-        ::WidgetAddChild(w, p->typeBox);
+        w->WidgetAddChild(p->typeBox);
 
         child = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x121, 0xC2, 0x13, 0x68), w,
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),

@@ -2179,3 +2179,22 @@ functions. None yields a scratch-register consumer that emits no code:
   0x12d are not AssignTemp rotation events; they take eax through the hint path, while the image's
   registers match a rotation temp. In HudPanel's reload (event 30) the hint carries eax and the image has
   ecx. A source form that makes c2 reject the hint would fix both; none is known.
+
+### Exception-handling functions: web or rotation temporary (Round BG, MpPanelScreen 30 -> 6, HudPanel 22 -> 6)
+
+In a function with an EH frame (any function holding `new T(args)` with a constructor, or a local
+with a destructor; it gets a `fs:[0]` frame) c1 does not forward a single-use named local into its
+use. A load passed through a named local, or through a static-inline wrapper parameter (`::WidgetAddChild(w, x)`),
+becomes a named WEB coloured at global colouring, with no AssignTemp event and no cursor movement. In a
+non-EH function the same single-use local is propagated and the load is an ordinary rotation temporary;
+a named local used twice is a web in both. Reproducer: `void ToyF(AM2_MpPanelScreen *p){ ::WidgetAddChild(p,
+p->typeBox); AM2_Widget *c = new AM2_Rec(0); }` has 0 body events with the EH `new`, 1 with `c = 0` or
+with the direct member call `p->WidgetAddChild(p->typeBox)`. Toys with an unrelated class did not
+reproduce it; the real AM2 types were needed. Lever: in a constructor with `new`, spell a call
+argument load as a direct member call to make it a rotation event; keep the wrapper to make it a
+non-consuming web. Pitfall: in an EH function the c2rot `atr` log also holds events from the
+`__unwindfunclet$...` functions (`line=0 base=0 cursor=0`; 25 in the toy); count only `line != 0`.
+Other rotation facts from the same round: `cmp word/dword [mem], imm` (op26) consumes a slot with no
+register effect; a load folded into its user (`push [mem]`) is an event with no instruction of its own;
+`cmp mem,reg` split late into `mov eax,[mem]; cmp eax,esi` adds the load AFTER rotation (not an event),
+while `sub eax,esi; jne` makes it a real event (why LoadMap's difference test costs `sub` for `cmp`).
