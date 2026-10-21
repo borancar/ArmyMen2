@@ -2198,3 +2198,11 @@ Other rotation facts from the same round: `cmp word/dword [mem], imm` (op26) con
 register effect; a load folded into its user (`push [mem]`) is an event with no instruction of its own;
 `cmp mem,reg` split late into `mov eax,[mem]; cmp eax,esi` adds the load AFTER rotation (not an event),
 while `sub eax,esi; jne` makes it a real event (why LoadMap's difference test costs `sub` for `cmp`).
+
+Two spellings of one base object (Round BH, HudPanel ctor 6 -> 0): when the image has a real register
+copy (`mov ecx,eax`) of a loaded field and ours has a reload, read the field once through one spelling
+of the base (`w->x`) and again through another (`this->x`, same pointer): c1 treats the second load as a
+CSE of the first, and that leaves a copy tuple. Named locals, static-inline wrappers and casts are
+forwarded by c1 and give no copy. The order of the two spellings matters. Candidate for other member
+functions that read the same field twice (Update3DAudioVolumes has the same shape: a `mov eax,ecx` copy
+in the image against ours reloading `mov eax,[eax]`).
