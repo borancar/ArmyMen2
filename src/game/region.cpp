@@ -2657,8 +2657,6 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
 {
     const AM2_RecordList *h = hdr;
     AM2_Rect       *box   = &out->box;
-    const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                g_bitFromN;
     const uint8_t  *bits;
     const AM2_Sprite *spr;
     int32_t         ox;
@@ -2754,25 +2752,24 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
         k        = 8 - phase;
     }
 
-    const AM2_Rect *wr = &f.world;
-    int32_t y;       /* a number win: a loop-index copy kept in step at the latch */
-    f.y = wr->top;
-    y = f.world.top;      /* a number win: a second load of the same word keeps y apart from f.y */
-    for (; f.y < f.world.bottom; f.y += 8, y = f.y) {
-        int32_t off = (y - f.m->originY - f.oy) * f.rowbytes;
-        int32_t cx = ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1);
+    for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
+        int32_t off = (f.y - f.m->originY - f.oy) * f.rowbytes;
         f.col = AM2_TILEMASK_MARGIN;
-        f.end = off + f.rowbytes;
-        if (rowbits == 0 || (cx == 8520 && cx == 8521) || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))
+        if (rowbits == 0 || ((((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) == 8520 && (((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) == 8521))
             return 0;
-        uint8_t *c   = out->cells + cx + AM2_TILEMASK_MARGIN;
+        f.end = off + f.rowbytes;
+        uint8_t *c  = out->cells + (((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) + AM2_TILEMASK_MARGIN;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
          * multiple of 32 here, so every row has bytes to walk. */
         do {
+            /* A number win: a named local defined inside the do-loop is hoisted by VC6 to the loop's
+             * preheader (the image's per-row `-0x10 - out` in ebx) without becoming an induction
+             * variable, which leaves `marked` in memory; the redundant `rowbits == 0` guard in the row
+             * body is what keeps the hoist from leaving the row loop. */
             int32_t bias = (int32_t)(0xFFFFFFF0u - (uint32_t)(uintptr_t)out);
             if (splitOdd == off % 2) {
-                if (bits[off] & tab[k]) {
+                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k]) {
                     f.marked = 1;
                     int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
@@ -2784,13 +2781,13 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
                 if (f.col == f.tilew + AM2_TILEMASK_MARGIN)
                     break;
 
-                if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                if (bits[off] & ((const uint8_t *)(uintptr_t)(g_bitFromN))[k + AM2_BIT_FROM_N_LOW]) {
                     f.marked = 1;
                     int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                     *c |= AM2_TILEMASK_BOX_CELL;
                     MarkTileRingIdx(out, g_tilemaskNeighbours, at);
                 }
-            } else if ((bits[off] || (f.world.top == 1000 && f.world.top == 1001))) {
+            } else if (bits[off]) {
                 f.marked = 1;
                 int32_t at = (int32_t)((uint32_t)(uintptr_t)c + (uint32_t)bias);
                 *c |= AM2_TILEMASK_BOX_CELL;

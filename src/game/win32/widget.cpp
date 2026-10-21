@@ -9246,7 +9246,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * ::MpPanelUpdate prints back into each row, so the constructor seeds
          * what the update displays. */
         last = i == 3;
-        spin = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0xF0, 37 + i * 32, 0x4C, 0x17 + last),
+        int32_t ys = 37 + i * 32;
+        spin = new AM2_MpSpin(*RectSet(AM2_TEMP(AM2_Rect), 0xF0, ys, 0x4C, 0x17 + last),
                               g_mpPanelPoints[i],
                               0, 0x1388, 0x64, w, MpCommitPoints,
                               g_hiliteColour,
