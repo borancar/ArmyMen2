@@ -2124,3 +2124,34 @@ copy between the two. Forcing 1a to edx (`c2rot.py web ... 1a:3`) deletes that c
 gives the image's first two `movsx`. So the one lever is a positive penalty on ecx for web 1a: a
 neighbour live in its range with cost > 0 and an ecx hint (thiscall `this`, a variable shift count,
 `rep` operands) or `left` (key 92) above 164. No code-neutral construct supplies either.
+
+### Where hints come from (Round BD, 2026-10-21)
+
+Measured in C2.DLL 8168 under gdb. The only hint-adder is `AddHint(web, target)` at 0x10714f83
+(six call sites: five in the per-tuple cost routine at 0x1071431d, one in the colouring step at
+0x10716918). It appends a node (next, target, weight) to the web's hint list (web+0x34) or adds to
+the weight if the target is already listed, and does nothing once the web has a register. Hints go
+only toward FIXED REGISTERS; there are no web-to-web hints.
+
+- **Creation:** a copy tuple between a register-candidate web and a fixed-register operand, weights
+  accumulating per copy. A call result gives eax; `this` of a thiscall gives ecx (its result eax);
+  a variable shift count gives ecx; a `rep` count (stos loop) gives ecx; inline `strlen` gives ecx
+  on its result; `/ const` and `/ 8` give edx or eax on the quotient; a 64-bit multiply gives eax and
+  edx; `return v` gives eax. Stack-passed arguments, constant-size `memcpy`/`memset`/`memcmp`, `movsx`
+  chains and byte values give no hint (byte values only restrict the allowed set to {eax, ecx, edx,
+  ebx}).
+- **Inheritance** (site 0x10716918): when a web is coloured, every copy partner on the copy list at
+  0x107ae0b0 gets a hint to that colour (ObjRemap: colouring the pre-clamp `cb` web to ecx gives its
+  post-clamp partner the hint (ecx, 3)).
+- **Penalty vector** (0x10716715), re-derived from the disassembly: the web's own hints subtract their
+  weight from that register; each uncoloured neighbour with cost > 0 adds its hint weights, only for
+  registers inside that neighbour's allowed set; a neighbour with no hint inside its allowed set and
+  exactly one allowed register adds 100 x cost on that register; ties go to the earliest of eax, ecx,
+  edx, esi, edi, ebx, ebp.
+- **No hint without code:** a dead shift, divide, 64-bit multiply, `strlen` or empty inline member
+  function whose result is unused vanishes before webs and hints exist. Every real hint source emits
+  code. A neighbour must also OVERLAP the live range of the web being decided: ObjRemap's shift-count
+  web (allowed {ecx}, cost 6) does not overlap web 1b, and every way to make it overlap changes code.
+
+`tools/c2hint.py` is c2pen plus a `HINT site=... web=... tgt=...` line per AddHint call (its `op` and
+`line` fields are unreliable; site, web and target are right).
