@@ -2213,3 +2213,15 @@ gives 26); and in LoadMap a store through `objs[index]` where a pointer `r = &ob
 free functions the second spelling can be a pointer to the same array element or a different
 subscript form; c1 forwards named locals and casts of one expression but not a different spelling of the
 same object.
+
+### Early evaluation by a dead pair (Round BL, ObjHitMaskAction 8 -> 0, ListMaskAction 14 -> 6)
+
+An impossible pair on an inline sub-expression, placed in an already-live condition AHEAD of the statement that
+consumes it, makes c1 evaluate that sub-expression at the pair; this fixes its IL position without emitting code. On
+ObjHitMaskAction the image evaluates the product P before the `f.end` store and the final `lea c`: a one-use named
+local `cx = P` is forwarded to its use (60); `cx` plus a pair on `cx` gives 2 (store order right, `lea` operands
+[edx+ecx] instead of [ecx+edx]); the inline expression itself in the pair, with the guard moved before `f.end`, gives 0.
+A named local that is a web (two or more uses) comes second in the `lea` operands; a forwarded single-use temporary
+comes first. In ScriptParseEvent the `mov eax,[eax+8]; push eax` loads take eax by the hint path whenever the base
+temporary `tok` dies at the load; if the base is read again after the load the load becomes a rotation temporary; a
+pair on `(intptr_t)ctx->tokens` makes the base pointer a shared value (22 -> 18).

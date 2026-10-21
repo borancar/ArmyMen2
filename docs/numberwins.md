@@ -88,3 +88,5 @@ HudPanel ctor carries no number win any more (its `w->x` dead read is gone).
 Update3DAudioVolumes and LoadMap's `numb` store no longer carry number wins (the volatile test and the volatile store are gone).
 
 FindPath: `dd <<= 1; if (dd == 70000 && dd == 70001) continue;` (a never-true pair on `dd`; part of a three-edit unit, 66 -> 54). Revisit.
+
+ObjHitMaskAction and ListMaskAction: never-true pairs on the product `((y >> shift) - box.top) * (box.right - box.left + 1)` ahead of the `f.end` store; ScriptParseEvent: the pair is on `(intptr_t)ctx->tokens`. Revisit.

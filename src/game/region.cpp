@@ -2145,12 +2145,11 @@ int32_t __cdecl ObjHitMaskAction(AM2_Object *obj, AM2_TileMask *out)
 
     for (f.y = f.world.top; f.y < f.world.bottom; f.y += 8) {
         int32_t off = (f.y - f.m->originY - obj->hit.top) * f.rowbytes;
-        uint8_t *c  = out->cells + ((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
-                            + AM2_TILEMASK_MARGIN;
         f.col = AM2_TILEMASK_MARGIN;
-        f.end = off + f.rowbytes;
-        if (rowbits == 0)
+        if (rowbits == 0 || ((((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) == 8520 && (((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) == 8521))
             return 0;
+        f.end = off + f.rowbytes;
+        uint8_t *c  = out->cells + (((f.y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)) + AM2_TILEMASK_MARGIN;
 
         /* No entry test: a row is never empty once rowbits is not 0. */
         do {
@@ -2761,12 +2760,12 @@ int32_t __cdecl ListMaskAction(AM2_Point at, const AM2_RecordList *hdr,
     y = f.world.top;      /* a number win: a second load of the same word keeps y apart from f.y */
     for (; f.y < f.world.bottom; f.y += 8, y = f.y) {
         int32_t off = (y - f.m->originY - f.oy) * f.rowbytes;
+        int32_t cx = ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1);
         f.col = AM2_TILEMASK_MARGIN;
-        uint8_t *c   = out->cells + ((y >> AM2_TILE_SHIFT) - out->box.top) * (out->box.right - out->box.left + 1)
-                             + AM2_TILEMASK_MARGIN;
         f.end = off + f.rowbytes;
-        if (rowbits == 0 || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))   /* the pair: a number win */
+        if (rowbits == 0 || (cx == 8520 && cx == 8521) || ((uintptr_t)(out->box.right) == 8520 && (uintptr_t)(out->box.right) == 8521))
             return 0;
+        uint8_t *c   = out->cells + cx + AM2_TILEMASK_MARGIN;
 
         /* No entry test, as in ObjHitMaskAction: rowbits is a non-zero
          * multiple of 32 here, so every row has bytes to walk. */

@@ -1213,7 +1213,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
                       "Line [%4d]:  Name required after PADOFF\n",
                       "Line [%4d]:  PADOFF name was not a pad\n",
                       tok->kind != AM2_TOKEN_STRING,
-                      ((ctx->tokens[*at].line == 1000 && ctx->tokens[*at].line == 1001) ? 0 : ctx->tokens[*at].line),
+                      (((intptr_t)ctx->tokens == 1000 && (intptr_t)ctx->tokens == 1001) ? 0 : ctx->tokens[*at].line),
                       ctx->tokens[*at].line);
             goto pad_found;
         case AM2_TOK_KILLED:
