@@ -1767,7 +1767,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                     }
                     r->trig = (uint8_t)trig;
                     r->field11 = 0;
-                    *(volatile int8_t *)&r->numb = (int8_t)numb;   /* a number win */
+                    objs[index].numb = (int8_t)numb;   /* through the array element, as the image does: r is &objs[index] */
 
                     if (strlen(scri) != 0) {
                         r->script =

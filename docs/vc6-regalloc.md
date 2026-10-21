@@ -2206,3 +2206,10 @@ CSE of the first, and that leaves a copy tuple. Named locals, static-inline wrap
 forwarded by c1 and give no copy. The order of the two spellings matters. Candidate for other member
 functions that read the same field twice (Update3DAudioVolumes has the same shape: a `mov eax,ecx` copy
 in the image against ours reloading `mov eax,[eax]`).
+
+Two spellings of one object, second case (Round BI, Update3DAudioVolumes 2 -> 0, LoadMap 18 -> 12): test
+through `g_dynamic[i]->buffer` and use through `dyn = g_dynamic[i]; dyn->buffer` (that order: the reverse
+gives 26); and in LoadMap a store through `objs[index]` where a pointer `r = &objs[index]` was used. For
+free functions the second spelling can be a pointer to the same array element or a different
+subscript form; c1 forwards named locals and casts of one expression but not a different spelling of the
+same object.

@@ -1631,8 +1631,6 @@ void __cdecl Update3DAudioVolumes(void)
     AM2_Object *obj;
     int32_t     dist;
     int32_t     vol;
-    LPDIRECTSOUNDBUFFER buf;
-
     if (!g_audioEnabled)
         return;
 
@@ -1641,13 +1639,14 @@ void __cdecl Update3DAudioVolumes(void)
     for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
         if (!g_dynamic[i])
             continue;
-        /* number win: a volatile test of the field, then a plain read of it; the image tests a
-         * load temporary and copies it into the argument register. */
-        if (!*(LPDIRECTSOUNDBUFFER volatile *)&g_dynamic[i]->buffer)
+        /* The test reads the slot's buffer through the array element and the call reads it
+         * through a pointer to the same element: two spellings of one object, so the second load
+         * is a CSE of the first and leaves the register copy the image has. */
+        AM2_Sound *dyn = g_dynamic[i];
+        if (!g_dynamic[i]->buffer)
             continue;
-        buf = g_dynamic[i]->buffer;
 
-        IDirectSoundBuffer_GetStatus(buf, &status);
+        IDirectSoundBuffer_GetStatus(dyn->buffer, &status);
         if (status & DSBSTATUS_PLAYING) {
             where = g_zeroPoint;
             if (g_dynamic[i]->owner) {

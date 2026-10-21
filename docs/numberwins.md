@@ -84,3 +84,5 @@ AddToItemList (objtable.cpp): `if (owner > 7) break;` after the counter store, w
 HudPanel ctor no longer carries the dead read of `self->open`; its other dead read (`w->x`) remains. The `w->WidgetAddChild(x)` member-call spelling in MpPanelScreen and HudPanel is not a number win: it is the same call as the wrapper.
 
 HudPanel ctor carries no number win any more (its `w->x` dead read is gone).
+
+Update3DAudioVolumes and LoadMap's `numb` store no longer carry number wins (the volatile test and the volatile store are gone).
