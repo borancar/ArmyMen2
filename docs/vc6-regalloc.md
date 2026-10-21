@@ -2155,3 +2155,27 @@ only toward FIXED REGISTERS; there are no web-to-web hints.
 
 `tools/c2hint.py` is c2pen plus a `HINT site=... web=... tgt=...` line per AddHint call (its `op` and
 `line` fields are unreliable; site, web and target are right).
+
+### Zero-code rotation consumers: what does not exist (Round BD)
+
+About 100 constructs tested on toys (`c2rot atr` event counts against a baseline) and on the real
+functions. None yields a scratch-register consumer that emits no code:
+
+- Algebraic no-ops (`^0`, `&-1`, `-(-x)`, `*1`, `%1`, `x-x`, `x!=x`, `(x,x)`) fold in c1: event count and
+  code unchanged.
+- Impossible pairs `(X==K && X==K+1)` on a plain memory operand with no other nearby use fold completely
+  (globals, `o->d`, `garr[n]`, `recs[i].y`, `p->p->f`, in `if`, `for`, `while`, `switch`, `&&`). Where a
+  pair does change anything it makes an existing load or address a shared web, which LOWERS the event
+  count (4 to 3 in the toy). Pairs on frame locals and registers fold in c1; on short or byte fields
+  they change the code. Their effect lands where the c2 block walk reaches them, not where they sit in
+  the source (MpPanelScreen: a pair in the AddChild or ArrowBar argument acts at ~0x835, not at the
+  `lea` at 0x48b); parity matters (n=2 inert, n=1 and 3 add 8 bytes of damage).
+- Unreachable code after `return`: a volatile read there leaves no event and identical code, so
+  DrawMenuCursor's win from it was block layout, not a consumer.
+- Dead volatile reads consume one slot but cost a real load (3 bytes).
+- Rotation order is the c2 block walk, not address order: in LoadMap `size - plane` adds a temp processed
+  at walk position 12, before the MHDR group, while the plain compares sit at 75 to 82.
+- Hint path versus rotation: in ScriptParseEvent the `mov eax,[eax+8]; push eax` loads at 0x88, 0xd5 and
+  0x12d are not AssignTemp rotation events; they take eax through the hint path, while the image's
+  registers match a rotation temp. In HudPanel's reload (event 30) the hint carries eax and the image has
+  ecx. A source form that makes c2 reject the hint would fix both; none is known.
