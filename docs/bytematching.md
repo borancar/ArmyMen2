@@ -365,3 +365,33 @@ RowUpdate or FindPath (fresh versions 195, 220 and 1,356 bytes against 88, 154 a
 the method pays when a function's CONTROL-FLOW layout is off, not when its residue is
 colour. Order of work: derive the block order and exits from the jump targets first, then
 the locals from the frame layout, then compile and compare.
+
+## The remaining 17 (2026-10-21, 512 bytes): what each needs
+
+Every residue below has a measured diagnosis; none has a known source form. See docs/vc6-regalloc.md
+for the allocator model (keys, penalty vector, hints, rotation) and the tools (`c2webs`, `c2blk`,
+`c2allow`, `c2rot`, `c2force`, `c2lines`, `c2fixed`, `c2pen`, `c2hint`).
+
+| function | bytes | what the image has that ours lacks |
+|---|---|---|
+| RowUpdate | 154 | `right`/`bottom` recomputed (`left + w`, `top + h`) unshared, `rect.top` reloaded after its store, `cols` spilled to [esp+0x10]; c2 shares the sums |
+| ObjRemap | 90 | pre-clamp `cb` (web 1a) in edx, needs an ecx hint/penalty from a neighbour live in its range, or `left` (key 92) above 164; image spills `top`, ours `left` |
+| FindPath | 66 | first inline distance masks `cur` destructively first; `mov ecx,[eax]; mov ebp,ebx; add ebp,ecx`; `shl eax,1; mov edi,eax`; 16-bit `test ax,ax`/`test dx,dx` |
+| SightScan | 38 | the allied-arm end test is proven dead (`cand == w`), which threads two jumps past the reload (`lea ecx,[edi+0x12]` for `add edi,0x12`); removing it moves the score block (436) |
+| MpPanelScreen ctor | 30 | one rotation consumer between the `flag50` store and the ArrowBar `lea` (ecx), and the `add esi,0x20; add ebx,4` order |
+| HudPanel ctor | 22 | `pointsField` stored before `btn->disabled`, reload into ecx (one more rotation slot before it), `mov ecx,eax` copy of `px` |
+| ScriptParseEvent | 22 | four name/line loads are webs that take eax; the image has edx/ecx: needs a neighbour with an eax penalty or hint live across them |
+| UpdateTrooperAction | 18 | arm-1 `s` web (zero neighbours) needs edx; arms 2-4 reloads of `out` consume no rotation slot in the image |
+| LoadMap | 18 | the `sub` at TRIG supplies one rotation consumer the image gets from a `cmp`; two scheduling swaps (`mov [esi+0x15],dl`, `xor eax,eax`/`add esp,4`) |
+| ListMaskAction | 14 | `f.end` spill store before the `lea` for `c`; `mov esi,eax` before the store |
+| ScriptPad | 12 | loop-1 `n` load/inc/store sits between the `sy` sum and the `sy` store; `n` is plain in the image |
+| ObjHitMaskAction | 8 | same `f.end` store position as ListMaskAction |
+| TrooperFire | 6 | `PointsDiffer(o->pos, at->at)` argument temps eax/ecx, ours edx/eax: bump at event 24 and a freeze at 25 or 26 |
+| OptionsDefaults | 4 | `neg eax` where the image has `test eax,eax`; plain test puts `setne` in al (20) |
+| ScriptIf | 4 | two `jb` where the image has `jl`; signed merges identical tails into their pairs (156 to 286) |
+| PausedFrameStep | 4 | `mov [esp+0x10],edx` before `mov esi,eax` |
+| Update3DAudioVolumes | 2 | `mov eax,ecx` copy of the loaded buffer where ours reloads `mov eax,[eax]` |
+
+Levers that are known NOT to exist: a zero-code rotation consumer, a hint without code (hints point at
+fixed registers only), a pair on a local or register operand (folds in c1), a dead non-volatile read
+(deleted in c1). Levers that work only with a measured prerequisite are listed with each win in STATUS.md.
