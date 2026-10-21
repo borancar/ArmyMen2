@@ -1821,7 +1821,7 @@ void __cdecl PausedFrameStep(void)
 
     /* The comm object is read at every use. */
     const int16_t *row;
-    const int16_t *xy;
+    int32_t        shown;       /* slots drawn so far: this one's coordinates are row[shown * 2], row[shown * 2 + 1] */
     int32_t        active;
     int32_t        idx;
     int32_t        slot;
@@ -1838,7 +1838,7 @@ void __cdecl PausedFrameStep(void)
 
     idx = active - 1;
     row = (const int16_t *)&g_mpRowCoords[idx * 4];
-    xy = row;
+    shown = 0;
 
     for (slot = 0; slot < 4; slot++) {
         int32_t  team;
@@ -1890,7 +1890,7 @@ void __cdecl PausedFrameStep(void)
 
         DrawSprite(g_mpMarkGrid
                        [g_commObject->CommArmyOfSlot(slot) * 5 + variant],
-                   xy[0], xy[1], 0);
+                   row[shown * 2], row[shown * 2 + 1], 0);
 
         if (g_commObject->slots[slot].team != 0) {
             /* The team sprite sits 0x5E right of the marker for the small
@@ -1899,8 +1899,8 @@ void __cdecl PausedFrameStep(void)
              * two-constant ternary, not a rounding of x. */
             DrawSprite(g_mpTeamSprites
                            [g_commObject->slots[slot].team],
-                       (variant == 3 ? 0x5E : 0x3E) + xy[0],
-                       xy[1] + 3, 0);
+                       (variant == 3 ? 0x5E : 0x3E) + row[shown * 2],
+                       row[shown * 2 + 1] + 3, 0);
         }
 
         /* Two calls, not a ternary argument: VC6 merges their tails, so
@@ -1908,16 +1908,16 @@ void __cdecl PausedFrameStep(void)
          * where a ternary argument is evaluated ahead of them. */
         if (badge) {
             if (variant == 3)
-                DrawSprite(g_mpMarkA, xy[0], xy[1], 0);
+                DrawSprite(g_mpMarkA, row[shown * 2], row[shown * 2 + 1], 0);
             else
-                DrawSprite(g_mpMarkB, xy[0], xy[1], 0);
+                DrawSprite(g_mpMarkB, row[shown * 2], row[shown * 2 + 1], 0);
         }
 
         if (g_commObject->CommSlotHasPlayer(slot))
             DrawLatencyBar(idx, slot);
         else
             DrawSprite(g_mpMarkC,
-                       xy[0] + 0x37, xy[1] + 3, 0);
+                       row[shown * 2] + 0x37, row[shown * 2 + 1] + 3, 0);
 
         if (variant > 2) {
             am2_sprintf(scoreText, "%d",
@@ -1925,7 +1925,7 @@ void __cdecl PausedFrameStep(void)
             width = TextExtent(scoreText, 1, NULL);
             if (!LockSurface(*(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                 return;
-            DrawText(xy[0] - width + 0x32, xy[1] + 4, scoreText, 1, 0,
+            DrawText(row[shown * 2] - width + 0x32, row[shown * 2 + 1] + 4, scoreText, 1, 0,
                      g_hiliteColour);
             UnlockSurface();
 
@@ -1936,7 +1936,7 @@ void __cdecl PausedFrameStep(void)
                 if (!LockSurface(
                         *(LPDIRECTDRAWSURFACE *)&g_drawTarget))
                     return;
-                DrawText(xy[0] - width + 0x58, xy[1] + 4, teamText, 1, 0,
+                DrawText(row[shown * 2] - width + 0x58, row[shown * 2 + 1] + 4, teamText, 1, 0,
                          g_hiliteColour);
                 UnlockSurface();
             }
@@ -1947,8 +1947,8 @@ void __cdecl PausedFrameStep(void)
 
             /* The rect is built from its own corner, and the text sits two
              * pixels inside that corner. */
-            clip.left   = xy[0];
-            clip.top    = xy[1] + 0x14;
+            clip.left   = row[shown * 2];
+            clip.top    = row[shown * 2 + 1] + 0x14;
             clip.right  = clip.left + 0x6E;
             clip.bottom = clip.top + 0x14;
             if (!LockSurface(
@@ -1959,7 +1959,7 @@ void __cdecl PausedFrameStep(void)
                             g_whiteInk);
             UnlockSurface();
         }
-        xy += 2;
+        shown++;
     }
 
     if (g_infoOverlayOn) {

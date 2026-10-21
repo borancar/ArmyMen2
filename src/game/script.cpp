@@ -19,6 +19,19 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+/* The image's inline "Unexpected end of script." blocks at the ALLOF/INORDER
+ * step and at the BUTNOT keyword's end test are not merged with the identical
+ * blocks elsewhere, although their tests are signed: each pushes its own copy
+ * of the string. Under the relink the copy is a symbol of its own, mapped to
+ * the string's address (relink.py maps am2_rl_* by the address in the
+ * comment); everywhere else it is the literal. */
+#if defined(AM2_RELINK)
+extern "C" const char am2_rl_scriptif_end;  /* 0x004875B0 */
+#define kScriptIfEnd (&am2_rl_scriptif_end)
+#else
+#define kScriptIfEnd "Unexpected end of script.\n"
+#endif
+
 #ifdef AM2_STANDALONE
 /* The seven token-kind names at 0x00487C74 (a const char*[7], indexed by
  * kKindName), transcribed to C literals; the blob's name strings then drop. */
@@ -3091,15 +3104,15 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_ALLOF:
             cond->kind = AM2_IF_ALLOF;
-            if ((uint32_t)++(*at) >= (uint32_t)ctx->count) {
-                am2_log("Unexpected end of script.\n");
+            if (++(*at) >= ctx->count) {
+                am2_log(kScriptIfEnd);
                 return 0;
             }
             break;
         case AM2_TOK_INORDER:
             cond->kind = AM2_IF_INORDER;
-            if ((uint32_t)++(*at) >= (uint32_t)ctx->count) {
-                am2_log("Unexpected end of script.\n");
+            if (++(*at) >= ctx->count) {
+                am2_log(kScriptIfEnd);
                 return 0;
             }
             break;
@@ -3143,8 +3156,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
             SCRIPT_ADD_EVENT(cond, na, nb, nc);
-            if ((uint32_t)*at >= (uint32_t)ctx->count) {
-                am2_log("Unexpected end of script.\n");
+            if (*at >= ctx->count) {
+                am2_log(kScriptIfEnd);
                 return 0;
             }
         }
