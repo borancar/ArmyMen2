@@ -5042,9 +5042,17 @@ score:
             /* Not a unit: a dropped weapon worth walking to. */
             if (!flags || !ObjIsType4(keep))
                 goto next;
-            DistAndAngle(&o->pos,
-                         &keep->pos,
-                         &pick.range, &pick.bearing);
+            {
+                /* A number win: two reaching definitions keep the address a web, as
+                 * the image holds it (the third argument is not a temporary). */
+                const AM2_Point *kp;
+
+                if (flags)
+                    kp = &keep->pos;
+                else
+                    kp = &keep->pos;
+                DistAndAngle(&o->pos, kp, &pick.range, &pick.bearing);
+            }
             /* Asked again here, as the image does (0x004041B0). */
             if (!keep)
                 goto next;

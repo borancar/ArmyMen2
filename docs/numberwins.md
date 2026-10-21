@@ -92,3 +92,5 @@ FindPath: `dd <<= 1; if (dd == 70000 && dd == 70001) continue;` (a never-true pa
 ObjHitMaskAction and ListMaskAction: never-true pairs on the product `((y >> shift) - box.top) * (box.right - box.left + 1)` ahead of the `f.end` store; ScriptParseEvent: the pair is on `(intptr_t)ctx->tokens`. Revisit.
 
 ObjRemap was rewritten: two never-true pairs in the flag test (`force == 1000 && force == 1001`, `d->shift == 1000 && d->shift == 1001`) and one volatile dword read of `o->pos.x`; the older dead reads are gone. Revisit.
+
+SightScan: `kp = flags ? &keep->pos : &keep->pos` as an if/else in the type-4 weapon arm (two reaching definitions; 38 -> 26). Revisit.
