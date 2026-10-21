@@ -5,8 +5,8 @@ compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
-State when this was written (2026-10-15): 1632 of 1646 functions
-byte-identical, 14 differing, 426 bytes of total edit distance. The live
+State when this was written (2026-10-15): 1633 of 1646 functions
+byte-identical, 13 differing, 336 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -403,3 +403,10 @@ the image's length (1798) and 54. Judge by length first: a subset whose length e
 displacements stop mismatching. The remaining FindPath hunks: `mov ecx,[eax]; mov ebp,ebx; add ebp,ecx` for `nb`;
 the first mask `and` destructive (a helper taking the same value under two spellings fixes it and drops the length
 to 1794); `shl eax,1; mov edi,eax; add di,[mem]` for `g`; `mov ecx,esi; and ecx,eax` in the final heuristic.
+
+**Re-derive again after new levers (Round BN, ObjRemap 90 -> 0).** A second from-scratch derivation, done after the
+earlier one's levers had been superseded, took ObjRemap from 90 to 0 where hundreds of local edits to the old source had
+not: the old source had been shaped by levers that no longer applied. Procedure: derive from the image first (block order,
+frame slots), write it, match the layout, then anneal with the CURRENT lever set (dead pairs on the flag test, statement
+permutations of the independent stores), then minimise: drop every hack whose ablation does not cost (here the volatile
+y read, the unreachable read). Re-run this for any function whose source predates a lever batch.

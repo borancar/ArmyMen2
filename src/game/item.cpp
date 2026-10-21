@@ -11134,79 +11134,72 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
  *
  * PointsEqual takes its two points BY VALUE -- rect.h has the signature, and
  * CLAUDE.md records a defect from calling it with pointers instead. */
-void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
+void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *d, int32_t force)
 {
-    int32_t        x, left, top;
-    int32_t        y;
-    int32_t        cl, ct, cr, cb, col, idx;
-    int32_t        cols, cell, stride;
+    int32_t x, y;
+    int32_t left, top;
+    int32_t cl, ct, cr, cb;
+    int32_t cols, shift;
+    int32_t n, cell, stride;
 
-    if (force == 0
-        && PointsEqual(o->prevPos, o->pos))
-        return;
-
-    /* A number win: volatile reads of the position, the x through its dword. */
-    { int16_t t = *(volatile int16_t *)&o->pos.y; y = t; }
-    { int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }
-
-    o->hit.right  = x + o->box.right;
-    top    = y + o->box.top;
-    o->hit.bottom = y + o->box.bottom;
-    left   = x + o->box.left;
-    o->hit.top    = top;
-    o->hit.left   = left;
-
-    if (!(o->flags & OBJ_FLAG_BIT0))
-        return;
-
-    /* The right edge first, and the bottom through `y + box.top` again: VC6
-     * folds it to `box.bottom + y` and shares the hit.bottom temporary
-     * (a byte win; the image also spills `top`, which this does not). */
-    cl = left   >> AM2_CELL_SHIFT;
-    ct = top    >> AM2_CELL_SHIFT;
-    cr = ((o->box.right - o->box.left) + left) >> AM2_CELL_SHIFT;
-    cb = ((o->box.bottom - o->box.top) + top)  >> AM2_CELL_SHIFT;
-
-    /* Off the grid in any direction is an unregister, not a clamp. The
-     * grid size is read where it is compared, rows first, and the column
-     * count is then held -- the walk ItemLinkCells and RowUpdate share. */
-    (void)*(volatile int32_t *)&o->pos.y;
-    if (cb < 0 || ct > desc->rows - 1 || cr < 0 || cl > desc->cols - 1) {
-        ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
-        return;
-        (void)*(volatile int32_t *)&y;
+    if (!force) {
+        if (PointsEqual(o->prevPos, o->pos))
+            return;
     }
-    cols = desc->cols;
+
+    y = o->pos.y;
+    { int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }
+    left = x + o->box.left;
+    o->hit.left   = left;
+    top  = y + o->box.top;
+    o->hit.right  = x + o->box.right;
+    o->hit.top    = top;
+    o->hit.bottom = y + o->box.bottom;
+
+    if (!((uint8_t)o->flags & OBJ_FLAG_BIT0) || (force == 1000 && force == 1001) || (d->shift == 1000 && d->shift == 1001))
+        return;
+
+    cl = left >> AM2_CELL_SHIFT;
+    ct = top  >> AM2_CELL_SHIFT;
+    cr = (o->box.right - o->box.left + left) >> AM2_CELL_SHIFT;
+    cb = (o->box.bottom - o->box.top + top) >> AM2_CELL_SHIFT;
+
+    if (cb < 0 || ct > d->rows - 1 || cr < 0 || cl > d->cols - 1) {
+        ItemPreDestroy(o, (int32_t)(uintptr_t)d);
+        return;
+    }
+    cols = d->cols;
 
     cl = cl <= 0 ? 0 : cl;
     ct = ct <= 0 ? 0 : ct;
     if (cr >= cols - 1)
         cr = cols - 1;
-    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
+    if (cb >= cols - 1)
         cb = cols - 1;
 
-    idx    = 0;
-    cell   = (ct << desc->shift) + cl;
+    shift  = d->shift;
+    n      = 0;
+    cell   = (ct << shift) + cl;
     stride = cols - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
-        for (col = cl; col <= cr; col++, idx++, cell++) {
-            if (o->cellEntries[idx].cell < 0 || o->cellEntries[idx].cell != cell) {
-                if (o->cellEntries[idx].cell >= 0)
-                    ListUnlink((&o->cellEntries[idx]), &desc->cells[o->cellEntries[idx].cell]);
-                o->cellEntries[idx].cell = cell;
-                ListPushFront((&o->cellEntries[idx]), &desc->cells[cell]);
-            }
+        int32_t xx;
+
+        for (xx = cl; xx <= cr; xx++, n++, cell++) {
+            if (o->cellEntries[n].cell >= 0 && o->cellEntries[n].cell == cell)
+                continue;
+            if (o->cellEntries[n].cell >= 0)
+                ListUnlink(&o->cellEntries[n], &d->cells[o->cellEntries[n].cell]);
+            o->cellEntries[n].cell = cell;
+            ListPushFront(&o->cellEntries[n], &d->cells[cell]);
         }
     }
 
-    /* Whatever the object was linked into beyond the cells it now covers is
-     * released, and -1 written back so a second pass sees it unlinked. */
-    for (; idx < (int32_t)o->cellCount; idx++) {
-        if (o->cellEntries[idx].cell < 0)
+    for (; n < (int32_t)o->cellCount; n++) {
+        if (o->cellEntries[n].cell < 0)
             return;
-        ListUnlink((&o->cellEntries[idx]), &desc->cells[o->cellEntries[idx].cell]);
-        o->cellEntries[idx].cell = -1;
+        ListUnlink(&o->cellEntries[n], &d->cells[o->cellEntries[n].cell]);
+        o->cellEntries[n].cell = -1;
     }
 }
 
