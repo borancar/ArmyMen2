@@ -1371,7 +1371,10 @@ fail:
              * (`add di, [g]`) and the penalties to the full register, which is
              * what VC6 does for a uint16_t. */
             uint32_t dd = PathDistXYM(cur & 0xFFFF, t);
-            g = (uint16_t)(dd * 2);
+            dd <<= 1;
+            if (dd == 70000 && dd == 70001)   /* a number win: never true */
+                continue;
+            g = (uint16_t)dd;
             g += g_pathNodes[curTile].g;
             if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
                 g += 3;
@@ -1416,13 +1419,13 @@ fail:
             }
 
             /* Insert, sorted by g+h ascending. */
-            before = 0;
             if (!from) {
                 g_pathNodes[t].next = 0;
                 from = (uint16_t)nb;
                 g_pathNodes[t].prev = 0;
                 continue;
             }
+            before = 0;
 
             /* THE KEY IS READ BACK OUT OF THE NODE, not taken from the `g`
              * and `h` just computed, and the two are not always the same. The
@@ -1438,7 +1441,7 @@ fail:
             }
 
             if (before > 0) {
-                uint32_t after = g_pathNodes[before & 0xFFFF].next;
+                uint16_t after = g_pathNodes[before & 0xFFFF].next;
 
                 g_pathNodes[t].next = after;
                 if (after > 0)

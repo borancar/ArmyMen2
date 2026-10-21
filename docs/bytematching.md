@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1631 of 1646 functions
-byte-identical, 15 differing, 458 bytes of total edit distance. The live
+byte-identical, 15 differing, 446 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -395,3 +395,11 @@ for the allocator model (keys, penalty vector, hints, rotation) and the tools (`
 Levers that are known NOT to exist: a zero-code rotation consumer, a hint without code (hints point at
 fixed registers only), a pair on a local or register operand (folds in c1), a dead non-volatile read
 (deleted in c1). Levers that work only with a measured prerequisite are listed with each win in STATUS.md.
+
+**Subsets of hunk fixes (Round BJ, FindPath 66 -> 54).** In a function whose residue is a few hunks, list every known
+single fix per hunk and test ALL subsets: each fix alone changes the length and shifts every jump displacement
+after it (`uint16_t after` 98, `before = 0` moved 100, `dd <<= 1` plus a pair 132), but the three together land on
+the image's length (1798) and 54. Judge by length first: a subset whose length equals the image's is the one whose
+displacements stop mismatching. The remaining FindPath hunks: `mov ecx,[eax]; mov ebp,ebx; add ebp,ecx` for `nb`;
+the first mask `and` destructive (a helper taking the same value under two spellings fixes it and drops the length
+to 1794); `shl eax,1; mov edi,eax; add di,[mem]` for `g`; `mov ecx,esi; and ecx,eax` in the final heuristic.
