@@ -11146,12 +11146,12 @@ void __cdecl ObjRemap(AM2_Object *o, AM2_MapDesc *desc, int32_t force)
         return;
 
     /* A number win: volatile reads of the position, the x through its dword. */
-    { int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }
     { int16_t t = *(volatile int16_t *)&o->pos.y; y = t; }
+    { int32_t t = *(volatile int32_t *)&o->pos.x; x = (int16_t)t; }
 
     o->hit.right  = x + o->box.right;
-    o->hit.bottom = y + o->box.bottom;
     top    = y + o->box.top;
+    o->hit.bottom = y + o->box.bottom;
     left   = x + o->box.left;
     o->hit.top    = top;
     o->hit.left   = left;

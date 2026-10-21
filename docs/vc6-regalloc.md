@@ -2110,3 +2110,17 @@ allowed {ebp, edi}, hints (ebp,1) and (edi,2), and the web under decision takes 
 constants follows first use in the IL; ties go to the higher web id; key = minus the sum of N x 2^depth
 over blocks where the web is live but not referenced, so a web referenced in more arm blocks has a
 higher key (merging case labels removes a referencing block, splitting adds one).
+
+### Where ObjRemap stands (Round BC, 2026-10-21)
+
+`tools/c2pen.py SRC FN` prints, for each register decision, the web, its key, cost, allowed set and
+hints, and every uncoloured neighbour (allowed set, hints, source lines). On ObjRemap the failing
+decisions are: web 19 (`cr` temporary, key 164) takes eax with an all-zero penalty vector; web 1a
+(`cb` temporary, key 164, allowed {ecx, edx, ebx, ebp, edi}) takes ecx, also with an all-zero vector,
+because none of its ten neighbours has cost > 0 and an ecx hint; web 10 (`cb` variable, allowed {edx},
+hint (ecx,3), key 61) is coloured long after and takes edx, and the `mov edx,ecx` in our code is the
+copy between the two. Forcing 1a to edx (`c2rot.py web ... 1a:3`) deletes that copy and the early
+`box.bottom` load and gives the image's `sub edx,eax; add edx,ecx; sar edx,8`; forcing 7:edx and 8:edi
+gives the image's first two `movsx`. So the one lever is a positive penalty on ecx for web 1a: a
+neighbour live in its range with cost > 0 and an ecx hint (thiscall `this`, a variable shift count,
+`rep` operands) or `left` (key 92) above 164. No code-neutral construct supplies either.
