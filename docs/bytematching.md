@@ -474,3 +474,13 @@ push esi; add ebp,eax`), which c2 makes a web for us (no event) because it has t
 IL and source shape tried (about 120) left it a web; the `sub` at TRIG is the only known way to
 supply the event, at the cost of `sub` for `cmp`. The mechanism and the IL notes are in
 `docs/vc6-regalloc.md` ("The AssignTemp walk").
+
+The same walk on the other rotation residues (same round): UpdateTrooperAction needs two cursor
+events between arm 3's `out` reload and arm 4's `movsx` where ours has none; the only tuple there
+with identical code is the `mov eax,[g_mpSession]` test load (a late-split compare operand for us,
+not an event), and a volatile read of it changes nothing; nested pairs placed in that conjunct
+emit real code (256) whatever their first operand (`out`, `at`, `o`). SightScan's score block:
+the image's `fieldF4` increment is a real temporary at cursor 1 with the `hold.facing` load hoisted
+above the `inc`; ours is either a volatile temporary at cursor 0 with no hoist (26) or, written
+plain, an RMW tuple split late into eax with the hoist (58). Arm 1 of UpdateTrooperAction (`s`
+in eax, image edx) is a two-use web, so it is a colouring tie, not a rotation one.
