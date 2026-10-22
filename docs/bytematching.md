@@ -515,3 +515,16 @@ one plane check as a difference. The rotation step it supplied is the image's SC
 (214-216). Still open: a source shape that gives one load AND the step. Ruled out this round: case
 order (2,321 orders), keeping `tag` live, a shared mismatch label or inlined `bad:` tails (the image
 has three tail-merged copies), fread return values, `consumed` spellings, `size`'s type.
+
+LoadMap's missing step, three hypotheses in parallel (same day, after the `!=` decision):
+(1) SCEN's third read of `size`: c1 emits two plain loads; c2 merges a local's loads with no kill
+between them into the variable's own node (op 4, a web) at CSE time, and every source-level kill
+found emits code (stores through `tmp`, memset, volatile, narrower re-reads); folded "kills" (self
+stores, empty ifs/switches, inline functions taking `&size`, unions, arrays, pointer reads) do not
+separate them. Untried: the c2 code that creates that node (0x10732fd9 / 0x107331b0).
+(2) TRIG/REGN/OWNR size loads: one extra event in any ONE of the three arms between SCEN and MHDR
+fixes MHDR onward (`size - plane` on any of them: 2; `plane = size; if (plane != W*H)` on REGN alone:
+206, arm registers swapped); events before SCEN cost 14-16, two or three arms 400-500; ~40 symmetric
+shapes are inert (356). The image's arms are uniform non-events.
+(3) MHDR's `cmp [esp+0x10], 0xc`: a frame-variable compare is always op47 (flags only) whatever the
+spelling; only real arithmetic (`size - 0xC != 0`: 216) takes the step.

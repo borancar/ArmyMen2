@@ -2194,8 +2194,8 @@ reproduce it; the real AM2 types were needed. Lever: in a constructor with `new`
 argument load as a direct member call to make it a rotation event; keep the wrapper to make it a
 non-consuming web. Pitfall: in an EH function the c2rot `atr` log also holds events from the
 `__unwindfunclet$...` functions (`line=0 base=0 cursor=0`; 25 in the toy); count only `line != 0`.
-Other rotation facts from the same round: `cmp word/dword [mem], imm` (op26) consumes a slot with no
-register effect; a load folded into its user (`push [mem]`) is an event with no instruction of its own;
+Other rotation facts from the same round: op26 is a zero-extending byte/word load (`xor eax,eax; mov al,[mem]`),
+not a compare (corrected 2026-10-22: a frame-variable `cmp [mem], imm` is op47, flags only, and never moves the cursor); a load folded into its user (`push [mem]`) is an event with no instruction of its own;
 `cmp mem,reg` split late into `mov eax,[mem]; cmp eax,esi` adds the load AFTER rotation (not an event),
 while `sub eax,esi; jne` makes it a real event (why LoadMap's difference test costs `sub` for `cmp`).
 
