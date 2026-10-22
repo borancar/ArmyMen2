@@ -425,3 +425,16 @@ SightScan 26 (needs the allied-arm `add edi,0x12` hint AND a non-consuming nOthe
 value temp together; pairs cannot add a consumer between two temps in one block),
 FindPath 54 and RowUpdate 154 (pair lever finds nothing; RowUpdate wants the
 `left+w`/`top+h` sums unshared by a store c1 treats as aliasing).
+
+## Round BR/BS (2026-10-22, 272 bytes, 7 differ)
+
+LoadMap 12 -> 2 came from losing pointer provenance (`slot = table - (X - X)`, X a runtime
+global read); it works only on an independent local or loop pointer, not inline at the
+use. It found nothing on RowUpdate (about 650 variants: the sums stay shared whatever the
+stores go through), SightScan, ScriptPad, UpdateTrooperAction, FindPath or
+ScriptParseEvent. LoadMap's last 2 bytes are the TRIG `sub eax,esi` that supplies a
+rotation temp; every `cmp` form shifts the rotation early in the function (272 to 504).
+SightScan's image skips eax for the fieldF4 temp as if a scratch were live there; the
+retest `if (!stt.cand) goto next;` both lays the score block out early and threads the
+jumps, and nothing separates the two. The only untried route for RowUpdate is
+hand-edited IL (`VC6_IL_OVERRIDE`), which is not source.
