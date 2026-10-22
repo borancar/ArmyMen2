@@ -438,3 +438,18 @@ SightScan's image skips eax for the fieldF4 temp as if a scratch were live there
 retest `if (!stt.cand) goto next;` both lays the score block out early and threads the
 jumps, and nothing separates the two. The only untried route for RowUpdate is
 hand-edited IL (`VC6_IL_OVERRIDE`), which is not source.
+
+## Round BT (2026-10-22, 272 bytes, 7 differ)
+
+Rewrites from the disassembly found no byte win. Leads kept: SightScan's score-block
+layout CAN be had without the dead retest (merge `pick` into `stt`, write the score block
+inline in the Kind7 arm, `goto score` from the other arms, labelled copy after the final
+`return`): 282 bytes, 236 with a local `c = stt.cand`; the residue is the Kind7 copy being
+scheduled with its arm (cand load hoisted above `add esp,8`, `cmp eax,ebp` instead of
+`test edi,edi`). FindPath: `nb = (cur & 0xFFFF) + *sp` closes the `nb` hunk but costs two
+bytes of length (54 -> 90); the three commutative-operand hunks (first mask `and ebx,eax`,
+`g` sum, final-heuristic mask) are untouched by ~150 spellings. ScriptParseEvent needs the
+tokens-base load to stop consuming a rotation slot while the name load becomes one; LoadMap
+needs one invisible rotation event between SCEN's tail and MHDR's `lea hdr` other than the
+TRIG `sub`. RowUpdate's sum sharing is unexplained; 2,520 statement orders and ~1,000
+helper shapes scored 164 or worse.
