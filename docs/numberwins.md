@@ -98,3 +98,5 @@ SightScan: `kp = flags ? &keep->pos : &keep->pos` as an if/else in the type-4 we
 TrooperFire, UpdateTrooperAction, OptionsDefaults, ScriptPad (Round BP): never-true pairs `(F == K && F == K+1)` on a byte field of a register-held pointer (`o->facing`, `box->forcePlain`) or on the int32 `box->disabled`, nested as `(A && !P) || P2`, each supplying one rotation-cursor event with no code left behind; the `-r->which` respelling in OptionsDefaults is gone in favour of this. ScriptPad: `sy = (ny == 1000 && ny == 1001) ? ny : ny`. Revisit.
 
 LoadMap (Round BR): the reveal-grid slot pointer is `(uintptr_t)g_tileRevealGrids - ((uintptr_t)g_mapTilesW - (uintptr_t)g_mapTilesW)`; a pointer built from an integer expression with a runtime read loses its provenance, so c2 keeps the store through `slot` ordered before the map-size reload (12 -> 2; replaces the old volatile pointer store). Revisit.
+
+FindPath (Round BW): `PathDistXYT(cur & 0xFFFF, curTile, t, t)` takes one tile under two spellings; `nb = (cur & 0xFFFF) + *sp`; the flag byte through `const uint8_t *fl = g_tileFlags`. Revisit.

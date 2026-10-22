@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1639 of 1646 functions
-byte-identical, 7 differing, 272 bytes of total edit distance. The live
+byte-identical, 7 differing, 250 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -492,3 +492,11 @@ volatile `t_n` form adds two tuples to the loop body (block N 16 -> 18) which li
 at the price of the body shape. Pairs on the layer byte change code (458-626); pairs and
 pair-ternaries on frame locals and globals fold before the key is computed; fifteen initialisation
 orders with the plain body all give 384.
+
+FindPath 54 -> 32 (Round BW, after the walk): the earlier levers combined at last once the `g` sum
+was spelled `g = (uint16_t)(dd + g_pathNodes[curTile].g)` and the flag byte read through a pointer
+local declared after it: the two-spelling distance helper (`PathDistXYT(cur & 0xFFFF, curTile, t,
+t)`), `nb = (cur & 0xFFFF) + *sp`, and both flag tests through `fl[t]`. Length stays 1798. Left:
+the flags pointer is hoisted into ecx in the image and the node offset read late as a folded add
+operand, where ours hoists the node offset and loads the flags pointer late; and the budget arm's
+`mov ecx,esi; and ecx,eax`.

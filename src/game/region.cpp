@@ -1117,6 +1117,19 @@ static inline int32_t PathDistXYM(uint32_t fromTile, uint32_t toTile)
                                      >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))));
 }
 
+/* The first inner-loop distance takes its tiles under two spellings: the mask
+ * through one, the shift through the other, both the same value at the call
+ * (`cur & 0xFFFF` and `curTile`). A number win: the second spelling keeps the
+ * masked copy from being CSE'd with the shifted one, which lets VC6 destroy
+ * the dying `curTile` in the first `and` as the image does. */
+static inline int32_t PathDistXYT(uint32_t fa, uint32_t fb, uint32_t ta, uint32_t tb)
+{
+    uint32_t m = *(const uint32_t *)&g_mapTilesW - 1;
+
+    return ApproxDistXY((int32_t)((ta & m) - (fa & m)),
+                        (int32_t)((tb >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF)) - (fb >> (*(const uint32_t *)&g_mapRowShift & 0xFFFF))));
+}
+
 static inline int32_t PathHeuristicM(uint32_t fromTile, uint32_t toTile)
 {
     return (int32_t)((double)PathDistXYM(fromTile, toTile) * 1.5);
@@ -1351,7 +1364,7 @@ fail:
         considered += AM2_TILE_STEP8_COUNT;
 
         for (; (intptr_t)sp < (intptr_t)(g_tileStep8 + AM2_TILE_STEP8_COUNT); sp++) {   /* signed, as the image's jl; both are in one table */
-            int32_t  nb = curTile + *sp;
+            int32_t  nb = (cur & 0xFFFF) + *sp;
             uint32_t t;
             uint16_t g;
             int32_t  h;
@@ -1370,17 +1383,19 @@ fail:
              * `g` is sixteen bits: the image adds the parent's G as a word
              * (`add di, [g]`) and the penalties to the full register, which is
              * what VC6 does for a uint16_t. */
-            uint32_t dd = PathDistXYM(cur & 0xFFFF, t);
+            uint32_t dd = PathDistXYT(cur & 0xFFFF, curTile, t, t);
             dd <<= 1;
             if (dd == 70000 && dd == 70001)   /* a number win: never true */
                 continue;
-            g = (uint16_t)dd;
-            g += g_pathNodes[curTile].g;
-            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_NO_WEIGHT_NEAR))
+            g = (uint16_t)(dd + g_pathNodes[curTile].g);
+            /* The flag byte through a pointer local, a number win: both tests read one
+             * byte and the pointer load lands where the image has it. */
+            const uint8_t *fl = g_tileFlags;
+            if (!(fl[t] & AM2_TILE_NO_WEIGHT_NEAR))
                 g += 3;
             /* Impossible pairs on nb and goalTile here and below are number wins: they raise those
              * variables' use counts and fold away. */
-            if (!(g_tileFlags[nb & 0xFFFF] & AM2_TILE_LITTLE_COVER_NEAR))
+            if (!(fl[t] & AM2_TILE_LITTLE_COVER_NEAR))
                 g += 1;
             h = PathHeuristic(t, goalTile);
 
