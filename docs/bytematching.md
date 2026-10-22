@@ -463,3 +463,14 @@ and MHDR's `lea hdr` (event 12); dead volatile reads at arm starts cost real loa
 (214-738); `(int32_t)size - plane != 0` still emits `sub`. ScriptParseEvent: a static
 inline wrapper over the pad lookup scores 32. UpdateTrooperAction: arm 1's `s` web needs a
 neighbour with positive cost and an eax hint, or an edx hint; nothing adds one without code.
+
+## Round BW (2026-10-22, 272 bytes, 7 differ): the IL route on LoadMap
+
+Hand-edited c1 IL fed to c2 (VC6_IL_OVERRIDE) and a logger of c2's temp-assignment walk
+(`tools/c2walk.py`) pinned LoadMap's last 2 bytes to one fact: the image has a rotation event
+between SCEN's fread argument load and MHDR's `lea hdr`, and the only tuple there that could
+carry it with identical code is SCEN's third read of `size` (`mov eax,[esp+0x20]; push eax;
+push esi; add ebp,eax`), which c2 makes a web for us (no event) because it has two uses. Every
+IL and source shape tried (about 120) left it a web; the `sub` at TRIG is the only known way to
+supply the event, at the cost of `sub` for `cmp`. The mechanism and the IL notes are in
+`docs/vc6-regalloc.md` ("The AssignTemp walk").

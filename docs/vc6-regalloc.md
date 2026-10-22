@@ -2233,3 +2233,33 @@ cursor, which shifts the following temporaries by one slot (here to ecx/edx as i
 by-value parameter that is only read. Remaining SightScan (26): `add edi,0x12` against `lea ecx,[edi+0x12]` in the allied
 arm with two jump targets (0x403dcd against 0x403dd9); the fieldF4 temp in ecx with the facing load between the load and
 the inc; one `push ecx` placement.
+
+### The AssignTemp walk, read from C2.DLL (Round BW, LoadMap's last 2 bytes)
+
+`tools/c2walk.py` logs the walk that `tools/c2rot.py` only reports the events of. AssignTemp
+(0x10734e4b) has one caller, 0x10733ddf: for a tuple T it walks the operand entries at [T+0x1c]
+and moves the cursor only for an entry whose kind ([E+8]) is 1, whose value node A = [E+0x14]
+has op 3 (an expression temporary; 4 is a web's definition, 5 a web's use, 1 a register, 7
+global memory) with [A+0x14] set (the defining tuple; 0 means the load was folded into its
+user, as `mov esi,[W]` into a web), and whose record B = [E+0x18] has no register yet (B.op 1
+means it has one, [[B+8]+0x1c]; 66 is the flags). Consequences measured on LoadMap and a toy:
+a load used twice (push and `add ebp,eax`, two pushes, push and a global store, push and an
+`lea`) is ALWAYS a web (A4) and never an event; a one-use load is always an event; types (int,
+unsigned, long, short parameters), the order of the two uses, a comma in the argument list, a
+named local, an inline helper, impossible pairs (they fold before the walk here), a dominated
+retest between the uses, dead expressions, self-stores and the pointer-provenance trick do not
+change that. The compare's memory operand is not an entry at all (`cmp mem,reg` is split late,
+no event); the `sub` form's result IS an A3 temporary, which is the whole of LoadMap's residue:
+the image has an event between SCEN's fread argument load and MHDR's `lea hdr` that we cannot
+place, and the only tuple there that could carry it is SCEN's third read of `size`, which ours
+makes a web. No c1 construct emits one load with two uses (c1 has no dup; `44` is the comma),
+so the lever, if it exists, is a c2 web-building rule not yet found.
+
+Hand-edited IL (VC6_IL_OVERRIDE) worked as the probe: the `gl` file holds each function's
+record (`<name>\0 .. 80 <u32 start> 80 <u32 ..> 80 <u32 ..>`), so a length-changing edit inside
+a function must add the delta to the start of every LATER function (map.cpp: map_install at
+gl+0x1694); labels and symbols cannot be added. IL opcodes decoded on the way: `26 id` symbol,
+`30 T` load (`30 90 T` volatile), `32 T` store that keeps its value, `33 T v` constant, `2c T 00`
+convert, `02 03 04` add sub mul, `0c` or, `09` shl, `08` neg, `0f T` compound assign, `1f` eq,
+`1a` not, `20` ne, `38 L` branch-if-false, `29 L` label, `3a L` goto, `44` comma, `55 T` push
+argument, `3e` call target, `4c` call, `4b` statement end, `4f 01 n` line, `41 41 3a` return.
