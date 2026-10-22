@@ -500,3 +500,9 @@ t)`), `nb = (cur & 0xFFFF) + *sp`, and both flag tests through `fl[t]`. Length s
 the flags pointer is hoisted into ecx in the image and the node offset read late as a folded add
 operand, where ours hoists the node offset and loads the flags pointer late; and the budget arm's
 `mov ecx,esi; and ecx,eax`.
+Follow-ups on the 32 that did not pay: the two-spelling helper at a second site, whether the same
+helper or a duplicate (196-254; the budget arm's distance and heuristic are different webs), the
+same trick on the heuristic call (124-182), `dd` as any of the four integer types (inert), named
+`pg`/node-pointer forms (58-324), and a volatile `node.g` (104). The flags-pointer local before the
+`g` sum hoists the pointer into ecx as the image does but turns the node-offset read into a
+temporary and shifts the rotation (90-92); both halves of that hunk are one c2 destination choice.
