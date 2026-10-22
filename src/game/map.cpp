@@ -873,7 +873,7 @@ done:
  * once into a local and the loop bound comes from that, not from the global
  * the header word was written to.
  */
-int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
+int32_t __cdecl ParseScenarios(const uint8_t *at, size_t remaining_in)
 {
     int32_t        count;
     AM2_Scenario  *table;
@@ -897,7 +897,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
 
         hdr = *(const AM2_ScenHdr *)at;
         at += AM2_SCENARIO_HDR_BYTES;
-        remaining_in -= (int32_t)AM2_SCENARIO_HDR_BYTES;
+        remaining_in -= AM2_SCENARIO_HDR_BYTES;
 
         if (strncmp(hdr.tag, "Scenario",
                     AM2_SCENARIO_TAG_BYTES) != 0)
@@ -918,7 +918,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining_in)
             int32_t took = ParseScenarioPart(&rec->parts[part], at);
 
             at += took;
-            remaining_in -= took;
+            remaining_in -= (size_t)took;
         }
     }
 
@@ -1637,7 +1637,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                 goto skip;
             orig_map_fread(tmp, (size_t)size, 1, f);
             consumed += (int32_t)size;
-            ParseScenarios(tmp, (int32_t)size);
+            ParseScenarios(tmp, (size_t)size);
             am2_free(tmp);
             break;
         }
