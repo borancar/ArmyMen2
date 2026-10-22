@@ -7554,13 +7554,14 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
     } else {
         const AM2_FireSpot *at = &out->spot;
 
-        if (at->at.x != 0 && (ObjCodeUnmapped(w) || (o->facing == 2000 && o->facing == 2001))) {
+        if (at->at.x != 0 && ((ObjCodeUnmapped(w) && !(o->facing == 4000 && o->facing == 4001))
+                              || (o->facing == 2000 && o->facing == 2001))) {
             /* Turned to face it only when it is somewhere else: a point
              * we are standing on still gets fired at, unturned. The
              * image's PointsDiffer `je` lands on the jitter below, not on
              * the no-point arm -- this was once one condition, which sent
              * that case one weapon-range down the heading instead. */
-            if (PointsDiffer(o->pos, at->at) || (o->facing == 3000 && o->facing == 3001))
+            if (PointsDiffer(o->pos, at->at))
                 TrooperFaceTo(o, &at->at);
             heading = JitterFacing(w, o->facing);
             fired = FireWeaponB(w, o, ObjHeight(o), heading, *at, 0);
@@ -7824,13 +7825,13 @@ sweep:
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;
-        } else if (!found) {
+        } else if ((!found && !(o->facing == 5100 && o->facing == 5101)) || (o->facing == 5102 && o->facing == 5103)) {
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;
         } else if (g_mpSession
-                   && !AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)
-                   && ObjType2Field548(o)) {
+                   && ((!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner) && !(o->facing == 5304 && o->facing == 5305)) || (o->facing == 5306 && o->facing == 5307))
+                   && ((ObjType2Field548(o) && !(o->facing == 5308 && o->facing == 5309)) || (o->facing == 5310 && o->facing == 5311))) {
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;

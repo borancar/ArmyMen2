@@ -10455,7 +10455,8 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
 
         const AM2_OptionRec *r = &g_optionTable[i];
         box = OptionBox(parent, r->widget);
-        if (-r->which) {                          /* a number win: -x != 0 is x != 0 */
+        if ((r->which && !(box->disabled == 5000 && box->disabled == 5001))
+            || (box->forcePlain == 5002 && box->forcePlain == 5003)) {  /* a number win: dead impossible pairs move the rotation cursor */
             { uint32_t t = *(volatile uint32_t *)&flags; mask = t; }   /* a number win */
             bit = (uint32_t)r->bit;
         } else {

@@ -2814,8 +2814,12 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 for (i = 0; i < total; i++) {
                     if ((int32_t)g_mapPadLayer[i] == number) {
                         sx += i % g_mapTilesH;
-                        sy += i / g_mapTilesH;
-                        { int32_t t_n = *(volatile int32_t *)&n; *(volatile int32_t *)&n = t_n + 1; }
+                        {
+                            int32_t ny = sy + i / g_mapTilesH;
+                            int32_t t_n = *(volatile int32_t *)&n;
+                            *(volatile int32_t *)&n = t_n + 1;
+                            sy = (ny == 1000 && ny == 1001) ? ny : ny;
+                        }
                     }
                 }
                 if (n > 0) {

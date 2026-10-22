@@ -94,3 +94,5 @@ ObjHitMaskAction and ListMaskAction: never-true pairs on the product `((y >> shi
 ObjRemap was rewritten: two never-true pairs in the flag test (`force == 1000 && force == 1001`, `d->shift == 1000 && d->shift == 1001`) and one volatile dword read of `o->pos.x`; the older dead reads are gone. Revisit.
 
 SightScan: `kp = flags ? &keep->pos : &keep->pos` as an if/else in the type-4 weapon arm (two reaching definitions; 38 -> 26). Revisit.
+
+TrooperFire, UpdateTrooperAction, OptionsDefaults, ScriptPad (Round BP): never-true pairs `(F == K && F == K+1)` on a byte field of a register-held pointer (`o->facing`, `box->forcePlain`) or on the int32 `box->disabled`, nested as `(A && !P) || P2`, each supplying one rotation-cursor event with no code left behind; the `-r->which` respelling in OptionsDefaults is gone in favour of this. ScriptPad: `sy = (ny == 1000 && ny == 1001) ? ny : ny`. Revisit.
