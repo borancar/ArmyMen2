@@ -528,3 +528,41 @@ fixes MHDR onward (`size - plane` on any of them: 2; `plane = size; if (plane !=
 shapes are inert (356). The image's arms are uniform non-events.
 (3) MHDR's `cmp [esp+0x10], 0xc`: a frame-variable compare is always op47 (flags only) whatever the
 spelling; only real arithmetic (`size - 0xC != 0`: 216) takes the step.
+
+## LoadMap and the other residues, second pass (2026-10-22, 604 bytes / 302 unmatched, 7 differ)
+
+Rule used from here: all seven plane checks stay `(int32_t)size != plane` (a check written as a
+difference, or one arm spelled differently from its six siblings, is not source a 1999 author
+writes), and in SCEN `consumed += size` stays before `ParseScenarios`. That puts LoadMap at 356
+(the `sub` form was 2 bytes). The distance counts a replaced byte twice and a one-byte length
+shift moves every later offset: 302 bytes of 389,636 are unmatched after alignment (0.078%).
+
+LoadMap. The image's rotation is one step ahead of ours from MHDR's `lea` onward; the step
+belongs between SCEN's fread-argument load (event 11) and MHDR's `lea` (event 12). Established:
+- c2 gives a load with two uses in one stretch the variable's own node (a web, no step); the
+  push and the add of SCEN's third read are two separate loads in c1's IL and c2 merges them.
+  One-use loads (the malloc and fread arguments) are temporaries and take a turn.
+- One extra step anywhere in that window, by IL edit, restores everything from MHDR onward
+  (`size - plane` at TRIG: 2 bytes; `consumed = ParseScenarios(...)`: 6), but no edit adds a step
+  without adding code. IL and C variants tried (about 250): declaration form and scope of
+  `size`/`tag`/`consumed`, structs packing them (520-1740), inline functions (356-468),
+  extra blocks and `if (1)`, guards on provable conditions (fold) and real ones (420+), `register`,
+  code-free kills between the reads (18 forms), compiler switches (34), statement and case order
+  (2,321 + 720 orders), shared `bad:`/mismatch tails (the image has three tail-merged copies),
+  fread return values, `consumed` spellings, ParseScenarios parameter types, MHDR compare
+  spellings (always op47, flags only), switch-expression IL, plane-check IL variants.
+- Second read after the call, or a volatile read, restores the step at the cost of one reload
+  (214-216). Rich header: all 65 C++ objects are compiler build 8168 (ours). `op26` is a
+  zero-extending byte/word load, not a compare.
+- Mutation search (commutative flips, `+=`/`= +`, mirrored comparisons, `++`, adjacent independent
+  assignment swaps): about 9,500 evaluations over LoadMap, FindPath, UpdateTrooperAction,
+  ScriptPad, RowUpdate: no gain. The first version flipped `cr + cl` inside `cols - cr + cl - 1`,
+  which is a different value; its "improvement" (154 -> 150) was rejected.
+
+Other residues, new negatives: ScriptPad (struct for `n`/`sx`/`sy` 676-680, plain body and every
+initialisation order 382-638, `register` no effect); UpdateTrooperAction (`bearing` through
+`&out` aliases 146-182, `owner` spellings identical); SightScan (allied-arm DistAndAngle
+argument spellings identical or worse, plain counter increments 40-62); ScriptParseEvent (natural
+kind test and plain line arguments 130-248, the pairs are what hold 18); FindPath (budget-arm
+distance spellings identical, 36 with the subtraction swapped); RowUpdate (clamp spellings
+166-272, `w`/`h` load order 156-380, rect as struct/locals 164-560).
