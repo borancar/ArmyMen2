@@ -453,3 +453,13 @@ tokens-base load to stop consuming a rotation slot while the name load becomes o
 needs one invisible rotation event between SCEN's tail and MHDR's `lea hdr` other than the
 TRIG `sub`. RowUpdate's sum sharing is unexplained; 2,520 statement orders and ~1,000
 helper shapes scored 164 or worse.
+
+## Round BV (2026-10-22, 272 bytes, 7 differ)
+
+No gain. RowUpdate: struct-assign of a local `AM2_Rect` (560), `RectSet`-built rect (386-468),
+inline `RowBounds(rc,x,y,w,h)` (260-432), labels/no-op branches (154-194) - the sums stay
+shared. LoadMap: the missing event sits exactly between SCEN's fread size load (event 11)
+and MHDR's `lea hdr` (event 12); dead volatile reads at arm starts cost real loads
+(214-738); `(int32_t)size - plane != 0` still emits `sub`. ScriptParseEvent: a static
+inline wrapper over the pad lookup scores 32. UpdateTrooperAction: arm 1's `s` web needs a
+neighbour with positive cost and an eax hint, or an edx hint; nothing adds one without code.
