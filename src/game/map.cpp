@@ -1806,13 +1806,16 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
      * -- and fills each null one.  Leaving them null does not fault: it makes
      * SettlePointInRegion spiral for a passable tile it can never find. */
     {
-        uint8_t **slot = g_tileRevealGrids;
+        /* A number win: the pointer walk is spelled as a sum of the table and a difference of two reads
+         * of one word (which is zero), so c2 loses sight of which object the stores through `slot` land
+         * in and keeps them ordered before the reloads of the map size, as the image does. */
+        uint8_t **slot = (uint8_t **)((uintptr_t)g_tileRevealGrids
+                                      - ((uintptr_t)g_mapTilesW - (uintptr_t)g_mapTilesW));
 
         while ((intptr_t)slot < (intptr_t)&g_tileCover) {
-            /* DEFAULT_LAYER written out with a volatile pointer store: a number win (the image
-             * stores the pointer before it reloads the map size). */
+            /* DEFAULT_LAYER written out through the walking pointer. */
             if (*slot == 0) {
-                *(void *volatile *)slot = am2_malloc(g_mapTilesW * g_mapTilesH);
+                *slot = (uint8_t *)am2_malloc(g_mapTilesW * g_mapTilesH);
                 memset(*slot, 0, g_mapTilesW * g_mapTilesH);
             }
             slot++;
