@@ -3,7 +3,8 @@
 How the reconstruction is brought from "behaves the same" to "the hosted VC6
 compiles it to the same bytes as the 1999 build". This is the working method,
 the tools, and the catalogue of source shapes that moved the count. Register
-rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
+rules live in `docs/vc6-regalloc.md`; this file is the loop around them. How a lab is set up and how the compiler
+and the match check are run is in `docs/bytematch-lab.md`.
 
 State when this was written (2026-10-15): 1639 of 1646 functions
 byte-identical, 7 differing, 604 bytes of total edit distance. The live
