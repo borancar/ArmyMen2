@@ -410,3 +410,18 @@ not: the old source had been shaped by levers that no longer applied. Procedure:
 frame slots), write it, match the layout, then anneal with the CURRENT lever set (dead pairs on the flag test, statement
 permutations of the independent stores), then minimise: drop every hack whose ablation does not cost (here the volatile
 y read, the unreachable read). Re-run this for any function whose source predates a lever batch.
+
+## Round BQ negative results (2026-10-22, 282 bytes, 7 differ)
+
+Pairs `(F==K && F==K+1)` fold to nothing on a frame local, a global, `*(uint8_t *)f`
+or a ternary with constant arms; they emit real code on `o->facing` inside a
+`g_mpSession`-led condition. Only nested `(A && !P) || P2` forms with a call result
+or frame local as the first operand give a surviving event. Residues:
+UpdateTrooperAction 8 (arm-1 `s` web wants edx; arm-4 `movsx` needs two more events
+after the arm-3 reload), ScriptPad 10 (moving the `sy` store after the `n` load
+matches order but colours `ny` eax, 16), LoadMap 12 (slot-loop `xor eax,eax`/`add esp,4`
+order; TRIG `sub` event), ScriptParseEvent 18 (name loads need edx),
+SightScan 26 (needs the allied-arm `add edi,0x12` hint AND a non-consuming nOther
+value temp together; pairs cannot add a consumer between two temps in one block),
+FindPath 54 and RowUpdate 154 (pair lever finds nothing; RowUpdate wants the
+`left+w`/`top+h` sums unshared by a store c1 treats as aliasing).
