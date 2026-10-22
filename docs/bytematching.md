@@ -484,3 +484,11 @@ the image's `fieldF4` increment is a real temporary at cursor 1 with the `hold.f
 above the `inc`; ours is either a volatile temporary at cursor 0 with no hoist (26) or, written
 plain, an RMW tuple split late into eax with the hoist (58). Arm 1 of UpdateTrooperAction (`s`
 in eax, image edx) is a two-use web, so it is a colouring tie, not a rotation one.
+
+ScriptPad's last 10 bytes, read with c2webs/c2blk (same round): the plain body `sy += i / H; n++;`
+compiles to the image's loop code (sum into the `sy` temporary, `n`'s load hoisted above the `sy`
+store), but loop-1's `i`/zero web then keys 84 against `ctx`'s 86 and `ctx` takes edi first; our
+volatile `t_n` form adds two tuples to the loop body (block N 16 -> 18) which lifts `i` to key 100
+at the price of the body shape. Pairs on the layer byte change code (458-626); pairs and
+pair-ternaries on frame locals and globals fold before the key is computed; fifteen initialisation
+orders with the plain body all give 384.
