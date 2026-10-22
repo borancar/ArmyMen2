@@ -1609,9 +1609,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             break;
         case AM2_IFF_TRIG:
             plane = g_mapTilesW * g_mapTilesH;
-            /* A difference, not a compare: a number win, the image has one more
-             * scratch temporary in the rotation here. */
-            if (size - (uint32_t)plane) MISMATCH();
+            if ((int32_t)size != plane) MISMATCH();
             g_tileFlags = (uint8_t *)am2_malloc(plane);
             orig_map_fread(g_tileFlags, plane, 1, f);
             consumed += plane;

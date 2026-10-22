@@ -6,7 +6,7 @@ the tools, and the catalogue of source shapes that moved the count. Register
 rules live in `docs/vc6-regalloc.md`; this file is the loop around them.
 
 State when this was written (2026-10-15): 1639 of 1646 functions
-byte-identical, 7 differing, 250 bytes of total edit distance. The live
+byte-identical, 7 differing, 604 bytes of total edit distance. The live
 numbers are in `STATUS.md`.
 
 ## Goal and metric
@@ -506,3 +506,12 @@ same trick on the heuristic call (124-182), `dd` as any of the four integer type
 `pg`/node-pointer forms (58-324), and a volatile `node.g` (104). The flags-pointer local before the
 `g` sum hoists the pointer into ecx as the image does but turns the node-offset read into a
 temporary and shifts the rotation (90-92); both halves of that hunk are one c2 destination choice.
+
+LoadMap back to the plain compare (2 -> 356, by decision): the TRIG check is `(int32_t)size != plane`
+like its six siblings; the `size - (uint32_t)plane` number win is withdrawn because no author writes
+one plane check as a difference. The rotation step it supplied is the image's SCEN third read of
+`size`, a single load that is a rotation temporary in the image and a web for us; a second read
+(volatile, or after the call) restores the step and matches MHDR onward at the cost of a load
+(214-216). Still open: a source shape that gives one load AND the step. Ruled out this round: case
+order (2,321 orders), keeping `tag` live, a shared mismatch label or inlined `bad:` tails (the image
+has three tail-merged copies), fread return values, `consumed` spellings, `size`'s type.

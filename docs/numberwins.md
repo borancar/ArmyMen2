@@ -100,3 +100,5 @@ TrooperFire, UpdateTrooperAction, OptionsDefaults, ScriptPad (Round BP): never-t
 LoadMap (Round BR): the reveal-grid slot pointer is `(uintptr_t)g_tileRevealGrids - ((uintptr_t)g_mapTilesW - (uintptr_t)g_mapTilesW)`; a pointer built from an integer expression with a runtime read loses its provenance, so c2 keeps the store through `slot` ordered before the map-size reload (12 -> 2; replaces the old volatile pointer store). Revisit.
 
 FindPath (Round BW): `PathDistXYT(cur & 0xFFFF, curTile, t, t)` takes one tile under two spellings; `nb = (cur & 0xFFFF) + *sp`; the flag byte through `const uint8_t *fl = g_tileFlags`. Revisit.
+
+LoadMap TRIG `size - (uint32_t)plane`: withdrawn (2026-10-22); the check is a plain `!=` again.
