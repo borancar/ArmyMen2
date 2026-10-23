@@ -2255,6 +2255,21 @@ place, and the only tuple there that could carry it is SCEN's third read of `siz
 makes a web. No c1 construct emits one load with two uses (c1 has no dup; `44` is the comma),
 so the lever, if it exists, is a c2 web-building rule not yet found.
 
+Walk-side follow-up (2026-10-23, gdb probes over the toy): webs are created DURING the walk —
+the walk's entry handler (0x10733ddf) skips entries whose value node A is not op 3, and the
+op-4 web-ref nodes are made on demand by AddWebRef (0x107025a3: creates the op-4 ref with
+[node+0x14] = the web and bumps the web's refcount at [web+0x3a]) while WebNode (0x10733134)
+makes the web's own node (idempotent: `[edi+8]` already set -> return it; fired once per web,
+e.g. `consumed`, then 0x10732fd2 builds an op-3 wrap per use — the wrap is NOT what entries
+reference: web-use entries point at the web node itself, op 4/5). The decision that matters —
+why the same variable's one-use loads get op-3 value nodes while the two-use load gets an op-4 —
+is taken when the entry's [E+0x14] link is set at tuple-build time, in the tuple dispatcher
+(0x1072e800+). A two-use load and a one-use load of the same frame slot differ only in use
+count, and every source-level attempt to change that count without emitting code folds away in
+c1: the classification is unconditional at the source level as far as measured (ten load shapes,
+five web-pressure levels, seven expression-tree identities, two comma forms, eleven pragma
+settings — all leave it untouched).
+
 Hand-edited IL (VC6_IL_OVERRIDE) worked as the probe: the `gl` file holds each function's
 record (`<name>\0 .. 80 <u32 start> 80 <u32 ..> 80 <u32 ..>`), so a length-changing edit inside
 a function must add the delta to the start of every LATER function (map.cpp: map_install at
@@ -2263,3 +2278,16 @@ gl+0x1694); labels and symbols cannot be added. IL opcodes decoded on the way: `
 convert, `02 03 04` add sub mul, `0c` or, `09` shl, `08` neg, `0f T` compound assign, `1f` eq,
 `1a` not, `20` ne, `38 L` branch-if-false, `29 L` label, `3a L` goto, `44` comma, `55 T` push
 argument, `3e` call target, `4c` call, `4b` statement end, `4f 01 n` line, `41 41 3a` return.
+
+IL ground truth (2026-10-24, the decisive read): c1's `ex` for the toy SCEN arm contains FOUR
+separate `30 42` (load `size`) ops — malloc arg, fread arg, `consumed +=`, ParseScenarios push —
+so c1 really has no shared-load construct; two adjacent loads of one frame slot with no kill
+between are always merged by c2 into one web. Hand-editing the `ex` to drop the second load (so
+the push reuses the add's load) does NOT reproduce the image: the IL load is the lvalue->rvalue
+step, and deleting it makes the push emit `push &size` (a miscompile), because the IL has no
+"value temp" a second use can reference. So the image's SCEN third read — one load, two uses,
+a rotation TEMP — is not expressible in c1's IL at all. The classification is unconditional from
+c1 through c2. Combined with the walk-side mapping (webs are made during the AssignTemp walk by
+WebNode 0x10733134 / AddWebRef 0x107025a3; entries for a webbed value link the web node, op 4/5,
+which the walk's A.op==3 test skips), LoadMap's 356 is closed at the IL level, not just the
+source level.

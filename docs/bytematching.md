@@ -567,3 +567,79 @@ argument spellings identical or worse, plain counter increments 40-62); ScriptPa
 kind test and plain line arguments 130-248, the pairs are what hold 18); FindPath (budget-arm
 distance spellings identical, 36 with the subtraction swapped); RowUpdate (clamp spellings
 166-272, `w`/`h` load order 156-380, rect as struct/locals 164-560).
+
+## Round BX (2026-10-22): the web-vs-temp rule, measured — LoadMap's last step is not source-reachable
+
+The walk reproduced with `tools/c2walk.py src/game/map.cpp =_LoadMap`: EVENT 10 is SCEN's
+malloc-argument load, EVENT 11 is SCEN's fread-argument load (both one-use temps), and the very
+next candidate tuple — SCEN's third read of `size`, one `mov` feeding the ParseScenarios push
+and the `consumed +=` add — is an op-4 WEB (`op1 L917 [A4]`), so the MHDR `lea hdr` that follows
+it in the walk takes the cursor one slot early (eax; the image has ecx). The image's one extra
+event in that window can sit anywhere in it (an IL step at any point restores MHDR onward), but
+the only zero-code tuple in it is that web.
+
+A battery of ten two-use-load shapes (local, global, pointer-deref, push+push, push+store,
+push+lea, uses in two branch arms, a 16-bit load, three uses), each walked with the gdb probe,
+gave the same classification every time: a load with two or more uses in one stretch is ALWAYS a
+web (A4, never an AssignTemp event); a one-use load is always a temp (A3*, an event). Types,
+scopes, spellings and use positions do not move it. With c1 unable to emit one load with two
+uses except as one variable (and every source-level kill between the uses emitting code), the
+image's temporary there is not reproducible from C++ as far as the rule is known. This closes
+the SCEN third-read hypothesis the same way the ~250 IL/C variants and the 120 IL edits did:
+LoadMap's 356 stands at the source-reachable floor unless a c2 web-building input not covered by
+the battery exists.
+
+Same rule, two more probes (same day): web PRESSURE does not move it — with 0/8/16/32/48 extra
+two-use locals around the arm, the SCEN walk is unchanged (the third read stays a web); and no
+expression-tree trick defeats the merge — double negation, `^ 0`, `- 0`, a comma prefix, a
+same-value ternary, and a cast chain each compile BYTE-IDENTICAL and leave the third read a web
+(c1 folds them all before c2). The web-building classification is unconditional at the c1 level.
+
+Also closed (2026-10-23, pragma sweep over all seven residues, 11 settings each): per-function
+`#pragma optimize` with a/w/y/g/s/t (and gs/gt) either changes nothing or is far worse —
+the aliasing letters a/w are codegen-neutral for all seven, so c1's merge behaviour does not
+come from an aliasing switch. And the comma-statement forms (`(consumed += size, ParseScenarios(tmp, size))`
+and the comma inside the argument list) are likewise byte-identical with the third read a web.
+Writing the arm as a `switch` case instead of an `if` changes nothing either (same walk).
+The remaining lead is the c2 pass that CREATES a load's value node as op 3 vs op 4 (the CSE
+merge / IL reader, before AssignTemp): the webify sites are 0x10731d5a (jump-table handler
+calling WebNode 0x10733134) and the per-use wrap at 0x10732fd2; the decision branch that picks
+them is not yet located.
+
+RowUpdate (same round, 154 stands): the image computes each geometry sum TWICE — `left+w`/`top+h`
+as an unshared `lea` at the store and again for the `>>8` — and reloads `rect.top` once while
+`left` stays in a register. Clone-lab probes (~25 shapes, scratch removed) found:
+(1) unshared sums ARE reachable — reading the summed field as a real memory load between the
+sum's store and its recompute splits the tuples (2 adds + a reload) — but only with code the
+image does not have; (2) forwarding poison is per-OBJECT, not per-field: any construct that
+forces `top` to reload also reloads `left`; (3) clone experiments with intervening global stores
+are misleading (they kill cached loads the real function's clean region never touches). The
+image needs one load with two unmerged same-input add tuples — the dual of LoadMap's web — and
+no C++ spelling reachable from this compiler produces it. Screens on the real function all lost:
+clamps 166, recompute 188-194, volatile placements 164-482, store reorder + recompute 284,
+`spr->bounds` recompute 362.
+
+ScriptParseEvent (18 stands) and ScriptPad (10 stands), ~75 more candidates: the four
+ScriptParseEvent hunks are single-use loads folded into their consumers (`[A+0x14]=0`, no
+AssignTemp event) that inherit their dying base's colour where the image has a fresh register —
+the cursor levers do not reach folded loads, and the oracle finds no event the image treats
+differently. The two placed impossible pairs are load-bearing: all 8 single-pair placements
+scored 18-232. Pairs attach only to un-aliased through-`ctx` loads (`ctx->tokens`,
+`ctx->tokens[*at].line`); pairs on `tok->value`, `tok->kind`, `*at` fold to nothing. ScriptPad's
+10 is one 3-instruction hunk in loop-1's body: the volatile read/store pair on `n` (the lever
+that lifts `i`'s key 84 -> 100 over `ctx`) is a scheduling barrier pinning n's load/inc/store
+together where the image splits them around the `sy` store; the nearest miss (12) needs n's inc
+and store split across it, which a barrier forbids. Both want the same thing as LoadMap: a key
+lift / event from a second use that c2 accepts without code.
+
+FindPath (32 stands), SightScan (26 stands), UpdateTrooperAction (8 stands), with two precise
+targets left for a future round. `tools/c2rot.py web 0xb:3` on UpdateTrooperAction colours
+EXACTLY the two arm-1 instructions into the image's (`mov edx,[esp+0x40]` / `mov [edx+4],bl`)
+with no other change: the arm-1 `s` web (key 24, refs 2, cost 4, no hints, ZERO neighbours) is a
+pure colouring tie that takes eax and wants edx — it needs an uncoloured neighbour with positive
+cost and an edx hint, or an own-hint, and no spelling adds one without code. SightScan: oracle
+bump at K=51 (the `*nOther` value load) is 36 -> 35 (fixes the fieldF4 register but re-breaks
+later matches) — the image is not ours+1 there; the needed extra consumer between two temps in
+one block is unreachable. FindPath: the image's `mov edi,eax; mov eax,[esp+0x18]; add di,[mem]`
+for the `g` sum survives every type/cast/order/statement-split spelling (c1 re-merges; the sum's
+codegen is invariant) — one c2 destination choice.

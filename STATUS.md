@@ -237,6 +237,17 @@ main result so far (details in `src/vc6/README.md`):
   over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
   and UpdateTrooperAction moved nothing; the measurements are in
   docs/vc6-regalloc.md.
+
+  2026-10-23: the last seven are LoadMap 356, RowUpdate 154, FindPath 32,
+  SightScan 26, ScriptParseEvent 18, ScriptPad 10, UpdateTrooperAction 8 --
+  relink 1639 of 1646, 604 bytes (302 unmatched after alignment; re-measure
+  with `tools/relinkscreen.py --list`). New negatives (docs/bytematching.md,
+  Round BX): LoadMap's missing rotation event rides SCEN's third read of
+  `size`, a two-use load that c2 always webs -- a ten-shape battery (local,
+  global, pointer-deref, push+push, push+store, push+lea, branch-split,
+  16-bit, three-use) never produced a temporary for a two-use load; and
+  RowUpdate's image wants one load feeding two unmerged same-input add
+  tuples, reachable only with code the image lacks.
   PlacementAllowed
   matches: each refusal is its own `return 0` rather than a shared `fail:`
   label. ObjSetFootprint,
