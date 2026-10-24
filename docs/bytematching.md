@@ -20,6 +20,17 @@ same bytes, the source is the original's up to things the compiler erases.
 bytes our relink emits and the bytes in the image. Zero means identical. It is
 what `make vc6-relink` reports, and it is the only metric to trust.
 
+The manifest covers the whole goal. Measured 2026-10-24 by diffing the image's
+function entries (`docs/functions.tsv`) against the manifest's addresses: the only
+game-side entries with no manifest address are `0x0045CAA0` (ADDR_LOG, a bare `ret`
+stub in the retail build — logging was compiled out; the harness owns it via
+`src/inject/gamelog.c`, so it is not a reconstructable function) and
+`0x00463390`/`0x00463396` (the DirectSound/DirectDraw-create IAT thunks, linker
+artifacts). Nothing below the CRT frontier is reconstructed-but-unscored, and
+`tools/remaining.py` finds zero unreconstructed game functions. The retail CRT
+block (0x00464xxx+) is not part of the byte-match: our CRT is hand-written in
+`src/platform/crt`.
+
 The older shape metric (the lab tools' masked listings) hides absolute
 addresses and register numbers. It misled repeatedly: a function can score "no
 shape difference" while a wrong jump target or a swapped register keeps it
