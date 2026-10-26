@@ -2324,3 +2324,13 @@ arm, score block -- the DFS takes the allied (`else`) edge of `if (!ObjsAreAllie
 reaches `score:` through the allied arm. The image's allied tail ends `jg next; jmp score`, so in
 the original something was laid out between the allied tail and the score block; inverting the
 null-`w` test (`if (w) {...} else {...}`) was not enough (402).
+
+What separates our SightScan from the image, read with the DFS log (`lay/dfs.py`): the image's
+allied tail is `jne S; ...; jg next; jmp S` with a separate jump block J before the score block S
+in RPO (so S has no fall-through predecessor and merges forward behind the Kind7 arm), and
+neither jump skips S's `stt.cand` test. Ours has J only because of the arm's own `if (!stt.cand)
+goto next;`, whose fold also lets c2 fold S's head test on every allied path (A's `jne` and J both
+go past the test). `th1` (no arm test) has the image's jump targets but no J: the tail falls into
+S, no merge, and S stays after the allied arm. Every no-code way to get J that was tried --
+`do {} while (0)`, `for (;;) {... break;}`, a braced `goto`, a one-case `switch`, a re-test of
+`keep` (not folded: 559 instructions) -- either folds away entirely (388-394) or emits code.
