@@ -697,3 +697,10 @@ Second pass on the two near ones (same day):
   So the open question is c2's block layout, not the allocator.
 - FindPath's `g` sum is invariant under the types of `g` (uint16/int16) and `dd`
   (uint32/int32/uint16), the statement split, and casting `dd` to 16 bits first (32-58).
+- FindPath's `g` sum, at the IL level (2026-10-26): c1's postfix for line 1390 is
+  `&g; dd(30 42); node.g (… 30 22) widen(2c 41 00); 02; narrow(2c 22 00); 32 22`. Swapping the
+  operands in the IL (VC6_IL_OVERRIDE, same length) compiles identically (32), and narrowing `dd`
+  to 16 bits in the IL instead of widening `node.g` does not change the sum either (58, other
+  hunks only). c2 picks the image's `mov edi,eax; add di,[mem]` vs our `mov di,[mem]; add di,ax`
+  from something other than the sum's IL -- casts on the field (`(int16_t)`, `(uint32_t)`, through
+  an `int16_t *`) were already no-ops in the source (32).
