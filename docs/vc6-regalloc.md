@@ -2417,3 +2417,17 @@ J dies when the two conditions are retargeted to S -- and inverts `jle S; jmp ne
 0x10758469). The original's compile did not invert there; what suppressed it is the one open
 question, and C1's output offers no handle on it (every spelling of the tail reaches the pass
 in the same shape).
+
+**Closest spelling and the exact missing step (same day).** `if (o->aiMode != 1 || stt.range <=
+AM2_AI_PATROL_DETOUR) goto score; goto next;` (`pl1`) compiles the allied tail to the image's own
+instructions -- `jne S; cmp [esp+0x14],0x168; jg next; add edi,0x12` -- and its J survives the
+reorder because the second condition falls into it; J then dies as a jump-to-next because RPO
+puts S directly behind it (S is J's only child). What the image needs is J alive AND S not
+behind it, which happens if the first condition's jump already targets S at the first DFS: S is
+then discovered through that edge, J is visited later through the second condition's fall-through,
+the `jmp next` block lands between J and S (RPO a, b, J, Jn, S), J keeps its `jmp S`, and the
+mover's rule (a) moves S behind the Kind7 body. C1 emits `38 skip; 3a label` for every `if (c)
+goto label;` form tried (plain, `&&`, `||`, two simple ifs; IL via VC6_KEEPTMP), never a branch
+to the user label, and no pass before the DFS collapses the jump-to-jump in our compiles. That
+collapse-before-DFS is the single unexplained step between any source we can write and the
+image.
