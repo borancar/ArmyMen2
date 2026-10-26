@@ -2399,3 +2399,21 @@ reloads after AngleDelta; a local `c` saves that but turns the compare into `cmp
 the head, a scalar `cand`, and the CSE-first spelling all leave the propagation in place.
 Reproduced bodies: `tri18` is byte-identical to the image from S's first increment through the
 end of the scoring block. Scripts: `ro/tri*.py`.
+
+**The mover, read (0x10738b9f).** For every unconditional `jmp L` (kind 0x11, `[t+0x20]` = 0,
+op != 0x18b, target ref kind 4): first 0x107140ec (delete if L is the next label); then the
+tuple before L's block (0x1070138e): if it is an unconditional jump to another label, L's block
+is unlinked and moved behind the `jmp`, which is deleted (0x1070b315/0x107020fe) -- the move that
+puts S behind the Kind7 body in base, where the folded J (`jmp S_body`) precedes S_head; if
+something falls into L instead, the block is duplicated behind the `jmp` only when its cost
+(0x107352ae over tuples with `[t+9]&1`) is <= 2, or <= 0x14 with the flag at 0x107ac0b0 set.
+Conditional jumps carry a kind-0x1e record at `[t+0x20]` and are never candidates; no tuple in
+SightScan carries the `[t+9]&8` exemption.
+
+What the image therefore needs: at mover time S_head preceded by the allied tail's `jmp next`,
+not yet inverted. Our reorder pass produces that layout -- RPO puts `jle S; jmp next; J; S` and
+J dies when the two conditions are retargeted to S -- and inverts `jle S; jmp next` into
+`jg next` falling into S within the same pass (both `jmp` tuples at the tail are gone by
+0x10758469). The original's compile did not invert there; what suppressed it is the one open
+question, and C1's output offers no handle on it (every spelling of the tail reaches the pass
+in the same shape).
