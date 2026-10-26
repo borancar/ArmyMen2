@@ -2445,3 +2445,30 @@ image's `jg next; jmp S` therefore needs a live block between J and S at the reo
 construct supplies one: forward gotos (trampolines), structured jump-over-else blocks and the
 in-sight side's one direct conditional edge into S (which leaves the Reveal body falling into S)
 all collapse the same way. SightScan's 26 stays open with that as the precise residue.
+
+## RowUpdate's rect block, traced (2026-10-26)
+
+The image stores `left`, `top`, `right`, `bottom` in that order, keeps `left` in a register
+from its computation (copied once, `mov eax,ebp`), and RELOADS `top` right after its store
+(`mov edi,[esi+0x10]`); `bottom`, `ct` and `cb` all come from that one reload, and `left+w` /
+`top+h` are each computed twice (`lea` for the store, `add`/`lea` again for the shift). Ours
+forwards `top` and shares the sums. Measured on the block's shape (`rw/shape.py`):
+
+- The reload is C2's store-to-load rule, read off C1's IL (`VC6_KEEPTMP`): a statement store is
+  `32 41 4b` and C2 forwards it; a store whose value is consumed (`32 41` followed by its use) is
+  not forwarded, and the field is reloaded for every later read while other fields keep
+  forwarding (`C5`: the store inside a never-true pair gives exactly the image's `top` reload with
+  `left` untouched; `E4` moves the effect to `left` when `left` is the consumed one). A store
+  through a different access path (`rc = &r->rect`) also blocks forwarding but for everything
+  after it (`A1`, `A7`: `left` reloaded too), so the image's stores were all through `r->rect`.
+- Every natural consumer takes the computed value itself: `bottom = (top = T) + h` (`B1`/`B3`),
+  `ct = (top = T) >> 8` (`F1`), `cb = ((top = T) + h) >> 8` (`F2`); the image serves all three from
+  the reload. A chained dead local (`t = top = T`, `D1`/`D3`), a comma (`G1`/`G2`/`G4`) and a cast
+  lvalue (`C2`/`C3`) are flattened by C1 into the plain store. Compound assignment (`top -= y`,
+  `E1`/`E2`) gives one sunk store or two stores. So the consumed store that the image needs has no
+  code-free C spelling found.
+- The two recomputed sums and the second `left` copy are consistent with `cr`/`cb` reading
+  `right`/`bottom` back (forwarded) and C2 rematerialising the sums once their registers were
+  reused; they follow from the reload, not from the source. `cl <= 0` (`setle`) is the image's
+  clamp spelling (`ru2/v1`: 19 hunks against 20 with `cl < 0`).
+RowUpdate's 154 stays, with the consumed `top` store as its precise residue. Scripts: `rw/`.
