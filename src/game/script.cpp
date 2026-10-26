@@ -2810,15 +2810,18 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 /* A number win: n is stepped as a volatile read into a named temporary and a
                  * volatile store, after sy as in the image. The temporary is a web of its own
                  * in the loop body (the load/inc/store is the same code), which raises the
-                 * counter's key above ctx's, so the counter takes edi and ctx ebx. */
+                 * counter's key above ctx's, so the counter takes edi and ctx ebx.
+                 * sy is stored between n's load and n's store, as the image orders them;
+                 * what still differs is register choice only (ny and n swap eax/edx,
+                 * and the spilled `number` reload follows whichever frees first). */
                 for (i = 0; i < total; i++) {
                     if ((int32_t)g_mapPadLayer[i] == number) {
                         sx += i % g_mapTilesH;
                         {
                             int32_t ny = sy + i / g_mapTilesH;
                             int32_t t_n = *(volatile int32_t *)&n;
-                            *(volatile int32_t *)&n = t_n + 1;
                             sy = (ny == 1000 && ny == 1001) ? ny : ny;
+                            *(volatile int32_t *)&n = t_n + 1;
                         }
                     }
                 }

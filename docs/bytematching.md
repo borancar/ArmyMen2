@@ -654,3 +654,29 @@ later matches) — the image is not ours+1 there; the needed extra consumer betw
 one block is unreachable. FindPath: the image's `mov edi,eax; mov eax,[esp+0x18]; add di,[mem]`
 for the `g` sum survives every type/cast/order/statement-split spelling (c1 re-merges; the sum's
 codegen is invariant) — one c2 destination choice.
+
+## Register-only residues (2026-10-26, 610 bytes, 7 differ)
+
+Boran's call: a higher distance is acceptable when what remains is register choice only.
+The check is a disassembly diff with register names masked and jump targets rewritten as
+instruction indices (a jump-displacement change from an encoding-length shift is not a
+difference); a function qualifies when that diff is empty, or when its only hunks are a spill
+reload or store whose position follows from which register frees first.
+
+- Already register-only: UpdateTrooperAction (8), ScriptParseEvent (18), and LoadMap's root
+  cause (the rotation step; its other bytes chain from it).
+- ScriptPad 10 -> 16, adopted: the `sy` store moved between n's volatile load and store, the
+  image's order. What remains is ny/n swapping eax/edx and the spilled `number` reload sitting
+  after whichever of them frees edx.
+- SightScan (26) is two levers short: `++o->fieldF4` plain (the volatile one was a scheduling
+  barrier: the image loads hold.facing between the load and the inc) and the weapon arm's
+  `DistAndAngle(&o->pos, &keep->pos, ...)` without the two-definition `kp` (its push order) both
+  remove a real hunk; the store-order hunks they add are register-caused (pick.bearing's byte in
+  al forces the eax store first). Left: the allied arm's end threads past `score:`'s `stt.cand`
+  test (`lea ecx,[edi+0x12]` / `jne` to the inc) where the image jumps back to the test and kills
+  edi. Removing the arm's own test, a second label, a volatile read, moving `stt.cand = w`, and
+  laying the score block out by hand all scored 180-568: the arm's test is what keeps the score
+  block in place, and c2 threads by value (w was tested nonzero).
+- FindPath (32): the heuristic's `and` order is register-only; the `g` sum is not (see above).
+- RowUpdate (154): 21+ hunks in every spelling -- top reloaded after its store, the two sums
+  computed twice, setle clamps, slot assignment. Not a respelling.
