@@ -2360,3 +2360,42 @@ true on every path into J is `w != 0`, which c2 equates with `stt.cand` through 
 tried (plain, pointer local, byte offset, memcpy); `aiMode`/`range` facts differ between the two
 paths into J, and `keep != 0` from the loop test is not propagated that far (a re-test emits code).
 No source spelling is known to produce the image here.
+
+### SightScan's allied tail, the full pass chain (2026-10-26)
+
+Measured with the scripts in the job scratch `lay/` (tuple dumps at every driver call site,
+`dfs2.py` for every DFS, `mv2.py` for the block before S). C1 encodes `if (c) goto L;` as
+`38 skip; 3a L; 29 skip` -- a branch-if-false around a separate `goto` -- for the `&&` form and
+for two simple `if`s alike (IL read from `VC6_KEEPTMP`), so the allied arm's `goto score` is
+always its own jump-only block J when the reorder pass (0x107050a3) runs, and the DFS always
+discovers S through J (every DFS, early and late, in every variant). Then:
+
+- **Base (arm test kept).** J = [test cand; je next; jmp S] is not jump-only, so it survives the
+  reorder. 0x107291e4 folds its test (cand == w != 0) and 0x107198fc copies S's head test into J
+  and folds that too: J = `jmp S_body` (line 3261). The late mover 0x10738b9f (called at
+  0x10758781; it runs 0x107140ec first, then walks the target label's reference list at
+  `[label+0x32]`) moves S_head behind the Kind7 body because the tuple before S_head's label is
+  now an unconditional jump. Result: the image's layout with the allied jumps landing past the
+  test (26).
+- **th1 (no arm test).** J is jump-only, the two conditions are retargeted to S and J dies as
+  unreachable in the reorder; RPO leaves `jle S; jmp next` right before S, and 0x107198fc inverts
+  it to `jg next` falling into S. S now has a fall-through predecessor and the mover declines
+  (388). Removing the Kind7 `goto` (C1 drops the join label), two simple `if`s, the scoring block
+  after the outer if/else, a label on J for the null path: all compile to one of these two.
+- **The image** is `jg next; jmp S` with S moved behind the Kind7 body: the same inversion with S
+  NOT adjacent to the allied tail at 0x1075855a. Under this compiler that needs S discovered
+  before the allied tail reaches it, and the allied arm (jump target of `if (!ObjsAreAllied)`)
+  is always visited first.
+
+Three inline copies of the scoring block (Kind7 fall-through, in-sight, allied with the null
+path jumping to the allied copy) reproduce the image's block order exactly (`tri15`: every call
+in the image's order), because the late merger (second call of 0x107375bf, after the rotation
+pass, machine-level) folds identical copies into the first one in layout. The copies do not
+merge because the Kind7 copy's head is propagated (`cmp ebx,ebp`: C2 scalarises `stt.cand` and
+knows it is `keep`), while S's head in the image is a reload of a join (`mov edi,[esp+0x20];
+test edi,edi`). An address-taken struct blocks the propagation but then `hold.best = stt.cand`
+reloads after AngleDelta; a local `c` saves that but turns the compare into `cmp edi,ebp`
+(variable web vs expression); volatile stores, a store to another field, never-true jumps into
+the head, a scalar `cand`, and the CSE-first spelling all leave the propagation in place.
+Reproduced bodies: `tri18` is byte-identical to the image from S's first increment through the
+end of the scoring block. Scripts: `ro/tri*.py`.
