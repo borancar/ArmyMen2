@@ -2346,3 +2346,17 @@ passes called at 0x107584d6..0x10758603. The jump tuple's own fields that change
 window are `[t+0x18]` and `[t+0x24]`; which one is the target was not settled (`[t+0x20]` is not
 a label pointer for kind 0x11). Next: bisect those passes with a field-level watch on the first
 `aiMode` jump tuple.
+
+**SightScan's skip, closed (same day).** Field watch on the `aiMode` jump: its target reference
+(`[t+0x18]`, kind 4, label at `[ref+0x14]`) changes in the pass called at 0x1075855a,
+**0x107198fc**, an iterate-to-fixpoint jump optimiser over block-ending jumps (kind 0x11), which
+threads a jump through a target block that is only a jump. The arm's `if (!stt.cand) goto next;`
+(line 3306) is gone one pass earlier, in 0x107291e4 (called at 0x107584b3): the global optimiser
+folds it from `w != 0` (w and `stt.cand` one value) and points the remaining jump block J past the
+score block's identical test; 0x107198fc then threads the `aiMode` jump through J. 0x107140ec, called
+from the same loop, only deletes a jump to the next label. So the image needs a test in the arm that
+c2 folds (to leave J) WITHOUT that fold implying `stt.cand != 0` at the score head. The only fact
+true on every path into J is `w != 0`, which c2 equates with `stt.cand` through any store spelling
+tried (plain, pointer local, byte offset, memcpy); `aiMode`/`range` facts differ between the two
+paths into J, and `keep != 0` from the loop test is not propagated that far (a re-test emits code).
+No source spelling is known to produce the image here.
