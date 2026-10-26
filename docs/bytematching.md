@@ -704,8 +704,8 @@ Second pass on the two near ones (same day):
   hunks only). c2 picks the image's `mov edi,eax; add di,[mem]` vs our `mov di,[mem]; add di,ax`
   from something other than the sum's IL -- casts on the field (`(int16_t)`, `(uint32_t)`, through
   an `int16_t *`) were already no-ops in the source (32).
-- FindPath (32) classified register-only under the goal's spill rule (2026-10-26, for Boran's
-  review): its one masked hunk is the reload of the spilled `curTile * 16` offset (`[esp+0x18]`) --
+- FindPath (32) classified register-only under the goal's spill rule (2026-10-26, confirmed by
+  Boran): its one masked hunk is the reload of the spilled `curTile * 16` offset (`[esp+0x18]`) --
   ours into ecx right after the call, the image's into eax after `dd` has left it. With the reload
   in eax, `dd` must move to `g`'s register first (`mov edi,eax`) and the parent's g is added from
   memory (`add di,[eax+...]`); with it in ecx, ours loads the parent's g into di and adds ax; and
