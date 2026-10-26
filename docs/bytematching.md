@@ -680,3 +680,20 @@ reload or store whose position follows from which register frees first.
 - FindPath (32): the heuristic's `and` order is register-only; the `g` sum is not (see above).
 - RowUpdate (154): 21+ hunks in every spelling -- top reloaded after its store, the two sums
   computed twice, setle clamps, slot assignment. Not a respelling.
+
+Second pass on the two near ones (same day):
+
+- SightScan's allied-arm jump is web-building, not a branch choice: `c2rot.py web 0x21:3` moves
+  `w`'s definition (`mov edi,eax` after LookupByUID), so `w` and the score block's `stt.cand`
+  reload are one web in our build. The arm's trailing `if (!stt.cand) goto next;` is what joins
+  them: its read is forwarded from `w`, which keeps `w` live to the arm's end and lets the jump
+  skip the reload. Without that test (`th1`) the score block's own code matches the image exactly
+  -- `mov dl,[esp+0x18]` / `mov [esp+0x38],edi` / `mov [esp+0x1c],eax`, store order included --
+  but c2 then lays the score block out after the allied arm instead of after the Kind7 arm (388).
+  Every other placement of a `stt.cand` read in the arm (before DistAndAngle, before
+  ObjsAreAllied, before the health test) and every rewrite of the aiMode tail gives the same 388;
+  merging `pick` and `stt` into one address-taken struct (the image's slots 0x14..0x20 fit it)
+  makes the score block reload `stt.cand` after AngleDelta, which the image does not (170-230).
+  So the open question is c2's block layout, not the allocator.
+- FindPath's `g` sum is invariant under the types of `g` (uint16/int16) and `dd`
+  (uint32/int32/uint16), the statement split, and casting `dd` to 16 bits first (32-58).
