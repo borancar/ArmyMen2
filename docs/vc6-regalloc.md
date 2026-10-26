@@ -2291,3 +2291,36 @@ c1 through c2. Combined with the walk-side mapping (webs are made during the Ass
 WebNode 0x10733134 / AddWebRef 0x107025a3; entries for a webbed value link the web node, op 4/5,
 which the walk's A.op==3 test skips), LoadMap's 356 is closed at the IL level, not just the
 source level.
+
+## Block layout (C2.DLL 8168, traced 2026-10-26 on SightScan)
+
+How c2 orders a function's basic blocks, found by bisecting the tuple order with gdb between the
+passes of the per-function phase list at 0x107583f0..0x107585d5 (scripts: job-scratch `lay/`).
+
+- **Structures.** The function context (ecx at 0x107335c3) holds the block-list header at
+  `[ctx+8]` (`[hdr]` first block, `[hdr+0x14]` = 0x7c, the block size). A block: `+0`/`+4`
+  next/prev, `+8`/`+0xc` predecessor/successor edge lists (edge: `+0` next edge, `+0xc` target
+  block), `+0x10`/`+0x14` the DFS link and iterator, `+0x18` flags (bit 0 = visited), `+0x1c` its
+  label tuple (first real tuple = `[[b+0x1c]]`), `+0x6c` block number (low 16 bits). Tuples are one
+  doubly linked list (`+0` next, `+0xc` prev), op at `+4`, line at `+0x10` (add `[ctx+0x24]`).
+- **The rebuild** (0x1070501b) re-derives the block list from the tuple list: 0x107041ae walks
+  the tuples and links the labels in tuple order, 0x1070461e builds blocks from them. So block
+  order is tuple order.
+- **The reorder** is 0x107050a3 (called at 0x10758454, before 0x107291e4 and the first optimizing
+  rebuild): 0x1070490f calls **0x107040a9, an iterative DFS** from the entry block over each
+  block's successor edges in edge-list order, writing the blocks out in post-order through `+0x10`,
+  then drops unvisited blocks; **0x1072ac58** walks that list and rebuilds the tuple list from it
+  (0x107274ae per block), which yields reverse post-order. Bisect: SightScan's score tuples are
+  ahead of the allied arm's until the call at 0x107050b7 and behind it after.
+- **Then emission merges.** At the rotation pass (0x107335c3) and at teardown SightScan's score
+  block still sits after the allied arm; the final code has it after the Kind7 arm, so the move
+  happens at code level after that pass (the "labelled block merges into the first identical copy
+  in layout" rule above). It happens when nothing falls through into the score block: in ours the
+  allied tail jumps (threaded) past the test, in `th1` (no arm test) it falls in and no merge
+  occurs.
+
+For SightScan the pre-emission RPO is: allied-test block, Kind7 test, Kind7, sight test, allied
+arm, score block -- the DFS takes the allied (`else`) edge of `if (!ObjsAreAllied(...))` first and
+reaches `score:` through the allied arm. The image's allied tail ends `jg next; jmp score`, so in
+the original something was laid out between the allied tail and the score block; inverting the
+null-`w` test (`if (w) {...} else {...}`) was not enough (402).
