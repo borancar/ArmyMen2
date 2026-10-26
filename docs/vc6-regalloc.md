@@ -2431,3 +2431,17 @@ goto label;` form tried (plain, `&&`, `||`, two simple ifs; IL via VC6_KEEPTMP),
 to the user label, and no pass before the DFS collapses the jump-to-jump in our compiles. That
 collapse-before-DFS is the single unexplained step between any source we can write and the
 image.
+
+**Refuted at the IL level (same day, `fil/ov5`, `fil/ov6`).** C1 routes every FORWARD `goto` through
+a trampoline: `3a T; 3a L` at the site and `T: 3a L` in a run of such blocks at the function's end
+(`29 c1 33 3a 67 33 29 be 33 3a 67 33 29 bd 33 3a 49 33 ...`); a backward `goto` is a single `3a L`.
+The DFS visits a forward conditional target first and a backward one after the fall-through.
+Hand-patching the `||` spelling's first branch to target `score` directly and forwards
+(`39 bc 33` -> `39 49 33`, with the scoring block moved after the allied arm) gives the predicted
+search order -- S discovered from the aiMode block, RPO `a, b, J, Jn, S` -- and still compiles to
+the th1 shape (388): once the second condition is retargeted to `next`, the `jmp next` block Jn
+has no predecessor, dies, J is adjacent to S, and its `jmp S` is deleted as a jump-to-next. The
+image's `jg next; jmp S` therefore needs a live block between J and S at the reorder, and no C
+construct supplies one: forward gotos (trampolines), structured jump-over-else blocks and the
+in-sight side's one direct conditional edge into S (which leaves the Reveal body falling into S)
+all collapse the same way. SightScan's 26 stays open with that as the precise residue.
