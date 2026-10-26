@@ -2334,3 +2334,15 @@ go past the test). `th1` (no arm test) has the image's jump targets but no J: th
 S, no merge, and S stays after the allied arm. Every no-code way to get J that was tried --
 `do {} while (0)`, `for (;;) {... break;}`, a braced `goto`, a one-case `switch`, a re-test of
 `keep` (not folded: 559 instructions) -- either folds away entirely (388-394) or emits code.
+
+**Where SightScan's skip is made (2026-10-26, `lay/succ*.py`, `lay/jt*.py`).** Block successor
+edges, logged at every rebuild (0x1070501b), show the allied arm's `aiMode` jump (lines
+3300-3304) going to the score block's head (3261) at the rebuild called from 0x1075861b and to
+its body past the test (3263-3267) by the rotation pass. The edges are recomputed from the
+tuples inside that rebuild (0x107048f7, from each block's last tuple: kind byte `[t+8]` 0x11 =
+conditional jump; 0x16 = label, `[label+0x14]` = its block), so the redirect itself is a tuple
+edit made earlier, between the third rebuild called from 0x107443a2 and 0x10758616 -- one of the
+passes called at 0x107584d6..0x10758603. The jump tuple's own fields that change across that
+window are `[t+0x18]` and `[t+0x24]`; which one is the target was not settled (`[t+0x20]` is not
+a label pointer for kind 0x11). Next: bisect those passes with a field-level watch on the first
+`aiMode` jump tuple.
