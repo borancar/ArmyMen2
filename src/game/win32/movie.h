@@ -29,7 +29,7 @@ struct AM2_Movie {
     int32_t             frameDue;   /* +0x14 raised by the timer */
     int32_t             big;        /* +0x18 which Smacker buffer size */
     struct AM2_Smack   *smack;      /* +0x1C from SmackOpen */
-    int32_t             field20;    /* +0x20 */
+    int32_t             unused20;    /* +0x20 */
     uint32_t            ddType;     /* +0x24 SmackDDSurfaceType's answer */
     uint32_t            timerId;    /* +0x28 */
     char                name[0x80]; /* +0x2C the filename, copied in */

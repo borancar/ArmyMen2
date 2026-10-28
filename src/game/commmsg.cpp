@@ -1129,7 +1129,7 @@ void __cdecl RecvTrooperFire(const AM2_ArmyMsgHdr *msg)
 
     unit->sight.bearing =
         unit->facing;
-    unit->sight.field00 = 1;
+    unit->sight.fromNet = 1;
     unit->sight.hit   = 1;
     unit->sight.seen   = 1;
 
@@ -2022,7 +2022,7 @@ void __cdecl TrooperFireSend(AM2_Object *trooper, AM2_Object *target)
     msg.flag     = t->fireFlag;
 
     /* Cleared before the send, not after. */
-    t->sight.field00 = 0;
+    t->sight.fromNet = 0;
     t->sight.hit = 0;
 
     ArmyMessageSend(&msg.hdr);
@@ -2286,14 +2286,14 @@ const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army)
         obj->sight.bearing = *p++;
         obj->fireStamp =
             g_gameClockMs;
-        obj->sight.field00 = 1;
+        obj->sight.fromNet = 1;
     }
 
     if (head & AM2_TROOPSUB_HAS_MODE) {
         obj->sight.state = (int32_t)*p++;
         obj->fireStamp =
             g_gameClockMs;
-        obj->sight.field00 = 1;
+        obj->sight.fromNet = 1;
     }
 
     {
@@ -3024,7 +3024,7 @@ int32_t __cdecl FlowRecvMessage(AM2_MsgNode *node)
                  * +0x68 has one toucher in this image and stays unnamed. */
                 f.me->peerClock =
                     orig_get_tick_count()
-                    - (f.me->field68 >> 1);
+                    - (f.me->roundTrip >> 1);
             }
         } else if (sender->nextExpected == 0) {
             if (g_commObject->verbose)

@@ -353,7 +353,7 @@ void __cdecl SaveOptions(void)
  * not from the reading, for exactly that reason.
  *
  * THE TYPE FILTER IS THREE TESTS AND ONLY THE LAST ONE BITES. Types 2, 3 and
- * 8 are admitted, OBJ_OFF_FIELD_94 must be zero, and then the type must be
+ * 8 are admitted, OBJ_OFF_BY_TYPE_94 must be zero, and then the type must be
  * exactly 2. Vehicles and roaches are excluded twice over. Kept as written:
  * folding it to `type == 2` would give the same behaviour and hide that the
  * wider test is what the original asks.
@@ -855,7 +855,7 @@ int32_t __cdecl LoadItemHeader(am2_FILE *fp, AM2_Object *hdr)
 /* 0x00433D20, 0x00422750 and 0x0043CB30 -- three of the eight per-type
  * savers, and the three that are nothing but a write.
  *
- * All three write from OBJ_OFF_FIELD_94, which is what settles what that
+ * All three write from OBJ_OFF_BY_TYPE_94, which is what settles what that
  * field is: the object's TYPE-SPECIFIC RECORD, saved whole. The sizes are
  * literals in the savers rather than a table -- 0x2C for type 1, 0x28 for
  * type 6, 0x4CC for type 8 -- so the record grows by an order of magnitude
@@ -874,7 +874,7 @@ int32_t __cdecl LoadItemHeader(am2_FILE *fp, AM2_Object *hdr)
  */
 int32_t __cdecl SaveType1(am2_FILE *fp, AM2_Object *obj)
 {
-    uint8_t *rec = (uint8_t *)&obj->field94;
+    uint8_t *rec = (uint8_t *)&obj->saveRec;
 
     orig_fwrite(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     WriteSaveTag(fp, *(const uint32_t *)(*(uint8_t *const *)rec + 8));
@@ -1140,7 +1140,7 @@ int32_t __cdecl PlaceScenario(void)
              * up. */
             if (!(obj->flagsLo & 4)
                 && ObjIsTypeIn238(obj)
-                && obj->field94 == 0) {
+                && obj->saveRec == 0) {
                 obj->scriptPoint =
                     g_zeroPoint;
                 /* A one-case switch, not `== 2`: the image tests the type
@@ -1251,7 +1251,7 @@ void __cdecl ResetLevelState(void)
  * evidence and the template: the savegame loader for the same type, sitting
  * immediately before this in the image. Everything structural here is its
  * vocabulary -- AM2_MISSILE_BYTES, ADDR_MISSILE_BOX, ADDR_MISSILE_ROW_SPEC,
- * ADDR_MISSILE_ANIMS, OBJ_OFF_FIELD_94 for the def pointer -- and the two
+ * ADDR_MISSILE_ANIMS, OBJ_OFF_BY_TYPE_94 for the def pointer -- and the two
  * agreeing is better evidence than either alone.
  *
  * THE FRAME RULE IS `def == 2 || def == 5`, which is what LoadType5 does too.
@@ -1401,7 +1401,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
  * IT READS AN INDEX WHERE THE OBJECT HOLDS A POINTER, which is the same trade
  * LoadType1 makes with its save tag: the file gives a number, the loader turns
  * it into ADDR_MISSILE_DEFS + index * AM2_MISSILE_DEF_BYTES and stores that in
- * OBJ_OFF_FIELD_94. A pointer written to disk would not survive a reload.
+ * OBJ_OFF_BY_TYPE_94. A pointer written to disk would not survive a reload.
  *
  * THE FOUR DWORDS AFTER IT ARE READ BY POSITION and the offsets they land on
  * carry other types' names -- OBJ_OFF_RANK, OBJ_OFF_REPAIR_FRAME,
@@ -1474,7 +1474,7 @@ AM2_Object *__cdecl LoadType5(am2_FILE *fp, AM2_Object *hdr)
 /* LoadType8 -- original 0x0043CB60, one caller, and the ROACH member of the
  * per-type savegame loader family LoadType1 belongs to. Read the 0x4CC-byte
  * record, build a roach from the header, and paste the record over the
- * object's OBJ_OFF_FIELD_94.
+ * object's OBJ_OFF_BY_TYPE_94.
  *
  * A C++ LOCAL IS CONSTRUCTED INTO THE READ BUFFER AND THEN READ OVER. The
  * pointer-list constructor runs on buffer + 0x10 and the fread that follows
@@ -1545,7 +1545,7 @@ AM2_Object *__cdecl LoadType8(am2_FILE *fp, const AM2_Object *hdr)
             (int32_t)h->uid);
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    CopyTypeRecord(&o->field94, rec, AM2_TYPE8_RECORD_SIZE);
+    CopyTypeRecord(&o->saveRec, rec, AM2_TYPE8_RECORD_SIZE);
 
     if (o->health > 0) {
         int32_t now;
@@ -1683,7 +1683,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     }
 
     memcpy(o, h, (size_t)g_itemHeaderSize);
-    CopyTypeRecord(&o->field94, rec, AM2_TYPE2_RECORD_SIZE);
+    CopyTypeRecord(&o->saveRec, rec, AM2_TYPE2_RECORD_SIZE);
 
     if (!(h->flags & OBJ_FLAG_BIT0)) {
         o->flags =
@@ -1879,7 +1879,7 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
     ClearPtrList(&o->followers);
     ClearPtrList(&o->riders);
 
-    CopyTypeRecord(&o->field94, rec, AM2_TYPE3_RECORD_SIZE);
+    CopyTypeRecord(&o->saveRec, rec, AM2_TYPE3_RECORD_SIZE);
 
     o->tableRec3 =
         g_objTableRecords
@@ -1955,10 +1955,10 @@ AM2_Object *__cdecl LoadType3(am2_FILE *fp, const AM2_Object *hdr)
  * IT BUILDS THE OBJECT AND THEN OVERWRITES MOST OF IT. CreateItem makes a
  * live item from the header's uid, position and flags; the saved header is
  * then memcpy'd over its first ADDR_ITEM_HEADER_SIZE bytes and the saved type
- * record over its OBJ_OFF_FIELD_94. What survives that is what the function
+ * record over its OBJ_OFF_BY_TYPE_94. What survives that is what the function
  * carefully saves in locals first:
  *
- *   - the FRESH object's OBJ_OFF_FIELD_94 pointer, put back over the one the
+ *   - the FRESH object's OBJ_OFF_BY_TYPE_94 pointer, put back over the one the
  *     file supplied -- the mirror of the saver's tag, and the reason a loaded
  *     item points at this session's table rather than at a stale address;
  *   - the two 16-byte blocks at +0x20 and +0x30, saved before the header copy
@@ -1983,7 +1983,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
     struct {
-        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t head[OBJ_OFF_BY_TYPE_94];
         uint8_t rec[AM2_TYPE1_RECORD_SIZE];
     } whole;
     uint32_t  tag;
@@ -2004,13 +2004,13 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
     if (!obj)
         return (AM2_Object *)0;
 
-    ownRec = obj->field94;
+    ownRec = obj->saveRec;
     memcpy(blockA, &obj->box, sizeof blockA);
     memcpy(blockB, &obj->hit, sizeof blockB);
 
     memcpy(obj, hdr, (size_t)g_itemHeaderSize);
-    memcpy(&obj->field94, whole.rec, AM2_TYPE1_RECORD_SIZE);
-    obj->field94 = ownRec;
+    memcpy(&obj->saveRec, whole.rec, AM2_TYPE1_RECORD_SIZE);
+    obj->saveRec = ownRec;
 
     memcpy(&obj->box, blockA, sizeof blockA);
     memcpy(&obj->hit, blockB, sizeof blockB);
@@ -2028,7 +2028,7 @@ AM2_Object *__cdecl LoadType1(am2_FILE *fp, const AM2_Object *hdr)
 
 int32_t __cdecl SaveType6(am2_FILE *fp, AM2_Object *obj)
 {
-    orig_fwrite((uint8_t *)&obj->field94,
+    orig_fwrite((uint8_t *)&obj->saveRec,
                 AM2_TYPE6_RECORD_SIZE, 1, fp);
     return 1;
 }
@@ -2038,7 +2038,7 @@ int32_t __cdecl SaveType8(am2_FILE *fp, AM2_Object *obj)
     if (!obj)
         return 0;
 
-    orig_fwrite((uint8_t *)&obj->field94,
+    orig_fwrite((uint8_t *)&obj->saveRec,
                 AM2_TYPE8_RECORD_SIZE, 1, fp);
     return 1;
 }
@@ -2064,7 +2064,7 @@ typedef void (__cdecl *AM2_FootprintFn)(void *obj);
  * SaveType4 landed: the saved record is the object with its footprint lifted.
  *
  * TYPE 2'S TAG COMES FROM ITS WEAPON, or is 1 when it has none -- WeaponByUid
- * on the uid at TROOPER_OFF_WEAPON_UID, then a pointer at OBJ_OFF_FIELD_C0 and
+ * on the uid at TROOPER_OFF_WEAPON_UID, then a pointer at OBJ_OFF_BY_TYPE_C0 and
  * the dword it points at. A trooper who has dropped his weapon saves a 1 where
  * an armed one saves the weapon's own code, so the tag is not a constant and a
  * reader cannot skip it.
@@ -2087,7 +2087,7 @@ int32_t __cdecl SaveType2(am2_FILE *fp, AM2_Object *obj)
         o->tableRec2Index =
             (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
-    orig_fwrite(&o->field94, AM2_TYPE2_RECORD_SIZE, 1, fp);
+    orig_fwrite(&o->saveRec, AM2_TYPE2_RECORD_SIZE, 1, fp);
 
     weapon = WeaponByUid(
                  o->inventory[0]);
@@ -2120,7 +2120,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, AM2_Object *obj)
         o->tableRec3Index =
             (int32_t)(((uint32_t)rec - ((uintptr_t)g_objTableRecords)) >> 8);
 
-    orig_fwrite(&o->field94, AM2_TYPE3_RECORD_SIZE, 1, fp);
+    orig_fwrite(&o->saveRec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
     n = o->followers.count;
     if (n > 0)
@@ -2185,7 +2185,7 @@ int32_t __cdecl SaveType5(am2_FILE *fp, AM2_Object *obj)
  * IT MAKES THE OBJECT OUT OF THE RECORD AND THEN OVERWRITES IT WITH THE SAME
  * RECORD. The 0x28 bytes are read onto the stack, three of their fields go to
  * ADDR_SPAWN_AT as the kind, the uid and one more, and the whole record is
- * then copied to OBJ_OFF_FIELD_94 -- so whatever the maker derived from those
+ * then copied to OBJ_OFF_BY_TYPE_94 -- so whatever the maker derived from those
  * three is replaced by the saved values a moment later. Reproduced; the two
  * are the same numbers unless the maker changes them.
  *
@@ -2207,7 +2207,7 @@ AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
     struct {
-        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t head[OBJ_OFF_BY_TYPE_94];
         struct {                        /* the explosion arm, TYPE6_REC_OFF_* */
             int32_t  kind;              /* +0x94 */
             int32_t  damage;            /* +0x98 */
@@ -2233,7 +2233,7 @@ AM2_Object *__cdecl LoadType6(am2_FILE *fp, const AM2_Object *hdr)
                0, 1, (int32_t)h->uid, 0);
 
     memcpy(made, h, (size_t)g_itemHeaderSize);
-    CopyTypeRecord(&made->field94, &obj.rec, AM2_TYPE6_RECORD_SIZE);
+    CopyTypeRecord(&made->saveRec, &obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
 
@@ -3101,7 +3101,7 @@ AM2_Object *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     /* The whole object on the stack, the record read in at +0x94, as the
      * other loaders have it. */
     struct {
-        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t head[OBJ_OFF_BY_TYPE_94];
         uint8_t rec[AM2_TYPE1_RECORD_SIZE];
     } obj;
     uint32_t  spriteKey;
@@ -3139,10 +3139,10 @@ AM2_Object *__cdecl LoadType4(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
                 h->uid);
     }
 
-    ownRec = w->field94;
+    ownRec = w->saveRec;
     memcpy(w, h, (size_t)g_itemHeaderSize);
-    memcpy(&w->field94, obj.rec, AM2_TYPE1_RECORD_SIZE);
-    w->field94 = ownRec;
+    memcpy(&w->saveRec, obj.rec, AM2_TYPE1_RECORD_SIZE);
+    w->saveRec = ownRec;
 
     w->followUid = cooldown;
     w->pickupAfter = 0;

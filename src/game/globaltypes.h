@@ -133,15 +133,15 @@ typedef struct AM2_ScenRow {
     uint8_t  _pad08[8];             /* +0x08 */
     uint8_t  amount;                /* +0x10 SCEN_ROW_OFF_AMOUNT */
     uint8_t  flag;                  /* +0x11 SCEN_ROW_OFF_FLAG, set when the wire byte was ZERO */
-    uint8_t  field12;               /* +0x12 SCEN_ROW_OFF_FIELD_12, forced to 1 if zero */
+    uint8_t  unused12;               /* +0x12 SCEN_ROW_OFF_UNUSED_12, forced to 1 if zero */
     char     name[0x51];            /* +0x13 SCEN_ROW_OFF_NAME, unbounded on the wire */
     AM2_Point at;                   /* +0x64 SCEN_ROW_OFF_AT */
-    uint8_t  field68;               /* +0x68 SCEN_ROW_OFF_FIELD_68 */
+    uint8_t  unused68;               /* +0x68 SCEN_ROW_OFF_UNUSED_68 */
     uint8_t  _pad69[3];
 } AM2_ScenRow;
 
 typedef struct AM2_ScenPart {
-    int32_t      field0;            /* +0x00 cleared, never filled */
+    int32_t      unused0;            /* +0x00 cleared, never filled */
     int16_t      count;             /* +0x04 SCENARIO_PART_OFF_COUNT */
     uint16_t     _pad06;
     AM2_ScenRow *rows;              /* +0x08 SCENARIO_PART_OFF_ROWS */
@@ -177,7 +177,7 @@ typedef struct AM2_FontRec {
     uint32_t  size;                     /* +0x000 ADDR_GLYPH_SIZE */
     uint16_t  offsets[256];             /* +0x004 ADDR_GLYPH_OFFSETS */
     uint8_t  *base;                     /* +0x204 ADDR_FONT_BASES */
-    uint32_t  field208;                 /* +0x208 */
+    uint32_t  unused208;                 /* +0x208 */
 } AM2_FontRec;
 
 #endif /* AM2_GLOBALTYPES_H */

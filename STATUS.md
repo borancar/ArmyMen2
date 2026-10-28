@@ -4231,7 +4231,7 @@ directional sight-cache band the port wrote was 16 units (one tile) short, and a
 green trooper's `AiCanSee` therefore read out-of-sight where the original read
 in-sight -- the pump-2464 green-trooper divergence (repro the combat run's
 recorded input.txt, `/tmp/sbs/input.txt`; trap was frame 2158 on 0x3ee, a type-2
-army-0 aimode-1 trooper whose AiGuardStep set OBJ_OFF_FIELD_C0 on the port and 0
+army-0 aimode-1 trooper whose AiGuardStep set OBJ_OFF_BY_TYPE_C0 on the port and 0
 on the original). The original `AddSightBlocker` (0x004036F0) computes the
 silhouette distance `dist = max(ApproxDistXY(near), ApproxDistXY(far))` and then
 does `add esi,0x10` ONCE (at 0x004038AD), so both the sight-range check AND the
@@ -4329,7 +4329,7 @@ its formation slot (trap pump 11373, frame 11243; repro
 them to a point). Everything was byte-identical through pump 11350; on the
 order pump the follower 0x3f4 was attached to leader 0x3f6 (FOLLOW_UID and
 aimode 3 set correctly on both), but the original wrote its destination
-OBJ_OFF_FIELD_C0 to a FORMATION point (1227,2707), 128 west of the leader,
+OBJ_OFF_BY_TYPE_C0 to a FORMATION point (1227,2707), 128 west of the leader,
 while the port left C0 at the leader's raw position -- so the port read as
 arrived (out state 1) where the original kept routing to the slot (out state
 4). AiBuildContext (0x00407D70), the vehicle AI context builder, had been

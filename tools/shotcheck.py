@@ -61,7 +61,7 @@ OBJ_OFF_ARMY = 0x10
 OBJ_OFF_TILE = 0x1A
 OBJ_OFF_SPEED = 0x44
 OBJ_OFF_QUERY_NEXT = 0x68
-OBJ_OFF_FIELD_94 = 0x94
+OBJ_OFF_BY_TYPE_94 = 0x94
 OBJ_OFF_RANK = 0x98
 TYPEREC_OFF_CODE = 0x00
 TYPEREC_OFF_FIELD_08 = 0x08
@@ -156,7 +156,7 @@ class Harness:
         uc.mem_write(SHOT_REC + TYPEREC_OFF_CODE, struct.pack("<i", c["code"]))
         uc.mem_write(SHOT_REC + TYPEREC_OFF_FIELD_08,
                      struct.pack("<i", c["rec8"]))
-        uc.mem_write(SHOT + OBJ_OFF_FIELD_94, struct.pack("<I", SHOT_REC))
+        uc.mem_write(SHOT + OBJ_OFF_BY_TYPE_94, struct.pack("<I", SHOT_REC))
         uc.mem_write(SHOT + OBJ_OFF_RANK, struct.pack("<I", SHOOTER_UID))
         uc.mem_write(SHOT + OBJ_OFF_ARMY, struct.pack("<b", SHOT_ARMY))
         uc.mem_write(SHOT + OBJ_OFF_TILE, struct.pack("<H", TILE))
@@ -168,7 +168,7 @@ class Harness:
             uc.mem_write(base, b"\0" * 0x120)
             uc.mem_write(rec, b"\0" * 0x40)
             uc.mem_write(base + OBJ_OFF_UID, struct.pack("<I", o["uid"]))
-            uc.mem_write(base + OBJ_OFF_FIELD_94, struct.pack("<I", rec))
+            uc.mem_write(base + OBJ_OFF_BY_TYPE_94, struct.pack("<I", rec))
             uc.mem_write(rec + TYPEREC_OFF_PERM,
                          struct.pack("<B", o["rec3c"]))
             nxt = obj_at(i + 1) if i + 1 < len(c["objs"]) else 0

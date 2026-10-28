@@ -202,7 +202,7 @@ typedef struct AM2_Seq {
     int32_t     life;            /* +0x14 SEQ_OFF_LIFE, signed: kind 0 tests < -4 */
     int32_t     height;          /* +0x18 a particle's floor offset, SpawnParticle's */
     AM2_MapRow *row;             /* +0x1C SEQ_OFF_ROW, the row it draws through */
-    int32_t     field20;         /* +0x20 */
+    int32_t     unused20;         /* +0x20 */
     uint32_t    owner;           /* +0x24 SEQ_OFF_OWNER: an army or a uid */
     int16_t     id;              /* +0x28 SEQ_OFF_ID */
     int16_t     prev;            /* +0x2A SEQ_OFF_PREV, -1 terminating */

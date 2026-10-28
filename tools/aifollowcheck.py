@@ -13,7 +13,7 @@ WHAT MAKES IT DIFFERENT FROM ITS SIBLINGS, and worth its own corpus:
   - the route arm is reached TWO ways: the lead range exceeding
     AM2_AI_FOLLOW_SLACK, or the leader having MOVED since last frame, which
     is a call to PointsDiffer on two packed points inside the leader
-  - the route arm's copy into OBJ_OFF_FIELD_C0 comes from the CONTEXT
+  - the route arm's copy into OBJ_OFF_BY_TYPE_C0 comes from the CONTEXT
     (SIGHT_OFF_DEST) rather than from the object's own script state, which
     every sibling uses
 
@@ -56,7 +56,7 @@ SIGHT_OFF_FOUND_RANGE = 0x20
 SIGHT_OFF_FOUND_BEARING = 0x24
 
 OBJ_OFF_SCRIPT_STATE = 0xB4
-OBJ_OFF_FIELD_C0 = 0xC0
+OBJ_OFF_BY_TYPE_C0 = 0xC0
 OBJ_OFF_TARGET_UID = 0xCC
 OBJ_OFF_DEADLINE_D0 = 0xD0
 OBJ_OFF_HIT_DIR = 0x104
@@ -126,7 +126,7 @@ class Harness:
         self.differ = differ
 
         uc.mem_write(OBJ + OBJ_OFF_SCRIPT_STATE, struct.pack("<I", 0x55667788))
-        uc.mem_write(OBJ + OBJ_OFF_FIELD_C0, struct.pack("<I", 0xDEADBEEF))
+        uc.mem_write(OBJ + OBJ_OFF_BY_TYPE_C0, struct.pack("<I", 0xDEADBEEF))
         uc.mem_write(OBJ + OBJ_OFF_TARGET_UID, struct.pack("<I", 0xCAFEBABE))
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_D0, struct.pack("<I", deadline))
         uc.mem_write(OBJ + OBJ_OFF_HIT_DIR, bytes([hit]))
@@ -150,7 +150,7 @@ class Harness:
         rd = lambda a: struct.unpack("<I", bytes(uc.mem_read(a, 4)))[0]
         return (bytes(uc.mem_read(OUT + 1, 1))[0],
                 rd(OBJ + OBJ_OFF_SCRIPT_STATE),
-                rd(OBJ + OBJ_OFF_FIELD_C0),
+                rd(OBJ + OBJ_OFF_BY_TYPE_C0),
                 rd(OBJ + OBJ_OFF_TARGET_UID),
                 bytes(uc.mem_read(OBJ + OBJ_OFF_HIT_DIR, 1))[0],
                 rd(CTX + SIGHT_OFF_OBSERVER),

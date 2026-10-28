@@ -465,7 +465,7 @@ void __cdecl ObjClearRoachFootprint(struct AM2_Object *obj);
 int32_t __cdecl RoachMaskWeight(struct AM2_Object *from, int32_t dir, uint32_t at,
                                 int32_t unused);
 
-/* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_FIELD_94
+/* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_BY_TYPE_94
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
 int32_t __cdecl ObjIsWatchedKind(const struct AM2_Object *obj);
 

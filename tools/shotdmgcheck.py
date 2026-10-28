@@ -57,7 +57,7 @@ SHOOTER_REACT = 0x00457DA0
 
 OBJ_OFF_UID = 0x04
 OBJ_OFF_FACING = 0x40
-OBJ_OFF_FIELD_94 = 0x94
+OBJ_OFF_BY_TYPE_94 = 0x94
 OBJ_OFF_RANK = 0x98
 OBJ_OFF_TARGET_UID = 0xCC
 TYPEREC_OFF_CODE = 0x00
@@ -163,7 +163,7 @@ class Harness:
         uc.mem_write(SHOT_REC + TYPEREC_OFF_CODE, struct.pack("<i", c["code"]))
         uc.mem_write(SHOT_REC + TYPEREC_OFF_DAMAGE,
                      struct.pack("<i", c["damage"]))
-        uc.mem_write(SHOT + OBJ_OFF_FIELD_94, struct.pack("<I", SHOT_REC))
+        uc.mem_write(SHOT + OBJ_OFF_BY_TYPE_94, struct.pack("<I", SHOT_REC))
         uc.mem_write(SHOT + OBJ_OFF_RANK, struct.pack("<I", SHOOTER_UID))
         uc.mem_write(SHOT + OBJ_OFF_FACING, struct.pack("<B", c["facing"]))
         uc.mem_write(TARGET + OBJ_OFF_UID, struct.pack("<I", TARGET_UID))

@@ -140,7 +140,7 @@ void __cdecl AiKeepRange(struct AM2_Object *o, struct AM2_SightOut *out, struct 
 void __cdecl AiWalkStep(struct AM2_Object *o, struct AM2_SightOut *out, struct AM2_SightCtx *c);
 
 /* 0x00407190, NINE callers -- the step every AI arm but one shares. Turn the
- * destination at OBJ_OFF_FIELD_C0 into a heading in `out`, routing through the
+ * destination at OBJ_OFF_BY_TYPE_C0 into a heading in `out`, routing through the
  * region graph when it is not in the region the object stands in. The third
  * argument is never read; the fourth suppresses the second copy of the
  * bearing. */
@@ -208,7 +208,7 @@ void __cdecl RoachAliveStepA(struct AM2_Object *o, struct AM2_RoachOut *out);
  * SIGHTCOUT_OFF_ names are relative to the base the caller passes. */
 /* 0x0044AD40, one caller -- StepType2's player arm. What the trooper you are
  * commanding does each frame: board a claimed vehicle if it is close enough,
- * otherwise walk toward OBJ_OFF_FIELD_C0, pick the pose the held weapon
+ * otherwise walk toward OBJ_OFF_BY_TYPE_C0, pick the pose the held weapon
  * wants, and drag every other selected unit along. */
 /* 0x0044A420. The input half of the player trooper's frame: keys and mouse
  * into the same record Type2PlayerStep then acts on. */
@@ -323,7 +323,7 @@ int32_t __cdecl ObjHitMaskAction(struct AM2_Object *obj, struct AM2_TileMask *ou
  * heuristic, same open-list defect. Answers 1 with the route written into
  * `out` and its length in `*n`, or 0. The fifth argument is never read. */
 /* 0x004049C0, twenty-six call sites: the step the trooper AI shares. Walk the
- * object toward OBJ_OFF_FIELD_C0, hopping through the region matrices when the
+ * object toward OBJ_OFF_BY_TYPE_C0, hopping through the region matrices when the
  * goal is elsewhere, and write a facing and a state into `out`. AiRouteToward's
  * longer sibling -- read the two together. */
 /* 0x00407710, two callers: AI mode 0 directly and mode 6 through the `attack`

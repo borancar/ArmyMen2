@@ -115,7 +115,7 @@ typedef struct AM2_RowSet {
 
 /* AM2_FireSpot is in point.h, beside AM2_Point. */
 
-/* An item's type record, what OBJ_OFF_FIELD_C0 points at on a weapon. */
+/* An item's type record, what OBJ_OFF_BY_TYPE_C0 points at on a weapon. */
 typedef struct AM2_ItemType {
     int32_t  kind;                  /* +0x00 ITEMTYPE_OFF_KIND, the def's id */
     uint32_t cooldown;              /* +0x04 ITEMTYPE_OFF_COOLDOWN, milliseconds */
@@ -281,7 +281,7 @@ typedef struct AM2_MissileDefRec {
 /* The sight record (SIGHTCOUT_OFF_*): what a trooper's sight scan saw and
  * where to fire. A trooper carries one at OBJ_OFF_SIGHT_OUT_T2. */
 typedef struct AM2_SightOut {
-    int32_t      field00;           /* +0x00 cleared when a shot is decided here */
+    int32_t      fromNet;           /* +0x00 cleared when a shot is decided here */
     uint8_t      bearing;           /* +0x04 SIGHTCOUT_OFF_BEARING */
     uint8_t      _pad05[3];
     int32_t      state;             /* +0x08 SIGHTCOUT_OFF_STATE */
@@ -450,8 +450,8 @@ typedef struct AM2_Object {
     uint8_t        cellCount;       /* +0x8C OBJ_OFF_CELL_COUNT */
     uint8_t        _pad8d[3];
     struct AM2_CellEntry *cellEntries; /* +0x90 OBJ_OFF_CELL_ENTRIES, cellCount of them */
-    union {                         /* +0x94 OBJ_OFF_FIELD_94, by object type: */
-        const uint8_t *field94;     /*   where the per-type save record starts */
+    union {                         /* +0x94 OBJ_OFF_BY_TYPE_94, by object type: */
+        const uint8_t *saveRec;     /*   where the per-type save record starts */
         const AM2_AaiRec *aai;      /*   an item's AAI record */
         const AM2_ItemType *def;    /*   a shot's or a missile's def, its
                                      *   weapon's typeRec */
@@ -485,7 +485,7 @@ typedef struct AM2_Object {
             union {                         /* +0xB0, by object type: */
                 int32_t    scriptId;        /*   OBJ_OFF_SCRIPT_ID, 1-based; 0 = none */
                 uint8_t    power;           /*   a shot's power byte */
-                struct { int16_t fieldB0, fieldB2; };  /* types 2, 3, 8: two halves */
+                struct { int16_t savedX, savedY; };  /* types 2, 3, 8: two halves */
                 AM2_Point  savedPoint;      /*   a trooper's: scriptPoint saved by the patrol */
             };
             union {                         /* +0xB4, by object type: */
@@ -511,9 +511,9 @@ typedef struct AM2_Object {
         };
     };
     union {                         /* +0xC0, by object type: */
-        const AM2_ItemType *typeRec; /*  OBJ_OFF_FIELD_C0, a weapon's or an item's
+        const AM2_ItemType *typeRec; /*  OBJ_OFF_BY_TYPE_C0, a weapon's or an item's
                                      *   record in ADDR_MISSILE_DEFS */
-        struct { int16_t fieldC0, fieldC2; };  /* types 2, 3, 8: two halves */
+        struct { int16_t destX, destY; };  /* types 2, 3, 8: two halves */
         AM2_Point  dest;            /*   a trooper's: where it was told to go */
     };
     union {                         /* +0xC4, by object type: */
@@ -671,7 +671,7 @@ static_assert(offsetof(AM2_Object, moveCount)     == 0x522, "move count");
 static_assert(offsetof(AM2_Object, maxHealth)     == 0x60,  "maxHealth");
 static_assert(offsetof(AM2_Object, health)        == 0x62,  "health");
 static_assert(offsetof(AM2_Object, heightAdj)     == 0x64,  "heightAdj");
-static_assert(offsetof(AM2_Object, field94)       == 0x94,  "field94");
+static_assert(offsetof(AM2_Object, saveRec)       == 0x94,  "saveRec");
 static_assert(offsetof(AM2_Object, blastRect)     == 0x9C,  "blastRect");
 static_assert(offsetof(AM2_Object, blastSource)   == 0xB8,  "blastSource");
 static_assert(offsetof(AM2_Object, typeRec)       == 0xC0,  "typeRec after blast");

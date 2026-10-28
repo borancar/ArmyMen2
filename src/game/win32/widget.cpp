@@ -2581,7 +2581,7 @@ static inline void GameMenuGoto(int32_t mode)
  * are in tension; this records which was chosen. */
 static inline void RecordAimedFire(AM2_Object *u, AM2_Object *target, int32_t withMode)
 {
-    u->sight.field00 = 1;
+    u->sight.fromNet = 1;
     u->sight.bearing    = u->facing;
     u->sight.hit   = 1;
     u->sight.seen   = 1;
@@ -3826,7 +3826,7 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
 /* The weapon's icon, a SWITCH in the original (two copies of the byte index
  * and jump table follow the function, at 0x004162AC/0x00416290 and
  * 0x0041630C/0x004162F0). The kind is the first dword of the item's
- * OBJ_OFF_FIELD_C0 record, the same reach HudSargeUpdate uses for its
+ * OBJ_OFF_BY_TYPE_C0 record, the same reach HudSargeUpdate uses for its
  * tooltip. Only kinds 2, 3, 4, 5 and 43 get an icon of their own; kind 1 is
  * a case of its own that answers what the default does. */
 static inline int32_t HudSquadWeaponIcon(const AM2_Object *weapon)
@@ -6108,7 +6108,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         if (obj->flags & OBJ_FLAG_DESTROYED)
             goto next;
 
-        if (ObjIsTypeIn238(obj) && obj->field94)
+        if (ObjIsTypeIn238(obj) && obj->saveRec)
             goto next;
 
         if (ObjType2Field548(obj)) {
@@ -6181,7 +6181,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                     }
                     if (SQUAD_HP(rider) == 0)
                         continue;
-                    if (ObjIsTypeIn238(rider) && rider->field94)
+                    if (ObjIsTypeIn238(rider) && rider->saveRec)
                         continue;
 
                     if (ObjType2Field548(rider)) {
@@ -6998,7 +6998,7 @@ AM2_HudTop::AM2_HudTop()
     typedY  = 3;
     typedX  = buttonX + 0x19;
     viewW   = 0x258 - buttonX;
-    field5B4 = 0x0A;
+    unused5B4 = 0x0A;
     typing    = 0;
     justSent = 0;
     buttonSprite = 0;
@@ -13950,7 +13950,7 @@ AM2_Widget::AM2_Widget()
     /* 0x0040 is deliberately not written -- the original leaves it, and
      * whatever it is arrives from the allocator. */
     w->flag44      = 0;
-    w->unknown48   = 0;
+    w->transparent   = 0;
     w->disabled   = 0;
     w->flag50      = 1;
     w->activate    = 0;
@@ -14217,7 +14217,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetRepaint()
      * the original puts it. */
     w->flag44 = 0;
 
-    if (w->unknown48) {
+    if (w->transparent) {
         AM2_Widget *up;
 
         /* The nearest ancestor with a sprite -- something with a backdrop
@@ -14293,7 +14293,7 @@ AM2_Button::AM2_Button(const char *b0, const char *b1, const char *b2, int32_t f
             PreloadSpriteName(b0, flag, 1);
     } else {
         self->spriteNormal = (AM2_Sprite *)0;
-        w->unknown48 = 1;
+        w->transparent = 1;
     }
     self->spriteFocus =
         PreloadSpriteName(b1, flag, 1);
@@ -15463,9 +15463,9 @@ AM2_ArrowBar::AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, con
 
     self->span = span;
     self->list = 0;
-    w->unknown48              = 0;
+    w->transparent              = 0;
     self->shift = 0;
-    self->field6C = 0;
+    self->unused6C = 0;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowDelete(int32_t flags)
@@ -15747,12 +15747,12 @@ AM2_ScrollBar::AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span)
     ::WidgetScreenRect(w);
 
     self->span  = span;
-    self->field58                = 0;
-    w->unknown48                             = 0;
+    self->unused58                = 0;
+    w->transparent                             = 0;
     self->pos   = 0;
     self->range = AM2_SCROLLBAR_RANGE;
     self->shift = 0;
-    self->field68                = 0;
+    self->unused68                = 0;
     self->onChange = 0;
 }
 
@@ -16426,7 +16426,7 @@ void __cdecl PointerActionFollow(AM2_Object *obj, AM2_Point at)
         if ((int32_t)o->type > AM2_OBJ_TYPE_VEHICLE
             && o->type != AM2_OBJ_TYPE_ROACH)
             goto next;
-        if (o->field94)
+        if (o->saveRec)
             goto next;
         /* An empty vehicle has nobody to give the order to. */
         if (ObjIsType3Inline(o) && o->riders.count == 0)
@@ -17139,7 +17139,7 @@ int32_t __cdecl PointerPickMode4(AM2_Object *o)
             return 1;
         }
         if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-            if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+            if (ObjIsType3Inline(o) && (keep = o, !o->saveRec) && o->riders.count < o->seats) {
                 int32_t i;
                 int32_t none = 1;
 
@@ -17166,7 +17166,7 @@ int32_t __cdecl PointerPickMode4(AM2_Object *o)
             if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
                 && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
                     || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-                && !o->field94)
+                && !o->saveRec)
                 return 1;
         }
     }
@@ -17189,7 +17189,7 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
             return 1;
         }
         if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-            if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+            if (ObjIsType3Inline(o) && (keep = o, !o->saveRec) && o->riders.count < o->seats) {
                 int32_t i;
                 int32_t none = 1;
 
@@ -17216,7 +17216,7 @@ int32_t __cdecl PointerPickMode5(AM2_Object *o)
             if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
                 && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
                     || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-                && !o->field94)
+                && !o->saveRec)
                 return 1;
         }
     }
@@ -17268,7 +17268,7 @@ int32_t __cdecl PointerPickMode6(AM2_Object *o)
     if (!(o->flags & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
         && o->health != 0
         && o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+        if (ObjIsType3Inline(o) && (keep = o, !o->saveRec) && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
 
@@ -17295,7 +17295,7 @@ int32_t __cdecl PointerPickMode6(AM2_Object *o)
         if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
             && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
                 || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-            && !o->field94)
+            && !o->saveRec)
             return 1;
     }
     return 0;
@@ -17448,7 +17448,7 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
 #undef AIM_HINT
     }
     if (o->owner == *(const int32_t *)&g_defaultOwner && o) {
-        if (ObjIsType3Inline(o) && (keep = o, !o->field94) && o->riders.count < o->seats) {
+        if (ObjIsType3Inline(o) && (keep = o, !o->saveRec) && o->riders.count < o->seats) {
             int32_t i;
             int32_t none = 1;
 
@@ -17475,7 +17475,7 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
         if ((int32_t)o->type >= AM2_OBJ_TYPE_TROOPER
             && ((int32_t)o->type <= AM2_OBJ_TYPE_VEHICLE
                 || (int32_t)o->type == AM2_OBJ_TYPE_ROACH)
-            && !o->field94)
+            && !o->saveRec)
             return 1;
     }
     return 0;
@@ -17679,7 +17679,7 @@ int32_t __cdecl PointerPickEnemyTrooper(AM2_Object *o)
  * OBJ_OFF_ARMY is not ours, find our leader, then two arms.
  *
  * A VEHICLE WITH A FREE SEAT SHOWS A HINT AND STILL ANSWERS 0. Type 3,
- * OBJ_OFF_FIELD_94 clear, and OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS -- which
+ * OBJ_OFF_BY_TYPE_94 clear, and OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS -- which
  * is the same pair EnterVehicle refuses on, seats used against seats, and is
  * what settles that reading rather than one comparison settling it. It calls
  * OverlayPrepare and stores the uid, and then returns 0 like every refusal. So
@@ -17715,7 +17715,7 @@ int32_t __cdecl PointerPickBoard(AM2_Object *o)
         return 0;
 
     if (ObjIsType3Inline(o)
-        && !o->field94
+        && !o->saveRec
         && o->riders.count < o->seats) {
         if (!g_mouseButton
             || GetTickCount()

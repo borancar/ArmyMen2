@@ -700,7 +700,7 @@
 /* Every bar is a percentage of ninety, which is the drawn width: the original
  * computes it as `value * 90 / max` with one `idiv` and no float. */
 #define AM2_HUD_BAR_WIDTH      90
-/* OBJ_OFF_FIELD_C0's record, two fields of it. The first dword is the one that
+/* OBJ_OFF_BY_TYPE_C0's record, two fields of it. The first dword is the one that
  * block already describes as indexing ADDR_WEAPON_HANDLERS; it is also what
  * picks the caption here, which is what names 41 of its values. */
 #define ITEMTYPE_OFF_KIND      0x00u
@@ -1255,7 +1255,7 @@
  * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
  * through the dead-fallback helper described above, and then two arms.
  *
- * A VEHICLE WITH A FREE SEAT -- type 3, OBJ_OFF_FIELD_94 clear, and
+ * A VEHICLE WITH A FREE SEAT -- type 3, OBJ_OFF_BY_TYPE_94 clear, and
  * OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS, which is the same pair EnterVehicle
  * refuses on and is what settles the reading: seats used against seats. It
  * shows overlay row 8 and stores the object's uid, and then ANSWERS 0 -- so the
@@ -1858,10 +1858,10 @@
 #define SCEN_ROW_OFF_POS         0x04u  /* int16_t x, int16_t y */
 #define SCEN_ROW_OFF_AMOUNT      0x10u
 #define SCEN_ROW_OFF_FLAG        0x11u  /* set when the wire byte was ZERO */
-#define SCEN_ROW_OFF_FIELD_12    0x12u  /* wire byte, forced to 1 if zero */
+#define SCEN_ROW_OFF_UNUSED_12    0x12u  /* wire byte, forced to 1 if zero */
 #define SCEN_ROW_OFF_NAME        0x13u  /* to +0x64, so 0x51 bytes, unbounded */
 #define SCEN_ROW_OFF_AT          0x64u  /* packed point, seeded to the origin */
-#define SCEN_ROW_OFF_FIELD_68    0x68u
+#define SCEN_ROW_OFF_UNUSED_68    0x68u
 /* 0x0043DD30, one caller. Free the four row arrays each scenario owns, then
  * the table, then clear both globals. */
 #define ADDR_FREE_SCENARIOS      0x0043DD30u  /* void(void) */
@@ -4541,7 +4541,7 @@
 #define AM2_AI_LEAD_NEAR         8
 #define AM2_AI_LEAD_CLOSE        0xC
 #define AM2_AI_LEAD_SPREAD       0x20
-#define SIGHTC_OFF_DEST_DIST     0x34u  /* to OBJ_OFF_FIELD_C0, as +0x28 is
+#define SIGHTC_OFF_DEST_DIST     0x34u  /* to OBJ_OFF_BY_TYPE_C0, as +0x28 is
                                          * in the vehicle record */
 #define SIGHTC_OFF_WANT_RANGE    0x4Cu
 /* Left named by offset, and here is the evidence that has accumulated. It
@@ -4586,7 +4586,7 @@
  * which were siblings of something already reconstructed and both of whose
  * comments held the answer to what looked odd in the new function.
  *
- * ITS OFFSETS ARE OVERLOADED BY TYPE and 0xC0 is the example. OBJ_OFF_FIELD_C0
+ * ITS OFFSETS ARE OVERLOADED BY TYPE and 0xC0 is the example. OBJ_OFF_BY_TYPE_C0
  * is documented as a POINTER to an item type record, read that way by
  * SelectInventorySlot and cleared by a destroy handler -- and here, on a
  * trooper, the same offset is a packed POINT handed to ApproxDist and
@@ -4680,7 +4680,7 @@
  * SettlePointInRegion's does.
  *
  * WALK, THEN ATTACH. While SIGHTC_OFF_DEST_DIST is over AM2_AI_REACHED_DIST it
- * copies the destination into OBJ_OFF_FIELD_C0 and hands off to
+ * copies the destination into OBJ_OFF_BY_TYPE_C0 and hands off to
  * ADDR_AI_TROOPER_STEP, which is AiStepIgnore's shape exactly. On arrival it
  * clears the destination, picks an object out of an army's list, and if that
  * object is within 0x400 calls ADDR_OBJ_ATTACH_TO.
@@ -7925,7 +7925,7 @@ typedef struct {
 /* 0x00449660, sixteen callers. It was ADDR_UNIT_ACTION, "void(obj, action) --
  * 44 arms", and that was wrong about the argument and about the arms.
  *
- * The argument is a WEAPON CODE -- the dword an item's OBJ_OFF_FIELD_C0 record
+ * The argument is a WEAPON CODE -- the dword an item's OBJ_OFF_BY_TYPE_C0 record
  * points at, the same value HeldWeaponCode returns and the same one
  * SelectInventorySlot already indexes ADDR_WEAPON_HANDLERS with. Every caller
  * computes it the same way: put a weapon in the unit's hand, read the code,
@@ -8136,7 +8136,7 @@ typedef struct {
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */
-#define OBJ_OFF_FIELD_94         0x94u
+#define OBJ_OFF_BY_TYPE_94         0x94u
 /* Three more UpdateTrooperAction reads: how many enforced turns have been
  * charged, the running total of how far they turned it, and when the medic
  * tent last healed. All named structurally -- one consumer each. */
@@ -8147,7 +8147,7 @@ typedef struct {
  *
  * WHAT IT CLEARS WAS ALREADY NAMED, and the offset ratchet is what said so:
  * six of the eleven fields had meaningful names already -- the four script
- * fields, OBJ_OFF_FIELD_C0's weapon record, OBJ_OFF_FOLLOW_UID, and the
+ * fields, OBJ_OFF_BY_TYPE_C0's weapon record, OBJ_OFF_FOLLOW_UID, and the
  * OBJ_OFF_HIT_DIR / OBJ_OFF_HIT_TIME pair. Naming them a second time by
  * offset would have made a coherent function look like eleven unknowns.
  * Only four needed new names, and they are named by offset because nothing
@@ -8175,7 +8175,7 @@ typedef struct {
  *
  * Two readers say what it is. AiRouteToward writes the destination here in the
  * same breath as OBJ_OFF_MOVE_TO, and AiTrooperStep compares it against the
- * goal at OBJ_OFF_FIELD_C0 with PointsEqual to decide whether the route it has
+ * goal at OBJ_OFF_BY_TYPE_C0 with PointsEqual to decide whether the route it has
  * is still the route it wants. So it is a packed point, and the memset that
  * named it merely happens to begin here.
  *
@@ -8497,7 +8497,7 @@ typedef struct {
  * writer, not a snapshot, and calling it twice would award the score twice.
  *
  * THE TYPE FILTER IS THREE TESTS DEEP AND ONLY THE LAST ONE BITES. It admits
- * types 2, 3 and 8, then requires OBJ_OFF_FIELD_94 to be zero, then requires
+ * types 2, 3 and 8, then requires OBJ_OFF_BY_TYPE_94 to be zero, then requires
  * the type to be exactly 2 -- so vehicles and roaches are excluded twice over.
  * Reproduced as written rather than folded, because the wider test is what
  * the original asks and a fold would hide that it once meant more.
@@ -9264,7 +9264,7 @@ typedef struct {
  * the rank, an int32 in 0..7. For an ITEM -- types 1 and 4 -- HeightAtPoint
  * reads its low byte and uses only the SIGN, as "this thing raises the ground
  * you stand on"; a rank could never make that byte negative. One name, both
- * readings, which is what OBJ_OFF_FIELD_94 already does rather than putting a
+ * readings, which is what OBJ_OFF_BY_TYPE_94 already does rather than putting a
  * second name on the offset. */
 /* A THIRD MEANING, and the field is left with the first name. On a type-5
  * SHOT this holds the SHOOTER's uid: ShotStrike compares it against each
@@ -9916,7 +9916,7 @@ typedef struct {
  * new at a place. What either is FOR is not established.
  *
  * 0x00516164 holds the literal 0xE80609, written once, and the stepper
- * compares it against the +8 field of the record at OBJ_OFF_FIELD_94 -- so it
+ * compares it against the +8 field of the record at OBJ_OFF_BY_TYPE_94 -- so it
  * is a type id being matched, not a count. 0x006622BC is read at exactly one
  * site, this one, and passed straight through as an argument. */
 #define ADDR_OBJ_MOVE_ALONG_FACING 0x00429040u /* void(obj, int32, int32, int32) */
@@ -10299,7 +10299,7 @@ typedef struct {
  * an import. Worth checking before filing a module: an indirect call is not
  * evidence of a callback and an import is not evidence of boundary work. */
 /* READ NOW, and renamed off its body rather than off the gate that reaches
- * it. It walks the player's trooper toward the point at OBJ_OFF_FIELD_C0,
+ * it. It walks the player's trooper toward the point at OBJ_OFF_BY_TYPE_C0,
  * boards a vehicle when one is claimed and close enough, picks the pose the
  * held weapon wants, and then drags the REST OF THE SELECTION along -- which
  * is the part the old offset-name could not hint at. Reconstructed. */
@@ -11576,7 +11576,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * them with an OR and takes the same arm either way.  WHICH two is not
  * established and cannot be read off the image -- the CONTROLS captions come
  * out of a data file, not a table in .rdata, so there is nothing to index.
- * Numbered rather than named, the way OBJ_OFF_FIELD_C0 is. */
+ * Numbered rather than named, the way OBJ_OFF_BY_TYPE_C0 is. */
 #define AM2_ACTION_0A            0x0A
 #define AM2_ACTION_06            0x06
 /* The vehicle's driving bindings, numbered rather than named for the reason
@@ -11721,7 +11721,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Two seconds, written to OBJ_OFF_REVEALED_UNTIL by whatever looked. */
 #define AM2_SIGHT_REVEAL_MS      0x7D0
 #define ADDR_SIGHT_SCAN           0x00403B40u  /* int32(obj, a, b, c, d, e) */
-/* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
+/* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_BY_TYPE_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
  * SaveType2 writes as its tag and ThingCode switches on. Reconstructed. Both
  * callers compare it against 20 and neither is read yet. Runs 12,293 times in
@@ -11870,7 +11870,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_WEAPON_RANGE_NONE     0x1000
 /* The weapon HANDLER table and the four globals SelectInventorySlot installs
  * out of it. Each record is 16 bytes and the index is the first dword of the
- * weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
+ * weapon's OBJ_OFF_BY_TYPE_C0, so that field is a pointer to a type record
  * rather than the scalar its structural name suggests.
  *
  * ONLY THE FIRST TWO FIELDS ARE FUNCTION POINTERS, and this said all four were
@@ -11915,7 +11915,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_PICKUP_AFTER     0xC8u
 /* 0x004337C0, one caller. Whether an item can be picked up: it must be a
  * weapon, its OBJ_OFF_PICKUP_AFTER must have passed, and the code its
- * OBJ_OFF_FIELD_C0 record holds must be 0x1F, 0x20 or 0x21. Reconstructed. */
+ * OBJ_OFF_BY_TYPE_C0 record holds must be 0x1F, 0x20 or 0x21. Reconstructed. */
 #define ADDR_CAN_PICK_UP         0x004337C0u  /* int32_t(void *obj, void *by) */
 /* 0x00402F00, one caller. A random value that AVERAGES its first argument:
  * `100 - spread` draws of `rand() % (centre * 2)`, divided by that count. A
@@ -13915,7 +13915,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * are 0x20C higher and are used as `comm + slot * 112 + OFFSET`. */
 #define COMM_SLOT_OFF_READY_TO_LOAD 0x064u
 #define COMM_SLOT_OFF_READY         0x068u
-#define COMM_SLOT_OFF_FIELD_5C      0x05Cu
+#define COMM_SLOT_OFF_UNUSED_5C      0x05Cu
 /* "Remove Player numPlayers now = %d \n" */
 #define ADDR_STR_REMOVE_PLAYER   0x00475860u
 #define COMM_STAT_RING           30u
@@ -15885,7 +15885,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * would be wrong in a way no compare against zero would show. */
 #define ADDR_AT_FLAG_BASE        0x004064E0u  /* int32(who, owner, army, name) */
 /* 0x00406550, two callers. Turn a thing's own code -- the dword its
- * OBJ_OFF_FIELD_C0 pointer points at -- into one of about a dozen result
+ * OBJ_OFF_BY_TYPE_C0 pointer points at -- into one of about a dozen result
  * codes, through a 39-entry index table at 0x00406688 and a 17-arm jump table
  * at 0x00406644.
  *
@@ -15977,12 +15977,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and loader in the family below reads it, which is what makes the two sides
  * agree by construction rather than by both spelling the same literal.
  *
- * The type-specific record starts at OBJ_OFF_FIELD_94, so 0x68..0x93 is saved
+ * The type-specific record starts at OBJ_OFF_BY_TYPE_94, so 0x68..0x93 is saved
  * by neither half. Stated rather than smoothed over; what lives there is not
  * established. */
 #define ADDR_ITEM_HEADER_SIZE 0x0051307Cu  /* int32_t, 0x68 */
 #define ADDR_SET_ITEM_HEADER_SIZE 0x00427640u /* void(void) */
-/* The per-type records, all at OBJ_OFF_FIELD_94 and each saved whole. The
+/* The per-type records, all at OBJ_OFF_BY_TYPE_94 and each saved whole. The
  * sizes are literals in their own savers -- there is no table -- so this is
  * where they are collected. */
 #define AM2_TYPE1_RECORD_SIZE 0x2Cu
@@ -15995,10 +15995,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * overwritten by them. Named for the argument each becomes. */
 /* THE RECORD IS FULLY ACCOUNTED FOR NOW, and CreateExplosion is what accounts
  * for it: the six fields below are the six the constructor writes, and each is
- * OBJ_OFF_FIELD_94 plus the BLAST_OFF_ offset StepType6 reads it back at.
+ * OBJ_OFF_BY_TYPE_94 plus the BLAST_OFF_ offset StepType6 reads it back at.
  * 0x00 + 0x04 + 0x10 of rect + 0x04 + 0x04 + 0x04 + 0x04 is 0x28, which is
  * AM2_TYPE6_RECORD_SIZE exactly. */
-#define TYPE6_REC_OFF_KIND    0x00u   /* -> OBJ_OFF_FIELD_94 */
+#define TYPE6_REC_OFF_KIND    0x00u   /* -> OBJ_OFF_BY_TYPE_94 */
 #define TYPE6_REC_OFF_EXTRA   0x04u   /* -> BLAST_OFF_DAMAGE */
 #define TYPE6_REC_OFF_RECT    0x08u   /* -> BLAST_OFF_RECT */
 #define TYPE6_REC_OFF_DUE_MS  0x18u   /* -> BLAST_OFF_DUE_MS */
@@ -16123,7 +16123,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_TYPE2_KEEP_HEALTH_OVER 100
 #define ADDR_LOAD_TYPE3       0x0045A120u  /* reconstructed */
 /* The type-3 record's fields LoadType3 reads BEFORE the memcpy puts the whole
- * thing at OBJ_OFF_FIELD_94. Each is that offset plus 0x94, and every one of
+ * thing at OBJ_OFF_BY_TYPE_94. Each is that offset plus 0x94, and every one of
  * those lands on a field this file already names -- +0x10 on OBJ_OFF_PTR_LIST,
  * +0x498 on VEHICLE_OFF_KIND, +0x4A0 on OBJ_OFF_TABLE_REC_SLOT and +0x4A4 on
  * VEHICLE_OFF_PTR_LIST. So the record is the object's own tail written out,
@@ -17213,7 +17213,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_REVEAL_ARMIES        4
 /* A TYPE ID, and its neighbour 0x00516164 is the same kind of thing -- that
  * one holds 0xE80609 and is matched against the very same field. Both are
- * compared with the +8 dword of an object's OBJ_OFF_FIELD_94 record, which
+ * compared with the +8 dword of an object's OBJ_OFF_BY_TYPE_94 record, which
  * orig.h already records as "a type id being matched, not a count". */
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
 /* -10.0f at 0x0046FD58, and the SIGN is load-bearing: the two droppers
@@ -17311,7 +17311,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * had named and documented all along. The alias ratchet caught it, not the
  * grep, because the grep was for the displacement.
  *
- * Named structurally, the way OBJ_OFF_FIELD_C0 is, since one reader cannot
+ * Named structurally, the way OBJ_OFF_BY_TYPE_C0 is, since one reader cannot
  * carry a name. What that reader does with it: zero means the pointer only
  * acts on the frame the mouse button CHANGED, non-zero lets it keep acting
  * while the button is held. definfo.cpp writes it from the parsed record's
@@ -17501,7 +17501,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * is a POINTER to a type record, not a scalar -- which also explains a
  * destroy handler clearing it. The name is left alone until the record itself
  * is read; what has changed is that it is no longer unread. */
-#define OBJ_OFF_FIELD_C0           0xC0u
+#define OBJ_OFF_BY_TYPE_C0           0xC0u
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
 /* 0x0044A3C0, one caller, which ADDS the answer to a y coordinate. The
  * negated SPR_OFF_OVY of the sprite the object's FIRST row is showing. */
@@ -17814,7 +17814,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * own facing before going to ADDR_COS8/ADDR_SIN8, which mask to 8 bits. */
 #define OBJ_OFF_FACING             0x40u   /* uint8_t */
 /* 0x0043BBE0, one caller. Apply a shot's damage to what it hit, and make the
- * shooter turn on the target. Its OBJ_OFF_FIELD_94 record supplies both the
+ * shooter turn on the target. Its OBJ_OFF_BY_TYPE_94 record supplies both the
  * damage and the code that decides how it is scaled. */
 #define ADDR_APPLY_SHOT_DAMAGE     0x0043BBE0u /* void(target,shot,a,b,dbl) */
 #define TYPEREC_OFF_CODE           0x00u  /* 1..30, the switch's subject */

@@ -105,7 +105,7 @@ TABLE_SPAN = 0x90
 # OBJ_OFF_CONVERTED_FROM and a vehicle's +0x59C are read on them.
 AI_TYPES = (2, 3)
 AI_FIELDS = (
-    ("destpt", 0x0C0, "<I"),      # OBJ_OFF_FIELD_C0, a packed point
+    ("destpt", 0x0C0, "<I"),      # OBJ_OFF_BY_TYPE_C0, a packed point
     ("aimode", 0x0E4, "<i"),      # OBJ_OFF_AI_MODE -- which arm ran
     ("pose",   0x538, "<i"),      # OBJ_OFF_POSE / a vehicle's list header
     ("sarge",  0x548, "<i"),      # OBJ_OFF_SARGE

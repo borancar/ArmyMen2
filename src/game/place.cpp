@@ -589,7 +589,7 @@ int32_t __cdecl PlacementAllowed(AM2_Point where, int32_t type, int32_t slot,
  *
  * FOUR ANSWERS AND ONLY ONE OF THEM DOES ANY WORK. A VEHICLE (type 3) counts
  * outright. A TROOPER (type 2) counts unless it is OBJ_OFF_SARGE or carries
- * anything at OBJ_OFF_FIELD_94 -- so the squad leader is not a placed unit,
+ * anything at OBJ_OFF_BY_TYPE_94 -- so the squad leader is not a placed unit,
  * which is exactly right for a screen where you lay your squad out and Sarge
  * is always there. Anything that is neither an item nor one of types 2, 3 and
  * 8 answers 0 before the type is even looked at.
@@ -899,7 +899,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
  *   A TROOPER matches on THE KIND OF THE WEAPON IN ITS FIRST SLOT, against a
  *   record whose UNIT_TYPE_OFF_TROOPER is set -- so what a soldier is worth
  *   is decided by what it is holding. It refuses outright if the trooper is
- *   Sarge or has anything at OBJ_OFF_FIELD_94, which is the same pair
+ *   Sarge or has anything at OBJ_OFF_BY_TYPE_94, which is the same pair
  *   IsPlacedUnit refuses on.
  *
  *   AN ITEM asks UnitKindMatches, one BUILDING record at a time, with the

@@ -228,7 +228,7 @@ void __cdecl ItemsReset(void)
  * worth a line. */
 /* 0x00448880, two callers, 64 bytes. The CODE of whatever weapon is in a
  * unit's hand -- the selected inventory slot's uid, looked up, checked to be a
- * weapon, and the dword its OBJ_OFF_FIELD_C0 record points at. Zero when the
+ * weapon, and the dword its OBJ_OFF_BY_TYPE_C0 record points at. Zero when the
  * slot is empty or holds something that is not a weapon.
  *
  * It is the same three steps SaveType2 takes to build its tag and the same
@@ -242,7 +242,7 @@ void __cdecl ItemsReset(void)
  * dereferenced without a null test; the slot index is used without a range
  * test, so a selection outside 0..5 reads past the array; LookupByUID's answer
  * goes straight into ObjIsType4, which is safe only because that accessor
- * opens on a null test of its own; and the OBJ_OFF_FIELD_C0 pointer is
+ * opens on a null test of its own; and the OBJ_OFF_BY_TYPE_C0 pointer is
  * dereferenced without one, which is safe only because a weapon always has the
  * record. Reproduced rather than tidied.
  *
@@ -295,7 +295,7 @@ int32_t __cdecl HeldWeaponCode(AM2_Object *unit)
  * and 8 point at ADDR_DIR_SCRATCH instead of a literal, so those units have no
  * fixed name and the caller sees whatever that buffer holds.
  *
- * THE CODE IS NOT BOUNDED. Whatever the weapon's OBJ_OFF_FIELD_C0 record says
+ * THE CODE IS NOT BOUNDED. Whatever the weapon's OBJ_OFF_BY_TYPE_C0 record says
  * indexes the table, so a code past its end reads whatever follows.
  * Reproduced; the shipped codes are the eleven the table covers.
  *
@@ -326,7 +326,7 @@ const char *__cdecl UnitClassName(AM2_Object *unit)
 /* 0x004337C0, one caller. Whether an item can be picked up.
  *
  * Three conditions and all three must hold: it is a weapon (type 4), its
- * OBJ_OFF_PICKUP_AFTER has passed, and the code its OBJ_OFF_FIELD_C0 record
+ * OBJ_OFF_PICKUP_AFTER has passed, and the code its OBJ_OFF_BY_TYPE_C0 record
  * holds is 0x1F, 0x20 or 0x21.
  *
  * THAT SECOND CONDITION CLOSES A FIELD FROM THE OTHER SIDE. +0xC8 was
@@ -1310,7 +1310,7 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * Reproduced; nothing here says why, and the two are not the same lookup.
  *
  * The parent is guarded on having a def record and the children are not: a
- * child with a null OBJ_OFF_FIELD_94 faults. Both the original's.
+ * child with a null OBJ_OFF_BY_TYPE_94 faults. Both the original's.
  */
 void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
 {
@@ -1322,7 +1322,7 @@ void __cdecl ApplyHeightItem(AM2_Object *o, int16_t height)
     if (!o)
         return;
     am2_height_log("ApplyHeightItem", o, height);
-    if (!o->field94)
+    if (!o->saveRec)
         return;
 
     third = o->repairFrame;
@@ -1840,7 +1840,7 @@ int32_t __cdecl BlockWeightAt(AM2_Object *from, AM2_Point at, AM2_Point ref)
  * rather than a literal zero -- `test eax,eax; jne; ret` with the argument
  * still in eax -- which is the same value and worth reproducing as the
  * constant it is. A non-item answers 0. An item answers the comparison
- * between its OBJ_OFF_FIELD_94 record's +8 dword and that global, which
+ * between its OBJ_OFF_BY_TYPE_94 record's +8 dword and that global, which
  * orig.h already records as a type id being matched rather than a count; its
  * neighbour 0x00516164 holds 0xE80609 and is matched against the same field.
  */
@@ -2957,7 +2957,7 @@ int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *
  * THE ROUTE POINT IS NOT THE REFERENCE POINT. `at` is the family's ref -- what
  * ApproxDist measures against and whose tile is charged at the end -- while
  * PointInRect is asked about the current LEG, taken from the planned route at
- * OBJ_OFF_MOVE_FROM indexed by OBJ_OFF_MOVE_AT, or OBJ_OFF_FIELD_C0 when the
+ * OBJ_OFF_MOVE_FROM indexed by OBJ_OFF_MOVE_AT, or OBJ_OFF_BY_TYPE_C0 when the
  * route is spent. I first read that array as a weapon inventory, having
  * carried +0xC0's meaning across from CreateMissile where it IS a missile def;
  * it is a packed point here, and PointsEqual being handed it BY VALUE is what
@@ -2965,7 +2965,7 @@ int32_t __cdecl BlockWeightDamaging(AM2_Object *from, AM2_Point at, AM2_Object *
  *
  * ON SATURATION the route advances, and only if the leg point was actually
  * inside something: OBJ_OFF_MOVE_AT steps on while it is short of the last
- * waypoint, and at the last it clears OBJ_OFF_FIELD_C0. With no route at all
+ * waypoint, and at the last it clears OBJ_OFF_BY_TYPE_C0. With no route at all
  * it clears +0xC0 and OBJ_OFF_SCRIPT_STATE together, but only when those two
  * already agree.
  *
@@ -4056,10 +4056,10 @@ void __cdecl DestroyByType(AM2_Object *obj)
  * rather than left to read as coverage. */
 void __cdecl DestroyType2(AM2_Object *o)
 {
-    o->fieldC0 = 0;
-    o->fieldC2 = 0;
-    o->fieldB0 = 0;
-    o->fieldB2 = 0;
+    o->destX = 0;
+    o->destY = 0;
+    o->savedX = 0;
+    o->savedY = 0;
 
     ObjAttachTo(o, (AM2_Object *)0);
     DestroyObjCommon(o);
@@ -4079,10 +4079,10 @@ void __cdecl DestroyType3(AM2_Object *o)
 {
     ObjClearFootprint(o);
 
-    o->fieldC0 = 0;
-    o->fieldC2 = 0;
-    o->fieldB0 = 0;
-    o->fieldB2 = 0;
+    o->destX = 0;
+    o->destY = 0;
+    o->savedX = 0;
+    o->savedY = 0;
 
     ObjAttachTo(o, (AM2_Object *)0);
     DestroyObjCommon(o);
@@ -4100,10 +4100,10 @@ void __cdecl DestroyType8(AM2_Object *o)
 {
     ObjClearRoachFootprint(o);
 
-    o->fieldC0 = 0;
-    o->fieldC2 = 0;
-    o->fieldB0 = 0;
-    o->fieldB2 = 0;
+    o->destX = 0;
+    o->destY = 0;
+    o->savedX = 0;
+    o->savedY = 0;
 
     ObjAttachTo(o, (AM2_Object *)0);
     DestroyObjCommon(o);
@@ -5669,7 +5669,7 @@ static void __cdecl ObjDeathCleanup(AM2_Object *obj)
     if (ObjIsType2((const AM2_Object *)obj)
         && (g_gameOverFlags & 0x200000u)
         && o->soldierKind != AM2_MP_ROLE_SEVEN
-        && o->field94 == 0)
+        && o->saveRec == 0)
         EventNotify(0, g_ruleUidB,
                     ((const AM2_Object *)obj)->uid,
                     0, 0, 0, 0, AM2_DEATH_DELAY_SHORT, 0, 1);
@@ -5988,7 +5988,7 @@ void __cdecl SetWeaponTarget(AM2_Object *target, AM2_Point at)
             u->inventory[g_weaponSlot]))
         return;
 
-    u->sight.field00 = 1;
+    u->sight.fromNet = 1;
     u->sight.bearing    = u->facing;
     u->sight.hit   = 1;
     u->sight.seen   = 1;
@@ -6055,7 +6055,7 @@ void __cdecl PickFireMode(AM2_Object *obj)
  *
  * The handlers are the substance. Each record of ADDR_WEAPON_HANDLERS is four
  * function pointers, indexed by the first dword of the weapon's
- * OBJ_OFF_FIELD_C0 -- so that field is a pointer to a type record, which is
+ * OBJ_OFF_BY_TYPE_C0 -- so that field is a pointer to a type record, which is
  * something no reader had established before. The readers settle that these
  * are functions rather than data: they all do `test eax,eax; call eax`.
  *
@@ -6481,8 +6481,8 @@ void __cdecl PointActionA(AM2_Object *o, AM2_Point point)
 
     ObjAttachTo(o, (AM2_Object *)0);
 
-    o->fieldB0 = 0;
-    o->fieldB2 = 0;
+    o->savedX = 0;
+    o->savedY = 0;
 
     NearestAllowedTile(o, TileOfPoint(point), &point);
 
@@ -6559,7 +6559,7 @@ void __cdecl Type2ActionC(AM2_Object *obj, int32_t prev)
  * gets exactly one.
  *
  * The next two blocks are both behind `record->code == 0x2A && health > 0`,
- * where the record is the pointer at OBJ_OFF_FIELD_94 -- see the note there,
+ * where the record is the pointer at OBJ_OFF_BY_TYPE_94 -- see the note there,
  * that field is a pointer for THIS object type and a scalar for others.
  *
  *   - Only the PLAYER's own such object reveals its surroundings, and only
@@ -7360,7 +7360,7 @@ void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
  *
  * IT WAS NAMED FOR NEITHER OF THOSE THINGS. orig.h called it ADDR_UNIT_ACTION,
  * "void(obj, action) -- 44 arms", and both halves were wrong. The argument is
- * the dword an item's OBJ_OFF_FIELD_C0 record points at -- the same value
+ * the dword an item's OBJ_OFF_BY_TYPE_C0 record points at -- the same value
  * HeldWeaponCode returns, and the same one SelectInventorySlot in this file
  * already computes and indexes ADDR_WEAPON_HANDLERS with before passing it
  * here. Sixteen callers and every one does the same three steps: put a weapon
@@ -8260,7 +8260,7 @@ void __cdecl AwardOwnArmyXp(void)
  * written up in CLAUDE.md, and it is worth one look at the table every time --
  * the linker's layout is not the switch.
  *
- * The kind is the first dword of the record OBJ_OFF_FIELD_C0 points at, which
+ * The kind is the first dword of the record OBJ_OFF_BY_TYPE_C0 points at, which
  * is the same record SelectInventorySlot indexes ADDR_WEAPON_HANDLERS with.
  * So the codes here are a second, smaller classification over the same field.
  */
@@ -8670,7 +8670,7 @@ void __cdecl ObjToAI(AM2_Object *obj)
         return;
 
     if (o->health > 0)
-        o->sight.field00 = 0;
+        o->sight.fromNet = 0;
 
     if (o->sarge)
         o->aiMode = 6;
@@ -8815,7 +8815,7 @@ void __cdecl SpawnRandomBarrage(void)
  * the accessor would change which counter moves and would be a different
  * function.
  *
- * The last test, on OBJ_OFF_FIELD_94, refuses an object that already has a
+ * The last test, on OBJ_OFF_BY_TYPE_94, refuses an object that already has a
  * type record. What that means is not established; the field is named for its
  * offset and this is one more reader of it.
  */
@@ -8840,7 +8840,7 @@ int32_t __cdecl SelectIfOwn(AM2_Object *obj)
     if (type < 2 || (type > 3 && type != 8))
         return 0;
 
-    if (o->field94)
+    if (o->saveRec)
         return 0;
 
     if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
@@ -8899,7 +8899,7 @@ void __cdecl ResetType2Fields(AM2_Object *obj)
     o->detour =
         g_zeroPoint;
     /* objdump.py reads 0xC0 as the destination point; orig.h names it
-     * OBJ_OFF_FIELD_C0, and that is the name used here rather than a second
+     * OBJ_OFF_BY_TYPE_C0, and that is the name used here rather than a second
      * one. Deploying cancels wherever the vehicle was headed. */
     o->dest = g_zeroPoint;
 
@@ -9289,13 +9289,13 @@ void __cdecl SelectionClick(void)
                 if (seen)
                     continue;
 
-                /* A type 2/3/8 whose OBJ_OFF_FIELD_94 is set is skipped ENTIRELY --
+                /* A type 2/3/8 whose OBJ_OFF_BY_TYPE_94 is set is skipped ENTIRELY --
                  * the original's `jne` goes past the push to the loop advance, not
                  * merely past the call below it. Reading it as "skip the call and add
                  * anyway" selects things the original does not, and no static check
                  * would see the difference. */
                 if (ObjIsTypeIn238(e)) {
-                    if (e->field94)
+                    if (e->saveRec)
                         continue;
                     ObjType2Field548(e);
                 }
@@ -9448,7 +9448,7 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
         o->convertedFrom = 0;
     arm3:
         o->sight.state = 0;
-        o->sight.field00 = 1;
+        o->sight.fromNet = 1;
         noise = 5;
         DiedEffectA(o);
         goto tail;
@@ -9461,7 +9461,7 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
     switch (kind) {
     case 2:
         o->sight.state = DEATH_ANIM(o);
-        o->sight.field00 = 1;
+        o->sight.fromNet = 1;
         noise = 5;
         if (o->soldierKind < big
             && o->sight.state == 0x21)
@@ -9474,11 +9474,11 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
     case 1:
         if (o->soldierKind >= big) {
             o->sight.state = 0x21;
-            o->sight.field00 = 1;
+            o->sight.fromNet = 1;
             noise = big;
         } else {
             o->sight.state = 0x20;
-            o->sight.field00 = 1;
+            o->sight.fromNet = 1;
             noise = big;
         }
         goto tail;
@@ -9503,7 +9503,7 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
     }
 #undef DEATH_ANIM
 
-    o->sight.field00 = 1;
+    o->sight.fromNet = 1;
     noise = 5;
 
 tail:
@@ -9698,7 +9698,7 @@ void __cdecl TrooperHostApprovedPickupItem(AM2_Object *troop, AM2_Object *item,
  * evidence for the correction above. OBJ_OFF_PICKUP_AFTER is what +0xC8 is
  * called -- the field was named right and only the prose beside this address
  * had it on the wrong object. ITEM_OFF_AMMO is 0xCC, which is
- * OBJ_OFF_TARGET_UID on other types; and item->OBJ_OFF_FIELD_C0 is an ITEMTYPE
+ * OBJ_OFF_TARGET_UID on other types; and item->OBJ_OFF_BY_TYPE_C0 is an ITEMTYPE
  * record, so the kind switched on below is ITEMTYPE_OFF_KIND and the ammo cap
  * is ITEMTYPE_OFF_CAPACITY. Overloading by type, as at 0x52C and 0x538.
  *
@@ -10563,7 +10563,7 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
  * clears one.
  *
  * THE SAME-RECORD TEST ANSWERS FROM A THIRD FIELD. When a slot's weapon has
- * the same OBJ_OFF_FIELD_94 as the candidate, the verdict is whether the
+ * the same OBJ_OFF_BY_TYPE_94 as the candidate, the verdict is whether the
  * CANDIDATE's OBJ_OFF_TARGET_UID is not -1 -- nothing about the slot. So "you
  * already carry one of these" is resolved by a property of the thing being
  * offered.
@@ -10593,8 +10593,8 @@ int32_t __cdecl PickWeaponSlot(AM2_Object *cand, AM2_Object *unit, int32_t *slot
             return 1;
         }
 
-        if (w->field94
-            == c->field94)
+        if (w->saveRec
+            == c->saveRec)
             return c->ammo != -1;
 
         if (KindInSetB(w->typeRec->kind)
@@ -11098,7 +11098,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
             SetFieldInAll(&o->rowSet, (void *)o->tableRec2);
         }
 
-        o->sight.field00 = 0;
+        o->sight.fromNet = 0;
         o->sight.state = 1;
         o->sight.bearing = o->facing;
         o->sight.hit = 0;
@@ -11615,7 +11615,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
  *
  * The damage is HALVED for one class -- ObjIsType2 and ClassifyByCode74
  * answering 2 -- and the damage KIND is 3 or 1 by a rand roll, which the
- * OBJ_OFF_FIELD_94 == 0x89 test skips entirely. Reading `and eax, 0x255` as a
+ * OBJ_OFF_BY_TYPE_94 == 0x89 test skips entirely. Reading `and eax, 0x255` as a
  * mask over a percentage would be wrong: it is the original's own roll and is
  * transcribed, not tidied.
  *

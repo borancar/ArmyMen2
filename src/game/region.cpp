@@ -3100,7 +3100,7 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
  * but one shares. orig.h left it unnamed for a long time, on the grounds that
  * "nothing in it says what it is and this file will not guess from a call
  * site". Read now, and the name is from the body: it turns the DESTINATION at
- * OBJ_OFF_FIELD_C0 into a HEADING in the out record, routing through the
+ * OBJ_OFF_BY_TYPE_C0 into a HEADING in the out record, routing through the
  * region graph when the destination is not in the region the object is
  * standing in.
  *
@@ -3125,7 +3125,7 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
  *   within AM2_AI_ARRIVED_DIST, stopping at the last one.
  *
  *   HEAD. Measure to the real destination. Inside AM2_AI_ARRIVED_DIST the
- *   walk is over: out+8 gets 1 and OBJ_OFF_FIELD_C0 is cleared to
+ *   walk is over: out+8 gets 1 and OBJ_OFF_BY_TYPE_C0 is cleared to
  *   ADDR_ZERO_POINT. Otherwise out+0 gets the bearing, out+8 gets 4, and one
  *   or two slow-down flags go in depending on how close the WORKING point is.
  *
@@ -3288,7 +3288,7 @@ heading:
  *
  * READ AS A DIFF AGAINST AiRouteToward above, which is the method this file
  * already uses for RoachRouteToward. Both walk an object toward the point at
- * OBJ_OFF_FIELD_C0, both hop through the region matrices when the goal is in
+ * OBJ_OFF_BY_TYPE_C0, both hop through the region matrices when the goal is in
  * another region, both end by writing a facing and a state into the caller's
  * record. What this one adds is a RETRY DEADLINE and an arrival test, and
  * where it differs it differs in ways that are easy to flatten:
@@ -3313,7 +3313,7 @@ heading:
  * assignment and is what the instructions say.
  *
  * AND THE TWO GOALS COME APART on the re-plan arms. `routeGoal` is written
- * from the object's own OBJ_OFF_FIELD_C0 while `moveTo` gets the LOCAL point,
+ * from the object's own OBJ_OFF_BY_TYPE_C0 while `moveTo` gets the LOCAL point,
  * which the region hop may have redirected to a link's tile. So the object
  * remembers what it was asked for and walks to where the corridor says. A
  * reading that used one point for both would be tidier and would lose the
@@ -3533,7 +3533,7 @@ walk:
  * ADDR_ROACH_BEHAVIOUR. It is AiRouteToward's TWIN: 518 of its 784 bytes are
  * byte-identical, and the diff of the two disassemblies is twenty-one lines.
  * orig.h had it as "a reachability helper ... it compares the region of the
- * object's position against the region of OBJ_OFF_FIELD_C0", which describes
+ * object's position against the region of OBJ_OFF_BY_TYPE_C0", which describes
  * its first six instructions and nothing after them.
  *
  * READ AS A DIFF, WHICH IS THE WHOLE METHOD HERE. Four changes:
@@ -3703,7 +3703,7 @@ heading:
  *
  * What `ignore` does. If the unit is still more than AM2_AI_ARRIVED_DIST from
  * the destination it remembers, it keeps the destination -- copying it into
- * OBJ_OFF_FIELD_C0 first -- and hands off to the common step. Otherwise it has
+ * OBJ_OFF_BY_TYPE_C0 first -- and hands off to the common step. Otherwise it has
  * arrived: the destination is cleared, and the only two things that will turn
  * it are a hit it has not yet reacted to and, after a delay, the bearing of
  * whatever the context found. Which is what ignoring an order looks like.
@@ -5136,9 +5136,9 @@ finish:
  *
  * TWO POINTS RATHER THAN ONE, and it is further evidence about a field this
  * file records as unresolved. The other arms clear OBJ_OFF_SCRIPT_STATE on
- * arrival and copy it into OBJ_OFF_FIELD_C0 when they move; this clears it
+ * arrival and copy it into OBJ_OFF_BY_TYPE_C0 when they move; this clears it
  * UNCONDITIONALLY at the top -- a follower has no destination of its own --
- * and copies the FORMATION POINT into OBJ_OFF_FIELD_C0 instead. So 0xC0 takes
+ * and copies the FORMATION POINT into OBJ_OFF_BY_TYPE_C0 instead. So 0xC0 takes
  * a packed point from two different sources, which is one more reading under
  * which 0xB4 is a point too.
  */
@@ -5531,7 +5531,7 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  * and the middle sets it to `now + AM2_AI_KEEP_RANGE_MS` after ordering a
  * walk, which is what makes the top's test fire for the next five seconds. So
  * a walk in progress short-circuits everything until the unit is within
- * AM2_AI_REACHED_DIST of OBJ_OFF_FIELD_C0, at which point the field is cleared
+ * AM2_AI_REACHED_DIST of OBJ_OFF_BY_TYPE_C0, at which point the field is cleared
  * and the middle starts the clock again from zero.
  *
  * The pose is written only in the gap: not while a walk is outstanding, not
@@ -5610,7 +5610,7 @@ void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  * emitted twice. Worth keeping the two cases apart: one calls for a diff of
  * the disassembly, the other for a table like the one above.
  *
- * OBJ_OFF_FIELD_C0 IS WRITTEN BEFORE THE WALK AND CLEARED AFTER IT, and it is
+ * OBJ_OFF_BY_TYPE_C0 IS WRITTEN BEFORE THE WALK AND CLEARED AFTER IT, and it is
  * OBJ_OFF_SCRIPT_STATE that supplies it -- `obj[0xC0] = obj[0xB4]` on the way
  * out and `obj[0xB4] = ADDR_ZERO_POINT` on arrival, the same pair the vehicle
  * arms perform. A sixth reading under which both fields hold packed points;
@@ -6820,7 +6820,7 @@ void __cdecl RoachBuildContext(AM2_Object *o, AM2_RoachCtx *s)
  * from the rest of the family, the way SettlePointInRegion's does.
  *
  * WALK, THEN ATTACH. While the destination is further than AM2_AI_REACHED_DIST
- * it copies the destination into OBJ_OFF_FIELD_C0 and hands off to the trooper
+ * it copies the destination into OBJ_OFF_BY_TYPE_C0 and hands off to the trooper
  * step -- AiStepIgnore's shape exactly. On arrival it clears the destination,
  * picks an object out of an army's list, and attaches to it if it is within
  * AM2_AI_ATTACH_RANGE.
@@ -7196,7 +7196,7 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
  *   OBJ_OFF_TABLE_REC_KIND is 5. A uid that no longer resolves is cleared and
  *   the walk goes on. Boarding RETURNS -- nothing below it runs that frame.
  *
- *   WALK toward OBJ_OFF_FIELD_C0, which AiKeepRange one file up already reads
+ *   WALK toward OBJ_OFF_BY_TYPE_C0, which AiKeepRange one file up already reads
  *   as the destination. Two arms, and their thresholds differ by four: an
  *   object already walking (OBJ_OFF_WALK_ORDER set) stops when it is within
  *   AM2_AI_REACHED_DIST and reports 1; an object not walking starts only past
@@ -7330,7 +7330,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
             continue;
         if (!ObjIsTypeIn238(other))
             continue;
-        if (other->field94 != 0)
+        if (other->saveRec != 0)
             continue;
 
         if (ObjIsType2(other) && o->uid56C) {
@@ -7537,7 +7537,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
     out->seen = 0;
 
     if (!g_mpSession || AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner)) {
-        out->field00 = 0;
+        out->fromNet = 0;
         o->fireFlag  = (uint8_t)orig_game_rand();
     }
 
@@ -8167,8 +8167,8 @@ void __cdecl StepType2(AM2_Object *o)
 
     w = WeaponByUid(o->inventory[o->inventorySel]);
 
-    if (o->sight.field00 == 0) {
-        o->sight.field00 = 0;
+    if (o->sight.fromNet == 0) {
+        o->sight.fromNet = 0;
         o->sight.state   = WeaponPoseIndex(o, w);
         o->sight.bearing = o->facing;
         o->sight.hit     = 0;
@@ -8194,11 +8194,11 @@ void __cdecl StepType2(AM2_Object *o)
                               * still playing its death animation reaches the
                               * tail too, so its weapon keeps being placed */
             RowFaceSprite(row);
-            o->sight.field00 = 0;
+            o->sight.fromNet = 0;
             LeaveRemainsRow(row);
             DestroyByType(o);
         } else {
-            o->sight.field00 = 0;
+            o->sight.fromNet = 0;
             DestroyByType(o);
         }
         /* DestroyByType is written in each arm, as the image has it (one
@@ -8223,7 +8223,7 @@ void __cdecl StepType2(AM2_Object *o)
      * "decode the first instruction at every jump target" only works if it is
      * applied to every jump, including the ones already believed understood;
      * an unread address cannot fail a test that was never run on it. */
-    if (o->sight.field00 != 0)
+    if (o->sight.fromNet != 0)
         goto tail;
 
     if (o->convertedFrom) {
@@ -8435,13 +8435,13 @@ void __cdecl StepType3(AM2_Object *o)
                     AiStep(o, &o->ctl);
             }
             Step3ChooseFacing(o, &o->ctl);
-        } else if (o->field94) {
+        } else if (o->saveRec) {
             AiStep(o, &o->ctl);
             Step3ChooseFacing(o, &o->ctl);
         } else {
             ObjAttachTo(o, (AM2_Object *)0);
-            o->fieldC0 = 0;
-            o->fieldC2 = 0;
+            o->destX = 0;
+            o->destY = 0;
         }
     } else {
         /* 0x0045D8CF: the gate set, or a remote vehicle -- the chooser
@@ -9668,7 +9668,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
             continue;
         if (!ObjIsTypeIn238(other))
             continue;
-        if (other->field94 != 0)
+        if (other->saveRec != 0)
             continue;
 
         other->aiMode = 3;
@@ -9826,7 +9826,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                         : o->fwdSpeed;
 
             if (!noTarget
-                && (uint16_t)o->fieldC0 == (uint16_t)target.x
+                && (uint16_t)o->destX == (uint16_t)target.x
                 && ApproxDist(&o->pos,
                               &target) < 0x60)
                 r->stop = 1;
@@ -9836,7 +9836,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             MoveStepPoint(o, facing, 0, want, 0, 0, &step);
 
             if (!noTarget
-                && (uint16_t)o->fieldC0 == (uint16_t)target.x
+                && (uint16_t)o->destX == (uint16_t)target.x
                 && (uint16_t)target.x != 0) {
                 if (ApproxDist((const AM2_Point *)&step, &target) - 1
                         <= ApproxDist(&o->pos, &target)

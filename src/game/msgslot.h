@@ -143,7 +143,7 @@ typedef struct AM2_Flow {
     uint32_t    sentPackets;    /* +0x028 FLOW_OFF_SENT_PACKETS */
     uint32_t    sentBytes;      /* +0x02C FLOW_OFF_SENT_BYTES */
     uint32_t    acksSeen;       /* +0x030 FLOW_OFF_ACKS_SEEN */
-    uint32_t    field34;        /* +0x034 */
+    uint32_t    unused34;        /* +0x034 */
     uint32_t    nacksSent;      /* +0x038 FLOW_OFF_NACKS_SENT */
     uint32_t    resends;        /* +0x03C FLOW_OFF_RESENDS */
     uint32_t    duplicates;     /* +0x040 FLOW_OFF_DUPLICATES */
@@ -154,10 +154,10 @@ typedef struct AM2_Flow {
     uint32_t    gapMax;         /* +0x054 FLOW_OFF_GAP_MAX */
     uint32_t    gapTotal;       /* +0x058 FLOW_OFF_GAP_TOTAL */
     uint32_t    readyAt;        /* +0x05C FLOW_OFF_READY_AT PLAYER_REC_OFF_MADE_AT */
-    uint32_t    field60;        /* +0x060 */
-    uint32_t    field64;        /* +0x064 */
-    uint32_t    field68;        /* +0x068 halved into FLOW_OFF_PEER_CLOCK */
-    uint32_t    field6C;        /* +0x06C */
+    uint32_t    unused60;        /* +0x060 */
+    uint32_t    unused64;        /* +0x064 */
+    uint32_t    roundTrip;        /* +0x068 halved into FLOW_OFF_PEER_CLOCK */
+    uint32_t    unused6C;        /* +0x06C */
     uint32_t    deliveredAt;    /* +0x070 FLOW_OFF_DELIVERED_AT AM2_PLAYER_LAST_SEEN */
     uint32_t    recvAt;         /* +0x074 FLOW_OFF_RECV_AT */
     AM2_MsgList queue;          /* +0x078 FLOW_OFF_QUEUE PLAYER_REC_OFF_MSGS */
@@ -165,12 +165,12 @@ typedef struct AM2_Flow {
     uint32_t    badChecksums;   /* +0x08C FLOW_OFF_BAD_CHECKSUMS */
     uint32_t    peerClock;      /* +0x090 FLOW_OFF_PEER_CLOCK */
     uint32_t    sequence;       /* +0x094 FLOW_OFF_SEQUENCE PLAYER_REC_OFF_FLAG_94 */
-    uint32_t    field98;        /* +0x098 */
-    uint32_t    field9C;        /* +0x09C */
-    uint32_t    fieldA0;        /* +0x0A0 */
+    uint32_t    unused98;        /* +0x098 */
+    uint32_t    unused9C;        /* +0x09C */
+    uint32_t    unusedA0;        /* +0x0A0 */
     int32_t     lossBurst;      /* +0x0A4 FLOW_OFF_LOSS_BURST */
     int32_t     lossPct;        /* +0x0A8 FLOW_OFF_LOSS_PCT */
-    int32_t     fieldAC;        /* +0x0AC */
+    int32_t     unusedAC;        /* +0x0AC */
     int32_t     lagMs;          /* +0x0B0 FLOW_OFF_LAG_MS */
     int32_t     lagSpread;      /* +0x0B4 FLOW_OFF_LAG_SPREAD */
     int32_t     nackCount;      /* +0x0B8 PEER_OFF_NACK_COUNT, records in nacks[] */
@@ -652,7 +652,7 @@ struct AM2_CommSlot {
     int32_t  wasHere;           /* +0x50 COMM_SLOT_OFF_TAKEN COMM_ARMY_OFF_WAS_HERE */
     int32_t  chksumErrs;        /* +0x54 COMM_ARMY_OFF_CHKSUM_ERRS */
     uint32_t unacked;           /* +0x58 COMM_SLOT_OFF_UNACKED */
-    int32_t  field5C;           /* +0x5C COMM_SLOT_OFF_FIELD_5C */
+    int32_t  unused5C;           /* +0x5C COMM_SLOT_OFF_UNUSED_5C */
     uint32_t heard;             /* +0x60 COMM_SLOT_OFF_HEARD, GetTickCount of the last packet */
     int32_t  readyToLoad;       /* +0x64 COMM_SLOT_OFF_READY_TO_LOAD */
     int32_t  ready;             /* +0x68 COMM_SLOT_OFF_READY */
@@ -663,7 +663,7 @@ struct AM2_CommSlot {
 #define AM2_COMM_STAT_SAMPLES 30
 
 struct AM2_Comm {
-    uint32_t     field000;      /* +0x000 */
+    uint32_t     unused000;      /* +0x000 */
     uint32_t     statIndex;     /* +0x004 COMM_OFF_STAT_INDEX, ring cursor, 0..29 */
     uint32_t     rxIndex;       /* +0x008 COMM_OFF_RX_INDEX */
     uint32_t     statTimes[AM2_COMM_STAT_SAMPLES]; /* +0x00C COMM_OFF_STAT_TIMES */
@@ -699,7 +699,7 @@ struct AM2_Comm {
     uint32_t     bufferMax;     /* +0x410 COMM_OFF_BUFFER_MAX */
     uint32_t     sendFlags;     /* +0x414 COMM_OFF_SEND_FLAGS */
     int32_t      verbose;       /* +0x418 COMM_OFF_VERBOSE AM2_COMM_LOG_ENABLED */
-    int32_t      field41C;      /* +0x41C */
+    int32_t      unused41C;      /* +0x41C */
     uint32_t     coalesceMs;    /* +0x420 COMM_OFF_COALESCE_MS */
     uint32_t     maxHoldMs;     /* +0x424 COMM_OFF_MAX_HOLD_MS */
     uint32_t     bufferDefault; /* +0x428 COMM_OFF_BUFFER_DEFAULT */

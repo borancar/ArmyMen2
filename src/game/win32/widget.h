@@ -95,7 +95,7 @@ typedef struct AM2_Widget {
                                      * four independent touchers saying the
                                      * same thing. */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
-    int32_t  unknown48;             /* 0x0048 */
+    int32_t  transparent;             /* 0x0048 */
     int32_t  disabled;              /* 0x004C  COUNTBTN_OFF_DISABLED: set disqualifies from focus, and
                                      * the multiplayer panel's update writes it
                                      * per row on exactly the policy its button
@@ -370,7 +370,7 @@ struct AM2_Button : AM2_ButtonBase {
     struct AM2_Sprite *spriteNormal;   /* 0x0068 BUTTON_OFF_SPRITE_NORMAL */
     struct AM2_Sprite *spriteFocus;    /* 0x006C BUTTON_OFF_SPRITE_FOCUS */
     struct AM2_Sprite *spritePressed;  /* 0x0070 BUTTON_OFF_SPRITE_PRESSED */
-    uint8_t     field74;
+    uint8_t     unused74;
     uint8_t     ownsSprites;           /* 0x0075 BUTTON_OFF_OWNS_SPRITES */
     uint8_t     pad_AM2_Button[AM2_BUTTON_SIZE - 0x76];
     AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
@@ -444,8 +444,8 @@ struct AM2_BuildMenuRec {
     int32_t  id;                    /* +0x00 BUILD_MENU_OFF_ID, into ADDR_UNIT_TYPES */
     int32_t  kind;                  /* +0x04 BUILD_MENU_OFF_KIND, the button's sprite */
     char     name[0x18];            /* +0x08 BUILD_MENU_OFF_NAME */
-    int32_t  field20;               /* +0x20 */
-    int32_t  field24;               /* +0x24 */
+    int32_t  unused20;               /* +0x20 */
+    int32_t  unused24;               /* +0x24 */
     AM2_Rect nextRect;              /* +0x28 BUILD_MENU_OFF_RECT, the NEXT entry's button */
 };
 
@@ -455,8 +455,8 @@ struct AM2_BuildButtonRec {
     int32_t  id;                    /* +0x10 */
     int32_t  kind;                  /* +0x14 */
     char     name[0x18];            /* +0x18 */
-    int32_t  field30;               /* +0x30 */
-    int32_t  field34;               /* +0x34 */
+    int32_t  unused30;               /* +0x30 */
+    int32_t  unused34;               /* +0x34 */
 };
 
 /* The same records as ADDR_POINTER_MODES addresses them, 0x10 in: a mode's
@@ -492,7 +492,7 @@ struct AM2_ListBox : AM2_Widget {
             int32_t inkSel;         /* 0x0084  LIST_OFF_INK_SEL */
             int32_t inkSelDown;     /* 0x0088  LIST_OFF_INK_SEL_DOWN */
             int32_t inkHotSel;      /* 0x008C  LIST_OFF_INK_HOT_SEL */
-            int32_t field90;        /* 0x0090 */
+            int32_t unused90;        /* 0x0090 */
         };
         int32_t   colours[5];       /* 0x0080  TEXTLIST_OFF_COLOURS, low byte used */
     };
@@ -519,7 +519,7 @@ struct AM2_ArrowBar : AM2_Widget {
     struct AM2_Arrow *down;         /* 0x0060  ARROWBAR_OFF_DOWN */
     AM2_Sprite *sprite0;            /* 0x0064  ARROWBAR_OFF_SPRITE0, the thumb */
     AM2_Sprite *sprite1;            /* 0x0068  ARROWBAR_OFF_SPRITE1 */
-    int32_t     field6C;            /* 0x006C */
+    int32_t     unused6C;            /* 0x006C */
     int32_t     shift;              /* 0x0070  ARROWBAR_OFF_SHIFT, where the thumb sits */
     int32_t     span;               /* 0x0074  ARROWBAR_OFF_SPAN */
     AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
@@ -529,11 +529,11 @@ struct AM2_ArrowBar : AM2_Widget {
 
 struct AM2_ScrollBar : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
-    int32_t     field58;            /* 0x0058 */
+    int32_t     unused58;            /* 0x0058 */
     struct AM2_Arrow *left;         /* 0x005C  the left arrow, auto-repeating */
     struct AM2_Arrow *right;        /* 0x0060  the right arrow */
     AM2_Sprite *bar;                /* 0x0064  SCROLLBAR_OFF_BAR, the bar the paint draws */
-    int32_t     field68;            /* 0x0068 */
+    int32_t     unused68;            /* 0x0068 */
     int32_t     shift;              /* 0x006C  SCROLLBAR_OFF_SHIFT, added to the centred x */
     int32_t     span;               /* 0x0070  SCROLLBAR_OFF_SPAN, taken off the width first */
     int32_t     pos;                /* 0x0074  SCROLLBAR_OFF_POS, 0..range */
@@ -626,7 +626,7 @@ struct AM2_HudRadar : AM2_Widget {
 /* One weapon row of the SARGE panel, HUDSARGE_REC_STRIDE bytes. */
 struct AM2_HudSargeSlot {
     int32_t index;                  /* 0x0000  HUDSARGE_REC_INDEX, -1 empty */
-    int32_t field4;                 /* 0x0004 */
+    int32_t unused4;                 /* 0x0004 */
     int32_t count;                  /* 0x0008  HUDSARGE_REC_COUNT, printed when >= 0 */
     int32_t ready;                  /* 0x000C  HUDSARGE_REC_READY HUDSARGE_REC_HIGHLIGHT: 0, 1 or 2 */
 };
@@ -721,9 +721,9 @@ struct AM2_CountButton : AM2_ButtonBase {
     uint8_t     pad71[3];
     void (__cdecl *onToggle)(AM2_Widget *); /* 0x0074  COUNTBTN_OFF_ON_TOGGLE */
     int32_t     menuRow;            /* 0x0078  COUNTBTN_OFF_MENU_ROW, into ADDR_BUILD_MENU */
-    int32_t     field7C;            /* 0x007C */
+    int32_t     unused7C;            /* 0x007C */
     int32_t     count;              /* 0x0080  COUNTBTN_OFF_COUNT, formatted with "%d" */
-    int32_t     field84;            /* 0x0084 */
+    int32_t     unused84;            /* 0x0084 */
     AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
     explicit AM2_CountButton(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_CountButton();
@@ -733,7 +733,7 @@ struct AM2_HudPanel : AM2_Widget {
     typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     AM2_Sprite *sprite0;            /* 0x0058  HUD_OFF_SPRITE0 */
     int32_t     open;               /* 0x005C  HUDPANEL_OFF_OPEN, which way to slide */
-    int32_t     field60;            /* 0x0060 */
+    int32_t     unused60;            /* 0x0060 */
     int32_t     stop;               /* 0x0064  HUDPANEL_OFF_STOP, the open position */
     AM2_Widget *pointsField;        /* 0x0068  HUDPANEL_OFF_POINTS_FIELD, drawn from below */
     char        pointsText[0xC];    /* 0x006C  HUDPANEL_OFF_POINTS_TEXT */
@@ -770,7 +770,7 @@ struct AM2_HudTop : AM2_Widget {
     int32_t       typedX;                   /* 0x05A8  HUDLOG_OFF_TYPED_X */
     int32_t       typedY;                   /* 0x05AC  HUDLOG_OFF_TYPED_Y */
     int32_t       viewW;                    /* 0x05B0  HUDLOG_OFF_VIEW_W */
-    int32_t       field5B4;                 /* 0x05B4  HUDLOG_OFF_FIELD_5B4 */
+    int32_t       unused5B4;                 /* 0x05B4  HUDLOG_OFF_FIELD_5B4 */
     AM2_CheckBox *checkbox;                 /* 0x05B8  HUD_A_OFF_CHECKBOX */
     AM2_HudTop();
     explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }

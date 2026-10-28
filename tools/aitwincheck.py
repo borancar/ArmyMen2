@@ -55,7 +55,7 @@ SIGHT_OFF_FOUND_BEARING = 0x24
 SIGHT_OFF_DEST_DIST = 0x28
 
 OBJ_OFF_SCRIPT_STATE = 0xB4
-OBJ_OFF_FIELD_C0 = 0xC0
+OBJ_OFF_BY_TYPE_C0 = 0xC0
 OBJ_OFF_TARGET_UID = 0xCC
 OBJ_OFF_DEADLINE_D0 = 0xD0
 OBJ_OFF_HIT_DIR = 0x104
@@ -118,7 +118,7 @@ class Harness:
         self.trace = []
 
         uc.mem_write(OBJ + OBJ_OFF_SCRIPT_STATE, struct.pack("<I", 0x55667788))
-        uc.mem_write(OBJ + OBJ_OFF_FIELD_C0, struct.pack("<I", 0xDEADBEEF))
+        uc.mem_write(OBJ + OBJ_OFF_BY_TYPE_C0, struct.pack("<I", 0xDEADBEEF))
         uc.mem_write(OBJ + OBJ_OFF_TARGET_UID, struct.pack("<I", 0xCAFEBABE))
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_D0, struct.pack("<I", deadline))
         uc.mem_write(OBJ + OBJ_OFF_HIT_DIR, bytes([hit]))

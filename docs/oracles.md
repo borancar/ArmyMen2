@@ -337,7 +337,7 @@ the CASE COUNT moves under the mutation rather than the verdict.
   things separate it from its siblings and each is a merge waiting to happen:
   it zeroes OBJ_OFF_SCRIPT_STATE UNCONDITIONALLY at the top where the others
   do it only on arrival; its route arm is reached TWO ways, by range or by the
-  leader having MOVED; and its copy into OBJ_OFF_FIELD_C0 comes from the
+  leader having MOVED; and its copy into OBJ_OFF_BY_TYPE_C0 comes from the
   CONTEXT where every sibling takes it from the object. That last is the
   dangerous one -- same instruction shape, different source -- and it fails
   160 of the cases when taken from the object instead.

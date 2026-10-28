@@ -1164,7 +1164,7 @@ int32_t __cdecl ObjBlockWeight(AM2_Object *from, AM2_Object *obj, AM2_Point unus
 }
 
 /* 0x00406550, two callers. Turn a thing's own code -- the dword its
- * OBJ_OFF_FIELD_C0 pointer points at -- into one of about a dozen result
+ * OBJ_OFF_BY_TYPE_C0 pointer points at -- into one of about a dozen result
  * codes.
  *
  * The original does it with a 39-entry byte table indexed by `code - 2` and a

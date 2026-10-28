@@ -46,7 +46,7 @@ SIGHTC_OFF_FOUND = 0x20
 SIGHTC_OFF_BEARING = 0x1C
 SIGHTC_OFF_DEST_DIST = 0x34
 OBJ_OFF_SCRIPT_STATE = 0xB4
-OBJ_OFF_FIELD_C0 = 0xC0
+OBJ_OFF_BY_TYPE_C0 = 0xC0
 OBJ_OFF_DEADLINE_D0 = 0xD0
 
 REACHED = 12
@@ -104,7 +104,7 @@ class Harness:
         self.trace = []
 
         uc.mem_write(OBJ + OBJ_OFF_SCRIPT_STATE, struct.pack("<I", STATE))
-        uc.mem_write(OBJ + OBJ_OFF_FIELD_C0, struct.pack("<I", 0xDEADBEEF))
+        uc.mem_write(OBJ + OBJ_OFF_BY_TYPE_C0, struct.pack("<I", 0xDEADBEEF))
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_D0, struct.pack("<I", deadline))
 
         uc.mem_write(CTX + SIGHTC_OFF_DEST_DIST, struct.pack("<i", dist))
@@ -118,7 +118,7 @@ class Harness:
         rd = lambda a: struct.unpack("<I", bytes(uc.mem_read(a, 4)))[0]
         return (bytes(uc.mem_read(OUT + 4, 1))[0],
                 rd(OBJ + OBJ_OFF_SCRIPT_STATE),
-                rd(OBJ + OBJ_OFF_FIELD_C0),
+                rd(OBJ + OBJ_OFF_BY_TYPE_C0),
                 tuple(self.trace))
 
 

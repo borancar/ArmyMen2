@@ -372,7 +372,7 @@ found:
         (&RECAT(slot))->recvPackets = 0;
         (&RECAT(slot))->sentPackets = 0;
         (&RECAT(slot))->acksSeen = 0;
-        (&RECAT(slot))->field34 = 0;
+        (&RECAT(slot))->unused34 = 0;
         (&RECAT(slot))->nacksSent = 0;
         g_msgWantedFlags |= want;
         (&RECAT(slot))->duplicates = 0;
@@ -383,11 +383,11 @@ found:
         (&RECAT(slot))->ready = 1;
         (&RECAT(slot))->heHas = 0;
         (&RECAT(slot))->badChecksums = 0;
-        (&RECAT(slot))->field9C = 0;
-        (&RECAT(slot))->fieldA0 = 0;
+        (&RECAT(slot))->unused9C = 0;
+        (&RECAT(slot))->unusedA0 = 0;
         (&RECAT(slot))->lossBurst = 0;
         (&RECAT(slot))->lossPct = 0;
-        (&RECAT(slot))->fieldAC = 0;
+        (&RECAT(slot))->unusedAC = 0;
         (&RECAT(slot))->lagMs = 0;
         (&RECAT(slot))->lagSpread = 0;
 
@@ -483,7 +483,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommRemovePlayer(int32_t id)
         me->slots[n].wasHere = me->slots[n + 1].wasHere;
         me->slots[n].remote = me->slots[n + 1].remote;
         me->slots[n].unacked = me->slots[n + 1].unacked;
-        me->slots[n].field5C = me->slots[n + 1].field5C;
+        me->slots[n].unused5C = me->slots[n + 1].unused5C;
         me->slots[n].heard = me->slots[n + 1].heard;
     }
 
@@ -527,7 +527,7 @@ void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
         self->slots[i].wasHere = 0;
         self->slots[i].team = 0;
         self->slots[i].unacked = 0;
-        self->slots[i].field5C = 0;
+        self->slots[i].unused5C = 0;
         self->slots[i].heard = now;
         memset(self->slots[i].name, 0, 0x40);
     }
@@ -553,7 +553,7 @@ void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
     self->lobbyStarting = 0;
     self->lobbied = 0;
     self->verbose = 0;
-    self->field41C = 0;
+    self->unused41C = 0;
     self->timeoutsOn = 1;
     self->coalesceMs = 100;
     self->maxHoldMs = 1000;
@@ -1220,7 +1220,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommDropDirectPlay()
         self->slots[i].id = 0;
 
         self->slots[i].unacked = 0;
-        self->slots[i].field5C = 0;
+        self->slots[i].unused5C = 0;
         self->slots[i].heard = GetTickCount();
         memset(self->slots[i].name, 0, 0x40);
     }
@@ -2348,7 +2348,7 @@ void __cdecl PacketSlotReset(uint32_t slot)
     g_playerRecords[slot].recvPackets = 0;
     g_playerRecords[slot].sentPackets = 0;
     g_playerRecords[slot].acksSeen = 0;
-    g_playerRecords[slot].field34 = 0;
+    g_playerRecords[slot].unused34 = 0;
     g_playerRecords[slot].badChecksums = 0;
     g_playerRecords[slot].nacksSent = 0;
     g_playerRecords[slot].duplicates = 0;

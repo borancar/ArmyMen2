@@ -746,7 +746,7 @@ int32_t __cdecl LevelCount(void)
  * SCEN_ROW_OFF_AT would run into the fields above it. Both reproduced.
  *
  * The two trailing fields are seeded rather than read: SCEN_ROW_OFF_AT takes
- * ADDR_ZERO_POINT, which is the packed origin, and SCEN_ROW_OFF_FIELD_68 is
+ * ADDR_ZERO_POINT, which is the packed origin, and SCEN_ROW_OFF_UNUSED_68 is
  * cleared. Neither comes off the wire.
  */
 int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
@@ -812,12 +812,12 @@ int32_t __cdecl ParseScenarioPart(AM2_ScenPart *p, const void *at)
         q = cur;
         row->amount  = *q++;
         row->flag    = (uint8_t)(*q++ == 0 ? 1 : 0);
-        row->field12 = *q;
-        row->field68 = 0;
+        row->unused12 = *q;
+        row->unused68 = 0;
         q++;
         row->at = g_zeroPoint;
-        if (!row->field12)
-            row->field12 = 1;
+        if (!row->unused12)
+            row->unused12 = 1;
 
         len = (int8_t)*q++;
         if (len) {
@@ -1764,7 +1764,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
                         r->owner = (uint8_t)ownr;
                     }
                     r->trig = (uint8_t)trig;
-                    r->field11 = 0;
+                    r->unused11 = 0;
                     objs[index].numb = (int8_t)numb;   /* through the array element, as the image does: r is &objs[index] */
 
                     if (strlen(scri) != 0) {

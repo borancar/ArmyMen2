@@ -125,7 +125,7 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, struct AM2_Object *obj);
 struct AM2_Object *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 
 /* The object header's two halves and three of the eight per-type savers, all
- * writing from OBJ_OFF_FIELD_94. See gameproc.cpp. */
+ * writing from OBJ_OFF_BY_TYPE_94. See gameproc.cpp. */
 int32_t __cdecl SaveItemHeader(am2_FILE *fp, struct AM2_Object *obj);
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, struct AM2_Object *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, struct AM2_Object *obj);
@@ -162,7 +162,7 @@ void *__cdecl CreateMissile(struct AM2_Object *weapon, struct AM2_Object *source
 
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
  * the tag, build the item from the tag, then overwrite most of it from the
- * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
+ * saved header -- keeping the FRESH object's OBJ_OFF_BY_TYPE_94 pointer and its
  * two 16-byte blocks at +0x20 and +0x30. See gameproc.cpp. */
 struct AM2_Object *__cdecl LoadType1(am2_FILE *fp, const struct AM2_Object *hdr);
 int32_t __cdecl SaveType6(am2_FILE *fp, struct AM2_Object *obj);
@@ -268,7 +268,7 @@ void __cdecl InitArmyObjLists(void);
 
 /* 0x0043CB60, one caller. The ROACH member of the per-type savegame loader
  * family: read the 0x4CC-byte record, build a roach from the header, paste the
- * record over OBJ_OFF_FIELD_94, and rescale the health across a possibly
+ * record over OBJ_OFF_BY_TYPE_94, and rescale the health across a possibly
  * different maximum. */
 struct AM2_Object *__cdecl LoadType8(am2_FILE *fp, const struct AM2_Object *hdr);
 /* 0x0045A120, one caller. The VEHICLE loader: rebuild two pointer lists and

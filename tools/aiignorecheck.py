@@ -51,7 +51,7 @@ SIGHT_OFF_BEARING = 0x18
 SIGHT_OFF_FOUND = 0x1C
 SIGHT_OFF_DEST_DIST = 0x28
 OBJ_OFF_SCRIPT_STATE = 0xB4
-OBJ_OFF_FIELD_C0 = 0xC0
+OBJ_OFF_BY_TYPE_C0 = 0xC0
 OBJ_OFF_DEADLINE_D0 = 0xD0
 OBJ_OFF_HIT_DIR = 0x104
 
@@ -100,7 +100,7 @@ class Harness:
         self.routed = 0
 
         uc.mem_write(OBJ + OBJ_OFF_SCRIPT_STATE, struct.pack("<I", state))
-        uc.mem_write(OBJ + OBJ_OFF_FIELD_C0, struct.pack("<I", 0xDEADBEEF))
+        uc.mem_write(OBJ + OBJ_OFF_BY_TYPE_C0, struct.pack("<I", 0xDEADBEEF))
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_D0, struct.pack("<I", deadline))
         uc.mem_write(OBJ + OBJ_OFF_HIT_DIR, bytes([hit]))
 
@@ -118,7 +118,7 @@ class Harness:
 
         return (bytes(uc.mem_read(OUT + 1, 1))[0],
                 struct.unpack("<I", bytes(uc.mem_read(OBJ + OBJ_OFF_SCRIPT_STATE, 4)))[0],
-                struct.unpack("<I", bytes(uc.mem_read(OBJ + OBJ_OFF_FIELD_C0, 4)))[0],
+                struct.unpack("<I", bytes(uc.mem_read(OBJ + OBJ_OFF_BY_TYPE_C0, 4)))[0],
                 bytes(uc.mem_read(OBJ + OBJ_OFF_HIT_DIR, 1))[0],
                 self.routed)
 

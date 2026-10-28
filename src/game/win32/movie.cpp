@@ -355,7 +355,7 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
     movie->srcH = 0;
     movie->timerId = 0;
     movie->smack = NULL;
-    movie->field20 = 0;
+    movie->unused20 = 0;
 
     strcpy(movie->name, name);
 

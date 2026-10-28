@@ -79,7 +79,7 @@ typedef struct AM2_MapRec {
     union { int32_t x; int16_t x16; };  /* +0x08 MAPREC_OFF_X */
     union { int32_t y; int16_t y16; };  /* +0x0C MAPREC_OFF_Y */
     uint8_t trig;                   /* +0x10 MAPREC_OFF_TRIG */
-    uint8_t field11;                /* +0x11 written 0 */
+    uint8_t unused11;                /* +0x11 written 0 */
     uint8_t elev;                   /* +0x12 MAPREC_OFF_ELEV */
     uint8_t owner;                  /* +0x13 MAPREC_OFF_OWNER, 0 = none */
     uint8_t move;                   /* +0x14 MAPREC_OFF_MOVE */
