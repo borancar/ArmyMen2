@@ -101,7 +101,7 @@ typedef struct AM2_SpriteSet {
 typedef struct AM2_SpriteGroupC {
     int32_t      count;          /* +0x00 SPRITEGRP_C_OFF_COUNT */
     AM2_Sprite **sprites;        /* +0x04 SPRITEGRP_C_OFF_SPRITES */
-    int32_t      field8;         /* +0x08, copied into the effect context */
+    int32_t      gate;         /* +0x08, copied into the effect context */
 } AM2_SpriteGroupC;
 
 /* One particle kind at ADDR_PARTICLE_KINDS, 0x18 bytes: its frame count, its

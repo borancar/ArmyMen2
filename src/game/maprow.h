@@ -197,8 +197,8 @@ typedef struct AM2_Seq {
         int32_t param;           /*   the particle kind, read as a dword */
     };
     uint32_t    gate;            /* +0x08 SEQ_OFF_GATE, milliseconds */
-    int32_t     field0C;         /* +0x0C SEQ_OFF_FIELD_0C */
-    int32_t     field10;         /* +0x10 SEQ_OFF_FIELD_10 */
+    int32_t     driftX;         /* +0x0C SEQ_OFF_DRIFT_X */
+    int32_t     driftY;         /* +0x10 SEQ_OFF_DRIFT_Y */
     int32_t     life;            /* +0x14 SEQ_OFF_LIFE, signed: kind 0 tests < -4 */
     int32_t     height;          /* +0x18 a particle's floor offset, SpawnParticle's */
     AM2_MapRow *row;             /* +0x1C SEQ_OFF_ROW, the row it draws through */

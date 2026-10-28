@@ -2183,8 +2183,8 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
 
     seq->kind     = AM2_SEQ_KIND6;
     seq->flag4    = (uint8_t)variant;
-    seq->field0C = 0;
-    seq->field10 = 0;
+    seq->driftX = 0;
+    seq->driftY = 0;
     seq->owner    = 0;
     seq->life     = AM2_SEQ_LIFE6;
     seq->gate     = 1;
@@ -2246,9 +2246,9 @@ void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust)
 
     seq->kind     = AM2_SEQ_KIND4;
     seq->flag4    = 0;
-    seq->field0C =
+    seq->driftX =
         g_seqK4DriftX;
-    seq->field10 =
+    seq->driftY =
         g_seqK4DriftY;
     seq->owner    = 0;
     seq->life     =
@@ -2322,9 +2322,9 @@ int32_t __cdecl SeqStepKind4(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         row->yAdjust +=
             g_seqK4Rise;
         row->pos.x +=
-            (int16_t)r->field0C;
+            (int16_t)r->driftX;
         row->pos.y +=
-            (int16_t)r->field10;
+            (int16_t)r->driftY;
 
         row->stamp54 = 0;
 
@@ -2480,7 +2480,7 @@ void __cdecl SeqRun(AM2_SeqCtx *ctx)
  *
  * The two are written out rather than shared. They differ in five places --
  * kind, sprite array, default lifetime, the value at ROW_OFF_26, and whether
- * SEQ_OFF_FIELD_10 is zeroed -- and kind 7 has the extra call at the end, so
+ * SEQ_OFF_DRIFT_Y is zeroed -- and kind 7 has the extra call at the end, so
  * a common helper would take five parameters and a flag to save eight lines.
  * The original has them as two functions and so does this.
  *
@@ -2507,8 +2507,8 @@ void __cdecl SeqAddKind5(const AM2_Point *at, int32_t owner, int32_t life)
     seq->kind     = AM2_SEQ_KIND5;
     seq->flag4    = 0;
     seq->owner    = owner;
-    seq->field0C = 0;
-    seq->field10 = 0;
+    seq->driftX = 0;
+    seq->driftY = 0;
     seq->life     = AM2_SEQ_LIFE5;
     if (life > 0)
         seq->life = life;
@@ -2546,7 +2546,7 @@ void __cdecl SeqAddKind7(const AM2_Point *at, int32_t owner, int32_t b,
     seq->flag4    = 0;
     seq->owner    = owner;
     seq->life     = AM2_SEQ_LIFE7;
-    seq->field0C = 0;
+    seq->driftX = 0;
     if (life > 0)
         seq->life = life;
     seq->gate     = 1;
@@ -2925,7 +2925,7 @@ struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *r, const struct AM2_
  * a box around its row.
  *
  * TWO DAMAGE ARMS, AND ONE OF THEM IS RATE-LIMITED. A type-2, -3 or -8 object
- * takes 1 every puff; anything else takes 15 but only once SEQ_OFF_FIELD_0C
+ * takes 1 every puff; anything else takes 15 but only once SEQ_OFF_DRIFT_X
  * has passed 9, and that counter is reset to 0 in the same breath. So troops
  * and vehicles burn steadily while scenery takes a single large hit every ten
  * puffs -- and the two arms differ in the AMOUNT as well as the gate, which a
@@ -2967,7 +2967,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         pt.x = (int16_t)(pt.x + ((orig_seq_rand() % 16) - 8) * variant);
 
         SeqAddKind6(&pt, variant);
-        r->field0C += 1;
+        r->driftX += 1;
 
         if (g_mpSession != 0
             && !AM2_THE_COMM->CommMustBroadcast(
@@ -2989,7 +2989,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
                 if (ObjIsTypeIn238(obj))
                     DamageObject(obj, 1, 1,
                                  r->owner, 0, 0);
-                else if (r->field0C > 9)
+                else if (r->driftX > 9)
                     DamageObject(obj, 0x0F, 1,
                                  r->owner, 0, 0);
                 obj = obj->queryNext;
@@ -2997,8 +2997,8 @@ int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         }
 
         r->gate -= 0x12C;
-        if (r->field0C > 9)
-            r->field0C = 0;
+        if (r->driftX > 9)
+            r->driftX = 0;
     }
 
     row->stamp54 +=
@@ -3063,9 +3063,9 @@ int32_t __cdecl SeqStepKind0(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
         }
 
         row->pos.x +=
-            (int16_t)r->field0C;
+            (int16_t)r->driftX;
         row->pos.y +=
-            (int16_t)r->field10;
+            (int16_t)r->driftY;
         row->yAdjust += (int16_t)r->life;
 
         /* The bounds test is on the DRAWN point -- the row's position with

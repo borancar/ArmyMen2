@@ -2078,14 +2078,14 @@ void __cdecl SpawnParticle(const AM2_Point *at, int32_t rowField2C,
 
     half = speed >> 1;
     if (angle < 0) {
-        ctx->field0C = (orig_game_rand() % speed) - half;
-        ctx->field10 = (orig_game_rand() % speed) - half;
+        ctx->driftX = (orig_game_rand() % speed) - half;
+        ctx->driftY = (orig_game_rand() % speed) - half;
     } else {
         /* The speed as a float, once. */
         float f = (float)speed;
 
-        ctx->field0C = (int32_t)(Cos8(angle) * f);
-        ctx->field10 = (int32_t)(Sin8(angle) * f);
+        ctx->driftX = (int32_t)(Cos8(angle) * f);
+        ctx->driftY = (int32_t)(Sin8(angle) * f);
     }
 
     ctx->life = (orig_game_rand() % half) + half;
@@ -2305,15 +2305,15 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
     ctx->flag4     = (uint8_t)group;
     ctx->owner = ownerUid;
     ctx->kind           = 2;
-    ctx->field0C  = 0;
-    ctx->field10  = 0;
+    ctx->driftX  = 0;
+    ctx->driftY  = 0;
 
     step  = 0x100 / g_spriteGroupsC[group].count;
     frame = ((step >> 1) + angle) / step;
     if (frame >= g_spriteGroupsC[group].count)
         frame -= g_spriteGroupsC[group].count;
     ctx->life = frame;
-    ctx->gate    = g_spriteGroupsC[group].field8;
+    ctx->gate    = g_spriteGroupsC[group].gate;
 
     row = ctx->row;
     row->cell  = 0;

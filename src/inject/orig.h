@@ -2366,7 +2366,7 @@
  * is the only reason they can be named at all. */
 #define ADDR_SEQ_ADD_KIND4       0x00461350u  /* void(const int32_t *at, int32_t) */
 /* The kind-4 constants, now that its stepper says what each is for: the two
- * SEQ_OFF_FIELD_0C/_10 sources are a per-step DRIFT in x and y, and the life
+ * SEQ_OFF_DRIFT_X/_10 sources are a per-step DRIFT in x and y, and the life
  * is the interval BETWEEN steps rather than a total -- the stepper zeroes the
  * row's elapsed each time it fires. */
 #define ADDR_SEQ_K4_DRIFT_X      0x0048CBD8u  /* int32_t, reads 3 */
@@ -8301,8 +8301,8 @@ typedef struct {
  * -- it is "start just above zero so the walker does not skip me". Which is
  * why the name is kept: what the WALKER does with it is still a gate. */
 #define SEQ_OFF_GATE             0x08u  /* int32_t, milliseconds */
-#define SEQ_OFF_FIELD_0C         0x0Cu  /* int32_t, zeroed */
-#define SEQ_OFF_FIELD_10         0x10u  /* int32_t, zeroed by kind 5 only */
+#define SEQ_OFF_DRIFT_X         0x0Cu  /* int32_t, zeroed */
+#define SEQ_OFF_DRIFT_Y         0x10u  /* int32_t, zeroed by kind 5 only */
 /* A DURATION in milliseconds, which kind 5 compares against the row's
  * ROW_OFF_STAMP_54 -- and that field is elapsed milliseconds there and a
  * FRAME COUNT in kind 2's stepper. One field, two units, by kind. */
