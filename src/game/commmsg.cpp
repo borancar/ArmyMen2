@@ -3397,7 +3397,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
 
             o->ctl.gate = 1;
             o->ctl.state = (int32_t)(action & 7u);
-            o->ctl.field0C = (int32_t)((uint32_t)action >> 7);
+            o->ctl.reverse = (int32_t)((uint32_t)action >> 7);
             o->ctl.stop = (int32_t)(((uint32_t)action >> 6) & 1u);
             o->ctl.approach = (int32_t)(((uint32_t)action >> 5) & 1u);
         }
@@ -3431,7 +3431,7 @@ uint8_t *__cdecl VehicleUpdateApply(uint8_t *at, int32_t army)
                 (uint32_t)o->ctl.heading,
                 (uint32_t)o->ctl.aim,
                 o->ctl.state,
-                o->ctl.field0C,
+                o->ctl.reverse,
                 o->ctl.stop,
                 o->ctl.approach);
 

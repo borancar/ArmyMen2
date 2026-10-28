@@ -1781,7 +1781,7 @@ void __cdecl VehicleUpdateAppend(AM2_ArmyBatch *msg, AM2_Object *obj)
     /* +0x544 is the vehicle KIND -- the same field Step3Drive dispatches its
      * engine sounds on -- with three state bits laid over the top. */
     action = *(const uint8_t *)&obj->deathKind;
-    if (obj->ctl.field0C)
+    if (obj->ctl.reverse)
         action |= 0x80u;
     if (obj->ctl.stop)
         action |= 0x40u;

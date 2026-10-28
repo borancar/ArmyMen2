@@ -62,8 +62,8 @@ typedef struct AM2_AnimCell {
 typedef struct AM2_Anim {
     int16_t       frames;         /* +0x00 */
     int16_t       directions;     /* +0x02 */
-    int16_t       field4;         /* +0x04 */
-    int16_t       field6;         /* +0x06 */
+    int16_t       speed;         /* +0x04 */
+    int16_t       endCell;         /* +0x06 */
     uint8_t       directionBits;  /* +0x08 -- Log2Mask(directions) */
     uint8_t       zero9;          /* +0x09 -- written 0, never read here */
     uint8_t       pad0A[2];

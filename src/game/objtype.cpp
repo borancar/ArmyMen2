@@ -681,7 +681,7 @@ AM2_AaiRec *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
                +0x28. */
             rec->crushDamage    = def->crushDamage;
             rec->armour         = def->armour;
-            rec->field3C        = def->field34;
+            rec->perm        = def->perm;
         }
 
         if (slot > 0) {

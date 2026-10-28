@@ -65,7 +65,7 @@ OBJ_OFF_FIELD_94 = 0x94
 OBJ_OFF_RANK = 0x98
 TYPEREC_OFF_CODE = 0x00
 TYPEREC_OFF_FIELD_08 = 0x08
-TYPEREC_OFF_FIELD_3C = 0x3C
+TYPEREC_OFF_PERM = 0x3C
 
 STRUCK_NOTHING = 0
 STRUCK_HARD = 5
@@ -169,7 +169,7 @@ class Harness:
             uc.mem_write(rec, b"\0" * 0x40)
             uc.mem_write(base + OBJ_OFF_UID, struct.pack("<I", o["uid"]))
             uc.mem_write(base + OBJ_OFF_FIELD_94, struct.pack("<I", rec))
-            uc.mem_write(rec + TYPEREC_OFF_FIELD_3C,
+            uc.mem_write(rec + TYPEREC_OFF_PERM,
                          struct.pack("<B", o["rec3c"]))
             nxt = obj_at(i + 1) if i + 1 < len(c["objs"]) else 0
             uc.mem_write(base + OBJ_OFF_QUERY_NEXT, struct.pack("<I", nxt))

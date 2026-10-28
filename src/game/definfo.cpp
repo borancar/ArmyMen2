@@ -446,16 +446,16 @@ void __cdecl LoadDefTables(void)
         g_missileDefs[id].kind        = src->kind;
         g_missileDefs[id].cooldown    = src->cooldown;
         g_missileDefs[id].life        = src->life;
-        g_missileDefs[id].field0C     = src->field0C;
+        g_missileDefs[id].zVel     = src->zVel;
         g_missileDefs[id].range       = src->range;
         g_missileDefs[id].rangeMin    = src->rangeMin;
         g_missileDefs[id].capacity    = src->capacity;
         g_missileDefs[id].damage     = src->damage;
         g_missileDefs[id].blastDamage = src->blastDamage;
         g_missileDefs[id].automatic   = src->automatic;
-        g_missileDefs[id].field28     = src->field28;
+        g_missileDefs[id].respawns     = src->respawns;
         g_missileDefs[id].weight      = src->weight;
-        g_missileDefs[id].field30     = src->field30;
+        g_missileDefs[id].randAmmo     = src->randAmmo;
     }
 
     /* The rank records. A projection of a 0x20-byte parsed record onto a
@@ -473,12 +473,12 @@ void __cdecl LoadDefTables(void)
         /* In the parsed record's order, which scatters them. */
         rec->max_health =
             src->maxHealth;
-        rec->field_04 =
-            src->field04;
+        rec->viewAngle =
+            src->viewAngle;
         rec->sight_range =
             src->sightRange;
-        rec->field_08 =
-            src->field08;
+        rec->hearRange =
+            src->hearRange;
 
         /* An integer percentage becomes a rate, with a floor of 1.0 -- and
          * this is the record's only float, which is what confirms the whole

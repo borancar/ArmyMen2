@@ -659,7 +659,7 @@ void __cdecl RowInit(AM2_MapRow *r, AM2_Sprite *sprite, int32_t x, int32_t y)
  * could not be added without touching this function.
  *
  * THE FIRST TEST IS A SHORTCUT AND IT DOES NOT GO THROUGH THE TABLE. An id
- * equal to the row's own ROW_OFF_FRAME answers ROW_OFF_FIELD_3C directly --
+ * equal to the row's own ROW_OFF_FRAME answers ROW_OFF_SPEED directly --
  * the value already cached on the row -- and is NOT doubled. So the same id
  * gives two different answers depending on whether the row happens to be
  * showing it. Reproduced; it is the whole reason the cached field exists.
@@ -679,7 +679,7 @@ int32_t __cdecl RowAnimField4(const AM2_MapRow *row, uint16_t id)
     int32_t              value;
 
     if ((int16_t)id == r->frame)
-        return r->field3C;
+        return r->speed;
 
     if (!id)
         return 0;
@@ -700,7 +700,7 @@ found:
         i = 0;
     }
 
-    value = (int16_t)table->entries[i].anim->field4;
+    value = (int16_t)table->entries[i].anim->speed;
 
     if (r->lut
         == g_rowLutDoubles)
@@ -745,7 +745,7 @@ found:
  * layout anim.h records, and the sprite is that cell's id through
  * ADDR_SPRITE_LIST.
  *
- * THE LAST TWO LINES ARE A SPECIAL CASE FOR ONE LUT. ROW_OFF_FIELD_3C takes
+ * THE LAST TWO LINES ARE A SPECIAL CASE FOR ONE LUT. ROW_OFF_SPEED takes
  * the animation's field4, DOUBLED when the row's MAPOBJ_OFF_LUT is
  * ADDR_ROW_LUT_DOUBLES and not otherwise. The comparison is on the LUT's
  * ADDRESS, not its contents. What makes that lut special is not established
@@ -821,10 +821,10 @@ found:
                                               + row->cell].sprite]),
                  g_mapDesc);
 
-    v = row->animPlaying->field4;
-    row->field3C = v;
+    v = row->animPlaying->speed;
+    row->speed = v;
     if (row->lut == g_rowLutDoubles)
-        row->field3C = (int16_t)(v + v);
+        row->speed = (int16_t)(v + v);
 }
 
 /* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from
@@ -1648,7 +1648,7 @@ int32_t __cdecl RandomRespawnKind(int32_t *out)
                 % g_respawnKindCount;
     int32_t kind = g_respawnKinds[r];
 
-    *out = g_missileDefs[kind].field30;
+    *out = g_missileDefs[kind].randAmmo;
     return kind;
 }
 

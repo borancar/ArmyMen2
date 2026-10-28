@@ -1068,7 +1068,7 @@ found:
         speed = (int32_t)(AM2_ANIM_FAST_STEP
                           / g_frameDeltaSec);
     } else {
-        speed = table->entries[i].anim->field4;
+        speed = table->entries[i].anim->speed;
     }
 
     if (rows->lut == g_rowLutDoubles)
@@ -3924,8 +3924,8 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
     dist    = ApproxDistXY(dx, dy);                                           \
     bearing = AI_ANGLE3(dx, dy, dist);                                        \
                                                                               \
-    if (abs(AngleDelta(facing, bearing)) > g_rankRecords[o->rank].field_04) { \
-        if (dist < g_rankRecords[o->rank].field_08)            \
+    if (abs(AngleDelta(facing, bearing)) > g_rankRecords[o->rank].viewAngle) { \
+        if (dist < g_rankRecords[o->rank].hearRange)            \
             goto SEEN_IT;                                                     \
         goto NOT_SEEN;                                                        \
     }                                                                         \
@@ -4009,8 +4009,8 @@ void __cdecl AiStepTrack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
  *   the facing is written twice into one slot, hull then turret.
  *
  * THE TWO RANK FIELDS ARE NOT ALIKE either, and they are read four bytes apart
- * off one base. RANK_REC_OFF_FIELD_04 is compared against an angle delta, so
- * it is an ARC; RANK_REC_OFF_FIELD_08 against a distance, so it is a RANGE.
+ * off one base. RANK_REC_OFF_VIEW_ANGLE is compared against an angle delta, so
+ * it is an ARC; RANK_REC_OFF_HEAR_RANGE against a distance, so it is a RANGE.
  * Outside the arc a target still counts if it is inside that range -- a unit
  * can be engaged from behind, but only close up. */
 void __cdecl AiAttackBody(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
@@ -4948,8 +4948,8 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
                 pick.range   = ApproxDistXY(dx, dy);
                 pick.bearing = AI_ANGLE3(dx, dy, pick.range);
 
-                if (abs(AngleDelta(hold.look, pick.bearing)) > g_rankRecords[o->rank].field_04) {
-                    if (pick.range < g_rankRecords[o->rank].field_08)
+                if (abs(AngleDelta(hold.look, pick.bearing)) > g_rankRecords[o->rank].viewAngle) {
+                    if (pick.range < g_rankRecords[o->rank].hearRange)
                         goto in_sight;
                     goto next;
                 }
@@ -7693,7 +7693,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
     /* A row still mid-animation, or one whose animation says so, stops the
      * whole step: take whatever is under the trooper and go to the tail. */
     rows = o->rowSet.rows;
-    if (rows->field3C <= 0
+    if (rows->speed <= 0
         && RowAnimField4(rows,
                          (uint16_t)*(const int16_t *)
                              &g_weaponPoseFrames[out->state]) <= 0) {
@@ -8322,7 +8322,7 @@ void __cdecl StepType3(AM2_Object *o)
     if (o->ctl.gate == 0) {
         o->ctl.heading  = o->facing;
         o->ctl.aim      = o->turretFacing;
-        o->ctl.field0C  = 0;
+        o->ctl.reverse  = 0;
         o->ctl.state    = 1;
         o->ctl.approach = 0;
         o->ctl.stop     = 0;
@@ -8463,7 +8463,7 @@ post:
         goto emit;
 
     if (o->speed > AM2_VEH_TURN_LIMIT) {
-        o->ctl.field0C = 1;
+        o->ctl.reverse = 1;
         o->ctl.state   = AM2_VEH_STATE_TURNING;
     } else if (o->speed < -AM2_VEH_TURN_LIMIT) {
         o->ctl.state = AM2_VEH_STATE_TURNING;
@@ -9354,7 +9354,7 @@ int32_t __cdecl Step3TurnBlocked(AM2_Object *o, const AM2_SteerOut *p,
     if (p->state != 1) {
         int32_t want_speed;
 
-        want_speed = p->field0C != 0
+        want_speed = p->reverse != 0
                      ? o->revSpeed
                      : o->fwdSpeed;
         /* Two independent `sar esi, 1`, not one test of two bits: both flags
@@ -9368,7 +9368,7 @@ int32_t __cdecl Step3TurnBlocked(AM2_Object *o, const AM2_SteerOut *p,
          * compares jle and jge; swapping them is invisible whenever the
          * desired speed is already inside the band. Each arm scales the
          * acceleration by the frame's float delta itself (int * float). */
-        if (p->field0C != 0) {
+        if (p->reverse != 0) {
             limit = (int32_t)((double)o->speed
                               - o->accelRate
                                 * g_frameDeltaSec);
@@ -9818,10 +9818,10 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                                        *(const uint8_t *)r);
                 d = abs(d);
                 if (d > 0x40)
-                    r->field0C = 1;
+                    r->reverse = 1;
             }
 
-            want = r->field0C != 0
+            want = r->reverse != 0
                         ? o->revSpeed
                         : o->fwdSpeed;
 
@@ -9855,7 +9855,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             /* The acceleration limiter, and the two arms clamp from
              * OPPOSITE sides: slowing down takes the larger of the two,
              * speeding up the smaller. */
-            if (r->field0C != 0) {
+            if (r->reverse != 0) {
                 int32_t v = (int32_t)((float)o->speed
                                       - (float)o->accelRate
                                         * g_frameDeltaSec);
@@ -9880,7 +9880,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
              * ApproxDist's arguments above are (position, target), the
              * order the image pushes, and the distance is symmetric. */
             if ((uint32_t)o->stuckCount > 0 && speed != 0) {
-                if (r->field0C != 0) {
+                if (r->reverse != 0) {
                     int32_t t = (int32_t)o->stuckCount * speed;
                     int32_t c = o->revSpeed;
                     speed = (c > t) ? c : t;
@@ -10321,7 +10321,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
     if (ActionKeyDown(AM2_ACTION_01)) {
         r->state = AM2_VEH_STATE_TURNING;
         r->stop = 0;
-        r->field0C = 1;
+        r->reverse = 1;
         steered = 1;
         o->dest = g_zeroPoint;
         o->walkOrder = 0;
@@ -10417,7 +10417,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                  * the reverse flag goes on. */
                 if (abs(aimDelta) > 0x64
                     && dist < 0x80) {
-                    r->field0C = 1;
+                    r->reverse = 1;
                     r->heading = (uint8_t)(r->heading + 0x80);
                 }
             }

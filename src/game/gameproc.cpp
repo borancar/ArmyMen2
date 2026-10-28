@@ -1342,7 +1342,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
     o->speed = b->speed;
 
     {
-        int32_t n = w->typeRec->field0C;
+        int32_t n = w->typeRec->zVel;
 
         if (n > 0) {
             o->velZ = (float)n;

@@ -70,8 +70,8 @@ static void DumpAnimTable(const AM2_AnimTable *t)
             int32_t cells = (int16_t)(a->directions * a->frames);
 
             n += sprintf(buf + n, " f=%d fa=%d bits=%d w4=%d w6=%d cells=%d",
-                         a->frames, a->directions, a->directionBits, a->field4,
-                         a->field6, cells);
+                         a->frames, a->directions, a->directionBits, a->speed,
+                         a->endCell, cells);
             for (j = 0; j < cells && j < 6; j++)
                 n += sprintf(buf + n, " (%d,%d)", a->cells[j].hold,
                              a->cells[j].sprite);
@@ -126,10 +126,10 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             table->entries[i].anim->directions = w;
             table->entries[i].anim->directionBits = Log2Mask(w);
             orig_fread(&w, 2, 1, fp);
-            table->entries[i].anim->field4 = w;
+            table->entries[i].anim->speed = w;
             table->entries[i].anim->zero9 = 0;
             orig_fread(&w, 2, 1, fp);
-            table->entries[i].anim->field6 = w;
+            table->entries[i].anim->endCell = w;
 
             /* Computed 16-bit and sign-extended afterwards, exactly as the
              * original does -- so a grid big enough to overflow an int16 would

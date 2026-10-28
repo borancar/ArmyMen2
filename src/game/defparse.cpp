@@ -265,11 +265,11 @@ int32_t __cdecl DefTrooperLine(int32_t cmd, char *line)
 
     if (!DefParseNumber(&rec.maxHealth, am2_strtok(line, kSep)))
         return 2;
-    if (!DefParseNumber(&rec.field04, am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.viewAngle, am2_strtok((char *)0, kSep)))
         return 3;
     if (!DefParseNumber(&rec.sightRange, am2_strtok((char *)0, kSep)))
         return 4;
-    if (!DefParseNumber(&rec.field08, am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.hearRange, am2_strtok((char *)0, kSep)))
         return 5;
     if (!DefParseNumber(&rec.firePct, am2_strtok((char *)0, kSep)))
         return 6;
@@ -819,12 +819,12 @@ int32_t __cdecl DefVehicleLine(int32_t code, char *line)
     }
 
     if (!DefParseNumber(&rec.seats, am2_strtok(line, kSep)))  return 2;
-    if (!NextNumber(&rec.field08))                              return 3;
-    if (!NextNumber(&rec.field0C))                              return 4;
+    if (!NextNumber(&rec.fwdSpeed))                              return 3;
+    if (!NextNumber(&rec.revSpeed))                              return 4;
     if (!NextNumber(&rec.accelRate))                              return 5;
     if (!NextNumber(&rec.turnInterval))                              return 6;
     if (!NextNumber(&rec.health))                              return 7;
-    if (!NextNumber(&rec.field1C))                              return 8;
+    if (!NextNumber(&rec.crushDamage))                              return 8;
     if (!NextNumber(&rec.armour))                              return 9;
 
     AddVehicleDef(&rec);
@@ -935,7 +935,7 @@ int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
      * recorded input, and settled by espmap --site on the two blocks. */
     if (!DefParseNumber(&rec.life, am2_strtok((char *)0, kSep)))
         return 3;
-    if (!DefParseNumber(&rec.field0C, am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.zVel, am2_strtok((char *)0, kSep)))
         return 4;
     if (!DefParseNumber(&rec.range, am2_strtok((char *)0, kSep)))
         return 5;
@@ -949,11 +949,11 @@ int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
         return 9;
     if (!DefParseNumber(&rec.blastDamage, am2_strtok((char *)0, kSep)))
         return 10;
-    if (!DefParseBoolean(&rec.field28, am2_strtok((char *)0, kSep)))
+    if (!DefParseBoolean(&rec.respawns, am2_strtok((char *)0, kSep)))
         return 11;
     if (!DefParseNumber(&rec.weight, am2_strtok((char *)0, kSep)))
         return 12;
-    if (!DefParseNumber(&rec.field30, am2_strtok((char *)0, kSep)))
+    if (!DefParseNumber(&rec.randAmmo, am2_strtok((char *)0, kSep)))
         return 13;
 
     AddMissileDef(&rec);

@@ -30,8 +30,8 @@ typedef struct AM2_PathNode {
  * the trooper definitions. */
 typedef struct AM2_RankRec {
     int32_t sight_range;    /* +0x00 RANK_REC_OFF_SIGHT_RANGE */
-    int32_t field_04;       /* +0x04 RANK_REC_OFF_FIELD_04, the view half-arc */
-    int32_t field_08;       /* +0x08 RANK_REC_OFF_FIELD_08, the out-of-arc range */
+    int32_t viewAngle;       /* +0x04 RANK_REC_OFF_VIEW_ANGLE, the view half-arc */
+    int32_t hearRange;       /* +0x08 RANK_REC_OFF_HEAR_RANGE, the out-of-arc range */
     float   fire_scale;     /* +0x0C RANK_REC_OFF_FIRE_SCALE */
     int32_t threshold;      /* +0x10 RANK_REC_OFF_THRESHOLD */
     int32_t max_health;     /* +0x14 RANK_REC_OFF_MAX_HEALTH */

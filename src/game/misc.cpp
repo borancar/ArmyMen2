@@ -317,7 +317,7 @@ void __cdecl SetFacing14(int32_t facing, const AM2_Object *src, AM2_RoachOut *ou
 
 void __cdecl SetFacing08(int32_t facing, const AM2_Object *src, AM2_SteerOut *out)
 {
-    AM2_SET_FACING(field0C, 4, 1)
+    AM2_SET_FACING(reverse, 4, 1)
 }
 #undef AM2_SET_FACING
 
@@ -815,7 +815,7 @@ int32_t __cdecl Field51MeetsMin(const AM2_MapRow *row)
     const AM2_Anim *rec = row->animPlaying;
 
     /* zero-extended byte, signed 16-bit compare */
-    if (rec && (int16_t)(uint16_t)row->cell >= rec->field6)
+    if (rec && (int16_t)(uint16_t)row->cell >= rec->endCell)
         return 1;
     return 0;
 }
@@ -1074,7 +1074,7 @@ static inline int32_t FacingFromDelta(const int32_t *mode, const int32_t *flag,
 
 int32_t __cdecl FacingFromDelta08(const AM2_SteerOut *rec, int32_t delta)
 {
-    return FacingFromDelta(&rec->state, &rec->field0C, delta);
+    return FacingFromDelta(&rec->state, &rec->reverse, delta);
 }
 
 int32_t __cdecl FacingFromDelta14(const AM2_RoachOut *rec, int32_t delta)

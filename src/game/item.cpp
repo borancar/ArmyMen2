@@ -2267,7 +2267,7 @@ void __cdecl WeaponRespawn(AM2_Object *obj)
     } else {
         const AM2_ItemType *rec = o->typeRec;
 
-        if (!rec->field28)
+        if (!rec->respawns)
             return;
         kind     = rec->kind;
         quantity = o->ammo;
@@ -3253,7 +3253,7 @@ static inline int32_t ShotPiercesArmour(const AM2_Object *target, const AM2_Obje
         return 1;
 
     rec  = target->aai;
-    need = rec->field3C;
+    need = rec->perm;
     if (need <= 0)
         return 1;
     if (shot->power < need)
@@ -3449,7 +3449,7 @@ refuse_top:
  *
  * Code 3 also keeps a record of what it did: `20 - TYPEREC_OFF_FIELD_08` into
  * OBJ_OFF_SPEED, for each object it damaged that is neither a trooper nor
- * an item with TYPEREC_OFF_FIELD_3C set. The same write happens once more in
+ * an item with TYPEREC_OFF_PERM set. The same write happens once more in
  * the terrain test below, so the last one wins and the value does not
  * accumulate.
  *
@@ -3492,7 +3492,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
         if (ObjIsType2(o))
             continue;
         if (ObjIsItem(o)
-            && o->aai->field3C > 0)
+            && o->aai->perm > 0)
             continue;
 
         s->speed =
@@ -7189,7 +7189,7 @@ int32_t __cdecl WeaponPoseIndex(AM2_Object *obj, AM2_Object *weapon)
  * MAPOBJ_OFF_LUT is ADDR_ROW_LUT_DOUBLES -- compared by ADDRESS, not by
  * content -- the dwell is shifted right by one, so that animation runs at
  * double speed. orig.h records the same table making a DIFFERENT function
- * double ROW_OFF_FIELD_3C. Two readers, two fields, and both amount to
+ * double ROW_OFF_SPEED. Two readers, two fields, and both amount to
  * "this one goes faster"; what makes the table special is still not
  * established, but it now has two witnesses instead of one.
  *
@@ -7694,7 +7694,7 @@ void __cdecl StepObjRows(AM2_Object *o)
         StepRowAnim(&set->rows[i]);
 
     if (set->count > 0)
-        o->speed = set->rows->field3C;
+        o->speed = set->rows->speed;
 }
 
 /* 0x0040D930, nine callers. Put a unit into a POSE.
@@ -8491,7 +8491,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
  *
  * THE GATE IS "THE CURRENT ANIMATION HAS FINISHED", AND IT IS SKIPPED rather
  * than tested when two conditions hold together -- the transition is one the
- * table below allows to interrupt, and the row's ROW_OFF_FIELD_3C is
+ * table below allows to interrupt, and the row's ROW_OFF_SPEED is
  * non-zero. Otherwise RowAnimFinished has to agree or nothing happens at all,
  * including the field write. So a caller cannot assume the state changed.
  *
@@ -8529,7 +8529,7 @@ void __cdecl SetObjField530(AM2_Object *obj, int32_t state)
 
     row = o->rowSet.rows;
 
-    if (!(mayInterrupt && row->field3C != 0)
+    if (!(mayInterrupt && row->speed != 0)
         && !RowAnimFinished(row))
         return;
 
@@ -8596,7 +8596,7 @@ uint8_t __cdecl JitterFacing(AM2_Object *obj, uint8_t facing)
 
 /* The row test SetKindFrames applies twice, written once. All three
  * conditions must hold for the row to be left alone: an animation is
- * playing, ROW_OFF_FIELD_3C is zero, and the cell index is short of the
+ * playing, ROW_OFF_SPEED is zero, and the cell index is short of the
  * last. This is a helper of ours -- the original inlines it both times --
  * and it is one only because writing the conjunction twice is how a
  * polarity gets flipped in one copy. */
@@ -8606,7 +8606,7 @@ static inline int32_t RowMidAnimation(const AM2_MapRow *row)
         ((const AM2_Anim *)row->animPlaying);
 
     return anim
-        && row->field3C == 0
+        && row->speed == 0
         && (int32_t)row->cell
                < (int32_t)anim->frames - 1;
 }
@@ -8683,7 +8683,7 @@ void __cdecl ObjToAI(AM2_Object *obj)
  * it -- unless a row is mid-animation, in which case that row is left alone.
  *
  * THE "MID-ANIMATION" TEST IS THREE CONDITIONS AND ALL THREE MUST HOLD to skip
- * the row: there is an animation playing, the row's ROW_OFF_FIELD_3C is zero,
+ * the row: there is an animation playing, the row's ROW_OFF_SPEED is zero,
  * and the current cell is short of the last. Any one failing means the frame
  * is set. Written as the single `if` the original branches into, because the
  * three are a conjunction and splitting them invites getting the polarity
@@ -10986,7 +10986,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
         obj->ctl.heading    = obj->facing;
         obj->ctl.aim = obj->turretFacing;
         obj->ctl.state = 1;
-        obj->ctl.field0C = 0;
+        obj->ctl.reverse = 0;
         obj->ctl.approach = 0;
         obj->ctl.stop = 0;
         obj->aiMode = 1;
@@ -12016,9 +12016,9 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
     o->seats =
         def->seats;
     o->fwdSpeed =
-        def->field08;
+        def->fwdSpeed;
     o->revSpeed =
-        def->field0C;
+        def->revSpeed;
     o->accelRate =
         def->accelRate;
     o->turnInterval =
@@ -12032,7 +12032,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
     o->health = o->maxHealth;
 
     o->crushDamage =
-        def->field1C;
+        def->crushDamage;
     o->armour =
         def->armour;
     o->heightSet =
@@ -12545,7 +12545,7 @@ void __cdecl StepType5(AM2_Object *obj)
 
     speed = def->range;
 
-    if (def->field0C) {
+    if (def->zVel) {
         /* Arced: gravity, and the height floors without stopping the fall. */
         if (obj->row0YAdjust <= 0) {
             obj->row0YAdjust = 0;
@@ -12771,7 +12771,7 @@ after_flight:
     }
 
     if (outcome >= 5) {
-        if (!obj->def->field0C
+        if (!obj->def->zVel
             && obj->flown > speed)
             goto expire;
         if (outcome != 5)

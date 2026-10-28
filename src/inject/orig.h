@@ -8031,7 +8031,7 @@ typedef struct {
 #define ADDR_FRAME_HEADING_BIAS  0x004740CCu  /* uint8_t[] */
 /* A byte LUT, filled at 0x0040A5C2 and 0x0040A5D7 and compared by ADDRESS at
  * six sites including this one. A row whose MAPOBJ_OFF_LUT is THIS lut gets
- * ROW_OFF_FIELD_3C doubled; every other lut takes the value unchanged. What
+ * ROW_OFF_SPEED doubled; every other lut takes the value unchanged. What
  * makes it special is not established -- the name says which one it is. */
 #define ADDR_ROW_LUT_DOUBLES     0x004F9EDCu  /* uint8_t[] */
 #define ROW_OFF_CELL             0x51u   /* uint8_t, index into anim->cells */
@@ -8077,8 +8077,8 @@ typedef struct {
  * fields of different structures; only the row's is an animation. */
 #define ADDR_STEP_OBJ_ROWS       0x00428E00u  /* void(void *obj) */
 #define ADDR_STEP_ROW_ANIM       0x0040A380u  /* void(void *row) */
-#define ROW_OFF_FIELD_3C         0x3Cu   /* int16_t -> OBJ_OFF_SPEED */
-/* int32_t, copied from ROW_OFF_FIELD_3C above. ObjMoveAlongFacing multiplies
+#define ROW_OFF_SPEED         0x3Cu   /* int16_t -> OBJ_OFF_SPEED */
+/* int32_t, copied from ROW_OFF_SPEED above. ObjMoveAlongFacing multiplies
  * it by ADDR_FRAME_DELTA_SEC and projects the result through Cos8/Sin8 into
  * the position, so it is a SPEED in units per second and the animation is
  * what supplies it. Left named for its offset: twenty sites across two files
@@ -9227,14 +9227,14 @@ typedef struct {
  * so 560..640, the range past which a trooper forgets its target. */
 #define RANK_REC_OFF_SIGHT_RANGE 0u    /* int32; 0x00404730 */
 /* AddSightBlocker (0x004036F0) is the second reader of both, and it settles
- * what RANK_REC_OFF_FIELD_04 is: it takes the LOW BYTE as an angular
+ * what RANK_REC_OFF_VIEW_ANGLE is: it takes the LOW BYTE as an angular
  * half-width and clips a blocker's silhouette to it, so it is the rank's SIGHT
  * ARC in the same eighth-of-a-turn units AngleDelta answers in. Left
  * field-numbered anyway: 48 through 76 is a wide arc for a heading unit and
  * one reader is not a meaning -- but it is the first thing that USES it, where
  * everything before only wrote or copied it. */
-#define RANK_REC_OFF_FIELD_04    4u    /* int32; 48 52 56 60 64 68 72 76 */
-#define RANK_REC_OFF_FIELD_08    8u    /* int32; 120 130 140 150 160 170 180 190 */
+#define RANK_REC_OFF_VIEW_ANGLE    4u    /* int32; 48 52 56 60 64 68 72 76 */
+#define RANK_REC_OFF_HEAR_RANGE    8u    /* int32; 120 130 140 150 160 170 180 190 */
 #define RANK_REC_OFF_FIRE_SCALE  12u   /* float; UnitWeaponInfo */
 #define RANK_REC_OFF_THRESHOLD   16u   /* int32; AiHitReact halves it */
 #define RANK_REC_OFF_MAX_HEALTH  20u   /* int32; handed to SetMaxHealth */
@@ -10865,7 +10865,7 @@ typedef struct {
  * AND 0x00473DC4 IS NOT A TABLE BASE. It is indexed `[rank * 28 + 0x473DC4]`
  * and has eight references of its own, which is exactly what a base looks
  * like -- but ADDR_RANK_RECORDS is 0x00473DC0 and this is its
- * RANK_REC_OFF_FIELD_04. 0x00473DC8 beside it is FIELD_08. One grep of the
+ * RANK_REC_OFF_VIEW_ANGLE. 0x00473DC8 beside it is FIELD_08. One grep of the
  * address before writing a name; the alternative was the sixth instance of
  * the commonest mistake in this project.
  *
@@ -12170,9 +12170,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_F_ONE               0x0046F2D8u  /* float 1.0 */
 /* The parsed rank record, keyed at +0 and projected onto the runtime one. */
 #define RANK_SRC_OFF_MAX_HEALTH  0x04u
-#define RANK_SRC_OFF_FIELD_04    0x08u
+#define RANK_SRC_OFF_VIEW_ANGLE    0x08u
 #define RANK_SRC_OFF_SIGHT_RANGE 0x0Cu
-#define RANK_SRC_OFF_FIELD_08    0x10u
+#define RANK_SRC_OFF_HEAR_RANGE    0x10u
 #define RANK_SRC_OFF_FIRE_PCT    0x14u
 #define RANK_SRC_OFF_THRESHOLD   0x18u
 #define RANK_SRC_OFF_XP          0x1Cu
@@ -16179,12 +16179,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * CreateVehicle copies eight of them straight across and that is the only
  * thing in the image that reads any of them. */
 #define VEHDEF_OFF_SEATS           0x04u  /* -> VEHICLE_OFF_SEATS */
-#define VEHDEF_OFF_FIELD_08        0x08u  /* -> obj +0x558 */
-#define VEHDEF_OFF_FIELD_0C        0x0Cu  /* -> obj +0x55C */
+#define VEHDEF_OFF_FWD_SPEED        0x08u  /* -> obj +0x558 */
+#define VEHDEF_OFF_REV_SPEED        0x0Cu  /* -> obj +0x55C */
 #define VEHDEF_OFF_FIELD_10        0x10u  /* -> obj +0x560 */
 #define VEHDEF_OFF_FIELD_14        0x14u  /* -> obj +0x564 */
 #define VEHDEF_OFF_HEALTH          0x18u  /* what SetMaxHealth is given */
-#define VEHDEF_OFF_FIELD_1C        0x1Cu  /* -> OBJ_OFF_FIELD_568 */
+#define VEHDEF_OFF_CRUSH_DAMAGE        0x1Cu  /* -> OBJ_OFF_FIELD_568 */
 #define VEHDEF_OFF_ARMOUR          0x20u  /* -> VEHICLE_OFF_ARMOUR */
 /* The three per-KIND tables CreateVehicle indexes, all six entries long. The
  * height is an int32 read as a BYTE -- 24, 32, 24, 24, 24, 33 -- and the two
@@ -17105,7 +17105,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * both names come from the first use anyone read. Noted rather than renamed on
  * the strength of one more site. */
 #define MISSILEDEF_OFF_HEAL_PCT  0x20u
-#define MISSILEDEF_OFF_FIELD_0C  0x0Cu
+#define MISSILEDEF_OFF_Z_VEL  0x0Cu
 /* StepType5 reads three more of this record. +0x0C, already here, chooses
  * between the arced arm and the flat one; +0x08 is the divisor its life is
  * scaled by and the gate on flying at all; +0x10 is the range, compared
@@ -17125,7 +17125,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * from the clamp, which is a reader and a writer's worth of evidence in one
  * expression -- the two bounds are used in the same comparison chain. */
 #define MISSILEDEF_OFF_RANGE_MIN 0x14u
-#define MISSILEDEF_OFF_FIELD_30  0x30u
+#define MISSILEDEF_OFF_RAND_AMMO  0x30u
 /* A weapon's own script-name index, used to look the name up in
  * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no
  * name and CreateWeapon gets a null. OBJ_OFF_BOUNDS is the same offset on
@@ -17820,7 +17820,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define TYPEREC_OFF_CODE           0x00u  /* 1..30, the switch's subject */
 #define TYPEREC_OFF_DAMAGE         0x1Cu  /* int32_t, the base amount */
 #define TYPEREC_OFF_FIELD_08       0x08u  /* ShotStrike subtracts it from 20 */
-#define TYPEREC_OFF_FIELD_3C       0x3Cu  /* uint8_t; a non-zero one on an ITEM
+#define TYPEREC_OFF_PERM       0x3Cu  /* uint8_t; a non-zero one on an ITEM
                                            * makes ShotStrike leave it alone */
 /* 0x0043C000, one caller -- ADDR_STEP_TYPE5. Reconstructed. */
 #define ADDR_SHOT_STRIKE           0x0043C000u /* int32(shot, packed, height) */

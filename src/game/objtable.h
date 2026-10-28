@@ -121,7 +121,7 @@ typedef struct AM2_ItemType {
     uint32_t cooldown;              /* +0x04 ITEMTYPE_OFF_COOLDOWN, milliseconds */
     int32_t  life;                  /* +0x08 MISSILEDEF_OFF_LIFE: StepType5's
                                      * divisor, and 0 means it does not fly */
-    int32_t  field0C;               /* +0x0C MISSILEDEF_OFF_FIELD_0C: the arced
+    int32_t  zVel;               /* +0x0C MISSILEDEF_OFF_Z_VEL: the arced
                                      * arm when non-zero, a vertical speed */
     int32_t  range;                 /* +0x10 ITEMTYPE_OFF_RANGE, MISSILEDEF_OFF_RANGE */
     int32_t  rangeMin;              /* +0x14 MISSILEDEF_OFF_RANGE_MIN: FireWeapon's
@@ -135,14 +135,14 @@ typedef struct AM2_ItemType {
     int32_t  blastDamage;           /* +0x20 what a missile hands CreateExplosion */
     int32_t  automatic;             /* +0x24 MISSILEDEF_OFF_FIELD_24: non-zero
                                      * repeats while held */
-    int32_t  field28;               /* +0x28 */
+    int32_t  respawns;               /* +0x28 */
     int32_t  weight;                /* +0x2C MISSILEDEF_OFF_WEIGHT, respawn weight */
-    int32_t  field30;               /* +0x30 MISSILEDEF_OFF_FIELD_30, RespawnKind's out */
+    int32_t  randAmmo;               /* +0x30 MISSILEDEF_OFF_RAND_AMMO, RespawnKind's out */
 } AM2_ItemType;
 
 /* An AAI record (AM2_AAI_RECORD_BYTES), what MakeAaiRecord builds from a
  * definition and an item's +0x94 points at. orig.h spells it with two
- * prefixes, AAIREC_OFF_ and AAI_OFF_; TYPEREC_OFF_FIELD_3C is its +0x3C. */
+ * prefixes, AAIREC_OFF_ and AAI_OFF_; TYPEREC_OFF_PERM is its +0x3C. */
 typedef struct AM2_AaiRec {
     int32_t  type;                  /* +0x00 AAIREC_OFF_TYPE, 0x2E for a built-in */
     int32_t  flags;                 /* +0x04 or'd into a placed object's flags */
@@ -163,7 +163,7 @@ typedef struct AM2_AaiRec {
     };
     int16_t  crushDamage;           /* +0x38 AAIREC_OFF_CRUSH_DAMAGE */
     int16_t  armour;                /* +0x3A AAIREC_OFF_ARMOUR */
-    uint8_t  field3C;               /* +0x3C TYPEREC_OFF_FIELD_3C: a non-zero
+    uint8_t  perm;               /* +0x3C TYPEREC_OFF_PERM: a non-zero
                                      * one makes an item shot-proof below it */
     uint8_t  _pad3D[3];
 } AM2_AaiRec;
@@ -193,12 +193,12 @@ typedef struct AM2_DefObjRec {
     };
     int16_t  armour;                /* +0x28 -> the AAI record's armour */
     uint8_t  _pad2A[2];
-    int32_t  field2C;               /* +0x2C */
+    int32_t  vis;               /* +0x2C */
     union {                         /* +0x30 DEF_OBJ_REC_OFF_FIELD_30: */
         int16_t crushDamage;        /*   MakeAaiRecord's int16 copy */
         int32_t crushDamageDword;   /*   and ApplyObjFrame's dword argument */
     };
-    uint8_t  field34;               /* +0x34 -> the AAI record's +0x3C */
+    uint8_t  perm;               /* +0x34 -> the AAI record's +0x3C */
     uint8_t  _pad35[3];
 } AM2_DefObjRec;
 
@@ -208,9 +208,9 @@ typedef struct AM2_DefObjRec {
 typedef struct AM2_TrooperDefRec {
     int32_t rank;                   /* +0x00 the bsearch key */
     int32_t maxHealth;              /* +0x04 RANK_SRC_OFF_MAX_HEALTH */
-    int32_t field04;                /* +0x08 RANK_SRC_OFF_FIELD_04 */
+    int32_t viewAngle;                /* +0x08 RANK_SRC_OFF_VIEW_ANGLE */
     int32_t sightRange;             /* +0x0C RANK_SRC_OFF_SIGHT_RANGE */
-    int32_t field08;                /* +0x10 RANK_SRC_OFF_FIELD_08 */
+    int32_t hearRange;                /* +0x10 RANK_SRC_OFF_HEAR_RANGE */
     int32_t firePct;                /* +0x14 RANK_SRC_OFF_FIRE_PCT */
     int32_t threshold;              /* +0x18 RANK_SRC_OFF_THRESHOLD */
     int32_t xp;                     /* +0x1C RANK_SRC_OFF_XP */
@@ -249,12 +249,12 @@ typedef struct AM2_UnitType {
 typedef struct AM2_VehicleDef {
     int32_t  kind;                  /* +0x00 the bsearch key */
     int32_t  seats;                 /* +0x04 VEHDEF_OFF_SEATS */
-    int32_t  field08;               /* +0x08 VEHDEF_OFF_FIELD_08 -> +0x558 */
-    int32_t  field0C;               /* +0x0C VEHDEF_OFF_FIELD_0C -> +0x55C */
+    int32_t  fwdSpeed;               /* +0x08 VEHDEF_OFF_FWD_SPEED -> +0x558 */
+    int32_t  revSpeed;               /* +0x0C VEHDEF_OFF_REV_SPEED -> +0x55C */
     int32_t  accelRate;             /* +0x10 VEHDEF_OFF_FIELD_10 -> accelRate */
     int32_t  turnInterval;          /* +0x14 VEHDEF_OFF_FIELD_14 -> turnInterval */
     int32_t  health;                /* +0x18 VEHDEF_OFF_HEALTH, SetMaxHealth's */
-    int32_t  field1C;               /* +0x1C VEHDEF_OFF_FIELD_1C -> +0x568 */
+    int32_t  crushDamage;               /* +0x1C VEHDEF_OFF_CRUSH_DAMAGE -> +0x568 */
     int32_t  armour;                /* +0x20 VEHDEF_OFF_ARMOUR */
 } AM2_VehicleDef;
 
@@ -266,16 +266,16 @@ typedef struct AM2_MissileDefRec {
     int32_t  kind;                  /* +0x00 -> +0x00 */
     uint32_t cooldown;              /* +0x04 -> +0x04 */
     int32_t  life;                  /* +0x08 -> +0x08 */
-    int32_t  field0C;               /* +0x0C -> +0x0C */
+    int32_t  zVel;               /* +0x0C -> +0x0C */
     int32_t  rangeMin;              /* +0x10 -> +0x14 */
     int32_t  range;                 /* +0x14 -> +0x10 */
     int32_t  capacity;              /* +0x18 -> +0x18 */
     int32_t  automatic;             /* +0x1C -> +0x24 */
     int32_t  damage;                /* +0x20 -> +0x1C, MedkitHeal's percentage */
     int32_t  blastDamage;           /* +0x24 -> +0x20 */
-    int32_t  field28;               /* +0x28 -> +0x28 */
+    int32_t  respawns;               /* +0x28 -> +0x28 */
     int32_t  weight;                /* +0x2C -> +0x2C */
-    int32_t  field30;               /* +0x30 -> +0x30 */
+    int32_t  randAmmo;               /* +0x30 -> +0x30 */
 } AM2_MissileDefRec;
 
 /* The sight record (SIGHTCOUT_OFF_*): what a trooper's sight scan saw and
@@ -303,7 +303,7 @@ typedef struct AM2_SteerOut {
     uint8_t      _pad02[2];
     int32_t      hit;               /* +0x04 SIGHTOUT_OFF_HIT */
     int32_t      state;             /* +0x08 a pose: 1 arrived, 4 under way */
-    int32_t      field0C;           /* +0x0C */
+    int32_t      reverse;           /* +0x0C */
     int32_t      stop;              /* +0x10 nearly there: stop */
     int32_t      approach;          /* +0x14 slow down; a roach's 1 arrived / 2 heading */
     AM2_FireSpot spot;              /* +0x18 SIGHTOUT_OFF_X / _Y / _YADJ */

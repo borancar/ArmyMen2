@@ -1689,7 +1689,7 @@ void __cdecl AddSightBlocker(AM2_Object *viewer, AM2_Object *blocker)
         > g_rankRecords[v->rank].sight_range)
         return;
 
-    arc = *(const uint8_t *)&g_rankRecords[v->rank].field_04;
+    arc = *(const uint8_t *)&g_rankRecords[v->rank].viewAngle;
 
     if (AbsAngle(heading, a0) < arc) {
         if (AbsAngle(heading, a1) > arc)

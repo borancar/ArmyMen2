@@ -63,7 +63,7 @@ typedef struct AM2_MapRow {
     uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
     uint8_t               _pad35[3];    /* +0x35 */
     AM2_CellEntry         *buffer;       /* +0x38  ROW_OFF_BUFFER, `owns` entries */
-    int16_t               field3C;      /* +0x3C  ROW_OFF_FIELD_3C */
+    int16_t               speed;        /* +0x3C  ROW_OFF_SPEED, the anim's speed (doubled on the doubling LUT) */
     uint8_t               _pad3e[2];    /* +0x3E */
     struct AM2_AnimTable *animCur;      /* +0x40  ROW_OFF_ANIM_CUR */
     struct AM2_Anim      *animPlaying;  /* +0x44  ROW_OFF_ANIM_PLAYING */
@@ -87,7 +87,7 @@ static_assert(offsetof(AM2_MapRow, yAdjust)     == 0x20, "yAdjust");
 static_assert(offsetof(AM2_MapRow, depthSlope)  == 0x28, "depthSlope");
 static_assert(offsetof(AM2_MapRow, lut)         == 0x2C, "lut");
 static_assert(offsetof(AM2_MapRow, buffer)      == 0x38, "buffer");
-static_assert(offsetof(AM2_MapRow, field3C)     == 0x3C, "field3C");
+static_assert(offsetof(AM2_MapRow, speed)     == 0x3C, "speed");
 static_assert(offsetof(AM2_MapRow, frame)       == 0x4C, "frame");
 static_assert(offsetof(AM2_MapRow, stamp54)     == 0x54, "stamp54");
 static_assert(offsetof(AM2_MapRow, headingBias) == 0x5C, "headingBias");
