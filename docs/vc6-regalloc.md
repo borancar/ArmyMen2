@@ -2472,3 +2472,14 @@ forwards `top` and shares the sums. Measured on the block's shape (`rw/shape.py`
   reused; they follow from the reload, not from the source. `cl <= 0` (`setle`) is the image's
   clamp spelling (`ru2/v1`: 19 hunks against 20 with `cl < 0`).
 RowUpdate's 154 stays, with the consumed `top` store as its precise residue. Scripts: `rw/`.
+
+**Kuna (2026-10-28).** `kuna decompile <GOG ArmyMen2.exe> 0x403b40 --addr` and `0x41d480 --addr`
+(the shipped image under `.wine/drive_c/GOG Games/Army Men II/`) were read as a second opinion.
+RowUpdate's lifting shows the residue literally -- `v4[4] = ...; v2 = v4[4];` then `v4[6] = v2 +
+v11;` and `(v5 + v8) >> 8`, `(v2 + v11) >> 8` for the shifts -- and its tail (the rect copy for
+DirtyCollect, `prevX/prevY` as one dword, `prevSprite`) matches ours byte for byte; reordering
+the copy's four assignments or writing `box = r->rect` only adds hunks (154 -> 154..172).
+SightScan decompiles to the CFG we already have (`if (!ObjsAreAllied) {Kind7 | sight} else
+{Type238 | weapon}`, the allied tail as `aiMode != 1 || range <= 0x168 -> score`). Kuna lifts the
+compiled control flow, so it cannot distinguish the source shapes that matter here (the
+consumed store, the live block before S); no new lead from it for either function.
