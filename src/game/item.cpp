@@ -1289,7 +1289,7 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * OBJ_OFF_HEIGHT_SET, recompute the row's depth key from the height, and do
  * the same to every object chained off this one.
  *
- * A THIRD WRITER OF ROW_OFF_FIELD_26, AND IT SETTLES THE READING. The seq
+ * A THIRD WRITER OF ROW_OFF_DEPTH_LAYER, AND IT SETTLES THE READING. The seq
  * adders write 0x3E8 and 1 and "terrain plus 0x3F2", which said only that the
  * field is a small biased number. This one writes `ScaleBy32Blocks(height) -
  * 0x3E8` and then ADDS an int16 from the object's def record. A term that is
@@ -3447,7 +3447,7 @@ refuse_top:
  * that hits everything at the point rather than one thing. That single `jne`
  * is the difference between a bullet and a blast.
  *
- * Code 3 also keeps a record of what it did: `20 - TYPEREC_OFF_FIELD_08` into
+ * Code 3 also keeps a record of what it did: `20 - TYPEREC_OFF_LIFE` into
  * OBJ_OFF_SPEED, for each object it damaged that is neither a trooper nor
  * an item with TYPEREC_OFF_PERM set. The same write happens once more in
  * the terrain test below, so the last one wins and the value does not
@@ -9410,7 +9410,7 @@ typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
  * dispatch rather than with the other arms.
  *
  * EVERY ARM ANSWERS THE SAME TWO QUESTIONS: which animation goes into
- * OBJ_OFF_FIELD_584, and which sound index survives into the tail. The
+ * OBJ_OFF_CTL_REVERSE, and which sound index survives into the tail. The
  * threshold is OBJ_OFF_SOLDIER_KIND against 6, held in ebx and reused by
  * every arm, which is why the arms look like they end abruptly -- they are
  * all falling into one tail.
@@ -11908,7 +11908,7 @@ AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot
  *
  * A VEHICLE GETS A SECOND ROW exactly when ADDR_TURRET_ANIMS[kind] has a
  * non-empty first dword, and that second row is the TURRET: its
- * ROW_OFF_ANIM_CUR is the turret table, its ROW_OFF_FIELD_26 is copied from
+ * ROW_OFF_ANIM_CUR is the turret table, its ROW_OFF_DEPTH_LAYER is copied from
  * row 0, and it takes ROW_FLAG_BIT5 where row 0 takes BIT8 and BIT6.
  *
  * THE SIX-ARM WEAPON TABLE IS NOT IN LAYOUT ORDER. The arms read 6, 7, 8,
@@ -13121,7 +13121,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
      * its sprite and its direction -- and a single-row one fires from the
      * object's own position with row 0's sprite. The three fields are the same
      * three either way: the multi-row displacements 0x64, 0x7C and 0x86 are
-     * 0x60 + ROW_OFF_SPRITE, 0x60 + ROW_OFF_X and 0x60 + ROW_OFF_FIELD_26,
+     * 0x60 + ROW_OFF_SPRITE, 0x60 + ROW_OFF_X and 0x60 + ROW_OFF_DEPTH_LAYER,
      * which is what identifies them as row 1 rather than as fields of their
      * own. Nothing new had to be named for this function. */
     if (u->rowSet.count > 1) {

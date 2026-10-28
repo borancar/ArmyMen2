@@ -770,7 +770,7 @@ struct AM2_HudTop : AM2_Widget {
     int32_t       typedX;                   /* 0x05A8  HUDLOG_OFF_TYPED_X */
     int32_t       typedY;                   /* 0x05AC  HUDLOG_OFF_TYPED_Y */
     int32_t       viewW;                    /* 0x05B0  HUDLOG_OFF_VIEW_W */
-    int32_t       unused5B4;                 /* 0x05B4  HUDLOG_OFF_FIELD_5B4 */
+    int32_t       unused5B4;                 /* 0x05B4  HUDLOG_OFF_UNUSED_5B4 */
     AM2_CheckBox *checkbox;                 /* 0x05B8  HUD_A_OFF_CHECKBOX */
     AM2_HudTop();
     explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }

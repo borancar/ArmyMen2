@@ -221,7 +221,7 @@ int32_t __cdecl SeqStepKind2(int32_t at, struct AM2_Seq *rec,
                              struct AM2_SeqCtx *ctx);
 
 /* 0x00461350. The fourth adder -- kind 4, into the OTHER context, shaded
- * through ROW_OFF_FIELD_2C, and what a kind 5 emits every 300 ms. */
+ * through ROW_OFF_LUT, and what a kind 5 emits every 300 ms. */
 void __cdecl SeqAddKind4(const AM2_Point *at, int32_t yAdjust);
 
 /* 0x004613E0. Kind 4's stepper: a four-cell shaded sprite that drifts and

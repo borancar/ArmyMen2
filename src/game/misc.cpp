@@ -2159,7 +2159,7 @@ static int32_t __cdecl SeqStepKind3(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
  * array is variants of eight frames each and this picks the first frame of
  * one of them. The 8 is a global, not a literal.
  *
- * ROW_OFF_FIELD_26 IS PROBABLY A DEPTH KEY, and this is what suggests it.
+ * ROW_OFF_DEPTH_LAYER IS PROBABLY A DEPTH KEY, and this is what suggests it.
  * Kind 5 writes 0x3E8 and kind 7 writes 1, which said only "a scale or a
  * count"; kind 6 writes the terrain attribute under its own point, scaled,
  * plus 0x3F2. Three constants of 1000, 1010-ish and 1 with a ground-height
@@ -2211,7 +2211,7 @@ void __cdecl SeqAddKind6(const AM2_Point *at, int32_t variant)
  * SeqStepKind5's emitter, so a kind 4 is what a kind 5 throws off every
  * 300 ms.
  *
- * IT IDENTIFIES ROW_OFF_FIELD_2C, which the other three adders only ever
+ * IT IDENTIFIES ROW_OFF_LUT, which the other three adders only ever
  * zeroed. This one writes ADDR_REMAP_SHADES[0] into it -- and MAPOBJ_OFF_LUT
  * is already 0x2C, "-> the sprite's +0x34", which is AM2_Sprite::lut. So the
  * field is the row's REMAP TABLE and a kind 4 is a shaded sprite where the
@@ -3033,7 +3033,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, AM2_Seq *rec, AM2_SeqCtx *ctx)
  * IT RETIRES THREE DIFFERENT WAYS -- off the map, into an explosion on a
  * blocked tile, and settling into a decal row -- and only the last leaves
  * anything behind. The decal copies four fields off the flying row and forces
- * ROW_OFF_FIELD_26 to 2, which is what PlaceGroundDecal does too.
+ * ROW_OFF_DEPTH_LAYER to 2, which is what PlaceGroundDecal does too.
  *
  * AND IT SETTLES THE PARTICLE TABLE'S BASE. Its `lea ecx,[ecx+ecx*2]` then
  * `[ecx*8 + 0x0048C7E4]` is kind * 24 off 0x0048C7E4, four bytes BELOW the

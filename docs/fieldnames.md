@@ -47,7 +47,7 @@ Every struct member has a role name, with two grades:
 | win32/widget.h:724 | `unused7C` | 0x007C |
 | win32/widget.h:726 | `unused84` | 0x0084 |
 | win32/widget.h:736 | `unused60` | 0x0060 |
-| win32/widget.h:773 | `unused5B4` | 0x05B4  HUDLOG_OFF_FIELD_5B4 |
+| win32/widget.h:773 | `unused5B4` | 0x05B4  HUDLOG_OFF_UNUSED_5B4 |
 
 ## Names that are readings rather than proofs
 

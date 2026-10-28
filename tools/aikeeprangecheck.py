@@ -46,7 +46,7 @@ RANDOM_POINT_TOWARD = 0x00404E50
 AI_TROOPER_STEP = 0x004049C0
 ADDR_GAME_CLOCK_MS = 0x00511E04
 
-SIGHTC_OFF_FIELD_00 = 0x00
+SIGHTC_OFF_CLASS = 0x00
 SIGHTC_OFF_OBSERVER = 0x14
 SIGHTC_OFF_RANGE = 0x18
 SIGHTC_OFF_BEARING = 0x1C
@@ -124,7 +124,7 @@ class Harness:
         uc.mem_write(OBJ + OBJ_OFF_MOVE_MODE, struct.pack("<i", f540))
         uc.mem_write(OBJ + OBJ_OFF_SOLDIER_KIND, struct.pack("<i", kind))
 
-        uc.mem_write(CTX + SIGHTC_OFF_FIELD_00, struct.pack("<i", ctx0))
+        uc.mem_write(CTX + SIGHTC_OFF_CLASS, struct.pack("<i", ctx0))
         uc.mem_write(CTX + SIGHTC_OFF_OBSERVER,
                      struct.pack("<I", OBSERVER if observer else 0))
         uc.mem_write(CTX + SIGHTC_OFF_RANGE, struct.pack("<i", rng))

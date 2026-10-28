@@ -66,7 +66,7 @@ OBJ_OFF_RANK = 0x98
 OBJ_OFF_HIT_DIR = 0x104
 OBJ_OFF_SOLDIER_KIND = 0x544
 
-SIGHTC_OFF_FIELD_00 = 0x00
+SIGHTC_OFF_CLASS = 0x00
 SIGHTC_OFF_OBSERVER = 0x14
 SIGHTC_OFF_SEED = 0x3C
 SIGHTC_OFF_KIND = 0x44
@@ -112,7 +112,7 @@ class Harness:
         uc.mem_write(OBJ + OBJ_OFF_SOLDIER_KIND, struct.pack("<i", kind))
         uc.mem_write(OBJ + OBJ_OFF_RANK, struct.pack("<i", rank))
 
-        uc.mem_write(CTX + SIGHTC_OFF_FIELD_00, struct.pack("<i", cls))
+        uc.mem_write(CTX + SIGHTC_OFF_CLASS, struct.pack("<i", cls))
         uc.mem_write(CTX + SIGHTC_OFF_OBSERVER,
                      struct.pack("<I", OBSERVER if observer else 0))
         uc.mem_write(CTX + SIGHTC_OFF_SEED, bytes([seed]))

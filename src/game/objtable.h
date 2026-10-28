@@ -133,7 +133,7 @@ typedef struct AM2_ItemType {
                                      * (parsed +0x20); the medkit's is the heal
                                      * percentage MedkitHeal applies */
     int32_t  blastDamage;           /* +0x20 what a missile hands CreateExplosion */
-    int32_t  automatic;             /* +0x24 MISSILEDEF_OFF_FIELD_24: non-zero
+    int32_t  automatic;             /* +0x24 MISSILEDEF_OFF_AUTOMATIC: non-zero
                                      * repeats while held */
     int32_t  respawns;               /* +0x28 */
     int32_t  weight;                /* +0x2C MISSILEDEF_OFF_WEIGHT, respawn weight */
@@ -194,7 +194,7 @@ typedef struct AM2_DefObjRec {
     int16_t  armour;                /* +0x28 -> the AAI record's armour */
     uint8_t  _pad2A[2];
     int32_t  vis;               /* +0x2C */
-    union {                         /* +0x30 DEF_OBJ_REC_OFF_FIELD_30: */
+    union {                         /* +0x30 DEF_OBJ_REC_OFF_CRUSH_DAMAGE: */
         int16_t crushDamage;        /*   MakeAaiRecord's int16 copy */
         int32_t crushDamageDword;   /*   and ApplyObjFrame's dword argument */
     };
@@ -251,8 +251,8 @@ typedef struct AM2_VehicleDef {
     int32_t  seats;                 /* +0x04 VEHDEF_OFF_SEATS */
     int32_t  fwdSpeed;               /* +0x08 VEHDEF_OFF_FWD_SPEED -> +0x558 */
     int32_t  revSpeed;               /* +0x0C VEHDEF_OFF_REV_SPEED -> +0x55C */
-    int32_t  accelRate;             /* +0x10 VEHDEF_OFF_FIELD_10 -> accelRate */
-    int32_t  turnInterval;          /* +0x14 VEHDEF_OFF_FIELD_14 -> turnInterval */
+    int32_t  accelRate;             /* +0x10 VEHDEF_OFF_ACCEL_RATE -> accelRate */
+    int32_t  turnInterval;          /* +0x14 VEHDEF_OFF_TURN_INTERVAL -> turnInterval */
     int32_t  health;                /* +0x18 VEHDEF_OFF_HEALTH, SetMaxHealth's */
     int32_t  crushDamage;               /* +0x1C VEHDEF_OFF_CRUSH_DAMAGE -> +0x568 */
     int32_t  armour;                /* +0x20 VEHDEF_OFF_ARMOUR */
@@ -309,7 +309,7 @@ typedef struct AM2_SteerOut {
     AM2_FireSpot spot;              /* +0x18 SIGHTOUT_OFF_X / _Y / _YADJ */
     uint8_t      _pad1e[2];
     uint32_t     uid;               /* +0x20 SIGHTOUT_OFF_UID, the target */
-    int32_t      gate;              /* +0x24 OBJ_OFF_FIELD_59C on a vehicle: 0 seeds the
+    int32_t      gate;              /* +0x24 OBJ_OFF_CTL_GATE on a vehicle: 0 seeds the
                                      * record. Step3Drive clears it through the
                                      * record pointer it is handed, so it is the
                                      * record's, not the object's. */
@@ -332,7 +332,7 @@ typedef struct AM2_RoachOut {
 /* The trooper AI's context record (SIGHTC_OFF_*): what the sight scan found
  * around a unit, filled by TrooperBuildContext and read by the AI steps. */
 typedef struct AM2_SightCtx {
-    int32_t             klass;      /* +0x00 SIGHTC_OFF_FIELD_00, ClassifyByCode74's 0..2 */
+    int32_t             klass;      /* +0x00 SIGHTC_OFF_CLASS, ClassifyByCode74's 0..2 */
     struct AM2_Object  *leader;     /* +0x04 SIGHTC_OFF_LEADER */
     int32_t             leadRange;  /* +0x08 SIGHTC_OFF_LEAD_RANGE */
     uint8_t             leadBearing;/* +0x0C SIGHTC_OFF_LEAD_BEARING */

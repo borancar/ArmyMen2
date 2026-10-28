@@ -648,7 +648,7 @@ void __cdecl RowInit(AM2_MapRow *r, AM2_Sprite *sprite, int32_t x, int32_t y)
 
 /* RowAnimField4 -- original 0x0040A130, two callers.
  *
- * This is the reader ROW_OFF_FIELD_2C's block in orig.h predicted from the
+ * This is the reader ROW_OFF_LUT's block in orig.h predicted from the
  * writing side: look an animation up in the row's current table by id, take
  * its AM2_Anim::field4, and DOUBLE it when the row's lut is the one that
  * doubles. Every other lut takes the value unchanged, which is exactly what
@@ -1455,7 +1455,7 @@ void __cdecl DepthResort(AM2_CellEntry *n, AM2_CellEntry **head)
  * null check in disguise -- the original tests the same argument it also adds
  * to every row's x.
  *
- * A FOURTH WRITER OF ROW_OFF_FIELD_26. The seq adders write 0x3E8 and 1 and
+ * A FOURTH WRITER OF ROW_OFF_DEPTH_LAYER. The seq adders write 0x3E8 and 1 and
  * "terrain plus 0x3F2", ApplyHeightItem writes a scaled height, and this
  * copies an int16 straight out of the spec. Consistent with a depth key and
  * with nothing else.
@@ -1984,7 +1984,7 @@ void __cdecl FreeSeqContexts(void)
  * local; the same declaration's parameter was already called `variant`, which
  * was the better half of it.
  *
- * ROW_OFF_FIELD_2C COMES OUT OF THE SPRITE, not the caller -- it is the decal
+ * ROW_OFF_LUT COMES OUT OF THE SPRITE, not the caller -- it is the decal
  * sprite's own +0x34 -- so a decal's remap travels with its artwork. */
 void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 {
@@ -2240,7 +2240,7 @@ void __cdecl DiedEffectB(const AM2_Point *at, int32_t facing,
  * depth links or the owner. A memcpy of the record would be shorter and
  * would be a different function.
  *
- * ROW_OFF_FIELD_26 IS FORCED TO 3 rather than copied, which is what makes the
+ * ROW_OFF_DEPTH_LAYER IS FORCED TO 3 rather than copied, which is what makes the
  * new row remains rather than a second live row; the source's own value is
  * never read.
  *

@@ -4621,7 +4621,7 @@ void __cdecl PlacementScreenClick(AM2_Point at)
  * same question in different arms. A changed-and-up button is a click and
  * calls the action slot; a changed-and-down button CLAIMS the mouse and calls
  * nothing; an unchanged button reaches the action slot only when the kind
- * record allows repeating, which is KINDREC_OFF_FIELD_24 and is the whole
+ * record allows repeating, which is KINDREC_OFF_AUTOMATIC and is the whole
  * reason that field had to be read.
  *
  * THE ACTION SLOT IS CALLED WITH A NULL OBJECT on the no-hit arms and with the
@@ -17509,7 +17509,7 @@ int32_t __cdecl PointerPickMode0(AM2_Object *o)
  *
  * AND checkoffsetuse IS NOISY HERE FOR A REASON WORTH KNOWING: this address's
  * functions.tsv entry is 1,072 bytes and holds TWO functions, so the tool's
- * "original" side is both of them. It reports OBJ_OFF_FIELD_9C among the
+ * "original" side is both of them. It reports OBJ_OFF_REPAIR_FRAME among the
  * offsets this function does not name, and that offset belongs to the sibling
  * at 0x004599A0. A merged entry makes that tool over-report the same way it
  * makes coverage over-credit. */

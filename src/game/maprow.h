@@ -56,8 +56,8 @@ typedef struct AM2_MapRow {
     int16_t               yAdjust;      /* +0x20  ROW_OFF_Y_ADJUST */
     int16_t               prevX;        /* +0x22  ROW_OFF_PREV_X */
     int16_t               prevY;        /* +0x24  ROW_OFF_PREV_Y */
-    int16_t               depthLayer;   /* +0x26  ROW_OFF_FIELD_26 / OBJ_OFF_DEPTH_LAYER, only when > 0 on both */
-    float                 depthSlope;   /* +0x28  ROW_OFF_FIELD_28 / OBJ_OFF_DEPTH_SLOPE */
+    int16_t               depthLayer;   /* +0x26  ROW_OFF_DEPTH_LAYER / OBJ_OFF_DEPTH_LAYER, only when > 0 on both */
+    float                 depthSlope;   /* +0x28  ROW_OFF_DEPTH_SLOPE / OBJ_OFF_DEPTH_SLOPE */
     const void           *lut;          /* +0x2C  MAPOBJ_OFF_LUT */
     void                 *palette;      /* +0x30  MAPOBJ_OFF_PALETTE */
     uint8_t               owns;         /* +0x34  ROW_OFF_OWNS */
@@ -256,7 +256,7 @@ void __cdecl SeqSubsystemInit(void);
 void __cdecl FreeSeqContexts(void);
 
 /* 0x00461EA0. Leave a remains row behind a dying object: four fields off the
- * source row, ROW_OFF_FIELD_26 forced to 3, then RowUpdate. */
+ * source row, ROW_OFF_DEPTH_LAYER forced to 3, then RowUpdate. */
 void __cdecl LeaveRemainsRow(const struct AM2_MapRow *src);
 
 /* 0x00461F90. Pick a sprite from the grid by direction and elapsed time,

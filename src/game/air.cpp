@@ -162,8 +162,8 @@ typedef uint32_t (__stdcall *AM2_TickFn)(void);
  * samples, which is what those two quantities are.
  *
  * A SEQUENCE NOT SEEN BEFORE IS APPENDED AND THE ANSWER IS A GUESS. The new
- * record's count starts at 1 or 0 by whether PEER_OFF_FIELD_40 is below half
- * of PEER_OFF_FIELD_38, and that same flag is what the function returns. So
+ * record's count starts at 1 or 0 by whether PEER_OFF_DUPLICATES is below half
+ * of PEER_OFF_NACKS_SENT, and that same flag is what the function returns. So
  * the first nack for a sequence is sent or withheld on a ratio between two
  * fields nothing here identifies, and every later one on the clock.
  *

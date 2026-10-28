@@ -5157,7 +5157,7 @@ only its definition, while its own header names one caller. `StepType3`'s
 alive path was misread in four places against 0x0045D660:
 
 - it tested the record's first word, the heading byte, where the original
-  tests `OBJ_OFF_FIELD_59C`, so every live vehicle skipped the whole block;
+  tests `OBJ_OFF_CTL_GATE`, so every live vehicle skipped the whole block;
 - a vehicle with occupants went nowhere: the original sends the player's
   vehicle (first occupant owned by the player) to `Step3Input` and
   `Step3RouteAndBoard` and everyone else's to `AiStep`, then all of them

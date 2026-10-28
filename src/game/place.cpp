@@ -762,7 +762,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             made->facing;
 
         if (made->rowSet.count > 1)
-            made->rowSet.rows[1].heading =      /* ROW_OFF_FIELD_B0 */
+            made->rowSet.rows[1].heading =      /* ROW_OFF_TROOP_STATE */
                 made->turretFacing;
 
         StepObjRows(made);

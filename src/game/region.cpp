@@ -42,7 +42,7 @@ int32_t am2_region_search_state = -1;
 
 #ifdef AM2_STANDALONE
 /* am2_hit_pose_by_class -- 0x00475198, the pose a hit trooper takes, indexed
- * by SIGHTC_OFF_FIELD_00 * 2 + high-bit (0..5, orig.h: "exactly SIX usable").
+ * by SIGHTC_OFF_CLASS * 2 + high-bit (0..5, orig.h: "exactly SIX usable").
  * One of the pose tables transcribed out of the carried blob; six int32
  * entries, bounded by ADDR_ARMY_TABLE (a pointer global) 24 bytes on. */
 extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
@@ -1015,7 +1015,7 @@ int32_t __cdecl MoveStepPoint(AM2_Object *obj, uint8_t heading, uint8_t turn,
  * it; it is a real off-by-one and not a transcription of one.
  *
  * THE SPEED IS THE ANIMATION'S, DOUBLED FOR ONE PARTICULAR REMAP. It is
- * AM2_Anim::field4, and the doubling is `ROW_OFF_FIELD_2C ==
+ * AM2_Anim::field4, and the doubling is `ROW_OFF_LUT ==
  * ADDR_ROW_LUT_DOUBLES` -- a row whose colour remap is that specific table
  * moves twice as fast, which is a stranger coupling than it looks and is
  * reproduced without explanation.
@@ -5303,7 +5303,7 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * "the original does it twice" is a fact about the original.
  *
  * IT IS ALSO WHAT IDENTIFIES SIGHTC_OFF_FOUND. That field was
- * SIGHTC_OFF_FIELD_20, "gates the turn in AiWalkStep"; here it is copied into
+ * SIGHTC_OFF_FOUND, "gates the turn in AiWalkStep"; here it is copied into
  * the OBSERVER/RANGE/BEARING triple with the found object's uid going to
  * OBJ_OFF_TARGET_UID, which is the same three-field promotion region.cpp
  * already writes from SIGHT_OFF_FOUND. The old name was right about what it
@@ -5536,7 +5536,7 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  *
  * The pose is written only in the gap: not while a walk is outstanding, not
  * for a soldier kind of 6 or more, not when OBJ_OFF_MOVE_MODE is set, not for
- * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_FIELD_00 is non-zero. Five gates
+ * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_CLASS is non-zero. Five gates
  * for one dword, and 7 or 5 by whether SIGHTC_OFF_SEED is under 4.
  *
  * AND `out` IS NOT THE VEHICLE FAMILY'S. Those arms write a heading at out[1];
@@ -6512,14 +6512,14 @@ void __cdecl SargeAiStep(AM2_Object *o, AM2_SightOut *out)
  *
  * IT HAS A TAIL SARGE DOES NOT, and the tail is where the frame's decision
  * lands. After the region is recorded it maps OBJ_OFF_MOVE_MODE and
- * SIGHTC_OFF_FIELD_00 onto SIGHTCOUT_OFF_STATE:
+ * SIGHTC_OFF_CLASS onto SIGHTCOUT_OFF_STATE:
  *
  *     0x540 == 1   ctx0 0 -> 1,  ctx0 2 -> 9,  else 8
  *     0x540 == 2   ctx0 0 -> 5,  else 4
  *     0x540 == 3   ctx0 2 -> 6,  else 7
  *     anything else            no write at all
  *
- * That is a THIRD independent site reading SIGHTC_OFF_FIELD_00 against 0, 1
+ * That is a THIRD independent site reading SIGHTC_OFF_CLASS against 0, 1
  * and 2, which is the range orig.h records for it as suggestive rather than
  * settled. Still nothing WRITES it here either.
  *
@@ -7230,7 +7230,7 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
  *
  * THE CONTEXT IS THE WHOLE 0x58-BYTE FRAME. `sub esp, 0x58` is
  * AM2_SIGHTC_BYTES exactly, the local starts where the four pushes leave it,
- * and ClassifyByCode74's answer is seeded into its +0 -- SIGHTC_OFF_FIELD_00,
+ * and ClassifyByCode74's answer is seeded into its +0 -- SIGHTC_OFF_CLASS,
  * the class every other builder puts there and the field AiTrooperStep
  * indexes its move-state table with. Nothing in this function reads it back.
  *

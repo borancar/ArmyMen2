@@ -64,7 +64,7 @@ OBJ_OFF_QUERY_NEXT = 0x68
 OBJ_OFF_BY_TYPE_94 = 0x94
 OBJ_OFF_RANK = 0x98
 TYPEREC_OFF_CODE = 0x00
-TYPEREC_OFF_FIELD_08 = 0x08
+TYPEREC_OFF_LIFE = 0x08
 TYPEREC_OFF_PERM = 0x3C
 
 STRUCK_NOTHING = 0
@@ -154,7 +154,7 @@ class Harness:
         uc.mem_write(SHOT, b"\0" * 0x200)
         uc.mem_write(SHOT_REC, b"\0" * 0x80)
         uc.mem_write(SHOT_REC + TYPEREC_OFF_CODE, struct.pack("<i", c["code"]))
-        uc.mem_write(SHOT_REC + TYPEREC_OFF_FIELD_08,
+        uc.mem_write(SHOT_REC + TYPEREC_OFF_LIFE,
                      struct.pack("<i", c["rec8"]))
         uc.mem_write(SHOT + OBJ_OFF_BY_TYPE_94, struct.pack("<I", SHOT_REC))
         uc.mem_write(SHOT + OBJ_OFF_RANK, struct.pack("<I", SHOOTER_UID))

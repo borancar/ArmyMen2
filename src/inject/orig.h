@@ -2510,7 +2510,7 @@
 #define DEFSPEC_OFF_SPRITE       0x00u  /* AM2_Sprite *, to RowInit */
 #define DEFSPEC_OFF_DX           0x04u  /* int16 */
 #define DEFSPEC_OFF_DY           0x06u  /* int16 */
-#define DEFSPEC_OFF_DEPTH        0x08u  /* int16 -> ROW_OFF_FIELD_26 */
+#define DEFSPEC_OFF_DEPTH        0x08u  /* int16 -> ROW_OFF_DEPTH_LAYER */
 #define AM2_DEFSPEC_BYTES        0x0Cu
 /* The left and top of the visible-area rectangle -- these are its first two
  * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14
@@ -3395,7 +3395,7 @@
  * queue it. A string found NEAR a function is not a string the function
  * prints.
  *
- * That also settles what was FLOW_OFF_FIELD_04, which this file admits was named from
+ * That also settles what was FLOW_OFF_NEXT_EXPECTED, which this file admits was named from
  * ProcessResendQueue alone: it is printed here as "expected %d" one past an
  * increment, so it is the NEXT SEQUENCE EXPECTED from that peer. The second
  * toucher this file asks for, arriving one function later. */
@@ -3996,11 +3996,11 @@
 #define AM2_HUDLOG_ROWS          12
 #define AM2_HUDLOG_ROW_STRIDE    0x58u
 #define HUDLOGROW_OFF_TEXT       0x00u
-#define HUDLOGROW_OFF_FIELD_50   0x50u
+#define HUDLOGROW_OFF_X   0x50u
 /* 0xA, written beside TYPED_X/TYPED_Y/VIEW_W and never read by anything this
  * project has reconstructed. Named for its offset, which is all that is
  * established. */
-#define HUDLOG_OFF_FIELD_5B4     0x5B4u
+#define HUDLOG_OFF_UNUSED_5B4     0x5B4u
 #define HUDLOG_OFF_COUNT         0x594u
 #define HUDLOG_OFF_BLIPS         0x59Cu  /* int32_t, chatter still owed */
 #define AM2_HUD_MSG_SIZE         0x58u   /* 88 */
@@ -4370,7 +4370,7 @@
  * settled into a walkable region, and the distance recorded at SIGHTC +0x38.
  *
  * THE TROOPER HAS AN EXTRA TAIL SARGE DOES NOT, mapping OBJ_OFF_MOVE_MODE and
- * SIGHTC_OFF_FIELD_00 onto SIGHTCOUT_OFF_STATE. It reads that field against
+ * SIGHTC_OFF_CLASS onto SIGHTCOUT_OFF_STATE. It reads that field against
  * 0, 1 and 2 -- a third independent site agreeing it is 0..2. Reconstructed.
  */
 #define ADDR_SARGE_AI_STEP     0x00407020u  /* void(obj, out), 368 bytes */
@@ -4556,7 +4556,7 @@
  * So the field IS that classifier's 0, 1 or 2, established by the WRITER
  * rather than by two consumers agreeing on a range. The paragraph above
  * reasoned it out and said plainly that nothing wrote it; something does. */
-#define SIGHTC_OFF_FIELD_00      0x00u
+#define SIGHTC_OFF_CLASS      0x00u
 /* SETTLED: TrooperBuildContext's last act is `ctx[0x3C] = (uint8_t)GameRand()`,
  * so this is a fresh roll per build -- the SIGHTC counterpart of
  * SIGHT_OFF_SEED. AiHitReact comparing it against 4 and 0x10 is therefore a
@@ -4604,7 +4604,7 @@
  * state into the caller's record.
  *
  * THE STATE COMES OUT OF ONE OF TWO THREE-ENTRY TABLES, indexed by the AI
- * context's SIGHTC_OFF_FIELD_00 -- ClassifyByCode74's 0, 1 or 2. They differ
+ * context's SIGHTC_OFF_CLASS -- ClassifyByCode74's 0, 1 or 2. They differ
  * in ONE entry, which is the whole reason there are two of them, and the
  * tables TILE, 0x004750B4 running to exactly 0x004750C0. */
 /* EIGHT CONSECUTIVE int32[3] TABLES RUN FROM 0x00475090 TO 0x004750F0, all
@@ -4750,7 +4750,7 @@
  * 56, 64, 80, 96, 112, 128, rising with rank. This comment used to say it read
  * "the first dword", which is what put the table's base four bytes late; see
  * the record's own note. */
-/* Six poses, 12..17, indexed by `SIGHTC_OFF_FIELD_00 * 2 + (byte >= 0x80)`.
+/* Six poses, 12..17, indexed by `SIGHTC_OFF_CLASS * 2 + (byte >= 0x80)`.
  * The two entries past them are not part of the table -- 0x4FA0C0 and 999 --
  * which is what bounds it at six and puts that field's range at 0..2. */
 #define ADDR_HIT_POSE_BY_CLASS   0x00475198u  /* int32_t[6] */
@@ -4863,8 +4863,8 @@
  * third dword is the COUNT, and the capped latency is the NACKINTERVAL. */
 #define PEER_OFF_ID              0x00u   /* "%x" in both messages */
 #define PEER_OFF_INTERVAL_N      0x04u
-#define PEER_OFF_FIELD_38        0x38u
-#define PEER_OFF_FIELD_40        0x40u   /* below half of 0x38 seeds count 1 */
+#define PEER_OFF_NACKS_SENT        0x38u
+#define PEER_OFF_DUPLICATES        0x40u   /* below half of 0x38 seeds count 1 */
 #define PEER_OFF_LATENCY_N       0x30u
 #define PEER_OFF_LATENCY_SUM     0x4Cu
 #define PEER_OFF_INTERVAL_SUM    0x58u
@@ -7539,13 +7539,13 @@ typedef struct {
  * between. Two siblings with one dead assignment is a template artefact, not a
  * misreading -- which is what makes reproducing it the right call. */
 #define OBJ_OFF_WEAPON_UID       0x54Cu  /* handed to WeaponByUid */
-#define OBJ_OFF_FIELD_568        0x568u
+#define OBJ_OFF_BY_TYPE_568        0x568u
 #define OBJ_OFF_FACE_TO        0x574u  /* int16_t, the facing widened */
-#define OBJ_OFF_FIELD_580        0x580u
-#define OBJ_OFF_FIELD_584        0x584u
-#define OBJ_OFF_FIELD_588        0x588u
-#define OBJ_OFF_FIELD_58C        0x58Cu
-#define OBJ_OFF_FIELD_598        0x598u
+#define OBJ_OFF_CTL_STATE        0x580u
+#define OBJ_OFF_CTL_REVERSE        0x584u
+#define OBJ_OFF_CTL_STOP        0x588u
+#define OBJ_OFF_CTL_APPROACH        0x58Cu
+#define OBJ_OFF_CTL_UID        0x598u
 #define AM2_DEPLOY_KIND_DONE     5      /* the kind reassignment's no-op value */
 #define ADDR_DEPLOY_VEHICLE      0x0045B9F0u  /* type 3 */
 /* Reconstructed. Place a vehicle: clear OBJ_FLAG_DESTROYED, take the nearest clear
@@ -8001,7 +8001,7 @@ typedef struct {
 #define AM2_KIND7_NAME_COUNT     64
 /* Fields of the object's FIRST ROW that carry its animation. */
 #define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
-/* 0x0040A130, two callers. The reader the ROW_OFF_FIELD_2C block above
+/* 0x0040A130, two callers. The reader the ROW_OFF_LUT block above
  * predicts: look an animation up in the row's current table by id and answer
  * its AM2_Anim::field4, DOUBLED when the row's lut is ADDR_ROW_LUT_DOUBLES. */
 #define ADDR_ROW_ANIM_FIELD4     0x0040A130u  /* int16_t(row *, uint16_t id) */
@@ -8157,7 +8157,7 @@ typedef struct {
  * side: ADDR_AI_BUILD_CONTEXT resolves it with LookupUid into the record's
  * +0x10, and AiStepDefend writes the uid of whatever 0x00403B40 found into it
  * in the same breath as promoting that object into +0x10. It was
- * OBJ_OFF_FIELD_CC, named by offset because nothing read then said what it
+ * OBJ_OFF_TARGET_UID, named by offset because nothing read then said what it
  * held. */
 #define OBJ_OFF_TARGET_UID       0xCCu   /* uint32_t */
 /* Cleared by ResetObjOnCof and compared against ADDR_GAME_CLOCK_MS by two
@@ -8324,7 +8324,7 @@ typedef struct {
 #define AM2_SEQ_LIFE5            0x17318   /* 95,000 */
 #define AM2_SEQ_LIFE7            0x2710    /* 10,000 */
 #define AM2_SEQ_LIFE6            0x3E8     /* 1,000 */
-/* Added to the scaled terrain attribute for kind 6's ROW_OFF_FIELD_26. */
+/* Added to the scaled terrain attribute for kind 6's ROW_OFF_DEPTH_LAYER. */
 #define AM2_SEQ_DEPTH_BIAS       0x3F2
 #define AM2_SEQ_ROW26_5          0x3E8     /* what each stamps at ROW_OFF_26 */
 #define AM2_SEQ_ROW26_7          1
@@ -8768,7 +8768,7 @@ typedef struct {
  * player in one flush is told the same number. FLOW_OFF_READY gates the flush
  * entirely: no flow queue for ourselves yet and nothing goes out. */
 /* +0x0C IS THE SEQUENCE HE HAS, and the writer is what settled it. It was
- * FLOW_OFF_FIELD_0C on the strength of ProcessResendQueue alone, which merely
+ * FLOW_OFF_HE_HAS on the strength of ProcessResendQueue alone, which merely
  * refuses to resend a packet older than it -- one reader is not a meaning, as
  * the comment here used to say. SendGameMsg sets it, once, on the first packet
  * ever sent to a player: `if (heHas == 0 && seq > 1) heHas = seq - 1`, and
@@ -9813,7 +9813,7 @@ typedef struct {
 /* Named structurally: nothing read so far says what any of the three is. The
  * word at 0xB2 is cleared beside the script id, 0xEC is set to whether 0xF4 is
  * positive, and 0xE4 is the AI mode OBJ_OFF_AI_MODE names. */
-#define OBJ_OFF_FIELD_B2         0xB2u   /* uint16_t */
+#define OBJ_OFF_SAVED_Y         0xB2u   /* uint16_t */
 #define OBJ_OFF_SAW_TARGET         0xECu   /* int32_t, 0 or 1 */
 #define OBJ_OFF_SIGHT_HITS         0xF4u   /* int32_t; only its sign is read */
 /* 0x0043A0A0, six callers. The nearest tile the object's POINT RULE will
@@ -10139,7 +10139,7 @@ typedef struct {
  * the second is a pointer. Settled by tools/espmap.py naming the slots rather
  * than by reading displacements. */
 /* Per-CLASS, indexed by ClassifyCode74's 0, 1 or 2 and written to
- * OBJ_OFF_FIELD_64 at the very end: 28, 18, 12. */
+ * OBJ_OFF_HEIGHT_ADJ at the very end: 28, 18, 12. */
 #define ADDR_TROOPER_CLASS_VALUE  0x00489840u  /* int32[3] */
 /* UpdateTrooperAction's own constants, all of them measured rather than
  * shared with a neighbour: the settle window, the arc outside which a turn is
@@ -10182,7 +10182,7 @@ typedef struct {
  * WHAT THE HEAD DOES. Classify the object; a dead one goes straight to the
  * tail. Outside a multiplayer session -- or inside one, for an army the comm
  * object does not own -- it asks how long since OBJ_OFF_DEADLINE_D0 and
- * remembers OBJ_OFF_FACING in OBJ_OFF_FIELD_580 when that is under 0x96
+ * remembers OBJ_OFF_FACING in OBJ_OFF_CTL_STATE when that is under 0x96
  * milliseconds.
  *
  * AND THIS FUNCTION IS ONE OF THAT FIELD'S FOURTEEN WRITERS: it stamps the
@@ -10199,7 +10199,7 @@ typedef struct {
  * ADDR_TROOPER_CLASS_VALUE's 28/18/12 are per-class height adjustments; 0x564
  * is OBJ_OFF_HELD_WEAPON_UID, so the clear at the end of the walk means
  * "nothing was underfoot, forget what you were holding"; and 0x538 is
- * OBJ_OFF_POSE. Grepping the OFFSETS rather than inventing OBJ_OFF_FIELD_65
+ * OBJ_OFF_POSE. Grepping the OFFSETS rather than inventing OBJ_OFF_HEIGHT_SET
  * and friends turned four blanks into four sentences.
  *
  * AND ONE OF THEM CONTRADICTS ITS NAME. 0xD8 is OBJ_OFF_STUCK_COUNT, "int32_t,
@@ -10214,7 +10214,7 @@ typedef struct {
  * A TROOPER STEPS UP ONTO WHAT IT IS STANDING ON, and the whole behaviour is
  * one stack slot used twice. The slot is zeroed at entry and again when the
  * facing sweep gives up; in the pickup walk it takes the HEIGHT
- * (OBJ_OFF_FIELD_65) of any item underfoot whose height is within 0x10 of the
+ * (OBJ_OFF_HEIGHT_SET) of any item underfoot whose height is within 0x10 of the
  * trooper's own; and at the very end it is the value handed to
  * ObjMoveAlongFacing -- but only when the trooper's own height already matches
  * the tile attribute under it.
@@ -10234,7 +10234,7 @@ typedef struct {
  * IT ALSO KEEPS A TURN ACCUMULATOR. OBJ_OFF_TURN_ACCUM takes the AngleDelta of
  * every enforced turn and is wrapped into +/-0x100 by two SEPARATE tests, the
  * second re-reading the field after the first may have changed it. Beside it
- * OBJ_OFF_FIELD_D8 is stamped at clock + 1000, and the sweep refuses to
+ * OBJ_OFF_STUCK_COUNT is stamped at clock + 1000, and the sweep refuses to
  * enforce a turn until that has passed -- so a trooper can be pushed around
  * once a second and only so far. */
 
@@ -10415,7 +10415,7 @@ typedef struct {
 #define ADDR_STEP3_DRIVE         0x0045CB30u  /* void(obj, rec) -- caller
                                                  pushes the record then the
                                                  object, add esp,8 */
-#define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
+#define OBJ_OFF_CTL_GATE        0x59Cu  /* gates the record init, once */
 /* The destruction sounds, one per vehicle kind. Kind 4 makes none -- it goes
  * straight to the row finish and DestroyByType. */
 #define AM2_SND_VEH_KIND0        0x20
@@ -11143,8 +11143,8 @@ typedef struct {
 #define DEF_OBJ_REC_OFF_HEALTH        0x14u  /* int16, -> max AND current */
 #define DEF_OBJ_REC_OFF_HEIGHT_ADJ    0x18u  /* int8 -> OBJ_OFF_HEIGHT_ADJ */
 #define DEF_OBJ_REC_OFF_RANK          0x1Cu  /* int8 -> OBJ_OFF_RANK */
-#define DEF_OBJ_REC_OFF_ROW_FIELD28   0x24u  /* -> every ROW_OFF_FIELD_28 */
-#define DEF_OBJ_REC_OFF_FIELD_30      0x30u  /* ObjAfterMove's third argument */
+#define DEF_OBJ_REC_OFF_ROW_FIELD28   0x24u  /* -> every ROW_OFF_DEPTH_SLOPE */
+#define DEF_OBJ_REC_OFF_CRUSH_DAMAGE      0x30u  /* ObjAfterMove's third argument */
 /* Set 0x16 loads its sprites with an extra bit. Every other set here, and
  * EnsureSpriteAaiRecord's PreloadSprite beside it, pass a bare 0x1000 --
  * spelled as a literal there and left as one here to match; ApplyObjFrame is
@@ -11152,7 +11152,7 @@ typedef struct {
  * the bit does has not been read, so the SET gets the name and the flag does
  * not. */
 #define AM2_SET_WITH_EXTRA_LOAD_FLAG  0x16
-/* Subtracted from the scaled height to make a row's ROW_OFF_FIELD_26. It is
+/* Subtracted from the scaled height to make a row's ROW_OFF_DEPTH_LAYER. It is
  * 1000, which is also AM2_SEQ_LIFE6 -- two unrelated constants that happen to
  * share a value, and writing one for the other is how a name goes wrong
  * silently. Its own name. */
@@ -13763,13 +13763,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * on -- so the displacements run [ebx-0x58] to [ebx+4] and none of them is a
  * negative field. */
 #define MSGREC_OFF_ID            0x00u  /* the player id */
-#define MSGREC_OFF_FIELD_04      0x04u  /* logged as the third %d */
+#define MSGREC_OFF_COLOUR      0x04u  /* logged as the third %d */
 #define MSGREC_OFF_ZERO          0x08u  /* written 0, never read here */
 #define MSGREC_OFF_POINTS        0x10u  /* that army's ADDR_ARMY_POINTS entry */
 #define MSGREC_OFF_NAME          0x14u  /* the player name, strcpy'd in */
-#define MSGREC_OFF_FIELD_54      0x54u
-#define MSGREC_OFF_FIELD_58      0x58u
-#define MSGREC_OFF_FIELD_5C      0x5Cu
+#define MSGREC_OFF_TEAM      0x54u
+#define MSGREC_OFF_READY_TO_LOAD      0x58u
+#define MSGREC_OFF_WAS_HERE      0x5Cu
 /* The message SendPlayerMsg fills. NOT 0x004FC3CC, which is the first address
  * that function touches and is 0x14 bytes in: +0x00..+0x07 are an
  * AM2_ArmyMsgHdr the send fills, and SendGameMsg is handed this. */
@@ -13899,12 +13899,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * group is plausibly a record of who just left -- plausibly, and the names say
  * only where they are. Reading the other nineteen touchers is a job of its
  * own. */
-#define COMM_OFF_FIELD_35C       0x35Cu
-#define COMM_OFF_FIELD_360       0x360u   /* the departing slot's index */
-#define COMM_OFF_FIELD_364       0x364u
-#define COMM_OFF_FIELD_368       0x368u   /* uint8_t */
-#define COMM_OFF_FIELD_3A8       0x3A8u
-#define COMM_OFF_FIELD_3AC       0x3ACu
+#define COMM_OFF_SLOT3_REMOTE       0x35Cu
+#define COMM_OFF_SLOT3_COLOUR       0x360u   /* the departing slot's index */
+#define COMM_OFF_SLOT3_ID       0x364u
+#define COMM_OFF_SLOT3_NAME       0x368u   /* uint8_t */
+#define COMM_OFF_SLOT3_TEAM       0x3A8u
+#define COMM_OFF_SLOT3_WAS_HERE       0x3ACu
 #define COMM_SLOT_OFF_NAME       0x00Cu   /* 0x40-byte string; CommConstruct
                                            * clears it, StartSelectedGame writes
                                            * "Computer%d" into it */
@@ -15316,12 +15316,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * OBJ_OFF_TROOP_STATE and only when the vehicle has more than one row. Named
  * structurally: what it selects is not established, and OBJ_OFF_SCRIPT_ID
  * shares the number on a different structure. */
-#define ROW_OFF_FIELD_B0       0xB0u  /* uint8_t */
+#define ROW_OFF_TROOP_STATE       0xB0u  /* uint8_t */
 /* Two more the seq adders write and nothing here reads. 0x26 takes 0x3E8 from
  * kind 5 and 1 from kind 7, so it is a scale or a count rather than a flag;
  * 0x2C is only ever zeroed. Named for their offsets, which is all that is
  * established. */
-#define ROW_OFF_FIELD_26       0x26u  /* int16_t */
+#define ROW_OFF_DEPTH_LAYER       0x26u  /* int16_t */
 /* IT IS THE ROW'S REMAP TABLE, and the evidence is that MAPOBJ_OFF_LUT is
  * already 0x2C "-> the sprite's +0x34" -- which is AM2_Sprite::lut, the
  * 256-entry remap. SeqAddKind4 writes ADDR_REMAP_SHADES[0] here where the
@@ -15333,7 +15333,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and the row's first dword is the bit RowUpdate tests to choose between
  * unlinking and re-linking. Recorded rather than merged -- collapsing two
  * families is a change of its own and wants doing deliberately. */
-#define ROW_OFF_FIELD_2C       0x2Cu  /* int32_t, a uint8_t *remap or NULL */
+#define ROW_OFF_LUT       0x2Cu  /* int32_t, a uint8_t *remap or NULL */
 #define ROW_OFF_PREV_X         0x22u  /* int16_t */
 #define ROW_OFF_PREV_Y         0x24u  /* int16_t */
 /* One entry of the row's buffer: which map cell it is linked into, or -1. */
@@ -16181,10 +16181,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define VEHDEF_OFF_SEATS           0x04u  /* -> VEHICLE_OFF_SEATS */
 #define VEHDEF_OFF_FWD_SPEED        0x08u  /* -> obj +0x558 */
 #define VEHDEF_OFF_REV_SPEED        0x0Cu  /* -> obj +0x55C */
-#define VEHDEF_OFF_FIELD_10        0x10u  /* -> obj +0x560 */
-#define VEHDEF_OFF_FIELD_14        0x14u  /* -> obj +0x564 */
+#define VEHDEF_OFF_ACCEL_RATE        0x10u  /* -> obj +0x560 */
+#define VEHDEF_OFF_TURN_INTERVAL        0x14u  /* -> obj +0x564 */
 #define VEHDEF_OFF_HEALTH          0x18u  /* what SetMaxHealth is given */
-#define VEHDEF_OFF_CRUSH_DAMAGE        0x1Cu  /* -> OBJ_OFF_FIELD_568 */
+#define VEHDEF_OFF_CRUSH_DAMAGE        0x1Cu  /* -> OBJ_OFF_BY_TYPE_568 */
 #define VEHDEF_OFF_ARMOUR          0x20u  /* -> VEHICLE_OFF_ARMOUR */
 /* The three per-KIND tables CreateVehicle indexes, all six entries long. The
  * height is an int32 read as a BYTE -- 24, 32, 24, 24, 24, 33 -- and the two
@@ -16217,10 +16217,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * object, this one is a plain field in a ROW. */
 #define AM2_ROACH_BYTES         0x560u
 #define AM2_ROACH_STAGGER_MS    0x1F4   /* rand() % this, added to the clock */
-/* What a constructor writes into ROW_OFF_FIELD_26. It was
+/* What a constructor writes into ROW_OFF_DEPTH_LAYER. It was
  * AM2_ROACH_ROW_FIELD26 until LoadType5 wrote the same value into the same
  * field of a MISSILE's row -- one constant in one struct, so one name. */
-#define AM2_ROW_FIELD26_INIT    0x3E8   /* int16, into ROW_OFF_FIELD_26 */
+#define AM2_ROW_FIELD26_INIT    0x3E8   /* int16, into ROW_OFF_DEPTH_LAYER */
 /* Bit 8 of a ROW's flags word, which CreateRoach sets with `or dh, 1`. Only
  * the write is identified: the sixteen byte-wide readers of bit 8 in the
  * image test whatever happens to be in `ah`, and pinning which of them hold a
@@ -17317,7 +17317,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * while the button is held. definfo.cpp writes it from the parsed record's
  * +0x1C -- one of five fields that table PERMUTES on the way in, which is the
  * reason an ITEMTYPE_ offset does not mean the same thing here. */
-#define MISSILEDEF_OFF_FIELD_24 0x24u
+#define MISSILEDEF_OFF_AUTOMATIC 0x24u
 /* The two frames LoadType5 chooses between on the def's first dword: 2 and 5
  * take one and everything else the other. What the dword IS has not been
  * read -- only which two values it treats alike. */
@@ -17819,7 +17819,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_APPLY_SHOT_DAMAGE     0x0043BBE0u /* void(target,shot,a,b,dbl) */
 #define TYPEREC_OFF_CODE           0x00u  /* 1..30, the switch's subject */
 #define TYPEREC_OFF_DAMAGE         0x1Cu  /* int32_t, the base amount */
-#define TYPEREC_OFF_FIELD_08       0x08u  /* ShotStrike subtracts it from 20 */
+#define TYPEREC_OFF_LIFE       0x08u  /* ShotStrike subtracts it from 20 */
 #define TYPEREC_OFF_PERM       0x3Cu  /* uint8_t; a non-zero one on an ITEM
                                            * makes ShotStrike leave it alone */
 /* 0x0043C000, one caller -- ADDR_STEP_TYPE5. Reconstructed. */
@@ -18001,7 +18001,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AAI_OFF_HEIGHT_ADJ         0x2Eu  /* int8 */
 #define AAI_OFF_RANK               0x2Fu  /* int8 */
 #define AAI_OFF_ROW_FIELD28        0x34u
-#define ROW_OFF_FIELD_28           0x28u
+#define ROW_OFF_DEPTH_SLOPE           0x28u
 /* 0x00433880, two callers. Build an object out of an AAI record: flags, army,
  * the common init, health, the row set, and a post-move. Eight arguments --
  * it was read as nine from an `add esp, 0x24` that also pops the malloc
