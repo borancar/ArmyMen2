@@ -4015,7 +4015,7 @@ FIXED below when that replay runs identical.
   pump 8583, frame 8414; repro sessions/bazookaroach-8583.txt, replayed with
   --tolerance 12 to pass the magnifying-glass 4-px residual first). At the trap
   only roach 0x400003ec (type 8, army 2) differs: OBJ_OFF_FACING 23 vs 41,
-  OBJ_OFF_FIELD_540 (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
+  OBJ_OFF_MOVE_MODE (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
   all downstream of FIELD_540. RNG seed (0x2f0c6a4a), game clock and
   ADDR_SIGHT_GENERATION (0x0e6c) are IDENTICAL, so it is deterministic, not an
   RNG desync. NARROWED (gdb watchpoint on FIELD_540): RoachBehaviour
@@ -4049,7 +4049,7 @@ FIXED below when that replay runs identical.
 - **OPEN (2026-09-10): a roach's BITE-state transition diverges -- hybrid bites
   Sarge, port still approaches.** Live repro sessions/roachbite-1112.txt (trap
   pump 1112, frame 1238, 1274 px box 218,193-312,268). Object tables, RNG and
-  all positions identical; roach 0x400003ef's OBJ_OFF_FIELD_530 is 4 (biting) on
+  all positions identical; roach 0x400003ef's OBJ_OFF_TROOP_STATE is 4 (biting) on
   the hybrid and 2 (approaching) on the port, with OBJ_OFF_DEADLINE_58 and the
   bite fields (0x54c-0x55d, 0xc4) set only on the hybrid -- so the sprite is the
   bite animation vs the walk. FOURTH manifestation of one recurring roach bug,
@@ -4094,8 +4094,8 @@ FIXED below when that replay runs identical.
   REFUSES a move step the original takes.** Live repro sessions/roachattack-1391.txt
   (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
   identical; only roach 0x400003ef differs, pos (2108,762) vs (2109,761), and
-  its OBJ_OFF_FIELD_44 (speed) is 130 on the hybrid but 0 on the port -- same
-  facing (63), same OBJ_OFF_FIELD_540 (63), same subpixel and pos through pump
+  its OBJ_OFF_SPEED (speed) is 130 on the hybrid but 0 on the port -- same
+  facing (63), same OBJ_OFF_MOVE_MODE (63), same subpixel and pos through pump
   1390. So this is NOT the heading/CopyByteIfSet path of the 8583 entry; it is
   the SPEED path. RoachStepTailA (0x0043D750, item.cpp) refuses the step when
   `RoachMaskWeight(obj, next, landing, 1) >= RoachMaskWeight(obj, cur, pos, 0)`
@@ -4306,7 +4306,7 @@ repro `sessions/vehmove2-6591.txt`; hand-played ordering multiple vehicles to
 move, exposed only once the formation fix above let a follower actually reach
 its slot and cluster). Every comparable input was byte-identical -- the full
 object (0x00..0x600), its row structure, the RNG seed, the view/cursor globals,
-the frame delta -- yet OBJ_OFF_FIELD_574 (`o+0x574`, a PERSISTENT search
+the frame delta -- yet OBJ_OFF_FACE_TO (`o+0x574`, a PERSISTENT search
 counter) read 3 on the port and 0 on the original, which fed Step3NextCandidate
 a different facing and cascaded to a 4,495-pixel divergence. A hybrid
 trampoline over VehicleBlockWeight showed the block weights and the CALL COUNT
@@ -4502,7 +4502,7 @@ port 0x1b vs hybrid 0xfa, with the candidate counter `+0x574` advanced to 2 on
 the port and 0 on the hybrid. So the port ran the AI CANDIDATE SEARCH on the
 PLAYER's vehicle. Root cause: `Step3ChooseFacing` (0x0045C8D0) has THREE early
 returns and only the third was reconstructed. The missing second --
-`if (ListFirstField548(obj) && obj[OBJ_OFF_FIELD_10C]==0) return` -- is what
+`if (ListFirstField548(obj) && obj[OBJ_OFF_WALK_ORDER]==0) return` -- is what
 skips the search for a player-driven vehicle; without it the search fought the
 player's input and, at the tree, chose a facing that was not blocked, turning
 the hull aside (gunFacing 0x1f -> 0). Fixed by adding the two missing guards
@@ -5185,7 +5185,7 @@ put back one function at a time; greedy removal then left exactly that
 chain, so the defect was in that function's own body. Three, all in
 `UpdateTrooperAction` and none an offset:
 
-- The move was handed `OBJ_OFF_FIELD_44` itself where the original hands
+- The move was handed `OBJ_OFF_SPEED` itself where the original hands
   the SPEED slot whenever that field is set, and the trooper's own signed
   height only when it differs from the tile's. The field reads 88 on a
   walking Sarge, `ObjMoveAlongFacing` made that his height, and

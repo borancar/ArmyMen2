@@ -195,7 +195,7 @@ static inline int32_t ArmyAlliedWithObjInline(int32_t army,
             && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
+        rec = (useRec3 && b->troopState != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)

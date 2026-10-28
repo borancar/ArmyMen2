@@ -1339,7 +1339,7 @@ void *__cdecl CreateMissile(AM2_Object *weapon, AM2_Object *source, AM2_Point at
         (int16_t)o->followers.count;
     o->deadline58 =
         g_gameClockMs;
-    o->field44 = b->field44;
+    o->speed = b->speed;
 
     {
         int32_t n = w->typeRec->field0C;
@@ -1696,7 +1696,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     if (renumber)
         o->flags |= OBJ_FLAG_NEEDS_REMAP;
 
-    o->field574 = -1;
+    o->faceTo = -1;
     o->inventorySel = 0;
     memset(&o->sight, 0, AM2_DEPLOY_CLEAR_DWORDS * 4);
 
@@ -1734,7 +1734,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     switch (o->soldierKind) {
     case AM2_SOLDIER_KIND_ACTION_C:
         o->soldierKind = 0;
-        Type2ActionC(o, o->field5A4 - 1);
+        Type2ActionC(o, o->convertedFrom - 1);
         break;
 
     case AM2_SOLDIER_KIND_ACTION_A:

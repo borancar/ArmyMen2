@@ -102,7 +102,7 @@ TABLE_SPAN = 0x90
 # from every object would run past most of them and return heap contents --
 # unstable between runs, which is exactly what the "values only" rule above
 # exists to prevent. Types 2 and 3 are known to reach at least 0x5A8, because
-# OBJ_OFF_FIELD_5A4 and a vehicle's +0x59C are read on them.
+# OBJ_OFF_CONVERTED_FROM and a vehicle's +0x59C are read on them.
 AI_TYPES = (2, 3)
 AI_FIELDS = (
     ("destpt", 0x0C0, "<I"),      # OBJ_OFF_FIELD_C0, a packed point

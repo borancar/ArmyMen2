@@ -2231,7 +2231,7 @@ Two reaching definitions to turn a rotation temporary into a web (Round BN, Sigh
 local in both arms of an `if` on an already-computed parameter, it becomes a coloured web that does not advance the
 cursor, which shifts the following temporaries by one slot (here to ecx/edx as in the image). The cheapest condition is a
 by-value parameter that is only read. Remaining SightScan (26): `add edi,0x12` against `lea ecx,[edi+0x12]` in the allied
-arm with two jump targets (0x403dcd against 0x403dd9); the fieldF4 temp in ecx with the facing load between the load and
+arm with two jump targets (0x403dcd against 0x403dd9); the sightHits temp in ecx with the facing load between the load and
 the inc; one `push ecx` placement.
 
 ### The AssignTemp walk, read from C2.DLL (Round BW, LoadMap's last 2 bytes)

@@ -407,10 +407,10 @@ void __cdecl ObjDropAltRecord(AM2_Object *obj)
 
     if (!obj)
         return;
-    if (o->field530 == AM2_OBJ_STATE_5)
+    if (o->troopState == AM2_OBJ_STATE_5)
         return;
 
-    o->field530 = AM2_OBJ_STATE_5;
+    o->troopState = AM2_OBJ_STATE_5;
 
     /* The argument is the field just written, read back -- the original's
      * `mov edx, ecx` is that second value, not the first reused. */
@@ -1571,7 +1571,7 @@ void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
  * rather than to the victim -- which is the sort of thing a reconstruction
  * would quietly get wrong by defaulting to the victim's own army.
  *
- * The spawn is gated on OBJ_OFF_FIELD_5A4 being non-zero. orig.h has that
+ * The spawn is gated on OBJ_OFF_CONVERTED_FROM being non-zero. orig.h has that
  * field as "structural until something says what it counts"; this does not
  * settle it either, but it adds a second reader to ADDR_TYPE2_FIELD5A4_SET's
  * and both treat it as a permission rather than a quantity.
@@ -1587,7 +1587,7 @@ void __cdecl TrooperDied(AM2_Object *obj, int32_t a, uint32_t by)
         o->flags &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
     }
 
-    if (o->field5A4) {
+    if (o->convertedFrom) {
         const AM2_Object *killer = LookupByUID(by);
         int16_t        army   = killer   /* a short: movsx ax, then movsx edx */
                                 ? killer->owner
@@ -1991,7 +1991,7 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * memset that has already zeroed all 0x560 bytes. The original does both; a
  * reconstruction that dropped them would be tidier and would differ.
  *
- * The deadline at OBJ_OFF_FIELD_FC is the clock plus a random 0..499, so two
+ * The deadline at OBJ_OFF_NEXT_THINK_AT is the clock plus a random 0..499, so two
  * roaches created in the same frame do not act in lockstep. It is the game's
  * own rand, not ours -- the LCG in the statically linked CRT -- so the
  * sequence is shared with everything else that draws from it and a
@@ -2029,7 +2029,7 @@ AM2_Object *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     o->health =
         o->maxHealth;
 
-    o->fieldFC =
+    o->nextThinkAt =
         (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
         + *(const int32_t *)&g_gameClockMs;
     o->rank = 7;
@@ -2418,7 +2418,7 @@ reset:
  * so a completely clear cell still demands 30 of the destination.
  *
  * ITS SECOND ARGUMENT IS A WINDOW INTO THE OBJECT, not a record of its own.
- * StepType8 passes `obj + OBJ_OFF_FIELD_540`, so +0x14 is OBJ_OFF_DEATH_STATE
+ * StepType8 passes `obj + OBJ_OFF_MOVE_MODE`, so +0x14 is OBJ_OFF_DEATH_STATE
  * -- 1 while alive, 5 or 6 once DamageRoach has killed it. This was called a
  * "control record" with a STOP field one batch ago, which was a second name
  * for fields that already had one and a meaning guessed off one branch. What
@@ -2448,7 +2448,7 @@ int32_t __cdecl RoachStepAllowed(AM2_Object *o, const AM2_RoachOut *ctrl,
             : g_roachForvel;
 
         if (reverse) {
-            int32_t v = (int32_t)((double)o->field44
+            int32_t v = (int32_t)((double)o->speed
                                   - g_roachRevacc
                                     * g_frameDeltaSec);
 
@@ -2456,7 +2456,7 @@ int32_t __cdecl RoachStepAllowed(AM2_Object *o, const AM2_RoachOut *ctrl,
         } else {
             int32_t v = (int32_t)(g_roachForacc
                                     * g_frameDeltaSec
-                                  + (double)o->field44);
+                                  + (double)o->speed);
 
             speed = (cap < v) ? cap : v;
         }
@@ -2528,7 +2528,7 @@ int32_t __cdecl RoachStepAllowed(AM2_Object *o, const AM2_RoachOut *ctrl,
  * is measuring against, so ROW_OFF_TURN_STAMP is updated by whichever of the
  * two actually commits.
  *
- * OBJ_OFF_FIELD_44 IS WRITTEN TWICE, once before StepObjRows and once after,
+ * OBJ_OFF_SPEED IS WRITTEN TWICE, once before StepObjRows and once after,
  * with the same value. Nothing here reads it in between, so the second store
  * is only explicable as StepObjRows modifying it -- that is the original's
  * shape and both stores are kept. Dropping either is invisible until the row
@@ -2550,7 +2550,7 @@ void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c)
     uint8_t         facing;
     AM2_Point        at;
 
-    if (o->field530 == 4
+    if (o->troopState == 4
         && o->deadline58
            > g_gameClockMs)
         RoachBite(o);
@@ -2564,7 +2564,7 @@ void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c)
         /* The frame's delta is multiplied by FLOAT constants straight out
          * of its float, `fld dword; fmul dword`. */
         if (c->flag18) {
-            int32_t v = (int32_t)(o->field44
+            int32_t v = (int32_t)(o->speed
                                   - g_frameDeltaSec
                                     * 80.0f);
 
@@ -2572,7 +2572,7 @@ void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c)
         } else {
             int32_t v = (int32_t)(g_frameDeltaSec
                                     * 100.0f
-                                  + (double)o->field44);
+                                  + (double)o->speed);
 
             speed = (cap < v) ? cap : v;
         }
@@ -2639,11 +2639,11 @@ void __cdecl RoachStepTailA(AM2_Object *obj, AM2_RoachOut *c)
     }
 
     o->facing = facing;
-    o->field44 = speed;
+    o->speed = speed;
     SetObjField530(o, c->state);
     o->rowSet.rows->heading = o->facing;
     StepObjRows(o);
-    o->field44 = speed;
+    o->speed = speed;
     ObjMoveAlongFacing(o, 0, 0, 0);
 }
 
@@ -3448,7 +3448,7 @@ refuse_top:
  * is the difference between a bullet and a blast.
  *
  * Code 3 also keeps a record of what it did: `20 - TYPEREC_OFF_FIELD_08` into
- * OBJ_OFF_FIELD_44, for each object it damaged that is neither a trooper nor
+ * OBJ_OFF_SPEED, for each object it damaged that is neither a trooper nor
  * an item with TYPEREC_OFF_FIELD_3C set. The same write happens once more in
  * the terrain test below, so the last one wins and the value does not
  * accumulate.
@@ -3495,7 +3495,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
             && o->aai->field3C > 0)
             continue;
 
-        s->field44 =
+        s->speed =
             20 - s->def->life;
     }
 
@@ -3510,7 +3510,7 @@ int32_t __cdecl ShotStrike(AM2_Object *shot, AM2_Point at, int16_t height)
                 return AM2_SHOT_STRUCK_HARD;
             return AM2_SHOT_STRUCK_NOTHING;
         }
-        s->field44 =
+        s->speed =
             20 - s->def->life;
     }
     return AM2_SHOT_STRUCK_GROUND;
@@ -3625,7 +3625,7 @@ void __cdecl ApplyShotDamage(AM2_Object *target, AM2_Object *shot, AM2_Point unu
  *   - FOR A TYPE 2, 3 OR 8: a VEHICLE of your own army does not (you drive
  *     past your own); anything you are not allied with does; and an ALLY does
  *     only under one condition -- the player's own unit is riding `from` and
- *     OBJ_OFF_FIELD_10C is clear.
+ *     OBJ_OFF_WALK_ORDER is clear.
  *
  *     That last arm is a real game rule and worth stating plainly: a vehicle
  *     the player is driving stops for friendly troops and one the AI is
@@ -3660,7 +3660,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
                 if (!ObjsAreAllied(from, obj, 0)
                     || ((leader = LookupOwnerObj(g_defaultOwner))->riding
                             == from->uid
-                        && !from->field10C))
+                        && !from->walkOrder))
                     return 1;
             }
         } else if (ObjIsWatchedKind(obj)) {
@@ -3696,7 +3696,7 @@ int32_t __cdecl ObjCollidesWith(AM2_Object *from, AM2_Object *obj)
  * question, three things are checked together: the viewer's army is the
  * player's ADDR_DEFAULT_OWNER, the owner object for that army is RIDING the
  * viewer -- LookupOwnerObj(owner)->OBJ_OFF_RIDING equals the viewer's uid --
- * and the viewer's OBJ_OFF_FIELD_10C is zero. All three together mean the
+ * and the viewer's OBJ_OFF_WALK_ORDER is zero. All three together mean the
  * trooper contributes nothing whatever the alliance says. Any one of them
  * failing falls through to the alliance question. So the unit the player is
  * driving is the only one for which a trooper is never an obstacle.
@@ -3746,7 +3746,7 @@ static inline int32_t TroopBlockWeight(const AM2_Object *f, AM2_Object *o,
             == (int32_t)g_defaultOwner
             && ((const AM2_Object *)LookupOwnerObj(g_defaultOwner))->riding
                == f->uid
-            && f->field10C == 0)
+            && f->walkOrder == 0)
             return 0;
         if (ObjsAreAllied(f, o, 0) || ((uintptr_t)o == 1000 && (uintptr_t)o == 1001) || ((uintptr_t)o == 1004 && (uintptr_t)o == 1005) || ((uintptr_t)o == 1008 && (uintptr_t)o == 1009) || ((uintptr_t)o == 1012 && (uintptr_t)o == 1013) || ((uintptr_t)o == 1016 && (uintptr_t)o == 1017))
             return AM2_BLOCK_FULL;
@@ -4881,7 +4881,7 @@ static inline int32_t BracedPose(const AM2_Object *o)
  * whatever the weapon, which is what says those two are "get into a stance"
  * rather than anything about the weapon.
  *
- * THE MOVEMENT GATE IS ON TWO ARMS ONLY. A trooper with OBJ_OFF_FIELD_44 above
+ * THE MOVEMENT GATE IS ON TWO ARMS ONLY. A trooper with OBJ_OFF_SPEED above
  * zero -- moving -- keeps its pose for the guns and the flamethrower, and does
  * not for the grenade, the bazooka or anything else. Reproduced; nothing here
  * says why.
@@ -4918,7 +4918,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
 
         switch (weapon->typeRec->kind) {
         case 3:                                                        /* FLAM */
-            if (o->field44 > 0)
+            if (o->speed > 0)
                 goto ret1;
             switch (cls) {
             case 1:
@@ -4956,7 +4956,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
 
         case 1:  case 7:  case 8:  case 9:  case 10:
         case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
-            if (o->field44 > 0)
+            if (o->speed > 0)
                 goto ret1c;
             switch (cls) {
             case 1:
@@ -5237,7 +5237,7 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
             obj->flags &= ~(uint32_t)OBJ_FLAG_BIT0;
         }
 
-        if (obj->field5A4 != 0) {
+        if (obj->convertedFrom != 0) {
             AM2_Object *killer = LookupByUID(attacker);
             int16_t  army   = killer != 0
                             ? (int16_t)killer->owner
@@ -6014,7 +6014,7 @@ void __cdecl SetWeaponTarget(AM2_Object *target, AM2_Point at)
 /* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
  * values than SetWeaponTarget above writes.
  *
- * The mode is 0x25 when the unit has OBJ_OFF_FIELD_5A4 AND its
+ * The mode is 0x25 when the unit has OBJ_OFF_CONVERTED_FROM AND its
  * OBJ_OFF_DEADLINE_58 is more than fifteen seconds behind the game clock, and
  * 1 in every other case -- including a unit with no field at all, which takes
  * the same 1 as one whose deadline is recent. Two different reasons, one
@@ -6038,7 +6038,7 @@ void __cdecl PickFireMode(AM2_Object *obj)
 {
     AM2_Object *o = obj;
 
-    if (o->field5A4
+    if (o->convertedFrom
         && (uint32_t)(*(const int32_t *)&g_gameClockMs
                       - (int32_t)o->deadline58)
                > AM2_FIRE_STALE_MS) {
@@ -6138,7 +6138,7 @@ typedef int32_t (__cdecl *AM2_Scan403B40Fn)(void *obj, void *a, void *b,
  * "there is a next slot", which is the count less one, and saying so is what
  * keeps the read inside the six.
  *
- * The scan above it is on a timer of its own -- `OBJ_OFF_FIELD_FC` against the
+ * The scan above it is on a timer of its own -- `OBJ_OFF_NEXT_THINK_AT` against the
  * game clock -- and runs whether or not anything is pressed, so it is not part
  * of the switch at all. Its answer is discarded here, where AiStepDefend keeps
  * the same function's answer as SIGHT_OFF_FOUND.
@@ -6151,7 +6151,7 @@ void __cdecl NextInventorySlot(AM2_Object *obj)
     AM2_Object *o = obj;
 
     if (g_gameClockMs
-        > (uint32_t)o->fieldFC) {
+        > (uint32_t)o->nextThinkAt) {
         /* Four out-params it discards -- it wants the scan's side effects,
          * which are the sight cache, the reveal stamps and the retry
          * deadline. The bearing is a byte; the others are int32. */
@@ -6183,7 +6183,7 @@ void __cdecl NextInventorySlot(AM2_Object *obj)
 /* The roach step seam is gone -- RoachStepTailA is reconstructed and its one
  * caller below calls it by name. What the seam's comment established is still
  * true of the signature and is kept here: the second argument is
- * `obj + OBJ_OFF_FIELD_540` and the FAMILY reads more than a byte through it
+ * `obj + OBJ_OFF_MOVE_MODE` and the FAMILY reads more than a byte through it
  * -- 0x0043D5B0 tests +0x14 as an int32, which is the object's
  * OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the same
  * shape of mistake as ObjInitCommon's `dir`. */
@@ -6196,20 +6196,20 @@ typedef void (__cdecl *AM2_StepFn)(void *obj);
  *
  * Clear the footprint, refresh the roach's own copy of its facing, and then
  * split on health: alive, it makes a sound and takes two steps; dead, it
- * dispatches on OBJ_OFF_FIELD_530 through three arms and a default. Every
+ * dispatches on OBJ_OFF_TROOP_STATE through three arms and a default. Every
  * path ends with the same two calls.
  *
  * IT DISPATCHES ON 0x530 AND WRITES 0x554, AND THOSE ARE DIFFERENT FIELDS.
  * OBJ_OFF_DEATH_STATE (0x554) is what DamageRoach writes 5 or 6 into when a
  * roach's health reaches zero -- and this stepper does not read it. It reads
- * OBJ_OFF_FIELD_530, whose only other named reader is ObjConceal comparing it
+ * OBJ_OFF_TROOP_STATE, whose only other named reader is ObjConceal comparing it
  * to 5, and it takes the SAME value set: 0, 5 and 6. Checked against the
  * bytes rather than assumed, because two fields carrying one vocabulary is
  * exactly the shape a mis-transcribed offset produces. What sets 0x530 is not
  * established; it is not the damage path.
  *
  * THE FACING IS PASSED BY ADDRESS to four of the five callees. The step reads
- * OBJ_OFF_FACING into OBJ_OFF_FIELD_540 at the top and hands the address of
+ * OBJ_OFF_FACING into OBJ_OFF_MOVE_MODE at the top and hands the address of
  * the copy on, so a callee that turns the roach writes the copy and the
  * object's own facing is only refreshed on the NEXT frame. Reproduced as the
  * pointer it is.
@@ -6235,7 +6235,7 @@ void __cdecl StepType8(AM2_Object *o)
     facing = &o->roachCtl;
 
     if (o->health == 0) {
-        switch (o->field530) {
+        switch (o->troopState) {
         case 0:
             DestroyByType(o);
             break;
@@ -6450,7 +6450,7 @@ void __cdecl DamageRoach(AM2_Object *obj, int32_t amount, uint8_t dir, int32_t k
  * ADDR_OBJ_ATTACH_TO is given a NULL target, which is the detach case of a
  * two-argument attach rather than a function of its own.
  *
- * The tail is two small writes: a flag set from whether OBJ_OFF_FIELD_F4 is
+ * The tail is two small writes: a flag set from whether OBJ_OFF_SIGHT_HITS is
  * positive -- `setg`, so strictly greater, and stored as 0 or 1 rather than
  * the value -- and an AI mode of 3 demoted to 1, which is the only mode this
  * touches.
@@ -6487,7 +6487,7 @@ void __cdecl PointActionA(AM2_Object *o, AM2_Point point)
     NearestAllowedTile(o, TileOfPoint(point), &point);
 
     o->scriptPoint = point;
-    o->fieldEC     = (o->fieldF4 > 0) ? 1 : 0;
+    o->sawTarget     = (o->sightHits > 0) ? 1 : 0;
 
     if (o->aiMode == 3)
         o->aiMode = 1;
@@ -6538,7 +6538,7 @@ void __cdecl Type2ActionC(AM2_Object *obj, int32_t prev)
         }
     }
 
-    o->field5A4  = prev + 1;
+    o->convertedFrom  = prev + 1;
     o->deadline58 =
         g_gameClockMs;
     o->aiDriven  = 1;
@@ -6865,7 +6865,7 @@ void __cdecl TrooperDropItem(AM2_Object *unit, int32_t slot, AM2_Point at)
  * The three guards are not the same as its siblings'. It refuses at
  * OBJ_OFF_SOLDIER_KIND >= 6, as B does and C does not, and it has one they do not:
  * ADDR_TYPE2_FIELD5A4_SET, which is false unless the object is a type 2 with
- * a positive OBJ_OFF_FIELD_5A4. So whatever that counter tracks is a reason
+ * a positive OBJ_OFF_CONVERTED_FROM. So whatever that counter tracks is a reason
  * NOT to re-arm.
  *
  * The old weapon is marked OBJ_FLAG_REPLACED and simply abandoned -- unlike
@@ -7131,7 +7131,7 @@ extern "C" const char *const am2_unit_class_names[45] = {   /* 0x00489B44 */
  * reads. Two tables 416 bytes apart is exactly the sort of thing to check
  * rather than assume when a comment already names one of them.
  *
- * OBJ_OFF_FIELD_578 is the second axis and it is still unnamed. It selects
+ * OBJ_OFF_ARMED is the second axis and it is still unnamed. It selects
  * between {1, 4} and {0x19, 0x1A} for one family of weapons and between
  * {1, 4} and {0x1F} for another, and it does nothing at all for class 2,
  * which always answers 6. The original computes it with `neg`/`sbb`/`and`,
@@ -7146,14 +7146,14 @@ int32_t __cdecl WeaponPoseIndex(AM2_Object *obj, AM2_Object *weapon)
         switch (weapon->typeRec->kind) {
         case 1: case 4: case 7: case 8: case 9: case 10: case 29: case 30:
             switch (cls) {
-            case 1:  return o->field578 ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
+            case 1:  return o->armed ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
             case 2:  return AM2_POSE_CLASS2;
-            default: return o->field578 ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
+            default: return o->armed ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
             }
 
         case 24: case 25: case 26: case 39: case 40:
             switch (cls) {
-            case 1:  return o->field578 ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
+            case 1:  return o->armed ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
             case 2:  return AM2_POSE_CLASS2;
             default: return AM2_POSE_STAND;
             }
@@ -7300,7 +7300,7 @@ void __cdecl StepRowAnim(AM2_MapRow *r)
  * 1..64 and never 0. The health scale is a double in the image and it is
  * exactly 1.5, read rather than guessed.
  *
- * OBJ_OFF_FIELD_578 is cleared for EVERY kind, before the kind 7 test, so it
+ * OBJ_OFF_ARMED is cleared for EVERY kind, before the kind 7 test, so it
  * is not part of that special case however much it looks like it.
  *
  * VERIFIED BY READING. Its counter is blind -- every caller that runs here is
@@ -7334,20 +7334,20 @@ void __cdecl SetSoldierKind(AM2_Object *obj, int32_t kind)
         }
     }
 
-    o->field578 = 0;
+    o->armed = 0;
     if (kind == 7) {
         o->flags |= OBJ_FLAG_8000;
 
         /* The name index is read back from the object, not kept in a local:
          * with a local, VC6 sets the flag above with a read-modify-write
          * `or [esi+8]` instead of the image's load, `or dh`, store. */
-        o->field5A8 =
+        o->kind7Name =
             orig_rand() % AM2_KIND7_NAME_COUNT + 1;
         o->scriptState =
             *(const int32_t *)&g_zeroPoint;
 
-        if (o->field5A8 > 0)
-            SetFieldInAll(&o->rowSet, g_kind7Names[o->field5A8]);
+        if (o->kind7Name > 0)
+            SetFieldInAll(&o->rowSet, g_kind7Names[o->kind7Name]);
 
         o->health = (int16_t)(int32_t)
             ((double)o->maxHealth
@@ -7694,7 +7694,7 @@ void __cdecl StepObjRows(AM2_Object *o)
         StepRowAnim(&set->rows[i]);
 
     if (set->count > 0)
-        o->field44 = set->rows->field3C;
+        o->speed = set->rows->field3C;
 }
 
 /* 0x0040D930, nine callers. Put a unit into a POSE.
@@ -8484,7 +8484,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
 
 /* SetObjField530 -- original 0x0043CD40, two callers.
  *
- * Move an object to a new OBJ_OFF_FIELD_530 and put its first row on the
+ * Move an object to a new OBJ_OFF_TROOP_STATE and put its first row on the
  * animation frame that goes with it. Named for the field, which is itself
  * named for its offset: nothing here says what the states MEAN, only how they
  * are changed.
@@ -8516,7 +8516,7 @@ void __cdecl SelectBestWeapon(AM2_Object *u)
 void __cdecl SetObjField530(AM2_Object *obj, int32_t state)
 {
     AM2_Object *o = obj;
-    int32_t  cur = o->field530;
+    int32_t  cur = o->troopState;
     AM2_MapRow *row;
     int32_t  mayInterrupt;
 
@@ -8533,7 +8533,7 @@ void __cdecl SetObjField530(AM2_Object *obj, int32_t state)
         && !RowAnimFinished(row))
         return;
 
-    o->field530 = state;
+    o->troopState = state;
 
     SetAnimFrame(row,
                  (int16_t)(g_field530Frames)[state],
@@ -8912,8 +8912,8 @@ void __cdecl ResetType2Fields(AM2_Object *obj)
      * never what it is. */
     memset(&o->routeGoal, 0, AM2_OBJ_TAIL_DWORDS * 4);
 
-    o->fieldFC  = 0;
-    o->field100 = 0;
+    o->nextThinkAt  = 0;
+    o->lastFireAt = 0;
     o->hitDir = 0;
     o->hitTime = 0;
 
@@ -8974,8 +8974,8 @@ void __cdecl ResetObjOnCof(AM2_Object *obj)
     o->deadlineD0 = 0;
     o->hitTime    = 0;
     o->hitDir     = 0;
-    o->field100   = 0;
-    o->fieldFC    = orig_rand() % AM2_COF_PHASE_MAX;
+    o->lastFireAt   = 0;
+    o->nextThinkAt    = orig_rand() % AM2_COF_PHASE_MAX;
 
     ObjAttachTo((AM2_Object *)o, (AM2_Object *)0);
 
@@ -9406,7 +9406,7 @@ typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
  * and for WeaponClassOf.
  *
  * KIND 3'S ARM IS REACHED TWO WAYS -- through the table, and by falling out of
- * the OBJ_OFF_FIELD_5A4 test above it, which is why that block sits before the
+ * the OBJ_OFF_CONVERTED_FROM test above it, which is why that block sits before the
  * dispatch rather than with the other arms.
  *
  * EVERY ARM ANSWERS THE SAME TWO QUESTIONS: which animation goes into
@@ -9444,8 +9444,8 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
      * at 0x447F12 directly and does NOT clear it. The block sits inside the
      * test, where the original lays it out, and case 3 jumps into it. Writing the two as one
      * condition clears the field on a path the original leaves alone. */
-    if (o->field5A4) {
-        o->field5A4 = 0;
+    if (o->convertedFrom) {
+        o->convertedFrom = 0;
     arm3:
         o->sight.state = 0;
         o->sight.field00 = 1;
@@ -9881,7 +9881,7 @@ void __cdecl ToggleSelect(AM2_Object *obj)
  *   the per-point weight comes from BlockWeightChain for the boat and from
  *   BlockWeightTroops for everything else;
  *
- *   the damage threshold on OBJ_OFF_FIELD_44 -- the speed the animation
+ *   the damage threshold on OBJ_OFF_SPEED -- the speed the animation
  *   supplies -- is 0x28 for the boat and 0x3C for the rest, so a boat starts
  *   doing its heavier damage at a lower speed;
  *
@@ -9972,13 +9972,13 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
                         + AM2_VEHICLE_HIT_COOLDOWN;
 
                     if (!ObjIsType2(o)) {
-                        if (abs(v->field44)
+                        if (abs(v->speed)
                             > AM2_BOAT_CRUSH_SPEED)
-                            hp = v->field568 / 3;
+                            hp = v->crushDamage / 3;
                         else
-                            hp = v->field568 / 6;
+                            hp = v->crushDamage / 6;
                     } else
-                        hp = v->field568;
+                        hp = v->crushDamage;
 
                     DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                  v->uid, 0, 0);
@@ -10030,12 +10030,12 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
                             + AM2_VEHICLE_HIT_COOLDOWN;
 
                         if (!ObjIsType2(o)) {
-                            if (abs(v->field44) > AM2_VEHICLE_CRUSH_SPEED)
-                                hp = v->field568 / 3;
+                            if (abs(v->speed) > AM2_VEHICLE_CRUSH_SPEED)
+                                hp = v->crushDamage / 3;
                             else
-                                hp = v->field568 / 6;
+                                hp = v->crushDamage / 6;
                         } else
-                            hp = v->field568;
+                            hp = v->crushDamage;
 
                         DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
                                      v->uid,
@@ -10046,14 +10046,14 @@ int32_t __cdecl VehicleBlockWeight(AM2_Object *veh, uint8_t facing, AM2_Point at
                          * original wraps the `setg` in the compiler's abs(),
                          * which on a 0/1 value is a no-op; the speed is read
                          * afresh here and below. */
-                        if (abs(v->field44
+                        if (abs(v->speed
                                 > AM2_VEHICLE_NOISY_SPEED)
                             || (orig_game_rand() & 0xFF) < AM2_VEHICLE_NOISE_ODDS)
                             sound = 1;
                     }
 
                     /* Reached whether or not it was hit. */
-                    speed = abs(v->field44);
+                    speed = abs(v->speed);
 
                     if (speed > AM2_VEHICLE_NOISY_SPEED
                         && (ObjIsType3(o)
@@ -10406,7 +10406,7 @@ struct AM2_Object *__cdecl WalkCellAtPoint(const AM2_Point *pt, const struct AM2
  * frame, 0x0C, by different routes the compiler did not merge. Written as one
  * case each way round, matching the table rather than the code layout.
  *
- * ARM 0 HAS AN EXTRA GUARD THE OTHERS DO NOT: a positive OBJ_OFF_FIELD_44
+ * ARM 0 HAS AN EXTRA GUARD THE OTHERS DO NOT: a positive OBJ_OFF_SPEED
  * takes the default answer of 1 before the frame is looked at, so an object
  * with that field set is never refused on frame grounds.
  *
@@ -10441,7 +10441,7 @@ int32_t __cdecl WeaponFrameReady(AM2_Object *obj, AM2_Object *weapon)
         return 0;
 
     case 1: case 7: case 8: case 9: case 10: case 29: case 30:
-        if (o->field44 > 0)
+        if (o->speed > 0)
             return 1;
         if (frame == 6 || frame == 7 || frame == 0x0D)
             break;
@@ -10518,7 +10518,7 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
     if (!o)
         return;
 
-    o->field530 = kind;
+    o->troopState = kind;
 
     slot = AM2_THE_COMM->CommArmyOfSlot(
                           (int32_t)UidArmy(uid));
@@ -10762,7 +10762,7 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(AM2_Object *obj))
  * arguments in the wrong places; tools/checkseams.py is what forced the old
  * typedef into view.
  *
- * ADDR_FRAME_DELTA_SEC scales everything, so OBJ_OFF_FIELD_44 is a SPEED and
+ * ADDR_FRAME_DELTA_SEC scales everything, so OBJ_OFF_SPEED is a SPEED and
  * ADDR_GRAVITY's 440.0 is an acceleration: the whole function is a per-frame
  * integrator with three sub-pixel accumulators, one per axis.
  *
@@ -10824,7 +10824,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
             heading = (uint8_t)(heading + 0x80u);
         heading = (uint8_t)(heading + row0->headingBias);
 
-        speed = o->field44;
+        speed = o->speed;
         if (speed != 0) {
             float       step;
             long double ny;
@@ -10905,7 +10905,7 @@ void __cdecl ObjMoveAlongFacing(AM2_Object *o, int32_t tileArg, int32_t unused,
  *
  * TWO THINGS READ BACKWARDS IN PROSE AND ARE REPRODUCED AS ENCODED.
  *
- * The ten-dword clear at OBJ_OFF_FIELD_578 covers 0x578..0x5A0, and the facing
+ * The ten-dword clear at OBJ_OFF_ARMED covers 0x578..0x5A0, and the facing
  * is stamped into 0x578 and OBJ_OFF_FACING_COPY2 AFTERWARDS. Doing the stamps
  * first -- the natural order to write -- zeroes them.
  *
@@ -11001,7 +11001,7 @@ void __cdecl DeployVehicle(AM2_Object *obj, int32_t x, int32_t y,
  *
  * The near-twin of DeployVehicle above, and the three DIFFERENCES are the
  * content: this clears from OBJ_OFF_SIGHT_OUT_T2 rather than
- * OBJ_OFF_FIELD_578 -- each deploy clears its own type's sight-output block,
+ * OBJ_OFF_ARMED -- each deploy clears its own type's sight-output block,
  * and the two records start four bytes apart -- RowUpdate takes force 1 rather
  * than 0, and an OBJ_OFF_SARGE guard decides whether rank and repair-frame are
  * cleared. Writing this from the sibling erases all three.
@@ -11059,13 +11059,13 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
             o->repairFrame = 0;
         }
 
-        o->field574 = (int16_t)o->facing;
+        o->faceTo = (int16_t)o->facing;
         o->facingCopy = o->facing;
         o->sight.bearing   = o->facing;
         SetUnitPose((AM2_Object *)o, 1);
 
         o->riding    = 0;
-        o->field5A4 = 0;
+        o->convertedFrom = 0;
         ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
         o->pose = 0;
 
@@ -11087,10 +11087,10 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
         /* The null test is the inlined state setter's own, as ItemTeardown's
          * copy of it has: `o` cannot be null here. */
         if (o != 0
-            && o->field530 != AM2_DEPLOY_KIND_DONE) {
+            && o->troopState != AM2_DEPLOY_KIND_DONE) {
             int32_t slot;
 
-            o->field530 = AM2_DEPLOY_KIND_DONE;
+            o->troopState = AM2_DEPLOY_KIND_DONE;
             slot = (int32_t)(uintptr_t)o->tableRec3;
             o->tableRec2 = (const uint8_t *)(uintptr_t)slot;
             o->tableRec3 = 0;
@@ -11758,7 +11758,7 @@ void __cdecl StepType6(AM2_Object *obj)
  * overwritten -- so the intermediate is observable by nothing and is kept.
  *
  * THE STAGGER IS CreateRoach's, to the constant: the clock plus a random
- * 0..499 into OBJ_OFF_FIELD_FC, from the GAME's rand rather than libc's, so
+ * 0..499 into OBJ_OFF_NEXT_THINK_AT, from the GAME's rand rather than libc's, so
  * two troopers made in one frame do not act in lockstep.
  *
  * IT ASKS ObjIsFriendly TWICE AND THE TWO ANSWERS ARE USED IN OPPOSITE SENSES.
@@ -11799,7 +11799,7 @@ AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot
     o->spawnFacing = (uint8_t)facing;
 
     o->flags |= (uint32_t)flags | OBJ_FLAG_BIT0;
-    o->field530 = 5;
+    o->troopState = 5;
     o->pose      = 0;
     o->owner       = (int8_t)army;
 
@@ -11817,7 +11817,7 @@ AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot
         *(const int16_t *)&g_rankRecords[0].max_health;
     SetMaxHealth(o, g_rankRecords[0].max_health);
     o->health = o->maxHealth;
-    o->field574 =
+    o->faceTo =
         (int16_t)o->facing;
 
     o->aiMode = AM2_TROOPER_AI_MINE;
@@ -11834,7 +11834,7 @@ AM2_Object *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot
         g_objTableRecords
         + slot * AM2_OBJ_TABLE_REC_SIZE;
 
-    o->fieldFC =
+    o->nextThinkAt =
         (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
         + *(const int32_t *)&g_gameClockMs;
 
@@ -12015,9 +12015,9 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
 
     o->seats =
         def->seats;
-    o->field558 =
+    o->fwdSpeed =
         def->field08;
-    o->field55C =
+    o->revSpeed =
         def->field0C;
     o->accelRate =
         def->accelRate;
@@ -12031,7 +12031,7 @@ struct AM2_Object *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, in
      * reason the two stores are not one: SetMaxHealth scales it. */
     o->health = o->maxHealth;
 
-    o->field568 =
+    o->crushDamage =
         def->field1C;
     o->armour =
         def->armour;
@@ -12592,12 +12592,12 @@ void __cdecl StepType5(AM2_Object *obj)
 
     strike = 1;
     {
-        int32_t life = obj->field44
+        int32_t life = obj->speed
                        + def->life;
 
         /* Past twenty, the speed is scaled by how far through its life it is.
          * The divisor is the def's, so a longer-lived missile slows less. */
-        if (obj->field44 > 0x14)
+        if (obj->speed > 0x14)
             speed = speed * life / def->life;
 
         if (obj->repairFrame)
@@ -13138,7 +13138,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
      * everything else takes a fresh random byte. It ends up as CreateMissile's
      * last argument, and four arms bias it before passing it on. */
     if (ObjIsTypeIn238(u)) {
-        u->field100 = g_gameClockMs;
+        u->lastFireAt = g_gameClockMs;
         seed = u->fireFlag;
     } else {
         seed = (uint8_t)orig_game_rand();
@@ -13377,7 +13377,7 @@ int32_t __cdecl FireWeapon(AM2_Object *weapon, AM2_Object *unit, int16_t height,
             PlaySoundAt(0, 0, 0, 0, 0);
             return 0;
         }
-        if (target->field530
+        if (target->troopState
             == *(const int32_t *)weapon->typeRec - 0x23) {
             PlaySoundAt(0, 0, 0, 0, 0);
             return 0;

@@ -5479,7 +5479,7 @@ AM2_HudSarge::~AM2_HudSarge()
  * three tests.
  *
  * The four middle arms are one shape with different comparands: clear the
- * target unless OBJ_OFF_FIELD_530 already equals 0, 1, 2 or 3 respectively.
+ * target unless OBJ_OFF_TROOP_STATE already equals 0, 1, 2 or 3 respectively.
  * Kind 0x17 clears only for a unit that is alive and not at full health;
  * 0x1A clears unconditionally; 0x29 clears the target of whatever the unit
  * is RIDING, and nulls OBJ_OFF_RIDING when that uid no longer resolves --
@@ -5523,20 +5523,20 @@ void __cdecl SelectWeapon(AM2_Object *unit, int32_t slot)
          * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
          * own and jumps into 0x26's. */
         case 0x23:
-            if (u->field530 != 0)
+            if (u->troopState != 0)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
 
         case 0x24:
-            if (u->field530 != 1)
+            if (u->troopState != 1)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x25:
-            if (u->field530 != 2)
+            if (u->troopState != 2)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x26:
-            if (u->field530 != 3)
+            if (u->troopState != 3)
                 SetWeaponTarget((AM2_Object *)u, g_zeroPoint);
             break;
         case 0x29: {
@@ -16721,7 +16721,7 @@ void __cdecl PointerActionMode6(AM2_Object *target, AM2_Point at)
             FormationSlotPoint(i, at, o, (AM2_Point *)&target);
 
             ObjAttachTo(o, (AM2_Object *)0);
-            o->fieldEC = 1;
+            o->sawTarget = 1;
             o->aiMode  = AM2_AI_MODE_IGNORE;
 
             PointActionA(o, *(const AM2_Point *)&target);
@@ -17114,7 +17114,7 @@ void __cdecl PointerSelect(AM2_Object *obj, AM2_Point at)
  * one mental model would have made them agree.
  *
  * `useRec3` is 0 in both: the original reads SAVED_OFF_TABLE_REC2 with no
- * OBJ_OFF_FIELD_530 test, which is the arm ArmyAlliedWithObj takes for 0.
+ * OBJ_OFF_TROOP_STATE test, which is the arm ArmyAlliedWithObj takes for 0.
  *
  * A FOE gets the enemy overlay row and answers 1. A FRIEND falls into the
  * tail written out below (see PointerPickMode6). The foe arm is written first, under the negated test:

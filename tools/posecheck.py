@@ -1,7 +1,7 @@
 """Check WeaponPoseIndex against the original, exhaustively.
 
 The function answers from three things: the object's class (0, 1 or 2, from
-ClassifyByCode74), one bit of OBJ_OFF_FIELD_578, and a 43-entry table indexed
+ClassifyByCode74), one bit of OBJ_OFF_ARMED, and a 43-entry table indexed
 by the weapon's code. That whole space is 3 x 2 x 46 cases including a null
 weapon and codes either side of the range, so it can be ENUMERATED rather than
 sampled -- the same argument as tools/moviecheck.py.

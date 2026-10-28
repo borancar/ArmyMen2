@@ -433,7 +433,7 @@ typedef struct AM2_Object {
     uint8_t        facing;          /* +0x40  OBJ_OFF_FACING */
     uint8_t        _pad41[1];       /* +0x41 */
     int16_t        row0YAdjust;     /* +0x42  OBJ_OFF_ROW0_Y_ADJUST */
-    int32_t        field44;         /* +0x44  OBJ_OFF_FIELD_44, row 0's field3C */
+    int32_t        speed;         /* +0x44  OBJ_OFF_SPEED, row 0's field3C */
     float          velZ;            /* +0x48  OBJ_OFF_VEL_Z */
     float          subpixelX;       /* +0x4C  OBJ_OFF_SUBPIXEL_X */
     float          subpixelY;       /* +0x50  OBJ_OFF_SUBPIXEL_Y */
@@ -526,9 +526,9 @@ typedef struct AM2_Object {
         int32_t    ammo;            /*   a weapon's: ITEM_OFF_AMMO */
     };
     uint32_t       deadlineD0;      /* +0xD0  OBJ_OFF_DEADLINE_D0 */
-    uint8_t        fieldD4;         /* +0xD4  OBJ_OFF_FIELD_D4, incremented per turn */
+    uint8_t        turnSteps;         /* +0xD4  OBJ_OFF_TURN_STEPS, incremented per turn */
     uint8_t        _padd5[1];
-    int16_t        fieldD6;         /* +0xD6  OBJ_OFF_FIELD_D6, wrapped into +/-0x100 */
+    int16_t        turnAccum;         /* +0xD6  OBJ_OFF_TURN_ACCUM, wrapped into +/-0x100 */
     int32_t        stuckCount;      /* +0xD8  OBJ_OFF_STUCK_COUNT, refused moves in a row */
     uint16_t       region;          /* +0xDC  OBJ_OFF_REGION */
     int16_t        prevRegion;      /* +0xDE  OBJ_OFF_PREV_REGION, -1 for none */
@@ -536,19 +536,19 @@ typedef struct AM2_Object {
     uint8_t        _pade2[2];
     int32_t        aiMode;          /* +0xE4  OBJ_OFF_AI_MODE */
     int32_t        aiModePrev;      /* +0xE8  OBJ_OFF_AI_MODE_PREV */
-    int32_t        fieldEC;         /* +0xEC  OBJ_OFF_FIELD_EC, 0 or 1 */
+    int32_t        sawTarget;         /* +0xEC  OBJ_OFF_SAW_TARGET, 0 or 1 */
     int32_t        moveStateAlt;    /* +0xF0  OBJ_OFF_MOVE_STATE_ALT */
-    int32_t        fieldF4;         /* +0xF4  OBJ_OFF_FIELD_F4, only its sign is read */
+    int32_t        sightHits;         /* +0xF4  OBJ_OFF_SIGHT_HITS, only its sign is read */
     uint8_t        facingCopy;      /* +0xF8  OBJ_OFF_FACING_COPY */
     uint8_t        _padf9[3];
-    int32_t        fieldFC;         /* +0xFC  OBJ_OFF_FIELD_FC */
-    int32_t        field100;        /* +0x100 OBJ_OFF_FIELD_100 */
+    int32_t        nextThinkAt;         /* +0xFC  OBJ_OFF_NEXT_THINK_AT */
+    int32_t        lastFireAt;        /* +0x100 OBJ_OFF_LAST_FIRE_AT */
     uint8_t        hitDir;          /* +0x104 OBJ_OFF_HIT_DIR */
     uint8_t        _pad105[3];
     uint32_t       hitTime;         /* +0x108 OBJ_OFF_HIT_TIME, a clock stamp */
-    int32_t        field10C;        /* +0x10C OBJ_OFF_FIELD_10C */
-    int32_t        field110;        /* +0x110 OBJ_OFF_FIELD_110 */
-    int32_t        field114;        /* +0x114 OBJ_OFF_FIELD_114 */
+    int32_t        walkOrder;        /* +0x10C OBJ_OFF_WALK_ORDER */
+    int32_t        othersSeen;        /* +0x110 OBJ_OFF_OTHERS_SEEN */
+    int32_t        alliesSeen;        /* +0x114 OBJ_OFF_ALLIES_SEEN */
     AM2_Point      routeGoal;       /* +0x118 OBJ_OFF_ROUTE_GOAL */
     int32_t        moveUntil;       /* +0x11C OBJ_OFF_MOVE_UNTIL, game-clock ms */
     union {                         /* +0x120, the route's waypoints */
@@ -570,8 +570,8 @@ typedef struct AM2_Object {
         const uint8_t *tableRec2;   /*   SAVED_OFF_TABLE_REC2, a type 2's record */
         int32_t    tableRec2Index;  /*   the slot as a save file holds it: an index */
     };
-    union {                         /* +0x530 OBJ_OFF_FIELD_530 */
-        int32_t    field530;        /*   ObjConceal compares to 5 */
+    union {                         /* +0x530 OBJ_OFF_TROOP_STATE */
+        int32_t    troopState;        /*   ObjConceal compares to 5 */
         uint8_t    turretFacing;    /*   a vehicle's gun facing, its low byte */
     };
     union {                         /* +0x534, by object type: */
@@ -583,7 +583,7 @@ typedef struct AM2_Object {
         struct {                    /* a unit's (types 2 and 8) */
             int32_t   pose;         /* +0x538 OBJ_OFF_POSE */
             int32_t   posePending;  /* +0x53C OBJ_OFF_POSE_PENDING */
-            int32_t   field540;     /* +0x540 OBJ_OFF_FIELD_540 */
+            int32_t   moveMode;     /* +0x540 OBJ_OFF_MOVE_MODE */
             int32_t   soldierKind;  /* +0x544 OBJ_OFF_SOLDIER_KIND */
             int32_t   sarge;        /* +0x548 OBJ_OFF_SARGE */
             uint32_t  inventory[6]; /* +0x54C UNIT_OFF_INVENTORY, weapon uids */
@@ -591,15 +591,15 @@ typedef struct AM2_Object {
             int32_t   inventorySel; /* +0x568 UNIT_OFF_INVENTORY_SEL, the slot in hand */
             uint32_t  uid56C;       /* +0x56C OBJ_OFF_UID_56C, a uid the menu row 8 order targets */
             uint32_t  riding;       /* +0x570 OBJ_OFF_RIDING, the uid ridden */
-            int16_t   field574;     /* +0x574 OBJ_OFF_FIELD_574, the facing widened */
+            int16_t   faceTo;     /* +0x574 OBJ_OFF_FACE_TO, the facing widened */
             uint8_t   _pad576[2];
-            int32_t   field578;     /* +0x578 OBJ_OFF_FIELD_578 */
+            int32_t   armed;     /* +0x578 OBJ_OFF_ARMED */
             AM2_SightOut sight;     /* +0x57C OBJ_OFF_SIGHT_OUT_T2 */
             uint32_t  fireStamp;    /* +0x5A0 UNIT_OFF_FIRE_STAMP */
-            int32_t   field5A4;     /* +0x5A4 OBJ_OFF_FIELD_5A4 */
-            int32_t   field5A8;     /* +0x5A8 OBJ_OFF_FIELD_5A8, the random name index */
+            int32_t   convertedFrom;     /* +0x5A4 OBJ_OFF_CONVERTED_FROM */
+            int32_t   kind7Name;     /* +0x5A8 OBJ_OFF_KIND7_NAME, the random name index */
             int32_t        nameIndex;       /* +0x5AC OBJ_OFF_NAME_INDEX */
-            uint32_t       field5B0;        /* +0x5B0 OBJ_OFF_FIELD_5B0, game-clock ms */
+            uint32_t       healStamp;        /* +0x5B0 OBJ_OFF_HEAL_STAMP, game-clock ms */
             AM2_Point      sentPos;         /* +0x5B4 TROOPER_OFF_SENT_POS */
             uint32_t       sentPosSeq;      /* +0x5B8 TROOPER_OFF_SENT_POS_T */
             uint8_t        sentFacing;      /* +0x5BC TROOPER_OFF_SENT_FACING */
@@ -612,20 +612,20 @@ typedef struct AM2_Object {
         struct {                    /* a vehicle's (type 3) */
             AM2_UidList riders;     /* +0x538 VEHICLE_OFF_PTR_LIST, its riders */
             int32_t   deathKind;    /* +0x544 0 destroyed outright, 5 the burn-out */
-            int32_t   field548;     /* +0x548 0 drags the turret onto the hull */
+            int32_t   turretFree;     /* +0x548 0 drags the turret onto the hull */
             int32_t   armour;       /* +0x54C VEHICLE_OFF_ARMOUR */
             uint32_t  weaponUid;    /* +0x550 VEHICLE_OFF_WEAPON_UID, its gun */
             int32_t   seats;        /* +0x554 VEHICLE_OFF_SEATS */
-            int32_t   field558;     /* +0x558 VEHICLE_OFF_FIELD_558 */
-            int32_t   field55C;     /* +0x55C VEHICLE_OFF_FIELD_55C */
+            int32_t   fwdSpeed;     /* +0x558 VEHICLE_OFF_FWD_SPEED */
+            int32_t   revSpeed;     /* +0x55C VEHICLE_OFF_REV_SPEED */
             int32_t   accelRate;    /* +0x560 VEHICLE_OFF_ACCEL_RATE, per second */
             uint32_t  turnInterval; /* +0x564 VEHICLE_OFF_TURN_INTERVAL, ms */
-            int32_t   field568;     /* +0x568 */
+            int32_t   crushDamage;     /* +0x568 */
             uint32_t  blockedSince; /* +0x56C the clock when a turn was first refused */
             int32_t   searchBase;   /* +0x570 the facing the turn search fans out from */
             int32_t   searchTries;  /* +0x574 the search's attempts, kept across frames */
             AM2_SteerOut ctl;       /* +0x578 its steering record, through +0x59F */
-            uint32_t  field5A0;     /* +0x5A0 */
+            uint32_t  vHealStamp;     /* +0x5A0 */
             uint8_t   turnCommitted;/* +0x5A4 the row facing last committed */
             uint8_t   _pad5a5[3];
             int32_t   turnRecommit; /* +0x5A8 non-zero: commit whatever the row reads */
@@ -681,7 +681,7 @@ static_assert(offsetof(AM2_Object, formationSlot) == 0xA0,  "formationSlot");
 static_assert(offsetof(AM2_Object, power)         == 0xB0,  "power");
 static_assert(offsetof(AM2_Object, soldierKind)   == 0x544, "soldierKind");
 static_assert(offsetof(AM2_Object, row0YAdjust)   == 0x42,  "row0YAdjust");
-static_assert(offsetof(AM2_Object, field44)       == 0x44,  "field44");
+static_assert(offsetof(AM2_Object, speed)       == 0x44,  "speed");
 static_assert(offsetof(AM2_Object, velZ)          == 0x48,  "velZ");
 static_assert(offsetof(AM2_Object, subpixelZ)     == 0x54,  "subpixelZ");
 static_assert(offsetof(AM2_Object, deadline58)    == 0x58,  "deadline58");
@@ -690,7 +690,7 @@ static_assert(offsetof(AM2_Object, typeRec)       == 0xC0,  "typeRec");
 static_assert(offsetof(AM2_Object, followUid)     == 0xC4,  "followUid");
 static_assert(offsetof(AM2_Object, targetUid)     == 0xCC,  "targetUid");
 static_assert(offsetof(AM2_Object, aiMode)        == 0xE4,  "aiMode");
-static_assert(offsetof(AM2_Object, field10C)      == 0x10C, "field10C");
+static_assert(offsetof(AM2_Object, walkOrder)      == 0x10C, "walkOrder");
 static_assert(offsetof(AM2_Object, vehicleKind)   == 0x52C, "vehicleKind");
 static_assert(offsetof(AM2_Object, pos)           == 0x12,  "pos");
 static_assert(offsetof(AM2_Object, rowSet.count)  == 0x70,  "rowSet.count");
@@ -709,16 +709,16 @@ static_assert(offsetof(AM2_Object, prevRegion)    == 0xDE,  "prevRegion");
 static_assert(offsetof(AM2_Object, goalRegion)    == 0xE0,  "goalRegion");
 static_assert(offsetof(AM2_Object, moveStateAlt)  == 0xF0,  "moveStateAlt");
 static_assert(offsetof(AM2_Object, hitTime)       == 0x108, "hitTime");
-static_assert(offsetof(AM2_Object, field114)      == 0x114, "field114");
+static_assert(offsetof(AM2_Object, alliesSeen)      == 0x114, "alliesSeen");
 static_assert(offsetof(AM2_Object, waypoints)     == 0x120, "waypoints");
-static_assert(offsetof(AM2_Object, field5A4)      == 0x5A4, "field5A4");
-static_assert(offsetof(AM2_Object, field5B0)      == 0x5B0, "field5B0");
+static_assert(offsetof(AM2_Object, convertedFrom)      == 0x5A4, "convertedFrom");
+static_assert(offsetof(AM2_Object, healStamp)      == 0x5B0, "healStamp");
 static_assert(offsetof(AM2_Object, facingCopy)    == 0xF8,  "facingCopy");
 static_assert(offsetof(AM2_Object, fireFlag)      == 0x529, "fireFlag");
 static_assert(offsetof(AM2_Object, tableRec2)     == 0x52C, "tableRec2");
 static_assert(offsetof(AM2_Object, tableRec3)     == 0x534, "tableRec3");
-static_assert(offsetof(AM2_Object, field574)      == 0x574, "field574");
-static_assert(offsetof(AM2_Object, field578)      == 0x578, "field578");
+static_assert(offsetof(AM2_Object, faceTo)      == 0x574, "faceTo");
+static_assert(offsetof(AM2_Object, armed)      == 0x578, "armed");
 static_assert(offsetof(AM2_Object, sight)         == 0x57C, "sight");
 static_assert(offsetof(AM2_Object, ctl)           == 0x578, "vehicle ctl");
 static_assert(offsetof(AM2_Object, roachCtl)      == 0x540, "roach ctl");
@@ -754,7 +754,7 @@ static_assert(offsetof(AM2_Object, searchTries)   == 0x574, "searchTries");
 static_assert(offsetof(AM2_Object, ctl.gate)      == 0x59C, "gate");
 static_assert(offsetof(AM2_Object, turnRecommit)  == 0x5A8, "turnRecommit");
 static_assert(offsetof(AM2_Object, nameIndex)     == 0x5AC, "nameIndex");
-static_assert(offsetof(AM2_Object, field540)      == 0x540, "field540");
+static_assert(offsetof(AM2_Object, moveMode)      == 0x540, "moveMode");
 static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
 static_assert(offsetof(AM2_Object, inventorySel)  == 0x568, "inventorySel");

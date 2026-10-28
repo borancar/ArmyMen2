@@ -874,7 +874,7 @@ void __cdecl MakePlacedUnit(AM2_Point where, int32_t type, int32_t slot,
             /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
              * apart, and tools/checkoffsetuse.py is what caught the slip. */
             occupant->aiDriven  = 1;
-            occupant->field540 = 1;
+            occupant->moveMode = 1;
 
             ObjTileChanged(occupant,
                            occupant->heightSet, 1);

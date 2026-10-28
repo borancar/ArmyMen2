@@ -3348,7 +3348,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         return;
     }
 
-    if (!ob->field5A4 && g_gameClockMs > ob->deadline58)
+    if (!ob->convertedFrom && g_gameClockMs > ob->deadline58)
         ob->deadline58 = 0;
 
     pt = *dest;
@@ -3526,7 +3526,7 @@ walk:
     if (ob->soldierKind == AM2_AI_KIND_FORCES_ALT)
         out->state = 3;
 
-    ob->field578 = 0;
+    ob->armed = 0;
 }
 
 /* RoachRouteToward -- original 0x00408210, three callers, all of them
@@ -4389,11 +4389,11 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     else
         o->savedPoint = g_zeroPoint;
 
-    if (o->fieldF4 <= 0
+    if (o->sightHits <= 0
         && !o->ammo) {
         /* Nothing to fight: walk the detour, then the state point, then
          * reload. */
-        o->fieldEC = 0;
+        o->sawTarget = 0;
 
         if ((uint16_t)o->detour.x) {
             if (ApproxDist(&o->pos,
@@ -4432,14 +4432,14 @@ void __cdecl AiPatrolStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         && !IsKind7(c->found))
         o->detour = g_zeroPoint;
 
-    if (o->fieldEC) {
+    if (o->sawTarget) {
         if (c->destDist
             > AM2_AI_REACHED_DIST) {
             o->dest = o->scriptPoint;
             AiTrooperStep(o, out, c);
             goto tail;
         }
-        o->fieldEC = 0;
+        o->sawTarget = 0;
         goto react;
     }
 
@@ -4548,7 +4548,7 @@ tail:
  * AiPatrolStep has no such test anywhere.
  *
  * ITS ENGAGED GATE IS ONE TEST, not two: AiPatrolStep takes the engaged path on
- * OBJ_OFF_FIELD_F4 or OBJ_OFF_TARGET_UID, this one on OBJ_OFF_FIELD_F4 alone.
+ * OBJ_OFF_SIGHT_HITS or OBJ_OFF_TARGET_UID, this one on OBJ_OFF_SIGHT_HITS alone.
  *
  * IT DROPS OBJ_OFF_FOLLOW_UID BEFORE LOOKING, so whatever it sees becomes the
  * thing it follows rather than being merged with what it followed before.
@@ -4569,8 +4569,8 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
     else
         o->savedPoint = g_zeroPoint;
 
-    if (o->fieldF4 <= 0) {
-        o->fieldEC = 0;
+    if (o->sightHits <= 0) {
+        o->sawTarget = 0;
         dest = c->destDist;
 
         if (dest > AM2_AI_PATROL_DETOUR) {
@@ -4611,13 +4611,13 @@ void __cdecl AiGuardStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         && !IsKind7(c->found))
         o->detour = g_zeroPoint;
 
-    if (o->fieldEC) {
+    if (o->sawTarget) {
         if (c->destDist > AM2_AI_REACHED_DIST) {
             o->dest = o->scriptPoint;
             AiTrooperStep(o, out, c);
             goto tail;
         }
-        o->fieldEC = 0;
+        o->sawTarget = 0;
         goto react;
     }
 
@@ -4845,10 +4845,10 @@ AM2_Object *__cdecl SightScan(AM2_Object *o, int32_t *outRange,
         }
     }
 
-    o->fieldFC =
+    o->nextThinkAt =
         g_gameClockMs
         + AM2_AI_TROOPER_RETRY_MS;
-    o->fieldF4 = 0;
+    o->sightHits = 0;
     ++g_sightGeneration;
     orig_log_one(o);
 
@@ -5004,7 +5004,7 @@ score:
                 if (!stt.cand)
                     goto next;
                 ++*(volatile int32_t *)nOther;       /* a number win: volatile read-modify-writes in the image's order */
-                ++*(volatile int32_t *)&o->fieldF4;
+                ++*(volatile int32_t *)&o->sightHits;
                 /* Discarded two instructions later; a call, so it counts. */
                 (void)AngleDelta(hold.facing, pick.bearing);
                 if (pick.range >= stt.bestRange + win.slack)
@@ -5091,8 +5091,8 @@ score:
 
 finish:
     orig_log_one(o);
-    if (!o->fieldF4)
-        o->fieldEC = 0;
+    if (!o->sightHits)
+        o->sawTarget = 0;
 
     /* The result starts at zero and takes `best`, or the fallback `alt`
      * (null when there is neither); the image returns it from two
@@ -5218,7 +5218,7 @@ void __cdecl AiStepAttack(AM2_Object *o, AM2_SteerOut *out, AM2_AiCtx *c)
  * mode field left as garbage lands there rather than faulting.
  *
  * The context is 0x44 bytes of stack, built fresh every frame and never kept.
- * Both callers pass `&obj[OBJ_OFF_FIELD_578]` as `out`, so what every arm
+ * Both callers pass `&obj[OBJ_OFF_ARMED]` as `out`, so what every arm
  * writes as `out[1]` is a byte inside the object itself -- the heading it
  * wants -- and not an output parameter in any useful sense.
  *
@@ -5282,7 +5282,7 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * to follow, and the four arms below are the cross product of that question
  * with "are we allied with it".
  *
- * TWO HALVES ON A COUNTER. OBJ_OFF_FIELD_110 counts the frames on which
+ * TWO HALVES ON A COUNTER. OBJ_OFF_OTHERS_SEEN counts the frames on which
  * ArmyAlliedWithObj said no, and once it is positive the whole function
  * switches to a second, shorter set of arms. So an object that has been
  * un-allied even once behaves differently from then on -- the counter is
@@ -5337,9 +5337,9 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
         goto hitreact;
 
     if (!ArmyAlliedWithObj(o->owner, c->leader, 1))
-        o->field110 += 1;
+        o->othersSeen += 1;
 
-    if (o->field110 <= 0) {
+    if (o->othersSeen <= 0) {
         /* ---- not provoked ---- */
         if (ObjIsItem(c->leader)
             && ArmyAlliedWithObj(o->owner, c->leader, 0)) {
@@ -5415,7 +5415,7 @@ void __cdecl AiApproachLeader(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
 
     d = ApproxDist(&o->pos,
                    &c->leader->pos);
-    if (o->fieldEC)
+    if (o->sawTarget)
         goto walk;
     if (d >= c->wantRange
         && c->leadRange > AM2_AI_LEAD_CLOSE)
@@ -5535,7 +5535,7 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  * and the middle starts the clock again from zero.
  *
  * The pose is written only in the gap: not while a walk is outstanding, not
- * for a soldier kind of 6 or more, not when OBJ_OFF_FIELD_540 is set, not for
+ * for a soldier kind of 6 or more, not when OBJ_OFF_MOVE_MODE is set, not for
  * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_FIELD_00 is non-zero. Five gates
  * for one dword, and 7 or 5 by whether SIGHTC_OFF_SEED is under 4.
  *
@@ -5575,7 +5575,7 @@ void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                               &o->dest);
             AiTrooperStep(o, out, c);
             o->deadline58 = g_gameClockMs + AM2_AI_KEEP_RANGE_MS;
-        } else if (!o->field540
+        } else if (!o->moveMode
                    && c->kind != 3
                    && c->seed < 0x10
                    && c->klass == 0) {
@@ -5656,7 +5656,7 @@ void __cdecl AiWalkStep(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  * both directions, so this is a cone of about eight degrees either side --
  * narrow, and the reason a unit does not reveal everything around it.
  *
- * A SECOND READER OF OBJ_OFF_FIELD_530, AND IT DISAGREES WITH THE FIRST.
+ * A SECOND READER OF OBJ_OFF_TROOP_STATE, AND IT DISAGREES WITH THE FIRST.
  * SetObjField530 treats that field as a small state, 0..6, indexing a table of
  * animation frames; this reads its low byte as an 8-BIT BEARING and hands it
  * to AngleDelta. Both cannot be describing the same quantity unless the states
@@ -5732,7 +5732,7 @@ void __cdecl ConsiderSighting(AM2_Object *o, AM2_SteerOut *out,
  * other is `>`. Wider, and off by one relative to it.
  *
  * THE BEARING IT COMPARES IS THE OUT RECORD'S, NOT THE SEEN OBJECT'S. The
- * other reads OBJ_OFF_FIELD_530 off the object; this reads a byte the out
+ * other reads OBJ_OFF_TROOP_STATE off the object; this reads a byte the out
  * record carries and, in its tail, WRITES the record's bearing back there. So
  * the out record accumulates a bearing across calls and this one is a step in
  * a sequence rather than a standalone test.
@@ -5799,7 +5799,7 @@ void __cdecl ConsiderSightingB(AM2_Object *o, AM2_RoachOut *out,
  * happen on a call whose cone test refused.
  *
  * ITS LAST TAIL WRITES THE SEEN OBJECT, not just the out record.
- * `OBJ_OFF_FIELD_578` is set to 1 on any recorded hit -- the field
+ * `OBJ_OFF_ARMED` is set to 1 on any recorded hit -- the field
  * SetSoldierKind clears for every kind -- which makes this the only one of the
  * three that reaches back into the object it was asked about for a reason
  * other than the reveal.
@@ -5855,7 +5855,7 @@ void __cdecl ConsiderSightingC(AM2_Object *o, AM2_SightOut *out,
 
     if (out->hit) {
         out->seen = 1;
-        o->field578 = 1;
+        o->armed = 1;
     }
 }
 
@@ -6511,7 +6511,7 @@ void __cdecl SargeAiStep(AM2_Object *o, AM2_SightOut *out)
  * difference between these two functions alone.
  *
  * IT HAS A TAIL SARGE DOES NOT, and the tail is where the frame's decision
- * lands. After the region is recorded it maps OBJ_OFF_FIELD_540 and
+ * lands. After the region is recorded it maps OBJ_OFF_MOVE_MODE and
  * SIGHTC_OFF_FIELD_00 onto SIGHTCOUT_OFF_STATE:
  *
  *     0x540 == 1   ctx0 0 -> 1,  ctx0 2 -> 9,  else 8
@@ -6567,7 +6567,7 @@ void __cdecl TrooperAiStep(AM2_Object *o, AM2_SightOut *out)
     /* Laid out 3, 2, 1, each arm an if/else with the else placed last --
      * and arm 2 tests `c0 != 1` before `c0 == 0`, redundantly, as the image
      * does. */
-    switch (o->field540) {
+    switch (o->moveMode) {
     case 3:
         if (c0 != 2)
             out->state = 7;
@@ -6705,9 +6705,9 @@ void __cdecl AiBuildContext(AM2_Object *o, AM2_AiCtx *s)
     if (target)
         DistAndAngle(&anchor, &target->pos, &s->range, &s->bearing);
 
-    if (g_gameClockMs >= (uint32_t)o->fieldFC)
+    if (g_gameClockMs >= (uint32_t)o->nextThinkAt)
         s->found = SightScan(o, &s->foundRange, &s->foundBearing,
-                             &o->field114, &o->field110, 0);
+                             &o->alliesSeen, &o->othersSeen, 0);
 
     if ((uint16_t)o->scriptPoint.x)
         s->destDist = ApproxDist(&o->pos, &o->scriptPoint);
@@ -6798,9 +6798,9 @@ void __cdecl RoachBuildContext(AM2_Object *o, AM2_RoachCtx *s)
             orig_log("Bad!\n");
     }
 
-    if (g_gameClockMs >= (uint32_t)o->fieldFC)
+    if (g_gameClockMs >= (uint32_t)o->nextThinkAt)
         s->found = SightScan(o, &s->foundRange, &s->foundBearing,
-                             &o->field114, &o->field110, 0);
+                             &o->alliesSeen, &o->othersSeen, 0);
 
     if ((uint16_t)o->scriptPoint.x)
         s->destDist = ApproxDist(&o->pos, &o->scriptPoint);
@@ -6915,7 +6915,7 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
 
     if ((g_gameClockMs - o->deadline58) > AM2_AI_IDLE_TIMEOUT_MS
         && ctx.destDist < AM2_AI_REACHED_DIST) {
-        int32_t     army = o->field5A4 - 1;
+        int32_t     army = o->convertedFrom - 1;
         uint32_t    from = 0;
         AM2_Object *rec  = LookupOwnerObj((uint32_t)army);
 
@@ -7089,7 +7089,7 @@ void __cdecl TrooperBuildContext(AM2_Object *o, AM2_SightCtx *c, int32_t sarge)
             c->vehicleDist = ApproxDist(&o->pos, &V->pos);
     }
 
-    if (g_gameClockMs >= (uint32_t)o->fieldFC)
+    if (g_gameClockMs >= (uint32_t)o->nextThinkAt)
         /* SightScan's sixth argument is the SARGE flag, ARG3 of this function
          * (espmap: `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the anchor
          * at [esp+0x18]). It gates the weapon arm and the hittable-vs-live
@@ -7097,7 +7097,7 @@ void __cdecl TrooperBuildContext(AM2_Object *o, AM2_SightCtx *c, int32_t sarge)
          * `anchor` (a packed point, always non-zero) made every follower target
          * and fire at nearby weapons when no enemy was in sight. */
         c->found = SightScan(o, &c->foundRange, &c->foundBearing,
-                             &o->field114, &o->field110, sarge);
+                             &o->alliesSeen, &o->othersSeen, sarge);
 
     if ((uint16_t)o->scriptPoint.x)
         c->destDist = ApproxDist(&o->pos, &o->scriptPoint);
@@ -7136,7 +7136,7 @@ void __cdecl TrooperBuildContext(AM2_Object *o, AM2_SightCtx *c, int32_t sarge)
  *
  * THE SECOND ARGUMENT IS THE OUTPUT RECORD, NOT A FACING. orig.h called it
  * `facing` from a call site. It is the record 0x0045D660 initialises inside the
- * object at OBJ_OFF_FIELD_578, whose +0x04, +0x08, +0x0C, +0x10 and +0x14 land
+ * object at OBJ_OFF_ARMED, whose +0x04, +0x08, +0x0C, +0x10 and +0x14 land
  * exactly on the SIGHTCOUT_OFF_ names -- and whose byte 1 is the heading,
  * which is what "facing" was seeing. A name taken from one caller, describing
  * one byte of a structure.
@@ -7198,7 +7198,7 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
  *
  *   WALK toward OBJ_OFF_FIELD_C0, which AiKeepRange one file up already reads
  *   as the destination. Two arms, and their thresholds differ by four: an
- *   object already walking (OBJ_OFF_FIELD_10C set) stops when it is within
+ *   object already walking (OBJ_OFF_WALK_ORDER set) stops when it is within
  *   AM2_AI_REACHED_DIST and reports 1; an object not walking starts only past
  *   AM2_WALK_START_DIST, re-aims at most every AM2_WALK_TURN_MS, and reports
  *   2. Reaching for the existing 0xC in both places would have been wrong in
@@ -7278,24 +7278,24 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
 
     dest = &o->dest;
     if (dest->x != 0) {
-        if (o->field10C) {
+        if (o->walkOrder) {
             AiTrooperStep(o, &o->sight, &ctx);
 
             if (ApproxDist(&o->pos, dest) < AM2_AI_REACHED_DIST) {
                 out->state  = 1;
-                o->field10C = 0;
+                o->walkOrder = 0;
             }
         } else if (ApproxDist(&o->pos, dest) > AM2_WALK_START_DIST) {
             if (g_gameClockMs - o->deadlineD0 > AM2_WALK_TURN_MS) {
                 uint8_t a = AngleBetween(&o->pos, dest);
 
                 out->bearing = a;
-                o->field574  = (int16_t)a;
+                o->faceTo  = (int16_t)a;
             }
             out->state = 2;
         }
 
-        if (!o->field10C)
+        if (!o->walkOrder)
             *dest = g_zeroPoint;
     }
 
@@ -7311,7 +7311,7 @@ void __cdecl Type2PlayerStep(AM2_Object *o, AM2_SightOut *out)
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
      * spells the same two fields as AM2_MousePress, privately. */
     if (orig_get_tick_count() - g_mousePress[0].tick > AM2_VIEW_SNAP_MS
-        && !o->field10C) {
+        && !o->walkOrder) {
         g_viewSnap  = 1;
         g_objCtxSet = 1;
     }
@@ -7385,7 +7385,7 @@ static inline void TrooperFaceTo(AM2_Object *o, const AM2_Point *to)
     o->facing        = f;
     o->sight.bearing = f;
     o->facingCopy    = f;
-    o->field574      = (int16_t)f;
+    o->faceTo      = (int16_t)f;
 }
 
 /* FireWeapon AS THIS FILE'S ORIGINAL DECLARED IT: the heading a byte. The
@@ -7500,8 +7500,8 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
         break;                       /* these leave the trooper's state alone */
 
     default:
-        if (o != (AM2_Object *)0 && o->field530 != AM2_TROOP_STATE_NONE) {
-            o->field530  = AM2_TROOP_STATE_NONE;
+        if (o != (AM2_Object *)0 && o->troopState != AM2_TROOP_STATE_NONE) {
+            o->troopState  = AM2_TROOP_STATE_NONE;
             o->tableRec2 = o->tableRec3;
             o->tableRec3 = 0;
             /* The record just moved to tableRec2 -- tableRec3 was zeroed on
@@ -7525,7 +7525,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
 
     SelectFirePose(o, w, out, ready);
 
-    o->field578 = 1;
+    o->armed = 1;
 
     if (!remote) {
         if (!ready)
@@ -7643,7 +7643,7 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
  * applies -- see no_route below.
  *
  * TWO FIELDS BOUND THE SWEEP AND NEITHER IS READABLE ALONE.
- * OBJ_OFF_FIELD_D6 accumulates the AngleDelta of every enforced turn and is
+ * OBJ_OFF_TURN_ACCUM accumulates the AngleDelta of every enforced turn and is
  * wrapped into +/-0x100 by two SEPARATE tests, the second re-reading the field
  * after the first may have changed it; OBJ_OFF_STUCK_COUNT is stamped a second
  * ahead and the sweep refuses to turn anything until it has passed.
@@ -7697,7 +7697,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
         && RowAnimField4(rows,
                          (uint16_t)*(const int16_t *)
                              &g_weaponPoseFrames[out->state]) <= 0) {
-        o->fieldD6     = 0;
+        o->turnAccum     = 0;
         o->stuckCount  = 0;
         at = ObjectsAtPoint((const AM2_Point *)pos, g_objMapDesc);
         goto settle_facing;
@@ -7708,7 +7708,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
         int32_t st = out->state;
 
         if (st == 2 || st == 3 || st == 0x26 || st == 0x12) {
-            o->field578 = 0;
+            o->armed = 0;
             switch (klass) {        /* `dec; je; dec; jne` in the image */
             case 1:
                 out->state = 8;
@@ -7724,7 +7724,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
 
     /* An enforced turn, at most one a second and only so far: the delta
      * between where the trooper faces and where it is being sent decides
-     * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
+     * which way, and OBJ_OFF_TURN_ACCUM remembers how far it has been pushed. */
     d = AngleDelta(o->facing, out->bearing);
     if ((uint32_t)o->stuckCount > (uint32_t)g_gameClockMs) {
         if (d > AM2_TROOPER_TURN_ARC) {
@@ -7734,7 +7734,7 @@ void __cdecl UpdateTrooperAction(AM2_Object *o, AM2_Object *weapon,
         } else {
             goto have_facing;
         }
-        ++o->fieldD4;
+        ++o->turnSteps;
     }
 
 have_facing:
@@ -7777,7 +7777,7 @@ sweep:
         /* 0x0044B17C..0x0044B1A6: the limit is the player's when Field548 is
          * set AND the object's ARMY byte is ADDR_DEFAULT_OWNER (`movsx eax,
          * [esi+0x10]; cmp eax, [0x4F9FDC]` -- the army-equals-owner idiom
-         * CLAUDE.md records) AND OBJ_OFF_FIELD_10C is clear. This compared
+         * CLAUDE.md records) AND OBJ_OFF_WALK_ORDER is clear. This compared
          * Field548's VALUE against the owner, which matched only sometimes, so
          * Sarge alternately swept three headings and six. */
         /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
@@ -7789,7 +7789,7 @@ sweep:
         i = 1;
         if (ObjType2Field548(o)
             && (int32_t)o->owner == (int32_t)g_defaultOwner
-            && !o->field10C)
+            && !o->walkOrder)
             tries = AM2_STEP_SWEEP_PLAYER;
         else
             tries = AM2_STEP_SWEEP_OTHER;
@@ -7879,13 +7879,13 @@ swept:
         speed  = 0;
         out->bearing  = facing;
         o->stuckCount = (int32_t)(g_gameClockMs + AM2_TROOPER_TURN_MS);
-        o->fieldD6   += (int16_t)AngleDelta(o->facing, facing);   /* the local, just stored */
-        acc = o->fieldD6;
+        o->turnAccum   += (int16_t)AngleDelta(o->facing, facing);   /* the local, just stored */
+        acc = o->turnAccum;
         if (acc > 0x100 || (i == 1000 && i == 1001))
-            o->fieldD6 = (int16_t)(acc - 0x100);
-        acc = o->fieldD6;
+            o->turnAccum = (int16_t)(acc - 0x100);
+        acc = o->turnAccum;
         if (acc < (int16_t)0xFF00)
-            o->fieldD6 = (int16_t)(acc + 0x100);
+            o->turnAccum = (int16_t)(acc + 0x100);
         goto settle_facing;
     }
     /* Exhausted: nothing to walk toward. */
@@ -8020,9 +8020,9 @@ settle_facing:
             /* A medic tent heals whoever stands in it, twice a second. */
             if ((int32_t)at->type == 1
                 && at->aai->type == 0x20
-                && g_gameClockMs > o->field5B0 + AM2_TROOPER_HEAL_MS) {
+                && g_gameClockMs > o->healStamp + AM2_TROOPER_HEAL_MS) {
                 HealObject(o, AM2_TROOPER_HEAL, at);
-                o->field5B0 = g_gameClockMs;
+                o->healStamp = g_gameClockMs;
             }
     next_item:
             at = at->queryNext;
@@ -8049,9 +8049,9 @@ pose:
     }
 
     if (turned)
-        o->field44 = 0;
+        o->speed = 0;
     {
-        /* WHAT THE MOVE IS HANDED IS NEVER OBJ_OFF_FIELD_44 ITSELF. The
+        /* WHAT THE MOVE IS HANDED IS NEVER OBJ_OFF_SPEED ITSELF. The
          * original (0x0044B720) tests that field and, when it is set, pushes
          * the SPEED slot; when it is clear it compares the trooper's own
          * OBJ_OFF_HEIGHT_SET against the tile's attribute and pushes the
@@ -8065,7 +8065,7 @@ pose:
          * Boot Camp's hut. */
         int32_t v;
 
-        if (!o->field44 && (uint8_t)o->heightSet != g_tileAttrs[o->tile])
+        if (!o->speed && (uint8_t)o->heightSet != g_tileAttrs[o->tile])
             v = (int8_t)o->heightSet;
         else
             v = speed;
@@ -8226,7 +8226,7 @@ void __cdecl StepType2(AM2_Object *o)
     if (o->sight.field00 != 0)
         goto tail;
 
-    if (o->field5A4) {
+    if (o->convertedFrom) {
         AiStepAttach(o, &o->sight);
         goto tail;
     }
@@ -8462,10 +8462,10 @@ post:
     if (o->ctl.state != 1)
         goto emit;
 
-    if (o->field44 > AM2_VEH_TURN_LIMIT) {
+    if (o->speed > AM2_VEH_TURN_LIMIT) {
         o->ctl.field0C = 1;
         o->ctl.state   = AM2_VEH_STATE_TURNING;
-    } else if (o->field44 < -AM2_VEH_TURN_LIMIT) {
+    } else if (o->speed < -AM2_VEH_TURN_LIMIT) {
         o->ctl.state = AM2_VEH_STATE_TURNING;
     }
 
@@ -8938,8 +8938,8 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
     cls = ClassifyByCode74(o);
 
-    if (o->field574 > 0)
-        out->bearing = (uint8_t)o->field574;
+    if (o->faceTo > 0)
+        out->bearing = (uint8_t)o->faceTo;
 
     code = weapon != 0
          ? weapon->typeRec->kind
@@ -8978,7 +8978,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
             uint8_t f = (uint8_t)((o->facing - 0x10)
                                   & 0xF0);
             out->bearing = f;
-            o->field574 = f;
+            o->faceTo = f;
             o->deadlineD0 = 0;
             g_turnRepeatMs += AM2_TURN_REPEAT_MS;
         }
@@ -8992,7 +8992,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                                   & 0xF0);
             out->bearing = f;
             o->deadlineD0 = 0;
-            o->field574 = f;
+            o->faceTo = f;
             g_turnRepeatMs += AM2_TURN_REPEAT_MS;
         }
     }
@@ -9138,7 +9138,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                      < 0x40)
             out->bearing = o->facing;
 
-        o->field574 = out->bearing;
+        o->faceTo = out->bearing;
     }
 
     if (GetMenuRow() == 1) {
@@ -9179,7 +9179,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
 
             if ((&g_mouseChanged)[0] != 0)
                 o->deadlineD0 = 0;
-            o->field574 = out->bearing;
+            o->faceTo = out->bearing;
 
             hit = WalkCellWrapper(o, aim);
             if (hit != 0) {
@@ -9226,7 +9226,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
         o->dest = g_zeroPoint;
         out->bearing = (uint8_t)AngleBetween(&o->pos, &aim);
         o->deadlineD0 = 0;
-        o->field574 = out->bearing;
+        o->faceTo = out->bearing;
 
         hit = WalkCellWrapper(o, aim);
         if (hit != 0) {
@@ -9258,7 +9258,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
                           (const AM2_Point *)&g_mousePress[0].point) < 4) {
             out->bearing = (uint8_t)AngleBetween(&o->pos,
                                          &at);
-            o->field574 = out->bearing;
+            o->faceTo = out->bearing;
             o->dest = at;
             /* The snap writes back into FIELD_C0, not the local: the original
              * (0x0044AC0A) loads `lea eax,[esi+0xc0]` for the out pointer and
@@ -9271,7 +9271,7 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
             NearestAllowedTile(o, TileOfPoint(at),
                                &o->dest);
             o->deadlineD0 = 0;
-            o->field10C = 1;
+            o->walkOrder = 1;
             o->prevRegion = (int16_t)0xFFFF;
             if (GetMenuRow() == 8)
                 o->uid56C = (int32_t)g_pointerHoverUid;
@@ -9285,13 +9285,13 @@ void __cdecl Type2PlayerInput(AM2_Object *o, AM2_Object *weapon, AM2_SightOut *o
     /* Held, and near enough that this is a turn rather than a march. */
     if (dist <= 0x20 && orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS) {
         out->bearing = (uint8_t)AngleBetween(&o->pos, &at);
-        o->field574 = out->bearing;
+        o->faceTo = out->bearing;
         o->dest = g_zeroPoint;
         o->deadlineD0 = 0;
         goto tail;
     }
 
-    o->field10C = 0;
+    o->walkOrder = 0;
     o->dest = at;
     if (GetMenuRow() == 8)
         o->uid56C = (int32_t)g_pointerHoverUid;
@@ -9355,8 +9355,8 @@ int32_t __cdecl Step3TurnBlocked(AM2_Object *o, const AM2_SteerOut *p,
         int32_t want_speed;
 
         want_speed = p->field0C != 0
-                     ? o->field55C
-                     : o->field558;
+                     ? o->revSpeed
+                     : o->fwdSpeed;
         /* Two independent `sar esi, 1`, not one test of two bits: both flags
          * set quarters it. */
         if (p->approach != 0)
@@ -9369,14 +9369,14 @@ int32_t __cdecl Step3TurnBlocked(AM2_Object *o, const AM2_SteerOut *p,
          * desired speed is already inside the band. Each arm scales the
          * acceleration by the frame's float delta itself (int * float). */
         if (p->field0C != 0) {
-            limit = (int32_t)((double)o->field44
+            limit = (int32_t)((double)o->speed
                               - o->accelRate
                                 * g_frameDeltaSec);
             speed = (want_speed > limit) ? want_speed : limit;
         } else {
             limit = (int32_t)(o->accelRate
                                 * g_frameDeltaSec
-                              + (double)o->field44);
+                              + (double)o->speed);
             speed = (want_speed < limit) ? want_speed : limit;
         }
     }
@@ -9475,7 +9475,7 @@ void __cdecl Step3ChooseFacing(AM2_Object *o, AM2_SteerOut *out)
     /* A vehicle a player is riding is steered by the player, not the AI
      * candidate search below -- unless FIELD_10C says otherwise. */
     if (ListFirstField548(o) != 0
-        && o->field10C == 0)
+        && o->walkOrder == 0)
         goto stop;
 
     /* Nothing to decide when the record already wants the current facing and
@@ -9579,12 +9579,12 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
 {
     int32_t i;
 
-    /* field10C splits this into TWO branches (0x0045D4CF), not one. When a
+    /* walkOrder splits this into TWO branches (0x0045D4CF), not one. When a
      * route is in progress the original runs AiRouteToward and ONLY an
      * arrival check -- if it has not arrived it jumps to the tail, leaving
      * the heading, the turret and the tolerance flags alone. The
-     * heading/turret block (including `if (!field548) aim = heading`, which
-     * drags the turret onto the hull) runs ONLY when field10C == 0. Folding
+     * heading/turret block (including `if (!turretFree) aim = heading`, which
+     * drags the turret onto the hull) runs ONLY when walkOrder == 0. Folding
      * them into one `if arrived / else` ran that block during a route too, so
      * a half-track under a move order swung its manually-aimed gun back to
      * the hull -- the turret facing (+0x530) then diverged. (0x45d4d9 vs
@@ -9594,12 +9594,12 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
          * the whole of the image's frame. */
         AM2_AiCtx local;
 
-        if (o->field10C != 0) {
+        if (o->walkOrder != 0) {
             AiRouteToward(o, &o->ctl, &local, 1);
 
             if (ApproxDist(&o->pos, &o->dest) < 0x30) {
                 r->state    = 1;
-                o->field10C = 0;
+                o->walkOrder = 0;
             }
             /* else: routing but not arrived -- do NOT touch heading/turret. */
         } else {
@@ -9612,7 +9612,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
             r->state   = 4;
             d    = abs(AngleDelta(r->heading, o->facing));
             dist = ApproxDist(&o->pos, &o->dest);
-            if (o->field548 == 0)
+            if (o->turretFree == 0)
                 r->aim = r->heading;
 
             /* Each distance band has its own limit and its own pair of
@@ -9635,16 +9635,16 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
 
         /* Inside the dest test: with no destination there is nothing to
          * reset (the branch at 0x0045D4C9 skips it). */
-        if (o->field10C == 0)
+        if (o->walkOrder == 0)
             o->dest = g_zeroPoint;
     }
 
-    if (o->field44 == 0)
+    if (o->speed == 0)
         return;
 
     if (orig_get_tick_count() - g_mousePressMs
             > 0x1F4u
-        && o->field10C == 0) {
+        && o->walkOrder == 0) {
         g_viewSnap = 1;
         g_objCtxSet = 1;
     }
@@ -9822,8 +9822,8 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             }
 
             want = r->field0C != 0
-                        ? o->field55C
-                        : o->field558;
+                        ? o->revSpeed
+                        : o->fwdSpeed;
 
             if (!noTarget
                 && (uint16_t)o->fieldC0 == (uint16_t)target.x
@@ -9856,7 +9856,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
              * OPPOSITE sides: slowing down takes the larger of the two,
              * speeding up the smaller. */
             if (r->field0C != 0) {
-                int32_t v = (int32_t)((float)o->field44
+                int32_t v = (int32_t)((float)o->speed
                                       - (float)o->accelRate
                                         * g_frameDeltaSec);
                 if (want <= v)
@@ -9866,7 +9866,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             } else {
                 int32_t v = (int32_t)((float)o->accelRate
                                         * g_frameDeltaSec
-                                      + (float)o->field44);
+                                      + (float)o->speed);
                 if (want >= v)
                     speed = v;
                 else
@@ -9882,11 +9882,11 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
             if ((uint32_t)o->stuckCount > 0 && speed != 0) {
                 if (r->field0C != 0) {
                     int32_t t = (int32_t)o->stuckCount * speed;
-                    int32_t c = o->field55C;
+                    int32_t c = o->revSpeed;
                     speed = (c > t) ? c : t;
                 } else {
                     int32_t t = (int32_t)o->stuckCount * speed;
-                    int32_t c = o->field558;
+                    int32_t c = o->fwdSpeed;
                     speed = (c < t) ? c : t;
                 }
             }
@@ -10022,7 +10022,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     }
 
     /* --- 0x0045D10E: everything below runs even on the early exit --- */
-    o->field44 = speed;
+    o->speed = speed;
     SetKindFrames(o, r->state);
 
     {
@@ -10058,7 +10058,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
         o->rowSet.rows[1].heading = o->turretFacing;
 
     StepObjRows((AM2_Object *)o);
-    o->field44 = speed;
+    o->speed = speed;
 
     /* Drag the passengers to the vehicle's new position, and their held
      * weapons with them. A passenger whose uid no longer resolves is
@@ -10093,7 +10093,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
     /* A stopped state-5 vehicle draws through the identity remap and a
      * moving one through the bright remap -- the headlights. */
     if (o->vehicleKind == 5) {
-        if (o->field44 == 0)
+        if (o->speed == 0)
             o->rowSet.rows->palette = g_remapIdent;
         else
             o->rowSet.rows->palette = g_remapBright;
@@ -10146,9 +10146,9 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
                 && p->aai->type == 0x21
                 && p->health > 0
                 && g_gameClockMs
-                       > o->field5A0 + 0x1F4u) {
+                       > o->vHealStamp + 0x1F4u) {
                 HealObject(o, 0x19, p);
-                o->field5A0 = g_gameClockMs;
+                o->vHealStamp = g_gameClockMs;
             }
 
             p = p->queryNext;
@@ -10157,7 +10157,7 @@ void __cdecl Step3Drive(AM2_Object *o, AM2_SteerOut *r)
 
     /* A stopped vehicle keeps its own tile height; a moving one takes the
      * height of the tile it is standing on when that differs. */
-    if (o->field44 == 0) {
+    if (o->speed == 0) {
         const uint8_t *attrs = g_tileAttrs;
 
         if ((uint8_t)o->heightSet != attrs[o->tile])
@@ -10258,7 +10258,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
     /* Cleared here and set by the steering arms below. Step3Drive reads it as
      * the term that forces a gun-sprite update past the rate limit, so it
      * means "the player is steering this frame". Raw offset on purpose: the
-     * OBJ_OFF_FIELD_5A8 in orig.h is a different type's field at the same
+     * OBJ_OFF_KIND7_NAME in orig.h is a different type's field at the same
      * displacement, and this block keeps such offsets unnamed. */
     o->turnRecommit = 0;
 
@@ -10270,7 +10270,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
      * discarded -- what is wanted is the scan's side effects, the same
      * reading NextInventorySlot's header records for its call. */
     if (g_gameClockMs
-            > (uint32_t)o->fieldFC) {
+            > (uint32_t)o->nextThinkAt) {
         SightScan(o, &range, &bearing, &allied, &other, 0);
     }
 
@@ -10290,7 +10290,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             r->heading = (uint8_t)(o->facing - 8);
         steered = 1;
         o->dest = g_zeroPoint;
-        o->field10C = 0;
+        o->walkOrder = 0;
     }
 
     if (ActionKeyDown(AM2_ACTION_LEFT) && !ActionKeyDown(AM2_ACTION_RIGHT)) {
@@ -10304,7 +10304,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             r->heading = (uint8_t)(o->facing + 8);
         steered = 1;
         o->dest = g_zeroPoint;
-        o->field10C = 0;
+        o->walkOrder = 0;
     }
 
     /* Both movement keys clear the destination, so a key cancels a mouse
@@ -10315,7 +10315,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         r->stop = 0;
         steered = 1;
         o->dest = g_zeroPoint;
-        o->field10C = 0;
+        o->walkOrder = 0;
     }
 
     if (ActionKeyDown(AM2_ACTION_01)) {
@@ -10324,7 +10324,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
         r->field0C = 1;
         steered = 1;
         o->dest = g_zeroPoint;
-        o->field10C = 0;
+        o->walkOrder = 0;
     }
 
     /* The turret swings a fixed 0x0F either way and the sound plays only in
@@ -10336,7 +10336,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             PlaySoundAt(0x16, 1, 0, o->pos.x,
                         o->pos.y);
         r->aim = (uint8_t)(r->aim + 0x0F);
-        o->field548 = 1;
+        o->turretFree = 1;
     }
 
     if (ActionKeyDown(AM2_ACTION_05)) {
@@ -10344,7 +10344,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             PlaySoundAt(0x16, 1, 0, o->pos.x,
                         o->pos.y);
         r->aim = (uint8_t)(r->aim - 0x0F);
-        o->field548 = 1;
+        o->turretFree = 1;
     }
 
     /* --- the mouse, on HUD rows 3 and 1 only, and only inside the map. --- */
@@ -10382,7 +10382,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                  * than from the hull. */
                 r->aim = AngleBetween(&gunPos,
                                     &cursorWorld);
-                o->field548 = 1;
+                o->turretFree = 1;
             } else if (!g_mouseButton && g_mouseChanged
                        && GetMenuRow() != 1
                        && orig_get_tick_count()
@@ -10400,7 +10400,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                     NearestAllowedTile(o, TileOfPoint(cursorWorld),
                                        &o->dest);
                     o->deadlineD0 = 0;
-                    o->field10C = 1;
+                    o->walkOrder = 1;
                     o->prevRegion = (int16_t)0xFFFF;
                 }
             } else if (g_mouseButton) {
@@ -10409,7 +10409,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                                   &cursorWorld);
                 r->state = AM2_VEH_STATE_TURNING;
                 o->dest = g_zeroPoint;
-                o->field10C = 0;
+                o->walkOrder = 0;
                 o->turnRecommit = 1;
 
                 /* AND IF IT IS BEHIND YOU AND CLOSE, BACK UP INSTEAD of

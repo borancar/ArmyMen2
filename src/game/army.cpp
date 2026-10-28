@@ -375,7 +375,7 @@ void __cdecl ExitAllFromVehicle(AM2_Object *vehicle, uint32_t damageOwner)
  *
  * SHARING AN OBJECT-TABLE RECORD IS ALLIANCE. The second object's record
  * pointer -- one of two fields, chosen by the third argument and by its
- * OBJ_OFF_FIELD_530 not being 5, which is the same 5 ObjConceal tests -- is
+ * OBJ_OFF_TROOP_STATE not being 5, which is the same 5 ObjConceal tests -- is
  * compared against the record for the FIRST object's army. Equal means allied.
  * Otherwise the pointer is decoded back to an index by matching it against the
  * four record addresses in turn, and that index goes through CommSlotForArmy
@@ -430,7 +430,7 @@ int32_t __cdecl ObjsAreAllied(const AM2_Object *a, const AM2_Object *b,
             && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
+        rec = (useRec3 && b->troopState != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)
@@ -630,7 +630,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, const AM2_Object *b, int32_t use
             && b->soldierKind == 7)
             return 0;
 
-        rec = (useRec3 && b->field530 != 5) ? b->tableRec3 : b->tableRec2;
+        rec = (useRec3 && b->troopState != 5) ? b->tableRec3 : b->tableRec2;
 
         if ((const uint8_t *)(uintptr_t)(((uintptr_t)g_objTableRecords)
                 + (uint32_t)((*(AM2_Comm *const *)&g_commObject)

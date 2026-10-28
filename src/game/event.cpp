@@ -215,7 +215,7 @@ void __cdecl EvtSetField540(uint32_t uid, int32_t value)
     obj = LookupByUID(uid);
     if (!ObjIsType2(obj))
         return;
-    obj->field540 = value;
+    obj->moveMode = value;
 }
 
 /* The two that check the type. LookupByUID's answer goes straight into
@@ -1183,7 +1183,7 @@ void __cdecl EvtAtPointA(uint32_t uid, AM2_Point point, int32_t relative)
     }
 
     if (ObjIsType2(obj))
-        obj->field540 = 0;
+        obj->moveMode = 0;
 
     PointActionA(obj, point);
 }
@@ -2153,7 +2153,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
         return;
 
     if (ObjIsType2(a))
-        a->field540 = 0;
+        a->moveMode = 0;
 
     ObjAttachTo(a, b);
 }
@@ -3109,7 +3109,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
             return 5;
         if (!ObjIsType2(o))
             return 5;
-        return o->field530;
+        return o->troopState;
 
     case AM2_OPERAND_HASITEM: {
         uint32_t want;

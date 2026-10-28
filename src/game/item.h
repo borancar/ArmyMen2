@@ -690,7 +690,7 @@ void __cdecl SoldierKindForWeapon(struct AM2_Object *unit, uint32_t code);
 void __cdecl SetWeaponTarget(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00447950. Set UNIT_OFF_FIRE_MODE to 0x25 when the unit has
- * OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
+ * OBJ_OFF_CONVERTED_FROM and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
  * and to 1 otherwise. */
 void __cdecl PickFireMode(struct AM2_Object *obj);
 
@@ -981,7 +981,7 @@ int32_t __cdecl WeaponFrameReady(struct AM2_Object *obj, struct AM2_Object *weap
  * KIND FIRST, UID SECOND, and this was the other way round until the caller
  * was read. The original takes the uid from [esp+0xC] (argument 2) to look
  * the object up and the kind from [esp+0x10] (argument 1) to store in
- * OBJ_OFF_FIELD_530. Nothing inside the function could show the swap: it is
+ * OBJ_OFF_TROOP_STATE. Nothing inside the function could show the swap: it is
  * self-consistent either way, and its one caller was still original, so no
  * A/B and no counter could reach it. The caller also pushes the firer's army
  * and position, which the body never reads. */

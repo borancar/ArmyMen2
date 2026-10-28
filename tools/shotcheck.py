@@ -59,7 +59,7 @@ ADDR_TILE_FLAGS = 0x00514ED0
 OBJ_OFF_UID = 0x04
 OBJ_OFF_ARMY = 0x10
 OBJ_OFF_TILE = 0x1A
-OBJ_OFF_FIELD_44 = 0x44
+OBJ_OFF_SPEED = 0x44
 OBJ_OFF_QUERY_NEXT = 0x68
 OBJ_OFF_FIELD_94 = 0x94
 OBJ_OFF_RANK = 0x98
@@ -160,7 +160,7 @@ class Harness:
         uc.mem_write(SHOT + OBJ_OFF_RANK, struct.pack("<I", SHOOTER_UID))
         uc.mem_write(SHOT + OBJ_OFF_ARMY, struct.pack("<b", SHOT_ARMY))
         uc.mem_write(SHOT + OBJ_OFF_TILE, struct.pack("<H", TILE))
-        uc.mem_write(SHOT + OBJ_OFF_FIELD_44, struct.pack("<i", 0x7777))
+        uc.mem_write(SHOT + OBJ_OFF_SPEED, struct.pack("<i", 0x7777))
 
         for i, o in enumerate(c["objs"]):
             base = obj_at(i)
@@ -189,7 +189,7 @@ class Harness:
         rc, _ = self.emu.call(SHOT_STRIKE, [SHOT, c["at"], c["height"]],
                               b"\0" * 64, count=400000)
         f44 = struct.unpack("<i", bytes(
-            uc.mem_read(SHOT + OBJ_OFF_FIELD_44, 4)))[0]
+            uc.mem_read(SHOT + OBJ_OFF_SPEED, 4)))[0]
         return rc, f44, tuple(self.trace)
 
 

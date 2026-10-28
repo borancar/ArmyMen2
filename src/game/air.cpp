@@ -359,7 +359,7 @@ void __cdecl ObjConceal(AM2_Object *obj, int32_t force)
     if (!(obj->flags & OBJ_FLAG_BIT4))
         obj->flags &= ~(uint32_t)OBJ_FLAG_REVEALED;
     else if (ObjIsType2((const AM2_Object *)obj)
-             && obj->field530 != 5)
+             && obj->troopState != 5)
         obj->flags &= ~(uint32_t)OBJ_FLAG_REVEALED;
 
     if (g_fogOfWar && !force)
@@ -1561,7 +1561,7 @@ void __cdecl FormationSlotPoint(int32_t slot, AM2_Point leaderPos, AM2_Object *o
  * the same exit. The other eight name the two extreme corners.
  *
  * THE HEADING IS THE TURRET'S when the viewer is a vehicle with more than one
- * row -- OBJ_OFF_FIELD_530 rather than OBJ_OFF_FACING -- which is the one
+ * row -- OBJ_OFF_TROOP_STATE rather than OBJ_OFF_FACING -- which is the one
  * place this function looks at what kind of thing is doing the seeing.
  *
  * ARC CLIPPING, and it is not symmetric. When one silhouette edge is inside

@@ -186,7 +186,7 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
     return mask;
 }
 /* 0x0044BBA0, four callers. True only when the object is a TYPE 2 and its
- * OBJ_OFF_FIELD_5A4 is positive.
+ * OBJ_OFF_CONVERTED_FROM is positive.
  *
  * Type2ActionA is the reader that says anything about what it means: that
  * function refuses to re-arm a unit when this is true, so the counter is a
@@ -200,7 +200,7 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
     if (!ObjIsType2(obj))
         return 0;
 
-    return obj->field5A4 > 0;
+    return obj->convertedFrom > 0;
 }
 
 

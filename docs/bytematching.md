@@ -446,7 +446,7 @@ use. It found nothing on RowUpdate (about 650 variants: the sums stay shared wha
 stores go through), SightScan, ScriptPad, UpdateTrooperAction, FindPath or
 ScriptParseEvent. LoadMap's last 2 bytes are the TRIG `sub eax,esi` that supplies a
 rotation temp; every `cmp` form shifts the rotation early in the function (272 to 504).
-SightScan's image skips eax for the fieldF4 temp as if a scratch were live there; the
+SightScan's image skips eax for the sightHits temp as if a scratch were live there; the
 retest `if (!stt.cand) goto next;` both lays the score block out early and threads the
 jumps, and nothing separates the two. The only untried route for RowUpdate is
 hand-edited IL (`VC6_IL_OVERRIDE`), which is not source.
@@ -492,7 +492,7 @@ events between arm 3's `out` reload and arm 4's `movsx` where ours has none; the
 with identical code is the `mov eax,[g_mpSession]` test load (a late-split compare operand for us,
 not an event), and a volatile read of it changes nothing; nested pairs placed in that conjunct
 emit real code (256) whatever their first operand (`out`, `at`, `o`). SightScan's score block:
-the image's `fieldF4` increment is a real temporary at cursor 1 with the `hold.facing` load hoisted
+the image's `sightHits` increment is a real temporary at cursor 1 with the `hold.facing` load hoisted
 above the `inc`; ours is either a volatile temporary at cursor 0 with no hoist (26) or, written
 plain, an RMW tuple split late into eax with the hoist (58). Arm 1 of UpdateTrooperAction (`s`
 in eax, image edx) is a two-use web, so it is a colouring tie, not a rotation one.
@@ -649,7 +649,7 @@ EXACTLY the two arm-1 instructions into the image's (`mov edx,[esp+0x40]` / `mov
 with no other change: the arm-1 `s` web (key 24, refs 2, cost 4, no hints, ZERO neighbours) is a
 pure colouring tie that takes eax and wants edx — it needs an uncoloured neighbour with positive
 cost and an edx hint, or an own-hint, and no spelling adds one without code. SightScan: oracle
-bump at K=51 (the `*nOther` value load) is 36 -> 35 (fixes the fieldF4 register but re-breaks
+bump at K=51 (the `*nOther` value load) is 36 -> 35 (fixes the sightHits register but re-breaks
 later matches) — the image is not ours+1 there; the needed extra consumer between two temps in
 one block is unreachable. FindPath: the image's `mov edi,eax; mov eax,[esp+0x18]; add di,[mem]`
 for the `g` sum survives every type/cast/order/statement-split spelling (c1 re-merges; the sum's
@@ -668,7 +668,7 @@ reload or store whose position follows from which register frees first.
 - ScriptPad 10 -> 16, adopted: the `sy` store moved between n's volatile load and store, the
   image's order. What remains is ny/n swapping eax/edx and the spilled `number` reload sitting
   after whichever of them frees edx.
-- SightScan (26) is two levers short: `++o->fieldF4` plain (the volatile one was a scheduling
+- SightScan (26) is two levers short: `++o->sightHits` plain (the volatile one was a scheduling
   barrier: the image loads hold.facing between the load and the inc) and the weapon arm's
   `DistAndAngle(&o->pos, &keep->pos, ...)` without the two-definition `kp` (its push order) both
   remove a real hunk; the store-order hunks they add are register-caused (pick.bearing's byte in

@@ -1639,10 +1639,10 @@ int32_t __cdecl RadarBlipColour(const AM2_Object *objv, int32_t *blink)
             && self->soldierKind == 7)
             return AM2_RADAR_COLOUR_MP7;
 
-        if (self->field530
+        if (self->troopState
             != AM2_RADAR_FIELD530_NONE) {
             *blink = 1;
-            return self->field530;
+            return self->troopState;
         }
     }
 
