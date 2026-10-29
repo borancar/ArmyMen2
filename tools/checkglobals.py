@@ -86,6 +86,16 @@ def addr_values():
     return out
 
 
+def relink_seam(bodies):
+    """True for a name whose extra body is the relink build's `am2_rl_*`
+    spelling of the same global, chosen by #if defined(AM2_RELINK)
+    (src/vc6/relink.py maps am2_rl_* to the address in the comment). This tool
+    reads #defines without the preprocessor, so it would call the two arms of
+    that #if a drift; the relink arm is a seam, not a second definition."""
+    return len(bodies) > 1 and any(b.lstrip().startswith("am2_rl_")
+                                   for b in bodies)
+
+
 def main():
     addrs = addr_values()
     # name -> {expansion -> [where]},  addr macro -> {name -> [where]}
@@ -127,6 +137,8 @@ def main():
                 print("           %-24s %s" % (name, ", ".join(wheres)))
 
     for name, bodies in sorted(by_name.items()):
+        if relink_seam(bodies):
+            continue
         if len(bodies) > 1:
             bad += 1
             print("  DRIFT  %s is defined %d different ways:" %
@@ -141,7 +153,8 @@ def main():
     # where a new alias is most likely to appear, and it passed when it was
     # tried.
     aliases = sum(len(names) - 1 for names in by_addr.values())
-    drifts = sum(len(bodies) - 1 for bodies in by_name.values())
+    drifts = sum(len(bodies) - 1 for bodies in by_name.values()
+                 if not relink_seam(bodies))
 
     if aliases > ALIAS_BASELINE or drifts > DRIFT_BASELINE:
         print("\n  FAILED   aliases %d (baseline %d), drifts %d (baseline %d)"

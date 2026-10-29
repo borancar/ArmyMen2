@@ -49,6 +49,27 @@ Every struct member has a role name, with two grades:
 | win32/widget.h:736 | `unused60` | 0x0060 |
 | win32/widget.h:773 | `unused5B4` | 0x05B4  HUDLOG_OFF_UNUSED_5B4 |
 
+## Why `unused` is a statement about the shipped program, not only about our source
+
+The reconstruction is byte-identical to the shipped image in 1,639 of 1,646 functions, and the
+other seven differ in register choice or block layout (`docs/bytematching.md`), not in which
+fields they touch. A function that matches byte for byte performs exactly the memory accesses
+the source spells, so a member the source never reads is a member the binary never reads. The
+members above are written only by the code that zeroes or copies whole records (reset blocks,
+the slot shift in `CommRemovePlayer`, the parsers).
+
+`tools/offsetreaders.py OFFSET... [--file SUBSTR]` cross-checks that independently of the
+source: it lists the image's own functions that use a `[reg+OFFSET]` operand. Looked at for
+every `unused` member, the hits are stack slots (`[esp+0x34]` in `FlowRecvMessage`,
+`[esp+0x208]` in `SaveGame`) or other structures sharing the number (the object's `+0x98/+0xA0`,
+the player message's `+0x9C/+0xA0/+0xAC` in `ReceivePlayerMsg`, the slot's `+0x60/+0x64`), never
+a Flow, comm, font, map-record or widget access. No string in the image labels them either: the
+program's own names for flow fields are `gotseq`, `hehas` and `active`, already used
+(`nextExpected`, `heHas`, `ready`).
+
+A role name for one of these would therefore be invented, which is worse than saying what is
+established: the member exists at that offset and nothing the program does depends on it.
+
 ## Names that are readings rather than proofs
 
 - `AM2_Object::moveMode` (was `field540`): a unit's walk-state selector; set by the script event

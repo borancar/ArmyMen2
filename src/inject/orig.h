@@ -13867,7 +13867,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x0FC and 0x174 are 0x78 apart, which is 30 dwords, and the last ends
  * exactly where COMM_OFF_RX_MAX begins. A layout that tiles is the check that
  * no base is off. */
-#define AM2_COMM_STAT_SAMPLES    30
 /* 0x0040F400, thiscall, three callers. Prints the four statistics lines the
  * reset above clears. Each line is gated on its own denominator, which is what
  * makes the seven unsigned divisions below it safe, and the elapsed seconds

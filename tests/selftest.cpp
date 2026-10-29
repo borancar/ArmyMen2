@@ -123,11 +123,28 @@ extern "C" void *__cdecl LoadDibFlipped(const char *, void *, uint16_t *)
  * IntersectRect. Seventh stub, and NOT extern "C" -- air.cpp forward-declares
  * it as ordinary C++, the same reason FreeSpriteRegistry above is not.
  * FindEnemyNear has no vectors: it reads the map descriptor. */
-void *__cdecl ObjectsInRect(const AM2_Rect *, const void *,
-                            int32_t (__cdecl *)(void *))
+struct AM2_MapDesc;
+struct AM2_Sprite;
+struct AM2_SpriteSet;
+struct AM2_Object *__cdecl ObjectsInRect(const AM2_Rect *, const struct AM2_MapDesc *,
+                                         int32_t (__cdecl *)(struct AM2_Object *))
 {
     return 0;
 }
+
+/* The next five are the same story: AllObjectsInRect (win32/mapdraw.cpp),
+ * FreeBitmap and SpriteDirIndex (win32/sprite.cpp) and AimStart/AimStartB
+ * (win32/widget.cpp) became real symbols when their seams closed, and none
+ * of those files links in this harness. All ordinary C++ linkage, matching
+ * their declarations; nothing under test calls them. */
+struct AM2_Object *__cdecl AllObjectsInRect(const AM2_Rect *, const struct AM2_MapDesc *)
+{
+    return 0;
+}
+void __cdecl FreeBitmap(struct AM2_Sprite **) { }
+int32_t __cdecl SpriteDirIndex(const struct AM2_SpriteSet *, uint32_t) { return 0; }
+void __cdecl AimStart(uint32_t, int8_t, AM2_Point) { }
+void __cdecl AimStartB(uint32_t, int8_t, AM2_Point) { }
 
 /* item.cpp's RowUnregisterAll calls this now that its seam is closed, and it
  * lives in win32/mapdraw.cpp for the same reason the two around it do -- it
@@ -769,7 +786,8 @@ static int PlaceRecordMatches(const AM2_Placement *got,
 {
     const AM2_Placement *w = (const AM2_Placement *)want;
 
-    return got->where == w->where
+    return got->where.x == w->where.x
+        && got->where.y == w->where.y
         && got->facing == w->facing
         && got->type == w->type
         && got->group == w->group
@@ -820,7 +838,8 @@ static int FirePoses(int *passed)
         *(int32_t *)(sight + 0x08) = 0x7BADF00D;
         *(int32_t *)(sight + 0x10) = v->seen;
 
-        rc  = SelectFirePose(v->nullobj ? (void *)0 : obj, wpn, sight,
+        rc  = SelectFirePose(v->nullobj ? (AM2_Object *)0 : (AM2_Object *)obj,
+                             (AM2_Object *)wpn, (AM2_SightOut *)sight,
                              v->ready);
         got = *(const int32_t *)(sight + 0x08);
 
@@ -1225,7 +1244,7 @@ static int HitReacts(int *passed)
         *(uint32_t *)(out + 8) = 0x5EED5EEDu;
         *(unsigned char *)(out + 4) = 0xA5;
 
-        AiHitReact(obj, out, ctx);
+        AiHitReact((AM2_Object *)obj, (AM2_SightOut *)out, (AM2_SightCtx *)ctx);
 
         pose     = *(const uint32_t *)(out + 8);
         turn     = *(const unsigned char *)(out + 4);
