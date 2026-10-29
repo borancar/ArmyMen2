@@ -96,9 +96,9 @@ static inline int32_t ObjIsType3Inline(const void *obj)
     return (*(const int32_t *)obj == 3) ? 1 : 0;
 }
 
-/* 0x0044BBA0. True only for a TYPE 2 whose OBJ_OFF_CONVERTED_FROM is positive.
+/* 0x0044BBA0. True only for a TYPE 2 whose OBJ_OFF_KIND7_ARMY is positive.
  * Type2ActionA refuses to re-arm a unit when this is true. */
-int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj);
+int32_t __cdecl Type2Kind7ArmySet(const AM2_Object *obj);
 
 /* Original: 0x00457490. */
 int32_t __cdecl ObjIsType3(const AM2_Object *obj);

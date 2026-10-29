@@ -3348,7 +3348,7 @@ void __cdecl AiTrooperStep(AM2_Object *ob, AM2_SightOut *out, const AM2_SightCtx
         return;
     }
 
-    if (!ob->convertedFrom && g_gameClockMs > ob->deadline58)
+    if (!ob->kind7Army && g_gameClockMs > ob->deadline58)
         ob->deadline58 = 0;
 
     pt = *dest;
@@ -5535,7 +5535,7 @@ void __cdecl AiHitReact(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
  * and the middle starts the clock again from zero.
  *
  * The pose is written only in the gap: not while a walk is outstanding, not
- * for a soldier kind of 6 or more, not when OBJ_OFF_MOVE_MODE is set, not for
+ * for a soldier kind of 6 or more, not when OBJ_OFF_AI_POSE is set, not for
  * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_CLASS is non-zero. Five gates
  * for one dword, and 7 or 5 by whether SIGHTC_OFF_SEED is under 4.
  *
@@ -5575,7 +5575,7 @@ void __cdecl AiKeepRange(AM2_Object *o, AM2_SightOut *out, AM2_SightCtx *c)
                               &o->dest);
             AiTrooperStep(o, out, c);
             o->deadline58 = g_gameClockMs + AM2_AI_KEEP_RANGE_MS;
-        } else if (!o->moveMode
+        } else if (!o->aiPose
                    && c->kind != 3
                    && c->seed < 0x10
                    && c->klass == 0) {
@@ -6511,7 +6511,7 @@ void __cdecl SargeAiStep(AM2_Object *o, AM2_SightOut *out)
  * difference between these two functions alone.
  *
  * IT HAS A TAIL SARGE DOES NOT, and the tail is where the frame's decision
- * lands. After the region is recorded it maps OBJ_OFF_MOVE_MODE and
+ * lands. After the region is recorded it maps OBJ_OFF_AI_POSE and
  * SIGHTC_OFF_CLASS onto SIGHTCOUT_OFF_STATE:
  *
  *     0x540 == 1   ctx0 0 -> 1,  ctx0 2 -> 9,  else 8
@@ -6567,7 +6567,7 @@ void __cdecl TrooperAiStep(AM2_Object *o, AM2_SightOut *out)
     /* Laid out 3, 2, 1, each arm an if/else with the else placed last --
      * and arm 2 tests `c0 != 1` before `c0 == 0`, redundantly, as the image
      * does. */
-    switch (o->moveMode) {
+    switch (o->aiPose) {
     case 3:
         if (c0 != 2)
             out->state = 7;
@@ -6915,7 +6915,7 @@ void __cdecl AiStepAttach(AM2_Object *o, AM2_SightOut *out)
 
     if ((g_gameClockMs - o->deadline58) > AM2_AI_IDLE_TIMEOUT_MS
         && ctx.destDist < AM2_AI_REACHED_DIST) {
-        int32_t     army = o->convertedFrom - 1;
+        int32_t     army = o->kind7Army - 1;
         uint32_t    from = 0;
         AM2_Object *rec  = LookupOwnerObj((uint32_t)army);
 
@@ -8162,8 +8162,8 @@ void __cdecl StepType2(AM2_Object *o)
 
     if (o->soldierKind == 7)
         PlaySoundAt(AM2_SND_KIND7, 1, 0, o->pos.x, o->pos.y);
-    else if (Type2Field5A4Set(o))
-        PlaySoundAt(AM2_SND_FIELD5A4, 1, 0, o->pos.x, o->pos.y);
+    else if (Type2Kind7ArmySet(o))
+        PlaySoundAt(AM2_SND_KIND7_ARMY, 1, 0, o->pos.x, o->pos.y);
 
     w = WeaponByUid(o->inventory[o->inventorySel]);
 
@@ -8226,7 +8226,7 @@ void __cdecl StepType2(AM2_Object *o)
     if (o->sight.fromNet != 0)
         goto tail;
 
-    if (o->convertedFrom) {
+    if (o->kind7Army) {
         AiStepAttach(o, &o->sight);
         goto tail;
     }
@@ -9583,7 +9583,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
      * route is in progress the original runs AiRouteToward and ONLY an
      * arrival check -- if it has not arrived it jumps to the tail, leaving
      * the heading, the turret and the tolerance flags alone. The
-     * heading/turret block (including `if (!turretFree) aim = heading`, which
+     * heading/turret block (including `if (!manualAim) aim = heading`, which
      * drags the turret onto the hull) runs ONLY when walkOrder == 0. Folding
      * them into one `if arrived / else` ran that block during a route too, so
      * a half-track under a move order swung its manually-aimed gun back to
@@ -9612,7 +9612,7 @@ void __cdecl Step3RouteAndBoard(AM2_Object *o, AM2_SteerOut *r)
             r->state   = 4;
             d    = abs(AngleDelta(r->heading, o->facing));
             dist = ApproxDist(&o->pos, &o->dest);
-            if (o->turretFree == 0)
+            if (o->manualAim == 0)
                 r->aim = r->heading;
 
             /* Each distance band has its own limit and its own pair of
@@ -10336,7 +10336,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             PlaySoundAt(0x16, 1, 0, o->pos.x,
                         o->pos.y);
         r->aim = (uint8_t)(r->aim + 0x0F);
-        o->turretFree = 1;
+        o->manualAim = 1;
     }
 
     if (ActionKeyDown(AM2_ACTION_05)) {
@@ -10344,7 +10344,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
             PlaySoundAt(0x16, 1, 0, o->pos.x,
                         o->pos.y);
         r->aim = (uint8_t)(r->aim - 0x0F);
-        o->turretFree = 1;
+        o->manualAim = 1;
     }
 
     /* --- the mouse, on HUD rows 3 and 1 only, and only inside the map. --- */
@@ -10382,7 +10382,7 @@ void __cdecl Step3Input(AM2_Object *o, AM2_SteerOut *r)
                  * than from the hull. */
                 r->aim = AngleBetween(&gunPos,
                                     &cursorWorld);
-                o->turretFree = 1;
+                o->manualAim = 1;
             } else if (!g_mouseButton && g_mouseChanged
                        && GetMenuRow() != 1
                        && orig_get_tick_count()

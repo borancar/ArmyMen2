@@ -206,7 +206,7 @@ void __cdecl DeclareRuleVars(void)
  * directly rather than through the image. Reaching for an orig_ macro here was
  * caught by tools/checkseams.py, which exists for exactly that. */
 
-void __cdecl EvtSetField540(uint32_t uid, int32_t value)
+void __cdecl EvtSetAiPose(uint32_t uid, int32_t value)
 {
     AM2_Object *obj;
 
@@ -215,7 +215,7 @@ void __cdecl EvtSetField540(uint32_t uid, int32_t value)
     obj = LookupByUID(uid);
     if (!ObjIsType2(obj))
         return;
-    obj->moveMode = value;
+    obj->aiPose = value;
 }
 
 /* The two that check the type. LookupByUID's answer goes straight into
@@ -1157,7 +1157,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, AM2_Point point,
  *
  * They differ in what they do with the result, and in one guard. EvtAtPointA
  * clears field 0x540 first if the object is type 2 -- the same field
- * EvtSetField540 exists for -- and always calls its action. EvtAtPointC
+ * EvtSetAiPose exists for -- and always calls its action. EvtAtPointC
  * declines when the object is ALREADY at the point, but only on the
  * non-relative path; adding a zero offset would be a no-op anyway, so the
  * asymmetry costs nothing and is reproduced.
@@ -1183,7 +1183,7 @@ void __cdecl EvtAtPointA(uint32_t uid, AM2_Point point, int32_t relative)
     }
 
     if (ObjIsType2(obj))
-        obj->moveMode = 0;
+        obj->aiPose = 0;
 
     PointActionA(obj, point);
 }
@@ -2134,7 +2134,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
  *
  * Field 0x540 is cleared on the first object when it is type 2, before the
  * pair is handed on. Third sighting of that step -- EvtAtPointA does it and
- * EvtSetField540 exists to write the field -- so several actions reset it
+ * EvtSetAiPose exists to write the field -- so several actions reset it
  * before giving an object something new to do, whatever it holds. */
 void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 {
@@ -2153,7 +2153,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
         return;
 
     if (ObjIsType2(a))
-        a->moveMode = 0;
+        a->aiPose = 0;
 
     ObjAttachTo(a, b);
 }
@@ -3257,8 +3257,8 @@ int event_install(void)
                         "EvtAtObjPosA", 1);
     rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_B, (const void *)EvtAtObjPosB,
                         "EvtAtObjPosB", 1);
-    rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
-                        "EvtSetField540", 2);
+    rc |= patch_replace(ADDR_EVT_SET_AI_POSE, (const void *)EvtSetAiPose,
+                        "EvtSetAiPose", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,
                         "EvtSetModeF0", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_94, (const void *)EvtSetMode94,
@@ -3838,7 +3838,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x2B:
-        EvtSetField540(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+        EvtSetAiPose(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                        act->n0);
         return;
 

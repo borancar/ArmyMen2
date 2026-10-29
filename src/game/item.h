@@ -690,7 +690,7 @@ void __cdecl SoldierKindForWeapon(struct AM2_Object *unit, uint32_t code);
 void __cdecl SetWeaponTarget(struct AM2_Object *target, AM2_Point at);
 
 /* 0x00447950. Set UNIT_OFF_FIRE_MODE to 0x25 when the unit has
- * OBJ_OFF_CONVERTED_FROM and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
+ * OBJ_OFF_KIND7_ARMY and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
  * and to 1 otherwise. */
 void __cdecl PickFireMode(struct AM2_Object *obj);
 

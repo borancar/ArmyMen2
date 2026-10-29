@@ -4015,7 +4015,7 @@ FIXED below when that replay runs identical.
   pump 8583, frame 8414; repro sessions/bazookaroach-8583.txt, replayed with
   --tolerance 12 to pass the magnifying-glass 4-px residual first). At the trap
   only roach 0x400003ec (type 8, army 2) differs: OBJ_OFF_FACING 23 vs 41,
-  OBJ_OFF_MOVE_MODE (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
+  OBJ_OFF_AI_POSE (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
   all downstream of FIELD_540. RNG seed (0x2f0c6a4a), game clock and
   ADDR_SIGHT_GENERATION (0x0e6c) are IDENTICAL, so it is deterministic, not an
   RNG desync. NARROWED (gdb watchpoint on FIELD_540): RoachBehaviour
@@ -4095,7 +4095,7 @@ FIXED below when that replay runs identical.
   (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
   identical; only roach 0x400003ef differs, pos (2108,762) vs (2109,761), and
   its OBJ_OFF_SPEED (speed) is 130 on the hybrid but 0 on the port -- same
-  facing (63), same OBJ_OFF_MOVE_MODE (63), same subpixel and pos through pump
+  facing (63), same OBJ_OFF_AI_POSE (63), same subpixel and pos through pump
   1390. So this is NOT the heading/CopyByteIfSet path of the 8583 entry; it is
   the SPEED path. RoachStepTailA (0x0043D750, item.cpp) refuses the step when
   `RoachMaskWeight(obj, next, landing, 1) >= RoachMaskWeight(obj, cur, pos, 0)`

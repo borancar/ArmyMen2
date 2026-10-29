@@ -583,7 +583,7 @@ typedef struct AM2_Object {
         struct {                    /* a unit's (types 2 and 8) */
             int32_t   pose;         /* +0x538 OBJ_OFF_POSE */
             int32_t   posePending;  /* +0x53C OBJ_OFF_POSE_PENDING */
-            int32_t   moveMode;     /* +0x540 OBJ_OFF_MOVE_MODE */
+            int32_t   aiPose;     /* +0x540 OBJ_OFF_AI_POSE */
             int32_t   soldierKind;  /* +0x544 OBJ_OFF_SOLDIER_KIND */
             int32_t   sarge;        /* +0x548 OBJ_OFF_SARGE */
             uint32_t  inventory[6]; /* +0x54C UNIT_OFF_INVENTORY, weapon uids */
@@ -596,7 +596,7 @@ typedef struct AM2_Object {
             int32_t   armed;     /* +0x578 OBJ_OFF_ARMED */
             AM2_SightOut sight;     /* +0x57C OBJ_OFF_SIGHT_OUT_T2 */
             uint32_t  fireStamp;    /* +0x5A0 UNIT_OFF_FIRE_STAMP */
-            int32_t   convertedFrom;     /* +0x5A4 OBJ_OFF_CONVERTED_FROM */
+            int32_t   kind7Army;     /* +0x5A4 OBJ_OFF_KIND7_ARMY */
             int32_t   kind7Name;     /* +0x5A8 OBJ_OFF_KIND7_NAME, the random name index */
             int32_t        nameIndex;       /* +0x5AC OBJ_OFF_NAME_INDEX */
             uint32_t       healStamp;        /* +0x5B0 OBJ_OFF_HEAL_STAMP, game-clock ms */
@@ -612,7 +612,7 @@ typedef struct AM2_Object {
         struct {                    /* a vehicle's (type 3) */
             AM2_UidList riders;     /* +0x538 VEHICLE_OFF_PTR_LIST, its riders */
             int32_t   deathKind;    /* +0x544 0 destroyed outright, 5 the burn-out */
-            int32_t   turretFree;     /* +0x548 0 drags the turret onto the hull */
+            int32_t   manualAim;     /* +0x548 0 drags the turret onto the hull */
             int32_t   armour;       /* +0x54C VEHICLE_OFF_ARMOUR */
             uint32_t  weaponUid;    /* +0x550 VEHICLE_OFF_WEAPON_UID, its gun */
             int32_t   seats;        /* +0x554 VEHICLE_OFF_SEATS */
@@ -711,7 +711,7 @@ static_assert(offsetof(AM2_Object, moveStateAlt)  == 0xF0,  "moveStateAlt");
 static_assert(offsetof(AM2_Object, hitTime)       == 0x108, "hitTime");
 static_assert(offsetof(AM2_Object, alliesSeen)      == 0x114, "alliesSeen");
 static_assert(offsetof(AM2_Object, waypoints)     == 0x120, "waypoints");
-static_assert(offsetof(AM2_Object, convertedFrom)      == 0x5A4, "convertedFrom");
+static_assert(offsetof(AM2_Object, kind7Army)      == 0x5A4, "kind7Army");
 static_assert(offsetof(AM2_Object, healStamp)      == 0x5B0, "healStamp");
 static_assert(offsetof(AM2_Object, facingCopy)    == 0xF8,  "facingCopy");
 static_assert(offsetof(AM2_Object, fireFlag)      == 0x529, "fireFlag");
@@ -754,7 +754,7 @@ static_assert(offsetof(AM2_Object, searchTries)   == 0x574, "searchTries");
 static_assert(offsetof(AM2_Object, ctl.gate)      == 0x59C, "gate");
 static_assert(offsetof(AM2_Object, turnRecommit)  == 0x5A8, "turnRecommit");
 static_assert(offsetof(AM2_Object, nameIndex)     == 0x5AC, "nameIndex");
-static_assert(offsetof(AM2_Object, moveMode)      == 0x540, "moveMode");
+static_assert(offsetof(AM2_Object, aiPose)      == 0x540, "aiPose");
 static_assert(offsetof(AM2_Object, seats)         == 0x554, "seats");
 static_assert(offsetof(AM2_Object, inventory)     == 0x54C, "inventory");
 static_assert(offsetof(AM2_Object, inventorySel)  == 0x568, "inventorySel");

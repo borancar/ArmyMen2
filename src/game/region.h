@@ -161,7 +161,7 @@ void __cdecl RoachRouteToward(struct AM2_Object *o, struct AM2_RoachOut *out,
 void __cdecl SargeAiStep(struct AM2_Object *o, struct AM2_SightOut *out);
 
 /* 0x004062B0, one caller. The same for every other trooper -- no pickup, and
- * a tail that maps OBJ_OFF_MOVE_MODE onto the output state. The caller at
+ * a tail that maps OBJ_OFF_AI_POSE onto the output state. The caller at
  * 0x0044B9FE chooses between the two on OBJ_OFF_SARGE. */
 void __cdecl TrooperAiStep(struct AM2_Object *o, struct AM2_SightOut *out);
 

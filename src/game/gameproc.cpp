@@ -1734,7 +1734,7 @@ AM2_Object *__cdecl LoadType2(am2_FILE *fp, AM2_Object *hdr, int32_t renumber)
     switch (o->soldierKind) {
     case AM2_SOLDIER_KIND_ACTION_C:
         o->soldierKind = 0;
-        Type2ActionC(o, o->convertedFrom - 1);
+        Type2ActionC(o, o->kind7Army - 1);
         break;
 
     case AM2_SOLDIER_KIND_ACTION_A:

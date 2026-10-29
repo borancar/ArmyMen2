@@ -1571,7 +1571,7 @@ void __cdecl ApplyObjHeight(AM2_Object *obj, int32_t height)
  * rather than to the victim -- which is the sort of thing a reconstruction
  * would quietly get wrong by defaulting to the victim's own army.
  *
- * The spawn is gated on OBJ_OFF_CONVERTED_FROM being non-zero. orig.h has that
+ * The spawn is gated on OBJ_OFF_KIND7_ARMY being non-zero. orig.h has that
  * field as "structural until something says what it counts"; this does not
  * settle it either, but it adds a second reader to ADDR_TYPE2_FIELD5A4_SET's
  * and both treat it as a permission rather than a quantity.
@@ -1587,7 +1587,7 @@ void __cdecl TrooperDied(AM2_Object *obj, int32_t a, uint32_t by)
         o->flags &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
     }
 
-    if (o->convertedFrom) {
+    if (o->kind7Army) {
         const AM2_Object *killer = LookupByUID(by);
         int16_t        army   = killer   /* a short: movsx ax, then movsx edx */
                                 ? killer->owner
@@ -2418,7 +2418,7 @@ reset:
  * so a completely clear cell still demands 30 of the destination.
  *
  * ITS SECOND ARGUMENT IS A WINDOW INTO THE OBJECT, not a record of its own.
- * StepType8 passes `obj + OBJ_OFF_MOVE_MODE`, so +0x14 is OBJ_OFF_DEATH_STATE
+ * StepType8 passes `obj + OBJ_OFF_AI_POSE`, so +0x14 is OBJ_OFF_DEATH_STATE
  * -- 1 while alive, 5 or 6 once DamageRoach has killed it. This was called a
  * "control record" with a STOP field one batch ago, which was a second name
  * for fields that already had one and a meaning guessed off one branch. What
@@ -3295,7 +3295,7 @@ static inline int32_t ShotFacingArc(const AM2_Object *target, const AM2_Object *
  *
  *   FRIENDLY FIRE FIRST. An object of the shot's own army carrying
  *   OBJ_FLAG_SHOT_PROOF is missed outright. Otherwise, still on its own army,
- *   a trooper is missed unless it has Type2Field5A4Set, or is Sarge in a
+ *   a trooper is missed unless it has Type2Kind7ArmySet, or is Sarge in a
  *   multiplayer game, or the code is AM2_SHOT_CODE_RANDOM -- and anything
  *   else of types 2, 3 and 8 is missed if it is the SHOOTER, which is what
  *   the shot's own +0x98 holds.
@@ -3353,7 +3353,7 @@ int32_t __cdecl ShotHitsObj(AM2_Object *t, int32_t code, int32_t army,
                 else
                     sarge = 0;
 
-                if (!Type2Field5A4Set(t) && !sarge
+                if (!Type2Kind7ArmySet(t) && !sarge
                     && code != AM2_SHOT_CODE_RANDOM)
                     return 0;
             } else if (s->shooterUid == t->uid) {
@@ -4887,7 +4887,7 @@ static inline int32_t BracedPose(const AM2_Object *o)
  * says why.
  *
  * FOUR REFUSALS, all answering 0 and all before any of that: no object, the
- * object destroyed, Type2Field5A4Set, and soldier kind 8.
+ * object destroyed, Type2Kind7ArmySet, and soldier kind 8.
  *
  * COLD: its one caller is TrooperFire, which nothing in a Boot Camp drive
  * reaches. Verified by reading. It is exhaustively testable the way
@@ -4907,7 +4907,7 @@ int32_t __cdecl SelectFirePose(AM2_Object *obj, AM2_Object *weapon, AM2_SightOut
      * thing in the function. */
     if (o != 0
         && !(o->flags & OBJ_FLAG_DESTROYED)
-        && !Type2Field5A4Set((const AM2_Object *)o)
+        && !Type2Kind7ArmySet((const AM2_Object *)o)
         && o->soldierKind
            != AM2_SOLDIER_KIND_ACTION_B) {
         cls = ClassifyByCode74(o);
@@ -5237,7 +5237,7 @@ void __cdecl DamageTrooper(AM2_Object *obj, int32_t amount, uint8_t d, int32_t k
             obj->flags &= ~(uint32_t)OBJ_FLAG_BIT0;
         }
 
-        if (obj->convertedFrom != 0) {
+        if (obj->kind7Army != 0) {
             AM2_Object *killer = LookupByUID(attacker);
             int16_t  army   = killer != 0
                             ? (int16_t)killer->owner
@@ -6014,7 +6014,7 @@ void __cdecl SetWeaponTarget(AM2_Object *target, AM2_Point at)
 /* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
  * values than SetWeaponTarget above writes.
  *
- * The mode is 0x25 when the unit has OBJ_OFF_CONVERTED_FROM AND its
+ * The mode is 0x25 when the unit has OBJ_OFF_KIND7_ARMY AND its
  * OBJ_OFF_DEADLINE_58 is more than fifteen seconds behind the game clock, and
  * 1 in every other case -- including a unit with no field at all, which takes
  * the same 1 as one whose deadline is recent. Two different reasons, one
@@ -6038,7 +6038,7 @@ void __cdecl PickFireMode(AM2_Object *obj)
 {
     AM2_Object *o = obj;
 
-    if (o->convertedFrom
+    if (o->kind7Army
         && (uint32_t)(*(const int32_t *)&g_gameClockMs
                       - (int32_t)o->deadline58)
                > AM2_FIRE_STALE_MS) {
@@ -6183,7 +6183,7 @@ void __cdecl NextInventorySlot(AM2_Object *obj)
 /* The roach step seam is gone -- RoachStepTailA is reconstructed and its one
  * caller below calls it by name. What the seam's comment established is still
  * true of the signature and is kept here: the second argument is
- * `obj + OBJ_OFF_MOVE_MODE` and the FAMILY reads more than a byte through it
+ * `obj + OBJ_OFF_AI_POSE` and the FAMILY reads more than a byte through it
  * -- 0x0043D5B0 tests +0x14 as an int32, which is the object's
  * OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the same
  * shape of mistake as ObjInitCommon's `dir`. */
@@ -6209,7 +6209,7 @@ typedef void (__cdecl *AM2_StepFn)(void *obj);
  * established; it is not the damage path.
  *
  * THE FACING IS PASSED BY ADDRESS to four of the five callees. The step reads
- * OBJ_OFF_FACING into OBJ_OFF_MOVE_MODE at the top and hands the address of
+ * OBJ_OFF_FACING into OBJ_OFF_AI_POSE at the top and hands the address of
  * the copy on, so a callee that turns the roach writes the copy and the
  * object's own facing is only refreshed on the NEXT frame. Reproduced as the
  * pointer it is.
@@ -6538,7 +6538,7 @@ void __cdecl Type2ActionC(AM2_Object *obj, int32_t prev)
         }
     }
 
-    o->convertedFrom  = prev + 1;
+    o->kind7Army  = prev + 1;
     o->deadline58 =
         g_gameClockMs;
     o->aiDriven  = 1;
@@ -6865,7 +6865,7 @@ void __cdecl TrooperDropItem(AM2_Object *unit, int32_t slot, AM2_Point at)
  * The three guards are not the same as its siblings'. It refuses at
  * OBJ_OFF_SOLDIER_KIND >= 6, as B does and C does not, and it has one they do not:
  * ADDR_TYPE2_FIELD5A4_SET, which is false unless the object is a type 2 with
- * a positive OBJ_OFF_CONVERTED_FROM. So whatever that counter tracks is a reason
+ * a positive OBJ_OFF_KIND7_ARMY. So whatever that counter tracks is a reason
  * NOT to re-arm.
  *
  * The old weapon is marked OBJ_FLAG_REPLACED and simply abandoned -- unlike
@@ -6895,7 +6895,7 @@ void __cdecl Type2ActionA(AM2_Object *obj)
         return;
     if (o->soldierKind >= 6)
         return;
-    if (Type2Field5A4Set((const AM2_Object *)obj))
+    if (Type2Kind7ArmySet((const AM2_Object *)obj))
         return;
 
     SetSoldierKind(obj, 7);
@@ -9406,7 +9406,7 @@ typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
  * and for WeaponClassOf.
  *
  * KIND 3'S ARM IS REACHED TWO WAYS -- through the table, and by falling out of
- * the OBJ_OFF_CONVERTED_FROM test above it, which is why that block sits before the
+ * the OBJ_OFF_KIND7_ARMY test above it, which is why that block sits before the
  * dispatch rather than with the other arms.
  *
  * EVERY ARM ANSWERS THE SAME TWO QUESTIONS: which animation goes into
@@ -9444,8 +9444,8 @@ void __cdecl TrooperDiedTail(AM2_Object *obj, int32_t kind)
      * at 0x447F12 directly and does NOT clear it. The block sits inside the
      * test, where the original lays it out, and case 3 jumps into it. Writing the two as one
      * condition clears the field on a path the original leaves alone. */
-    if (o->convertedFrom) {
-        o->convertedFrom = 0;
+    if (o->kind7Army) {
+        o->kind7Army = 0;
     arm3:
         o->sight.state = 0;
         o->sight.fromNet = 1;
@@ -11065,7 +11065,7 @@ void __cdecl DeployTrooper(AM2_Object *obj, int32_t x, int32_t y, int32_t resurr
         SetUnitPose((AM2_Object *)o, 1);
 
         o->riding    = 0;
-        o->convertedFrom = 0;
+        o->kind7Army = 0;
         ObjRemap((AM2_Object *)o, g_objMapDesc, 1);
         o->pose = 0;
 

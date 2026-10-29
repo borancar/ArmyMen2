@@ -70,14 +70,19 @@ program's own names for flow fields are `gotseq`, `hehas` and `active`, already 
 A role name for one of these would therefore be invented, which is worse than saying what is
 established: the member exists at that offset and nothing the program does depends on it.
 
-## Names that are readings rather than proofs
+## Names that were readings, and what settled them
 
-- `AM2_Object::moveMode` (was `field540`): a unit's walk-state selector; set by the script event
-  `EvtSetField540` and by placement, switched on in the trooper step. The values 1..3 are not decoded.
-- `AM2_Object::convertedFrom` (was `field5A4`): 1-based army the unit was before it changed owner
-  (`prev + 1`), 0 for none; the death handler reports the kill to that army.
-- `AM2_Object::turretFree` (was `field548`): 0 slaves the turret to the hull heading.
-- `AM2_Flow::roundTrip` (was `field68`): only reader halves it to estimate the peer's clock base; nothing
-  writes it, so it is always 0.
-- `AM2_SightOut::fromNet` (was `field00`): set when a network update supplies the facing or mode, and
-  when a shot is decided; the sight record is only refreshed from the weapon pose while it is 0.
+- `AM2_Object::aiPose` (was `moveMode`, `field540`): the script command `setaipose {stand|kneel|prone|none}`
+  (action 0x2B, `EvtSetAiPose`) writes 1/2/3/0, placement writes 1 on a pillbox occupant, and the trooper
+  step switches on it to choose the walk/pose state. Settled by the command's own parser.
+- `AM2_Object::kind7Army` (was `convertedFrom`, `field5A4`): army + 1, written only by `Type2ActionC`,
+  which puts the unit on soldier kind 7 and is reached from menu arm 42 (the actor's owner) and a script
+  action (an army). The idle step reports to that army's leader; 0 = none. Named for the kind it belongs to.
+- `AM2_Object::manualAim` (was `turretFree`, `field548`): set whenever the player turns the turret (keys or
+  mouse); while 0 the vehicle AI sets the gun aim to the hull heading.
+
+## One name that is still an inference
+
+- `AM2_Flow::roundTrip` (was `field68`): its only reader subtracts half of it from the tick count to
+  estimate the peer's clock base, so it is a round-trip estimate; nothing writes it, so it is always 0.
+  The function that reads it says as much in a comment, but the program names it nowhere.

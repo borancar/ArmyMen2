@@ -19,7 +19,7 @@ pass with the whole body deleted. The pose is seeded with a sentinel first, so
 "wrote nothing" -- which two arms really do -- is distinguishable from "wrote
 zero".
 
-NOTHING IS HOOKED. Its two callees, ClassifyByCode74 and Type2Field5A4Set, are
+NOTHING IS HOOKED. Its two callees, ClassifyByCode74 and Type2Kind7ArmySet, are
 pure reads of the object and run for real under the emulator; the only reason
 tools/explcheck.py and tools/collectcheck.py hook anything is that theirs reach
 the heap and the map.
@@ -48,7 +48,7 @@ OBJ_SPEED     = 0x44
 OBJ_ROWS      = 0x74
 OBJ_POSE      = 0x538
 OBJ_SOLDIER   = 0x544
-OBJ_FIELD_5A4 = 0x5A4
+OBJ_KIND7_ARMY = 0x5A4
 WPN_TYPEREC   = 0xC0
 ROW_FRAME     = 0x4C
 SIGHT_STATE   = 0x08
@@ -147,7 +147,7 @@ def build(kind, row_frame, pose, soldier, speed, seen, obj_type=0, f5a4=0,
     put(OBJ, OBJ_ROWS, ROW)
     put(OBJ, OBJ_POSE, pose)
     put(OBJ, OBJ_SOLDIER, soldier)
-    put(OBJ, OBJ_FIELD_5A4, f5a4)
+    put(OBJ, OBJ_KIND7_ARMY, f5a4)
     struct.pack_into("<h", buf, ROW - SCRATCH + ROW_FRAME, row_frame)
     put(WPN, WPN_TYPEREC, KIND)
     put(KIND, 0, kind)

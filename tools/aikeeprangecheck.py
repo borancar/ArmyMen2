@@ -57,7 +57,7 @@ SIGHTC_OFF_WANT_RANGE = 0x4C
 OBJ_OFF_DEADLINE_58 = 0x58
 OBJ_OFF_BY_TYPE_C0 = 0xC0
 OBJ_OFF_DEADLINE_D0 = 0xD0
-OBJ_OFF_MOVE_MODE = 0x540
+OBJ_OFF_AI_POSE = 0x540
 OBJ_OFF_SOLDIER_KIND = 0x544
 
 REACHED = 12
@@ -121,7 +121,7 @@ class Harness:
 
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_58, struct.pack("<I", dl58))
         uc.mem_write(OBJ + OBJ_OFF_DEADLINE_D0, struct.pack("<I", dlD0))
-        uc.mem_write(OBJ + OBJ_OFF_MOVE_MODE, struct.pack("<i", f540))
+        uc.mem_write(OBJ + OBJ_OFF_AI_POSE, struct.pack("<i", f540))
         uc.mem_write(OBJ + OBJ_OFF_SOLDIER_KIND, struct.pack("<i", kind))
 
         uc.mem_write(CTX + SIGHTC_OFF_CLASS, struct.pack("<i", ctx0))

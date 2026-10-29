@@ -4369,7 +4369,7 @@
  * position into the goal point, its +4 into OBJ_OFF_PICKUP_AFTER, the point
  * settled into a walkable region, and the distance recorded at SIGHTC +0x38.
  *
- * THE TROOPER HAS AN EXTRA TAIL SARGE DOES NOT, mapping OBJ_OFF_MOVE_MODE and
+ * THE TROOPER HAS AN EXTRA TAIL SARGE DOES NOT, mapping OBJ_OFF_AI_POSE and
  * SIGHTC_OFF_CLASS onto SIGHTCOUT_OFF_STATE. It reads that field against
  * 0, 1 and 2 -- a third independent site agreeing it is 0..2. Reconstructed.
  */
@@ -8192,9 +8192,9 @@ typedef struct {
  * same union, recorded where the offset is rather than argued in one file. */
 /* Incremented from Type2ActionC's argument and stored; 0x0044BBA0 answers
  * whether it is positive. Structural until something says what it counts. */
-#define OBJ_OFF_CONVERTED_FROM        0x5A4u  /* int32_t */
+#define OBJ_OFF_KIND7_ARMY        0x5A4u  /* int32_t */
 /* 0x0044BBA0, four callers: false unless the object is a type 2 AND its
- * OBJ_OFF_CONVERTED_FROM is positive. Type2ActionA refuses when it is true, so
+ * OBJ_OFF_KIND7_ARMY is positive. Type2ActionA refuses when it is true, so
  * whatever that counter tracks is a reason not to re-arm. */
 #define ADDR_TYPE2_FIELD5A4_SET  0x0044BBA0u /* int32_t(const void *obj) */
 /* The weapon Type2ActionA gives out, and the action code it then runs -- the
@@ -8368,21 +8368,21 @@ typedef struct {
  * sometimes check the type or the null, then store. The differences between
  * them are exactly which of those guards each one has, so they are worth
  * keeping separate rather than folding into one helper. */
-#define ADDR_EVT_SET_FIELD_540   0x0041FAB0u  /* void(uid, int32), type 2 only */
+#define ADDR_EVT_SET_AI_POSE   0x0041FAB0u  /* void(uid, int32), type 2 only */
 /* StepType8 says what it is for a ROACH: the object's own copy of
  * OBJ_OFF_FACING, refreshed from it at the top of every step and then passed
  * BY ADDRESS to four callees -- so one of them can turn the roach by writing
  * the copy, and the object's facing is only read into it again next frame.
- * Kept as FIELD_540 rather than renamed: ADDR_EVT_SET_FIELD_540 writes the
+ * Kept as FIELD_540 rather than renamed: ADDR_EVT_SET_AI_POSE writes the
  * same offset for a type 2, which is not a roach, and one offset with two
  * uses wants one name and two readings. */
-#define OBJ_OFF_MOVE_MODE        0x540u
+#define OBJ_OFF_AI_POSE        0x540u
 /* 0x0041FD50. Takes TWO uids, requires both above the threshold and both to
  * resolve, clears field 0x540 on the first if it is type 2, and hands the pair
  * to 0x00458070 -- 640 bytes with twenty callers, unnamed.
  *
  * That "clear 0x540 first, but only for type 2" step is the third sighting:
- * EvtAtPointA does it, ADDR_EVT_SET_FIELD_540 exists to write it, and this is
+ * EvtAtPointA does it, ADDR_EVT_SET_AI_POSE exists to write it, and this is
  * a third. Whatever the field holds, several actions reset it before giving
  * the object something new to do. */
 #define ADDR_EVT_OBJ_PAIR        0x0041FD50u  /* void(uint32_t, uint32_t) */
@@ -10018,7 +10018,7 @@ typedef struct {
 #define ADDR_STEP_TYPE2          0x0044B7D0u  /* void(obj) */
 #define OBJ_OFF_SIGHT_OUT_T2     0x57Cu  /* StepType2's SIGHTCOUT base */
 #define AM2_SND_KIND7            0x33
-#define AM2_SND_FIELD5A4         0x2D
+#define AM2_SND_KIND7_ARMY         0x2D
 /* Two of StepType2's callees, still original and named by offset. */
 /* RECONSTRUCTED as TrooperFire, and it names itself: "FIRE  trooper: %x
  * weapon: %x  ammo: %d". Given a trooper, the weapon in hand and the sight
@@ -11963,7 +11963,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_TROOPSUB_HAS_FACING  0x40000000u
 #define AM2_TROOPSUB_HAS_MODE    0x20000000u
 /* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
- * values: 0x25 when it has OBJ_OFF_CONVERTED_FROM and its OBJ_OFF_DEADLINE_58 is
+ * values: 0x25 when it has OBJ_OFF_KIND7_ARMY and its OBJ_OFF_DEADLINE_58 is
  * more than fifteen seconds behind the game clock, and 1 otherwise. So that
  * field carries at least four different things -- a pose, 0x1F for a point,
  * and these two -- which is why it is named for the field and not for a
@@ -16270,9 +16270,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Reconstructed. */
 #define ADDR_ROACH_STEP_ALLOWED 0x0043D0F0u  /* int32(obj, ctrl, int32 *turn) */
 /* THE SECOND ARGUMENT IS NOT A RECORD OF ITS OWN AND THESE NAMES CLAIMED IT
- * WAS. StepType8 passes `obj + OBJ_OFF_MOVE_MODE`, so the "control record" is
+ * WAS. StepType8 passes `obj + OBJ_OFF_AI_POSE`, so the "control record" is
  * a window into the object and every offset here is an object field twelve
- * hundred bytes in: +0x00 is OBJ_OFF_MOVE_MODE, +0x14 is OBJ_OFF_DEATH_STATE
+ * hundred bytes in: +0x00 is OBJ_OFF_AI_POSE, +0x14 is OBJ_OFF_DEATH_STATE
  * and +0x18 is the dword after it. Named ROACHCTL_OFF_* one batch ago, which
  * is a second name for fields that already had one -- my own mistake, of
  * exactly the kind this file catalogues.
@@ -16286,7 +16286,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *
  * The pointer form is kept because the original takes two pointers and four
  * callers pass them; only the meaning-claims are withdrawn. */
-#define ROACHSTEP_OFF_FACING    0x00u  /* = OBJ_OFF_MOVE_MODE */
+#define ROACHSTEP_OFF_FACING    0x00u  /* = OBJ_OFF_AI_POSE */
 #define ROACHSTEP_OFF_STATE     0x14u  /* = OBJ_OFF_DEATH_STATE; 1 is alive */
 #define ROACHSTEP_OFF_FLAG18    0x18u  /* the dword after it; picks the arm */
 /* 0x0043D750's two stuck fields, and the second is a UNION rather than a new
@@ -16462,7 +16462,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * neither carries a string. Types other than those two get no handler at all;
  * the common tail runs for every type. */
 /* 0x00447E50, one caller. A trooper has died: take it off the map, drop
- * whatever OBJ_OFF_CONVERTED_FROM gates, and hand the rest to the shared tail.
+ * whatever OBJ_OFF_KIND7_ARMY gates, and hand the rest to the shared tail.
  *
  * THE THING IT SPAWNS BELONGS TO THE KILLER. `by` is a uid, and the army the
  * spawn gets is that object's OBJ_OFF_ARMY -- or 4, the neutral army, when
@@ -16492,7 +16492,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * READ THAT TABLE AS DATA -- it orders the arms 1 -> 0x447FAF, 2 -> 0x447F4E,
  * 3 -> 0x447F12, 4 -> 0x447FEA, 5 -> 0x44800A, so KINDS 1 AND 3 ARE SWAPPED
  * against the layout and numbering the bodies top to bottom gets two of five
- * wrong. Kind 3's arm is also fallen into from the OBJ_OFF_CONVERTED_FROM test
+ * wrong. Kind 3's arm is also fallen into from the OBJ_OFF_KIND7_ARMY test
  * above the dispatch -- but that path CLEARS the field first and the table
  * path does not, so the two are not one condition. Reconstructed. */
 #define ADDR_TROOPER_DIED_TAIL   0x00447EE0u  /* void(obj, int32 kind) */
@@ -17493,7 +17493,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Zeroed by every per-type destroy handler, in a pair of 16-bit stores, right
  * beside the script id. It sits immediately after the four script dwords at
  * 0xB0..0xBC, which is suggestive and not evidence, so it is named the way
- * OBJ_OFF_MOVE_MODE already is -- structurally, until something reads it.
+ * OBJ_OFF_AI_POSE already is -- structurally, until something reads it.
  *
  * Something reads it now. SelectInventorySlot does `mov ecx,[obj+0xC0]; mov
  * ecx,[ecx]` and uses that first dword to index ADDR_WEAPON_HANDLERS, so this
@@ -17685,7 +17685,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* How many the vehicle holds -- EnterVehicle refuses once the occupant list
  * has reached it. The same offset carries OBJ_OFF_DEATH_STATE on a roach,
  * which is a different record; recorded as its own name in the VEHICLE_
- * family rather than aliased onto that one, the way OBJ_OFF_MOVE_MODE is
+ * family rather than aliased onto that one, the way OBJ_OFF_AI_POSE is
  * kept apart from its second use. */
 #define VEHICLE_OFF_SEATS          0x554u
 /* The four beside it, all written by CreateVehicle from the def record and

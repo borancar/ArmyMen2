@@ -340,7 +340,7 @@ void __cdecl EventClearAll(void);
  * on some object: the two are adjacent dwords, and a record with fields past
  * 0x540 is far larger than AM2_Object's header. Whatever type 2 is, it carries
  * a substantial tail. */
-void __cdecl EvtSetField540(uint32_t uid, int32_t value);
+void __cdecl EvtSetAiPose(uint32_t uid, int32_t value);
 
 void __cdecl EvtSetModeF0(uint32_t uid, int32_t value);
 void __cdecl EvtSetMode94(uint32_t uid, int32_t value);
@@ -355,7 +355,7 @@ void __cdecl EvtSetByte40(uint32_t uid, int8_t value);
  * uid floor the rest of the family does.
  *
  * +0x530 is a third field in the same far tail: ObjType2Field548 reads +0x548
- * and EvtSetField540 writes +0x540, both on type 2, and this writes +0x530 on
+ * and EvtSetAiPose writes +0x540, both on type 2, and this writes +0x530 on
  * type 3. Two different types with live fields past 0x500 says the two
  * records are alike out there, which is as much as these three accessors can
  * establish on their own. */

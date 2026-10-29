@@ -186,7 +186,7 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
     return mask;
 }
 /* 0x0044BBA0, four callers. True only when the object is a TYPE 2 and its
- * OBJ_OFF_CONVERTED_FROM is positive.
+ * OBJ_OFF_KIND7_ARMY is positive.
  *
  * Type2ActionA is the reader that says anything about what it means: that
  * function refuses to re-arm a unit when this is true, so the counter is a
@@ -195,12 +195,12 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
  * The type test comes FIRST and short-circuits, so the field is never read on
  * an object of another type -- which matters, because 0x5A4 is far enough into
  * the record that other types may not have it. */
-int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
+int32_t __cdecl Type2Kind7ArmySet(const AM2_Object *obj)
 {
     if (!ObjIsType2(obj))
         return 0;
 
-    return obj->convertedFrom > 0;
+    return obj->kind7Army > 0;
 }
 
 
@@ -1417,8 +1417,8 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
                         "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
-    rc |= patch_replace(ADDR_TYPE2_FIELD5A4_SET, (const void *)Type2Field5A4Set,
-                        "Type2Field5A4Set", 4);
+    rc |= patch_replace(ADDR_TYPE2_FIELD5A4_SET, (const void *)Type2Kind7ArmySet,
+                        "Type2Kind7ArmySet", 4);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE3, (const void *)ObjIsType3, "ObjIsType3", 1);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE238, (const void *)ObjIsTypeIn238, "ObjIsTypeIn238", 1);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE8, (const void *)ObjIsType8, "ObjIsType8", 1);
