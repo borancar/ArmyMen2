@@ -258,7 +258,7 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/cheat.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp src/game/dirty.cpp src/game/anim.cpp src/platform/crt/sort.cpp src/platform/crt/string.cpp src/platform/crt/conv.cpp src/platform/crt/printf.cpp src/platform/crt/fltcvt.cpp src/platform/crt/stdio.cpp src/platform/crt/lowio.cpp src/platform/crt/standin.cpp src/platform/crt/dir.cpp src/platform/crt/time.cpp src/platform/crt/env.cpp src/platform/crt/mbcs.cpp src/platform/crt/strtod.cpp src/platform/crt/heap.cpp src/platform/crt/exit.cpp src/platform/crt/startup.cpp
+                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/cheat.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp src/game/dirty.cpp src/game/anim.cpp src/crt/sort.cpp src/crt/string.cpp src/crt/conv.cpp src/crt/printf.cpp src/crt/fltcvt.cpp src/crt/stdio.cpp src/crt/lowio.cpp src/crt/standin.cpp src/crt/dir.cpp src/crt/time.cpp src/crt/env.cpp src/crt/mbcs.cpp src/crt/strtod.cpp src/crt/heap.cpp src/crt/exit.cpp src/crt/startup.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe
@@ -362,9 +362,9 @@ check: standalone-generate
 	    echo "    needs the module the function now lives in."; \
 	    rc=1; \
 	fi; \
-	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h src/platform/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h)" ]; then \
+	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h third_party/win32_layer/src/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h)" ]; then \
 	    echo "  generated files DRIFTED from what is committed:"; \
-	    git status --short docs/ src/game/scripttokens.h src/platform/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h | sed 's/^/    /'; \
+	    git status --short docs/ src/game/scripttokens.h third_party/win32_layer/src/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h | sed 's/^/    /'; \
 	    echo "    regenerate and commit, or find out why a tool changed its mind"; \
 	    rc=1; \
 	else \
@@ -430,7 +430,7 @@ endif
 # migrated out of that blob into typed C data is one less thing holding the
 # layout in place.
 SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
-            $(wildcard src/platform/crt/*.cpp) \
+            $(wildcard src/crt/*.cpp) \
             src/standalone/runtime.cpp src/standalone/origtail.cpp \
             src/standalone/fixups.cpp \
             src/standalone/imports.cpp \
@@ -495,7 +495,7 @@ run-stock:
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) "$(GAMEEXE)"
 
 # The NATIVE build: the same reconstruction as the standalone, linked as a
-# Linux executable against src/platform -- the Win32 and DirectX surface the
+# Linux executable against third_party/win32_layer -- the Win32 and DirectX surface the
 # game's win32/ modules call, implemented over SDL3 -- instead of against
 # Wine. One executable, no runner: SDL is the outermost layer and everything
 # the game sees below its window is emulated to it.
@@ -522,7 +522,7 @@ run-stock:
 # separate because the define changes what a header expands to.
 NATIVE_CXX   := g++
 NATIVE_CC    := gcc
-NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp) \
+NATIVE_SRC   := $(SA_SRC) $(wildcard third_party/win32_layer/src/*.cpp) src/standalone/appinfo.cpp \
                 src/standalone/noinput.cpp src/standalone/devtools.cpp
 # libsmacker (third_party/libsmacker, LGPL 2.1) decodes the films for the
 # native port's smackw32 (src/game/win32/smackw32.cpp); no other build links it.
@@ -537,7 +537,7 @@ DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(LUA_CSRC)) \
                 $(BUILD)/native-dev/origchunks.o $(BUILD)/native-dev/origgap.o
 NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE \
-                -isystem src/platform/include -include callconv.h
+                -isystem third_party/win32_layer/include -include callconv.h
 NATIVE_ARCH  := -m32 -fno-pie -no-pie
 # -fdata-sections gives every global its own input section, so tools/placement.py
 # can place the transcribed globals at their original VAs via src/standalone/
@@ -558,7 +558,7 @@ NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
 
 # The HYBRID build: the ORIGINAL ArmyMen2.exe, loaded by our own PE loader
-# and run over src/platform, with no Wine anywhere. src/hybrid/loader.cpp
+# and run over third_party/win32_layer, with no Wine anywhere. src/hybrid/loader.cpp
 # is WinMain: it maps the retail image at 0x00400000 -- which an ELF whose
 # text is at 0x00700000 leaves free -- fills its import table with the
 # platform layer's functions, and calls its entry point. No reconstruction
@@ -567,9 +567,10 @@ NATIVE_LIBS  := -lSDL3 -lpthread -lm
 #
 #     make hybrid
 #     AM2_GAMEDIR="$(GAMEDIR)" AM2_LOG=/tmp/hybrid.log build/armymen2-hybrid -nointro
-HYBRID_SRC   := $(wildcard src/platform/*.cpp) src/hybrid/loader.cpp
+HYBRID_SRC   := $(wildcard third_party/win32_layer/src/*.cpp) src/hybrid/loader.cpp \
+                src/standalone/appinfo.cpp
 HYBRID_OBJ   := $(patsubst %.cpp,$(BUILD)/hybrid/%.o,$(HYBRID_SRC))
-HYBRID_DEFS  := -DAM2_NATIVE -DAM2_HYBRID -isystem src/platform/include -include callconv.h
+HYBRID_DEFS  := -DAM2_NATIVE -DAM2_HYBRID -isystem third_party/win32_layer/include -include callconv.h
 HYBRID_CXXF  := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu++14 \
                 -fno-strict-aliasing -fno-exceptions -fno-rtti $(DEPFLAGS) \
                 $(HYBRID_DEFS)
@@ -582,7 +583,7 @@ HYBRID_LDF   := $(NATIVE_ARCH) -static-libgcc \
 # run can be driven and its object table dumped exactly as the native
 # development binary's can. Same port, same tools.
 HYBRID_DEV_SRC := $(HYBRID_SRC) src/hybrid/devtools.cpp src/hybrid/crtcheck.cpp \
-                  src/game/image.cpp $(wildcard src/platform/crt/*.cpp)
+                  src/game/image.cpp $(wildcard src/crt/*.cpp)
 HYBRID_DEV_OBJ := $(patsubst %.cpp,$(BUILD)/hybrid-dev/%.o,$(HYBRID_DEV_SRC)) \
                   $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(SA_CSRC)) \
                   $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(LUA_CSRC))
@@ -599,11 +600,11 @@ $(BUILD)/hybrid/%.o: %.cpp
 
 $(BUILD)/hybrid-dev/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(NATIVE_CXX) $(HYBRID_CXXF) -DAM2_DEVTOOLS -c $< -o $@
+	$(NATIVE_CXX) $(HYBRID_CXXF) -DAM2_DEVTOOLS -DW32L_DEVTOOLS -c $< -o $@
 
 $(BUILD)/hybrid-dev/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(NATIVE_CC) $(HYBRID_CF) -DAM2_DEVTOOLS -c $< -o $@
+	$(NATIVE_CC) $(HYBRID_CF) -DAM2_DEVTOOLS -DW32L_DEVTOOLS -c $< -o $@
 
 -include $(HYBRID_OBJ:.o=.d) $(HYBRID_DEV_OBJ:.o=.d)
 
@@ -722,11 +723,11 @@ $(BUILD)/native/origgap.o: src/standalone/origgap.S
 
 $(BUILD)/native-dev/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(NATIVE_CXX) $(NATIVE_CXXF) -DAM2_DEVTOOLS -c $< -o $@
+	$(NATIVE_CXX) $(NATIVE_CXXF) -DAM2_DEVTOOLS -DW32L_DEVTOOLS -c $< -o $@
 
 $(BUILD)/native-dev/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(NATIVE_CC) $(NATIVE_CF) -DAM2_DEVTOOLS -c $< -o $@
+	$(NATIVE_CC) $(NATIVE_CF) -DAM2_DEVTOOLS -DW32L_DEVTOOLS -c $< -o $@
 
 $(BUILD)/native-dev/origchunks.o: src/standalone/origchunks.S
 	@mkdir -p $(dir $@)

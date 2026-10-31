@@ -23,21 +23,21 @@
  * games' height calls diff. A missing line on one side is a call it skips --
  * which is how a 50-vs-0 depth divergence is traced to its setter. The object
  * position is logged so a specific object is greppable; window-gated by
- * AM2_TRACE_FROM/TO. */
+ * W32L_TRACE_FROM/TO. */
 #if defined(AM2_RELINK)
 /* Harness code: not in the original, so not in the relink either. */
 #define am2_height_log(name, obj, hin) ((void)0)
 #else
-extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
-extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+extern "C" uint32_t w32l_host_pump_number(void) __attribute__((weak));
+extern "C" int32_t w32l_trace_window(void) __attribute__((weak));
 static void am2_height_log(const char *name, const void *obj, int32_t hin)
 {
     static int32_t tr = -1;
     const AM2_Object *o = (const AM2_Object *)obj;
     if (tr < 0) tr = getenv("AM2_TRACE_HEIGHT") != 0;
-    if (tr && o && (!(&am2_trace_window) || am2_trace_window()))
+    if (tr && o && (!(&w32l_trace_window) || w32l_trace_window()))
         fprintf(stderr, "HEIGHT %s pump %u pos=%d,%d tile=%d hin=%d hset=%d\n", name,
-                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u),
                 o->pos.x, o->pos.y,
                 o->tile, hin, o->heightSet);
 }
@@ -14117,9 +14117,9 @@ AM2_Object *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     {
         static int32_t tw = -1;
         if (tw < 0) tw = getenv("AM2_TRACE_WEAPON") != 0;
-        if (tw && (!(&am2_trace_window) || am2_trace_window()))
+        if (tw && (!(&w32l_trace_window) || w32l_trace_window()))
             fprintf(stderr, "WEAPON pump %u pos=%d,%d kb=%d quantity=%d ammo=%d\n",
-                    (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                    (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u),
                     o->pos.x, o->pos.y,
                     kb, quantity, ammo);
     }

@@ -1,9 +1,9 @@
 /* crtcheck.cpp -- the reconstructed CRT against the original, in the one
  * process that holds both.
  *
- * The hybrid runs the ORIGINAL CRT over src/platform: its fopen reaches the
+ * The hybrid runs the ORIGINAL CRT over third_party/win32_layer: its fopen reaches the
  * platform's CreateFileA through the IAT, its fread the platform's ReadFile.
- * The reconstruction in src/platform/crt calls the same functions by name.
+ * The reconstruction in src/crt calls the same functions by name.
  * So with both linked into this binary, one scripted sequence of stdio
  * calls can be run through each, on its own copy of the same file, and
  * everything observable compared with no budget: the return value, errno
@@ -36,8 +36,8 @@
  */
 #include "../inject/win32.h"
 #include "../inject/orig.h"
-#include "../platform/platform.h"
-#include "../platform/crt/crt.h"
+#include "../../third_party/win32_layer/src/platform.h"
+#include "../crt/crt.h"
 #include "../game/image.h"
 
 #include <stdio.h>
@@ -110,7 +110,7 @@ static uint8_t *ck_alloc(uint32_t n)
 
     if (!p) {
         fprintf(stderr, "crtcheck: out of memory\n");
-        am2_host_exit(2);
+        w32l_host_exit(2);
     }
     return p;
 }
@@ -395,7 +395,7 @@ static void ck_write_host(const char *path, const uint8_t *data, uint32_t len)
 
     if (!h || (len && fwrite(data, 1, len, h) != len) || fclose(h) != 0) {
         fprintf(stderr, "crtcheck: cannot write %s\n", path);
-        am2_host_exit(2);
+        w32l_host_exit(2);
     }
 }
 
@@ -548,7 +548,7 @@ static void ck_push(int32_t side, const char *desc, int32_t v)
 
     if (n >= CK_DIR_VALUES) {
         fprintf(stderr, "crtcheck: too many directory values\n");
-        am2_host_exit(2);
+        w32l_host_exit(2);
     }
     snprintf(ck_dd[side][n], CK_DESC, "%s", desc);
     ck_dv[side][n] = v;
@@ -618,7 +618,7 @@ static void ck_push_find(int32_t side, const char *what, int32_t ret, const CRT_
 static void ck_run_dir(int32_t side, const AM2_CkDirStack *s, const char *dir, const char *tree)
 {
     /* A handle the platform never issued is not probed: Win32 would answer
-     * ERROR_INVALID_HANDLE, and src/platform's FindClose, which is what
+     * ERROR_INVALID_HANDLE, and third_party/win32_layer's FindClose, which is what
      * both stacks reach here, dereferences what it is given. */
     static const char *const patterns[] = {
         "%s/*", "%s/*.txt", "%s/*.TXT", "%s/nomatch*", "%s/sub/*", "%s/a.txt",
@@ -1052,7 +1052,7 @@ static void ck_sbh_snapshot(void)
         ck_snap = (uint8_t *)malloc(ck_snap_cap);
         if (!ck_snap) {
             fprintf(stderr, "crtcheck: cannot snapshot the heap\n");
-            am2_host_exit(2);
+            w32l_host_exit(2);
         }
     }
     ck_sbh_walk(ck_snap, 0, NULL);
@@ -1584,7 +1584,7 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
     ck_trace = getenv("AM2_CRTCHECK_TRACE") ? atoi(getenv("AM2_CRTCHECK_TRACE")) : 0;
     if (!dir || !*dir) {
         fprintf(stderr, "crtcheck: AM2_CRTCHECK must name a writable directory\n");
-        am2_host_exit(2);
+        w32l_host_exit(2);
     }
     ck_build_corpus();
 
@@ -1610,5 +1610,5 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
 
     fprintf(stderr, "crtcheck: %d scripts, %d calls, %d files: %d mismatching calls, %d differing files\n",
             ck_scripts, ck_ops, ck_nfiles, ck_mismatches, ck_filediffs);
-    am2_host_exit(ck_mismatches || ck_filediffs ? 1 : 0);
+    w32l_host_exit(ck_mismatches || ck_filediffs ? 1 : 0);
 }

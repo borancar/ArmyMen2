@@ -1,5 +1,5 @@
 #!/bin/bash
-# lockstep.sh -- run two binaries through the same replay under AM2_LOCKSTEP
+# lockstep.sh -- run two binaries through the same replay under W32L_LOCKSTEP
 # and report the first presented frame on which they differ.
 #
 #     tools/lockstep.sh [-a BIN] [-b BIN] [-o DIR] SCRIPT
@@ -8,7 +8,7 @@
 # build/armymen2 (the reconstruction over the same) unless said otherwise.
 # Both run headless -- SDL's dummy video and audio drivers -- with the
 # platform's deterministic clock, timers, sound and input (see platform.h,
-# AM2_LOCKSTEP), so their frame logs are comparable line for line. On a
+# W32L_LOCKSTEP), so their frame logs are comparable line for line. On a
 # divergence both are run again to dump that frame, and the pixel count and
 # bounding box of the difference are printed. Exit 0 when identical, 1 on a
 # divergence, 2 when a run failed.
@@ -34,7 +34,7 @@ GAMEDIR=${AM2_GAMEDIR:-"$REPO/.wine/drive_c/GOG Games/Army Men II"}
 run() { # tag binary [extra env...]
     tag=$1; bin=$2; shift 2
     env SDL_VIDEO_DRIVER=dummy SDL_AUDIO_DRIVER=dummy AM2_GAMEDIR="$GAMEDIR" \
-        AM2_LOCKSTEP=1 AM2_REPLAY="$SCRIPT" AM2_FRAMELOG="$OUT/$tag.frames" \
+        W32L_LOCKSTEP=1 W32L_REPLAY="$SCRIPT" W32L_FRAMELOG="$OUT/$tag.frames" \
         AM2_LOG="$OUT/$tag.game.log" "$@" timeout 600 "$bin" -nointro -dbg \
         > "$OUT/$tag.err" 2>&1
     rc=$?
@@ -57,8 +57,8 @@ fi
 first=$(diff <(cut -d' ' -f1,3 "$OUT/a.frames") <(cut -d' ' -f1,3 "$OUT/b.frames") | grep -m1 '^[<>]' | cut -d' ' -f2)
 pump=$(awk -v f="$first" '$1==f{print $2; exit}' "$OUT/a.frames")
 echo "lockstep: DIVERGE at presented frame $first (pump $pump); $na vs $nb frames presented"
-run ad "$A" AM2_FRAMEDUMP_AT="$first" AM2_FRAMEDUMP_TO="$OUT/a-$first.ppm" >/dev/null
-run bd "$B" AM2_FRAMEDUMP_AT="$first" AM2_FRAMEDUMP_TO="$OUT/b-$first.ppm" >/dev/null
+run ad "$A" W32L_FRAMEDUMP_AT="$first" W32L_FRAMEDUMP_TO="$OUT/a-$first.ppm" >/dev/null
+run bd "$B" W32L_FRAMEDUMP_AT="$first" W32L_FRAMEDUMP_TO="$OUT/b-$first.ppm" >/dev/null
 if [ -s "$OUT/a-$first.ppm" ] && [ -s "$OUT/b-$first.ppm" ]; then
     "$REPO/.venv/bin/python" - "$OUT/a-$first.ppm" "$OUT/b-$first.ppm" <<'PY'
 import sys

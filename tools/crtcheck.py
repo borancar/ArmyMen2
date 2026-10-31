@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the reconstructed CRT's stdio against the original's, in ONE process
 and with no Wine: build/armymen2-hybrid-dev runs the original CRT over
-src/platform, and with AM2_CRTCHECK set it links src/platform/crt beside it
+third_party/win32_layer, and with AM2_CRTCHECK set it links src/crt beside it
 and runs src/hybrid/crtcheck.cpp instead of the game.
 
 That module scripts the same sequence of fopen/fread/fgets/fseek/ftell/
@@ -46,7 +46,7 @@ bias 1 each (in the PST8PDT run only, where the US rules are computed),
 and a case-sensitive getenv 2 to 3. The three that pass are theorems on
 this platform, not gaps: _isindst's own _daylight guard is shadowed by the
 same test in __loctotime_t; time()'s daylight flag needs a
-GetTimeZoneInformation that reports daylight dates and src/platform's
+GetTimeZoneInformation that reports daylight dates and third_party/win32_layer's
 never does; and _chdir's UNC arm needs a current directory beginning with
 a doubled separator, which getcwd never yields. _mbctoupper is not
 discriminated either, by construction: the drive letter it upper-cases is

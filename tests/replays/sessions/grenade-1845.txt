@@ -1,4 +1,4 @@
-# recorded by tools/sidebyside.py; replay with --replay or AM2_REPLAY
+# recorded by tools/sidebyside.py; replay with --replay or W32L_REPLAY
 86 host motion 2 258
 86 host motion 7 257
 86 host motion 10 256

@@ -1,0 +1,16 @@
+win32_layer, vendored unmodified.
+
+  upstream  https://github.com/borancar/win32_layer
+  commit    f9f0025a45a176c13e3bf13e2c2d8d27f0c00b00 (master, 2026-10-31)
+  license   GPL 2 (LICENSE)
+
+It began as this repository's src/platform and was moved out on 2026-10-31. The
+copy here is the whole upstream tree (src/, include/, README.md, LICENSE,
+Makefile); ArmyMen2's own Makefile compiles src/*.cpp directly into the native
+and hybrid builds rather than through the library target.
+
+Change it upstream, then copy the tree back here and update this note.
+src/glyphs.inc is the one exception in direction: it is generated in this
+repository by tools/glyphdump.py from tests/glyphs-reference.txt (glyphs
+recorded from the game under Wine), and make check verifies the copy here
+against that generator -- carry a regenerated file upstream.

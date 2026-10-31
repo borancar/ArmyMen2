@@ -58,8 +58,8 @@ extern "C" const uint8_t am2_frame_heading_bias[152] = {
     0, 0, 0, 0, 0, 0, 0, 0,
 };
 #endif
-extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
+extern "C" int32_t w32l_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!(&w32l_trace_window) || w32l_trace_window())
 #include "../inject/patch.h"
 
 /* DirtyCollect is reconstructed, in dirty.cpp, and has no header of its own
@@ -174,7 +174,7 @@ static int32_t DepthCompareBody(const AM2_MapRow *pa, const AM2_MapRow *pb)
 
 /* AM2_TRACE_DEPTH=1: the same line the hybrid's dev loader logs over the
  * original, so the two games' comparisons diff at a pump. */
-extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+extern "C" uint32_t w32l_host_pump_number(void) __attribute__((weak));
 
 
 
@@ -1189,7 +1189,7 @@ int32_t __cdecl DepthCompare(const AM2_MapRow *a, const AM2_MapRow *b)
     if (trace && a && b && AM2_TRACE_ON()) {
         const AM2_MapRow *pa = (const AM2_MapRow *)a, *pb = (const AM2_MapRow *)b;
         fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
-                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u),
                 pa->depthLayer, (double)pa->depthSlope,
                 pa->pos.x, pa->pos.y,
                 pb->depthLayer, (double)pb->depthSlope,

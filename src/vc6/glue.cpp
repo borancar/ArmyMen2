@@ -45,8 +45,8 @@ int   (*am2_chdir)(const char *) = _chdir;
 char *(*am2_getcwd)(char *, int) = (char *(*)(char *, int))_getcwd;
 
 /* ---- host / trace / CRT hooks (platform.h + crt.h, C linkage) ------------ */
-unsigned int am2_host_pump_number(void) { return 0; }
-int am2_trace_window(void) { return 0; }
+unsigned int w32l_host_pump_number(void) { return 0; }
+int w32l_trace_window(void) { return 0; }
 void am2_crt_use_game(void) { }
 
 /* ---- injected-harness stubs (unused in a drop-in image) ------------------ */

@@ -1,5 +1,5 @@
 /* loader.cpp -- the ORIGINAL ArmyMen2.exe, loaded by us and run over
- * src/platform, with no Wine anywhere.
+ * third_party/win32_layer, with no Wine anywhere.
  *
  * The native build links the reconstruction against the platform layer.
  * This build links the platform layer alone and loads the retail PE into
@@ -9,7 +9,7 @@
  * import table is filled with the address of our implementation of that
  * name, and its entry point, the MSVC 6 CRT's WinMainCRTStartup, is
  * called. From then on the retail code runs unmodified, and every call it
- * makes out of itself lands in the same src/platform the reconstruction
+ * makes out of itself lands in the same third_party/win32_layer the reconstruction
  * runs over.
  *
  * What the CRT and the game need from the process beyond the imports:
@@ -19,7 +19,7 @@
  *               gets a page whose first dword is the end-of-chain marker,
  *               reached through a GDT entry set_thread_area allocates.
  *               Threads inherit their creator's, and the ones the game
- *               makes get their own through am2_thread_attach.
+ *               makes get their own through w32l_thread_attach.
  *   the cwd     The original reads its install directory with getcwd, so
  *               AM2_GAMEDIR is entered before the entry point runs.
  *   the log     The retail logger at ADDR_LOG is a bare `ret`, and the
@@ -31,10 +31,10 @@
  *
  * sdl.cpp's main calls WinMain, and this file IS WinMain.
  */
-#include "../platform/platform.h"
+#include "../../third_party/win32_layer/src/platform.h"
 #include "../inject/orig.h"
 #include "../inject/luaconsole.h"
-#include "../platform/crt/crt.h"
+#include "../crt/crt.h"
 
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -145,7 +145,7 @@ static void am2_hybrid_teb_attach(void)
 __attribute__((constructor)) static void am2_hybrid_init(void)
 {
     am2_hybrid_teb_attach();
-    am2_thread_attach = am2_hybrid_teb_attach;
+    w32l_thread_attach = am2_hybrid_teb_attach;
 }
 
 /* ---- missing imports ----------------------------------------------------------------- */
@@ -261,8 +261,8 @@ extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, c
         h = (uint8_t)atanCos[(dy << 9) / dx];
     } else if (dx == 0) {
         h = dy < 0 ? 0u : 0x80u;
-        if (am2_trace_window())
-            fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+        if (w32l_trace_window())
+            fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)w32l_host_pump_number(),
                 from[0], from[1], to[0], to[1], h);
         return h;
     } else {
@@ -270,8 +270,8 @@ extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, c
     }
     if (dx > 0)
         h = (uint8_t)(h + 0x80u);
-    if (am2_trace_window())
-        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+    if (w32l_trace_window())
+        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)w32l_host_pump_number(),
             from[0], from[1], to[0], to[1], h);
     return h;
 }
@@ -298,9 +298,9 @@ extern "C" void __cdecl am2_hybrid_trace_draw_map_object(void *obj, const RECT *
     spr = *(uint8_t **)(o + MAPOBJ_OFF_SPRITE);
     *(uint8_t **)(spr + 0x34) = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
     *(void **)(spr + 0x38)    = *(void **)(o + MAPOBJ_OFF_PALETTE);
-    if (am2_trace_window())
+    if (w32l_trace_window())
         fprintf(stderr, "MAPOBJ pump %u bounds=%ld,%ld-%ld,%ld world=%ld,%ld-%ld,%ld clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
-            (unsigned)am2_host_pump_number(), (long)bounds->left, (long)bounds->top, (long)bounds->right, (long)bounds->bottom,
+            (unsigned)w32l_host_pump_number(), (long)bounds->left, (long)bounds->top, (long)bounds->right, (long)bounds->bottom,
             (long)world->left, (long)world->top, (long)world->right, (long)world->bottom,
             (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
             (long)(clip.left - view->left), (long)(clip.top - view->top),
@@ -322,9 +322,9 @@ extern "C" void __cdecl am2_hybrid_trace_draw_sprite(uint8_t *spr, int32_t x, in
     y -= *(const int16_t *)(spr + 0x26);
     if (!((am2_clip_rect_fn)(uintptr_t)ADDR_CLIP_RECT)((const RECT *)(spr + 0x14), (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &x, &y, &clipped))
         return;
-    if (am2_trace_window())
+    if (w32l_trace_window())
         fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%ld,%ld-%ld,%ld mode=%d\n",
-            (unsigned)am2_host_pump_number(), *(unsigned *)spr, *(unsigned *)(spr + 8), *(unsigned *)(spr + 0xC),
+            (unsigned)w32l_host_pump_number(), *(unsigned *)spr, *(unsigned *)(spr + 8), *(unsigned *)(spr + 0xC),
             x, y, (long)clipped.left, (long)clipped.top, (long)clipped.right, (long)clipped.bottom, mode);
     ((am2_draw_sprite_clipped_fn)(uintptr_t)ADDR_DRAW_SPRITE_CLIPPED)(spr, x, y, &clipped, mode);
 }
@@ -362,8 +362,8 @@ extern "C" int32_t __cdecl am2_hybrid_trace_depth_compare(const uint8_t *pa, con
         }
         if (r == 0)
             r = (int16_t)ay > (int16_t)by ? 1 : (int16_t)ay < (int16_t)by ? -1 : ((pb < pa) ? 1 : -1);
-        if (am2_trace_window())
-            fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+        if (w32l_trace_window())
+            fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n", (unsigned)w32l_host_pump_number(),
                 la, (double)sa, ax, ay, lb, (double)sb, bx, by, r);
     }
     return r;
@@ -399,9 +399,9 @@ static am2_blit_tramp_fn am2_blit_tramp[5];   /* copy16, copy32, remap16, overla
 static void am2_blit_log(const char *name, int32_t x, int32_t y,
                          int32_t l, int32_t t, int32_t r, int32_t b)
 {
-    if (am2_trace_window())
+    if (w32l_trace_window())
         fprintf(stderr, "BLIT %s pump %u x=%d y=%d src=%d,%d-%d,%d\n",
-                name, (unsigned)am2_host_pump_number(), x, y, l, t, r, b);
+                name, (unsigned)w32l_host_pump_number(), x, y, l, t, r, b);
 }
 
 #define AM2_BLIT_HOOK(idx, name)                                              \
@@ -431,7 +431,7 @@ static void *am2_tramp_install(uintptr_t addr, int plen, const void *hook)
             PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (am2_blit_tramp_page == MAP_FAILED) {
-            am2_plat_log("AM2 trace: cannot map trampoline page");
+            w32l_plat_log("AM2 trace: cannot map trampoline page");
             am2_blit_tramp_page = NULL;
             return NULL;
         }
@@ -463,9 +463,9 @@ static am2_objh_fn am2_objh_tramp[2];
 static void am2_objh_log(const char *name, const void *obj, int32_t hin)
 {
     const uint8_t *o = (const uint8_t *)obj;
-    if (o && am2_trace_window())
+    if (o && w32l_trace_window())
         fprintf(stderr, "HEIGHT %s pump %u pos=%d,%d tile=%d hin=%d hset=%d\n", name,
-                (unsigned)am2_host_pump_number(),
+                (unsigned)w32l_host_pump_number(),
                 *(const int16_t *)(o + 0x12), *(const int16_t *)(o + 0x14),
                 *(const uint16_t *)(o + 0x1A), hin, *(const signed char *)(o + 0x65));
 }
@@ -491,10 +491,10 @@ static void *__cdecl am2_cw_hook(const char *name, int32_t army, int32_t key,
                                  int32_t remote, int32_t uid)
 {
     void *o = am2_cw_tramp(name, army, key, at, flags, quantity, remote, uid);
-    if (am2_trace_window()) {
+    if (w32l_trace_window()) {
         const uint8_t *ob = (const uint8_t *)o;
         fprintf(stderr, "WEAPON pump %u pos=%d,%d quantity=%d ammo=%d\n",
-                (unsigned)am2_host_pump_number(),
+                (unsigned)w32l_host_pump_number(),
                 ob ? *(const int16_t *)(ob + 0x12) : 0, ob ? *(const int16_t *)(ob + 0x14) : 0,
                 quantity, ob ? *(const int32_t *)(ob + 0xCC) : 0);
     }
@@ -625,9 +625,9 @@ static uint32_t am2_hybrid_bind_imports(const uint8_t *image, const AM2_PeDataDi
             } else {
                 name = (const char *)(image + (names[i] & 0x7FFFFFFFu) + 2);
             }
-            fn = am2_export_lookup(module, name);
+            fn = w32l_export_lookup(module, name);
             if (!fn) {
-                am2_plat_log("import %s!%s is not provided", module, name);
+                w32l_plat_log("import %s!%s is not provided", module, name);
                 fn = am2_hybrid_make_stub(module, name);
                 missing++;
             } else {
@@ -636,7 +636,7 @@ static uint32_t am2_hybrid_bind_imports(const uint8_t *image, const AM2_PeDataDi
             slots[i] = (uint32_t)(uintptr_t)fn;
         }
     }
-    am2_plat_log("imports: %u bound, %u missing", (unsigned)bound, (unsigned)missing);
+    w32l_plat_log("imports: %u bound, %u missing", (unsigned)bound, (unsigned)missing);
     return missing;
 }
 
@@ -690,7 +690,7 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         if (sec[i].VirtualAddress + n > oh->SizeOfImage)
             am2_hybrid_die("section %.8s runs past the end of the image", sec[i].Name);
         memcpy(image + sec[i].VirtualAddress, file + sec[i].PointerToRawData, n);
-        am2_plat_debug("section %.8s at 0x%08x, %u bytes of %u",
+        w32l_plat_debug("section %.8s at 0x%08x, %u bytes of %u",
                        sec[i].Name, (unsigned)(oh->ImageBase + sec[i].VirtualAddress),
                        (unsigned)n, (unsigned)sec[i].VirtualSize);
     }
@@ -707,7 +707,7 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         if (*jump == 0xEB)
             *jump = 0x74;
         else if (*jump != 0x74)
-            am2_plat_debug("0x0044D8FE is %02x, not the GOG patch; left alone",
+            w32l_plat_debug("0x0044D8FE is %02x, not the GOG patch; left alone",
                            (unsigned)*jump);
     }
     entry = (void (*)(void))(uintptr_t)(oh->ImageBase + oh->AddressOfEntryPoint);
@@ -715,10 +715,10 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
     free(file);
 
     am2_hybrid_patch_jmp(ADDR_LOG, (const void *)&am2_hybrid_log);
-    am2_host_cursor_query = am2_hybrid_cursor_query;
-    am2_host_cursor_set = am2_hybrid_cursor_set;
+    w32l_host_cursor_query = am2_hybrid_cursor_query;
+    w32l_host_cursor_set = am2_hybrid_cursor_set;
     AddVectoredExceptionHandler(1, am2_hybrid_fault);
-    am2_set_command_line(cmdline);
+    w32l_set_command_line(cmdline);
 
     {
         const char *dir = getenv("AM2_GAMEDIR");
@@ -735,7 +735,7 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
     control_start();
     /* Let the step socket's `lua` action run on the game thread at a pump
      * boundary, so a give-weapon is frame-exact across two lockstep games. */
-    am2_host_lua = am2_lua_eval;
+    w32l_host_lua = am2_lua_eval;
 
     /* AM2_CRTCHECK=<dir>: run src/hybrid/crtcheck.cpp instead of the game.
      * It takes over at WinMain, so the original CRT's startup has run and
@@ -792,7 +792,7 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         am2_cw_tramp = (am2_cw_fn)am2_tramp_install(ADDR_CREATE_WEAPON, 5, (const void *)&am2_cw_hook);
 #endif
 
-    am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);
+    w32l_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);
     entry();
     /* WinMainCRTStartup ends in ExitProcess and does not return. */
     return 0;

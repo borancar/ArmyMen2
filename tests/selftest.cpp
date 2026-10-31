@@ -23,7 +23,7 @@
 #include "../src/game/objflag.h"
 #include "../src/game/misc.h"
 #include "../src/game/objtype.h"
-#include "../src/platform/crt/crt.h"
+#include "../src/crt/crt.h"
 #include "../src/game/region.h"   /* AiHitReact */
 
 #include "../src/game/script.h"

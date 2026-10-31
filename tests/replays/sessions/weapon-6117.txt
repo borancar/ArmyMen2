@@ -1,4 +1,4 @@
-# recorded by tools/sidebyside.py; replay with --replay or AM2_REPLAY
+# recorded by tools/sidebyside.py; replay with --replay or W32L_REPLAY
 118 host key 0xdb 0x00 1
 129 host key 0xdb 0x00 0
 179 host motion 182 309

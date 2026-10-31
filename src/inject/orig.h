@@ -18136,7 +18136,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The rest of the CRT's stdio and its low-level I/O layer, from the bodies.
  * A FILE is 0x20 bytes {ptr, cnt, base, flag, file, charbuf, bufsiz,
  * tmpfname}; an ioinfo is 8 {osfhnd, osfile, pipech} and the table is 64
- * blocks of 32, indexed fd>>5 / fd&31. src/platform/crt/stdio.cpp and
+ * blocks of 32, indexed fd>>5 / fd&31. src/crt/stdio.cpp and
  * lowio.cpp reconstruct all of it. */
 #define ADDR_CRT_FSOPEN        0x004648C2u  /* FILE *(path, mode, shflag) */
 #define ADDR_CRT_OPENFILE      0x00467FF8u  /* FILE *(path, mode, shflag, FILE *): parses the mode, _sopen, fills the FILE */
@@ -18179,7 +18179,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_FMODE         0x006648B0u  /* int32 _fmode: 0 is text, 0x8000 binary */
 #define ADDR_CRT_UMASKVAL      0x00664608u  /* int32 _umaskval */
 
-/* The directory, time and environment layer; src/platform/crt/dir.cpp,
+/* The directory, time and environment layer; src/crt/dir.cpp,
  * time.cpp, env.cpp and mbcs.cpp. */
 #define ADDR_CRT_GETDCWD       0x00465DC8u  /* char *(drive, buf, max) */
 #define ADDR_CRT_VALIDDRIVE    0x00465E99u  /* int32(drive): GetDriveTypeA on "X:\" */
@@ -18222,7 +18222,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_MBCTYPE       0x006649E0u  /* uint8[257] _mbctype, indexed c+1: _setmbcp fills it at startup */
 #define ADDR_CRT_MBLCID        0x00664AE4u  /* uint32 __mblcid: the LCID _setmbcp derives from it */
 
-/* strtod and the long-double conversions under it; src/platform/crt/strtod.cpp. */
+/* strtod and the long-double conversions under it; src/crt/strtod.cpp. */
 #define ADDR_CRT_FLTIN2        0x00469858u  /* _flt *(str, len, 0, 0): __strgtold12 then __ld12tod into ADDR_CRT_FLT_PTR's record */
 #define ADDR_CRT_STRGTOLD12    0x0046BCBDu  /* uint32(ld12 *, const char **end, str, mult12, scale, decpt, implicit_E) */
 #define ADDR_CRT_MTOLD12       0x0046C7E8u  /* void(digits, n, ld12 *): up to 24 decimal digits into a normalised long double */
@@ -18241,7 +18241,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_CVTINFO_DOUBLE 0x0048D3C8u /* {max_exp 1024, min_exp -1023, mantbits 53, expbits 11, size 64, bias 1023}; the float's follows */
 
 /* The heap: malloc over the small-block heap for 1016 bytes and under,
- * HeapAlloc above; src/platform/crt/heap.cpp. And the exit path;
+ * HeapAlloc above; src/crt/heap.cpp. And the exit path;
  * exit.cpp. */
 #define ADDR_CRT_NH_MALLOC     0x0046480Au  /* void *(size, nhflag): _heap_alloc, retrying through the new handler */
 #define ADDR_CRT_HEAP_ALLOC    0x00464836u  /* void *(size): __sbh_alloc_block under the threshold, else HeapAlloc */
@@ -18288,7 +18288,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_CRTHEAP       0x00665C4Cu  /* HANDLE _crtheap */
 #define ADDR_CRT_SEH_OLD_FILTER 0x006647DCu /* LPTOP_LEVEL_EXCEPTION_FILTER: what SetUnhandledExceptionFilter answered at startup */
 
-/* The startup, src/platform/crt/startup.cpp: what fills the tables the
+/* The startup, src/crt/startup.cpp: what fills the tables the
  * modules above read. */
 #define ADDR_CRT_STARTUP                 0x004664C0u  /* void(void): WinMainCRTStartup -- the version words, the heap, lowio, the command line and environment, argv, envp, _cinit, WinMain, exit */
 #define ADDR_CRT_GET_ENV_STRINGS         0x0046A396u  /* char *(void): __crtGetEnvironmentStringsA, the wide block converted or the narrow one copied */

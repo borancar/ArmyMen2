@@ -1172,7 +1172,7 @@ def main():
                 "ADDR_COMPARE_TRIPLE", "ADDR_TYPES_COMPATIBLE",
                 "ADDR_SET_FACING_14", "ADDR_SET_FACING_08",
                 "ADDR_IS_KIND_10_17", "ADDR_IS_KIND_14_22",
-                # The CRT under src/platform/crt: pure over the bytes their
+                # The CRT under src/crt: pure over the bytes their
                 # arguments point at, so the same harness serves them.
                 "ADDR_CRT_STRCHR", "ADDR_CRT_STRSTR", "ADDR_CRT_STRNCPY",
                 "ADDR_CRT_STRNCMP", "ADDR_CRT_STRTOK", "ADDR_CRT_ATOI",

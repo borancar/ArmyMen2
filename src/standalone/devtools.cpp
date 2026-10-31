@@ -32,7 +32,7 @@
 #ifdef AM2_DEVTOOLS
 
 #include "../inject/win32.h"
-#include "../platform/platform.h"
+#include "../../third_party/win32_layer/src/platform.h"
 #include "../inject/hooklog.h"
 #include <stddef.h>
 #include <sys/mman.h>
@@ -58,18 +58,18 @@
  * glibc's brk heap follow, and the ELF's startup stub sits at the
  * traditional 0x08048000) and below 0x10000000. 96 MB reserved; the kernel
  * commits pages as they are touched, and a Boot Camp mission uses 14. */
-/* The arena is the platform's now -- src/platform/fixedheap.cpp, the
+/* The arena is the platform's now -- third_party/win32_layer/src/fixedheap.cpp, the
  * deterministic heap every HeapAlloc and VirtualAlloc reservation comes
  * from in every binary, hybrid included, so a savestate here carries the
  * same memory a comparison compares. What this file keeps is the
  * savestate over it and the per-frame canary scan. The game's allocations
  * go through the CRT's malloc, like the player's binary; the arena's old
  * entry points are the CRT's. */
-#define AM2_ARENA_BASE  (am2_fixed_heap_base())
-#define AM2_ARENA_SIZE  (am2_fixed_heap_limit())
+#define AM2_ARENA_BASE  (w32l_fixed_heap_base())
+#define AM2_ARENA_SIZE  (w32l_fixed_heap_limit())
 
-static void arena_init(void) { (void)am2_fixed_heap_on(); }
-static void canary_scan(void) { am2_fixed_frame_check(); }
+static void arena_init(void) { (void)w32l_fixed_heap_on(); }
+static void canary_scan(void) { w32l_fixed_frame_check(); }
 
 /* ---- savestates ----------------------------------------------------------- */
 
@@ -99,14 +99,14 @@ static int32_t state_save(const char *path, char *out, size_t cap)
     h.span_lo    = AM2_SPAN_LO;
     h.span_hi    = AM2_SPAN_HI;
     h.arena_base = (uint32_t)(uintptr_t)AM2_ARENA_BASE;
-    h.arena_used = am2_fixed_heap_used();
+    h.arena_used = w32l_fixed_heap_used();
     h.game_clock = *(const uint32_t *)0x00511E04u;
-    h.resv_base  = (uint32_t)(uintptr_t)am2_fixed_resv_base();
-    h.resv_used  = am2_fixed_resv_used();
+    h.resv_base  = (uint32_t)(uintptr_t)w32l_fixed_resv_base();
+    h.resv_used  = w32l_fixed_resv_used();
     if (fwrite(&h, sizeof h, 1, fp) != 1
         || fwrite((const void *)AM2_SPAN_LO, AM2_SPAN_HI - AM2_SPAN_LO, 1, fp) != 1
         || fwrite(AM2_ARENA_BASE, h.arena_used, 1, fp) != 1
-        || (h.resv_used && fwrite(am2_fixed_resv_base(), h.resv_used, 1, fp) != 1)) {
+        || (h.resv_used && fwrite(w32l_fixed_resv_base(), h.resv_used, 1, fp) != 1)) {
         fclose(fp);
         snprintf(out, cap, "err short write to %s", path);
         return 0;
@@ -137,16 +137,16 @@ static int32_t state_load(const char *path, char *out, size_t cap)
         return 0;
     }
     arena_init();
-    before = am2_fixed_heap_used();
+    before = w32l_fixed_heap_used();
     if (fread((void *)AM2_SPAN_LO, AM2_SPAN_HI - AM2_SPAN_LO, 1, fp) != 1
         || fread(AM2_ARENA_BASE, h.arena_used, 1, fp) != 1
-        || (h.resv_used && fread(am2_fixed_resv_base(), h.resv_used, 1, fp) != 1)) {
+        || (h.resv_used && fread(w32l_fixed_resv_base(), h.resv_used, 1, fp) != 1)) {
         fclose(fp);
         snprintf(out, cap, "err short read from %s -- the state is now half restored", path);
         return 0;
     }
     fclose(fp);
-    am2_fixed_resv_mark(h.resv_used);
+    w32l_fixed_resv_mark(h.resv_used);
     /* Whatever the arena had grown to since is unreachable now; scrub it so
      * a stale pointer faults rather than finding old objects. */
     if (before > h.arena_used)
@@ -308,10 +308,10 @@ extern "C" int32_t devtools_command(int32_t argc, char **argv, char *out, size_t
         uint32_t allocs, frees;
         void    *head;
         arena_init();
-        am2_fixed_stats(&allocs, &frees, &head);
+        w32l_fixed_stats(&allocs, &frees, &head);
         snprintf(out, cap, "ok arena at %p: %u KB used, %u allocs, %u frees, free head %p, reservations %u KB",
-                 (void *)AM2_ARENA_BASE, am2_fixed_heap_used() / 1024, allocs, frees, head,
-                 am2_fixed_resv_used() / 1024);
+                 (void *)AM2_ARENA_BASE, w32l_fixed_heap_used() / 1024, allocs, frees, head,
+                 w32l_fixed_resv_used() / 1024);
         return 1;
     }
     if ((!strcmp(argv[1], "save") || !strcmp(argv[1], "load")) && argc >= 3) {
@@ -343,7 +343,8 @@ extern "C" int32_t devtools_command(int32_t argc, char **argv, char *out, size_t
 extern "C" void devtools_init(void)
 {
     arena_init();
-    am2_host_frame_hook = devtools_frame;
+    w32l_host_frame_hook = devtools_frame;
+    w32l_host_hotkey = devtools_hotkey;
     hooklog("devtools: arena at %p, savestates on `snap save|load FILE`; F5 saves the game, F9 reloads it",
             (void *)AM2_ARENA_BASE);
 }

@@ -8,7 +8,7 @@ first frame that differs -- both games left alive at that frame.
 
 A is build/armymen2-hybrid-dev (the original over src/platform) and B is
 build/armymen2-dev (the reconstruction over the same). Both run under
-AM2_LOCKSTEP with AM2_STEP pointing at a socket this script listens on, so
+W32L_LOCKSTEP with W32L_STEP pointing at a socket this script listens on, so
 neither pumps until told to. Each pump goes: the LEADER (B, the port,
 unless --leader a) is stepped and reports the frames it presented and the
 host events its window took; those events are handed to the follower,
@@ -58,11 +58,11 @@ class Side:
         env = dict(os.environ)
         env.update({
             "SDL_AUDIO_DRIVER": "dummy",
-            "AM2_LOCKSTEP": "1",
-            "AM2_STEP": self.path,
+            "W32L_LOCKSTEP": "1",
+            "W32L_STEP": self.path,
             "AM2_CTL_PORT": str(port),
             "AM2_LOG": os.path.join(out, tag + ".game.log"),
-            "AM2_FRAMELOG": os.path.join(out, tag + ".frames"),
+            "W32L_FRAMELOG": os.path.join(out, tag + ".frames"),
         })
         env.setdefault("AM2_GAMEDIR", os.path.join(REPO, ".wine/drive_c/GOG Games/Army Men II"))
         if not video:
@@ -275,7 +275,7 @@ def main():
         # this file is sent to BOTH games as an action for the SAME pump, so a
         # give-weapon or poke lands on the same frame on both and they stay in
         # lockstep -- no skipping, nothing hidden. `lua <code>` runs on the game
-        # thread at the pump boundary (see am2_replay_apply). Any replay verb
+        # thread at the pump boundary (see w32l_replay_apply). Any replay verb
         # works too (key/button/cursor/...). Consumed once, then the file is
         # removed. Also resumes a held trap, like the skip file.
         inject_file = os.path.join(out, "inject")
@@ -321,7 +321,7 @@ def main():
         # A session is reproducible only if this exists, and the first live
         # trap of this tool was lost for want of it.
         record = open(os.path.join(out, "input.txt"), "w")
-        record.write("# recorded by tools/sidebyside.py; replay with --replay or AM2_REPLAY\n")
+        record.write("# recorded by tools/sidebyside.py; replay with --replay or W32L_REPLAY\n")
 
         def pump_once():
             """Step the leader, then the follower through the same pump.

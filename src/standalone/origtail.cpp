@@ -7,7 +7,7 @@
  * sprite / rank / roach / difficulty tables, MP slot labels, and misc small
  * consts.  Each is placed byte-identical at its VA (its ADDR_ macro redirected
  * in src/inject/standalone.h); checkimagedata byte-verifies every one.  The
- * CRT-owned residual data lives beside the CRT in src/platform/crt/crtdata.cpp.
+ * CRT-owned residual data lives beside the CRT in src/crt/crtdata.cpp.
  */
 #include <stdint.h>
 

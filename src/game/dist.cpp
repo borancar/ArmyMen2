@@ -31,8 +31,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
+extern "C" int32_t w32l_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!(&w32l_trace_window) || w32l_trace_window())
 
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
 {
@@ -173,7 +173,7 @@ uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
     return AngleOfDeltaBody(dx, dy);
 }
 
-extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+extern "C" uint32_t w32l_host_pump_number(void) __attribute__((weak));
 
 uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
 {
@@ -191,7 +191,7 @@ uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
         trace = getenv("AM2_TRACE_ANGLE") != 0;
     if (trace && AM2_TRACE_ON())
         fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n",
-                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u),
                 from->x, from->y, to->x, to->y, h);
 #endif
     return h;

@@ -44,8 +44,8 @@
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
-extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
+extern "C" int32_t w32l_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!(&w32l_trace_window) || w32l_trace_window())
 
 #ifdef AM2_STANDALONE
 /* am2_shake_presets -- 0x00486170, the screen-shake presets ShakeAt selects
@@ -540,7 +540,7 @@ bad:
  *
  * Exercised by every frame, so the Boot Camp pixel budget is what checks it. */
 /* Not const: ScrollDecay shifts all four edges every frame. */
-extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+extern "C" uint32_t w32l_host_pump_number(void) __attribute__((weak));
 
 typedef void (__cdecl *am2_void_fn)(void);
 
@@ -655,7 +655,7 @@ void __cdecl DrawMapObject(AM2_MapRow *obj, const AM2_Rect *world)
             trace = getenv("AM2_TRACE_MAPOBJ") != 0;
         if (trace && AM2_TRACE_ON())
             fprintf(stderr, "MAPOBJ pump %u bounds=%d,%d-%d,%d world=%d,%d-%d,%d clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
-                    (unsigned)am2_host_pump_number(), o->rect.left, o->rect.top, o->rect.right, o->rect.bottom,
+                    (unsigned)w32l_host_pump_number(), o->rect.left, o->rect.top, o->rect.right, o->rect.bottom,
                     world->left, world->top, world->right, world->bottom,
                     (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
                     (long)(clip.left - g_viewRect.left), (long)(clip.top - g_viewRect.top),

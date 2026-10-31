@@ -1,6 +1,6 @@
 # CRT reconstruction notes
 
-**THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/platform/crt/`, and
+**THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/crt/`, and
 its names carry a `crt_` prefix.** The image's MSVC 6 runtime is 231
 functions the game reaches 44 of, and glibc behind those names is a second
 runtime with its own tie order, heap and float formatting -- each a frame
@@ -20,8 +20,8 @@ nothing but the stack depth.
 
 **THE HYBRID IS THE CRT'S ORACLE, AND IT NEEDS NEITHER WINE NOR AN
 EMULATOR.** `build/armymen2-hybrid-dev` runs the ORIGINAL CRT over
-`src/platform`, so its `fopen` reaches our `CreateFileA` through the IAT
-and its `fread` our `ReadFile`; link `src/platform/crt` beside it and the
+`third_party/win32_layer`, so its `fopen` reaches our `CreateFileA` through the IAT
+and its `fread` our `ReadFile`; link `src/crt` beside it and the
 reconstruction reaches the same two by name. `AM2_CRTCHECK=<dir>` takes
 over at `WinMain`, after the original's startup has built the heap and the
 handle tables, and `src/hybrid/crtcheck.cpp` runs one scripted sequence

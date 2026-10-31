@@ -10,7 +10,7 @@
  * interactive poking, NOT frame-exact. For a frame-exact modification (a give
  * that must land on the same pump in two lockstepped games) use the step
  * socket's `lua` action instead -- tools/sidebyside.py's inject file -- which
- * runs the same chunk through am2_host_lua on the game thread at the pump
+ * runs the same chunk through w32l_host_lua on the game thread at the pump
  * boundary on both sides. */
 #ifndef AM2_LUACONSOLE_H
 #define AM2_LUACONSOLE_H

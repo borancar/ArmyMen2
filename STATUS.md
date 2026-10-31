@@ -23,7 +23,9 @@ Last updated: **2026-10-31**.
 ## The builds
 
 - **`make`** (= `make native`, the default goal since 2026-10-31): `build/armymen2`,
-  the Linux port -- an i386 ELF over SDL3 through `src/platform/`, with no
+  the Linux port -- an i386 ELF over SDL3 through win32_layer (its own repo,
+  github.com/borancar/win32_layer, vendored in `third_party/win32_layer/`; the
+  game's reconstructed CRT is `src/crt/`), with no
   Wine and no original code, and `build/armymen2-dev`, the same sources plus the
   control socket (port 31337), savestates and injected input that every tool in
   `tools/` drives. Run with
@@ -35,7 +37,7 @@ Last updated: **2026-10-31**.
   `UPSTREAM`) behind `src/game/win32/smackw32.cpp`, RAD's API adapted to it;
   only the native build links it.
 - **`make hybrid`**: `build/armymen2-hybrid(-dev)`, the ORIGINAL `ArmyMen2.exe`
-  loaded by our own PE loader over the same `src/platform/`, no Wine. It is the
+  loaded by our own PE loader over the same `third_party/win32_layer/`, no Wine. It is the
   oracle every comparison here is made against.
 - **`make vc6-relink`** (and `tools/relinkscreen.py`): the reconstruction
   compiled by the original Visual C++ 6.0 (build 12.00.8168), hosted natively
@@ -47,8 +49,8 @@ Last updated: **2026-10-31**.
   reconstruction was verified function by function, and it still builds and
   runs; it is no longer the way functions are tested.
 - **`make standalone`**: the reconstruction as a Windows PE under Wine. Fails
-  at link: `src/standalone/runtime.cpp` calls `am2_set_command_line` (since
-  `be5c2980`), which lives in `src/platform/kernel32crt.cpp`, a file this build
+  at link: `src/standalone/runtime.cpp` calls `w32l_set_command_line` (since
+  `be5c2980`), which lives in `third_party/win32_layer/src/kernel32crt.cpp`, a file this build
   does not link. Its generator step, which `make check` uses, works.
 
 ## Coverage
@@ -164,7 +166,7 @@ the history. The hybrid replaced it as the reference.
   The adapter's `SmackDDSurfaceType` answers 0, so the game copies film palette
   entries 10-245 only (`MovieApplyPalette`) and takes the other twenty from its
   snapshot of GDI's system palette. That palette is now its own in
-  `src/platform/gdi32.cpp`, as on Windows under `SYSPAL_STATIC`: the twenty
+  `third_party/win32_layer/src/gdi32.cpp`, as on Windows under `SYSPAL_STATIC`: the twenty
   statics, fixed, with `RealizePalette` filling only 10-245 and the
   exclusive-mode DirectDraw palette replacing the screen's, not GDI's. Before
   that the snapshot took the game's RGB 3-3-2 cube and the 3DO logo's greys on

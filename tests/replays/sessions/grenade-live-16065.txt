@@ -1,5 +1,5 @@
 # recorded live via sidebyside; missile uid 3f7 type5 diverges y 1625(hybrid)/1648(port) at pump 16065
-# recorded by tools/sidebyside.py; replay with --replay or AM2_REPLAY
+# recorded by tools/sidebyside.py; replay with --replay or W32L_REPLAY
 12478 host motion 372 171
 12478 host motion 372 170
 12478 host motion 373 170

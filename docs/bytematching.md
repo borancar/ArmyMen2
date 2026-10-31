@@ -29,7 +29,7 @@ stub in the retail build — logging was compiled out; the harness owns it via
 artifacts). Nothing below the CRT frontier is reconstructed-but-unscored, and
 `tools/remaining.py` finds zero unreconstructed game functions. The retail CRT
 block (0x00464xxx+) is not part of the byte-match: our CRT is hand-written in
-`src/platform/crt`.
+`src/crt`.
 
 The older shape metric (the lab tools' masked listings) hides absolute
 addresses and register numbers. It misled repeatedly: a function can score "no

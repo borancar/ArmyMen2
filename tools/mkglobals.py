@@ -480,7 +480,7 @@ def main():
             fixups.append((BLOB_LO + off, seams[v]))
     # The table's own slots hold jmp THUNKS to the initializers, which the
     # scan above cannot match, so they are rewritten here by position: the
-    # CRT's _cinit, reconstructed in src/platform/crt/startup.cpp, walks
+    # CRT's _cinit, reconstructed in src/crt/startup.cpp, walks
     # the table itself and must find the reconstructions in it.
     # ... unless the table has itself been transcribed (am2_crt_inittab holds
     # the reconstructions directly), in which case its range is MIGRATED and
@@ -515,7 +515,7 @@ def main():
 
     # No staticinit.cpp any more. It used to emit am2_run_static_init(), a
     # hand-rolled walk of the __xc_a..__xc_z initializers for a standalone
-    # whose CRT did not run them. Ours does: crt_cinit (src/platform/crt/
+    # whose CRT did not run them. Ours does: crt_cinit (src/crt/
     # startup.cpp) walks am2_crt_inittab, the transcribed XC table, through
     # crt_initterm -- and nothing ever called am2_run_static_init, so it was
     # dead weight compiled into every build.

@@ -1384,7 +1384,7 @@ void __cdecl DrawMenuCursor(void)
          * original does (0x004130D4): the WHOLE 32x32 slot stretched back down
          * onto the saved rect. Save and restore are a stretch round trip
          * (12x16 -> 32x32 -> 12x16), which is only lossless if the platform's
-         * nearest-neighbour samples pixel centres -- am2_stretch does; the
+         * nearest-neighbour samples pixel centres -- w32l_stretch does; the
          * truncating rounding it used to copy from wined3d left the restore a
          * pixel left of where it came from, and on a screen that is not
          * repainted each tick (the pause menu, the briefing) that residue

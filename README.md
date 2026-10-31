@@ -16,8 +16,10 @@ AM2_GAMEDIR="/path/to/Army Men II" build/armymen2 -nointro
 ```
 
 `make` with no target builds the native port: an i386 ELF linked against
-`src/platform/`, which implements the Win32, DirectDraw, DirectSound,
-DirectInput and C-runtime surface the game calls over SDL3. No Wine, and no
+[win32_layer](https://github.com/borancar/win32_layer) (vendored in
+`third_party/win32_layer/`), which implements the Win32, DirectDraw,
+DirectSound and DirectInput surface the game calls over SDL3, and against the
+game's own MSVC 6 C runtime, reconstructed in `src/crt/`. No Wine, and no
 original code at run time.
 
 - **You need your own copy of the game.** The port reads the original's data
@@ -42,10 +44,10 @@ original code at run time.
   256-entry DirectDraw palette among them), which are the ones every
   comparison against the original exercises. Its `-w` windowed mode exists but
   is not the port's default.
-- **Window and pacing knobs**: `AM2_SCALE=N` (integer window scale; default
-  the largest that fits), `AM2_RESIZABLE=1` (a free-size, letterboxed window
-  instead of a fixed one), `AM2_FPS=N` (the 60 Hz pacing Flip stands for; 0
-  turns it off), `AM2_VSYNC`.
+- **Window and pacing knobs**: `W32L_SCALE=N` (integer window scale; default
+  the largest that fits), `W32L_RESIZABLE=1` (a free-size, letterboxed window
+  instead of a fixed one), `W32L_FPS=N` (the 60 Hz pacing Flip stands for; 0
+  turns it off), `W32L_VSYNC`.
 
 ## Status of the byte-for-byte reconstruction
 
@@ -95,7 +97,7 @@ linked into a standalone executable, then into the native Linux port. Two
 references are used to check it:
 
 - **The hybrid** (`make hybrid`): the *original* `ArmyMen2.exe`, loaded by our own
-  PE loader over the same `src/platform/` as the port, with no Wine. Run against
+  PE loader over the same win32_layer as the port, with no Wine. Run against
   the port in lockstep, it is the behavioural oracle:
 
   ```sh
@@ -114,7 +116,7 @@ in `docs/` and `src/standalone/`.
 ## Other targets
 
 ```sh
-make hybrid             # the original EXE over src/platform (the oracle)
+make hybrid             # the original EXE over win32_layer (the oracle)
 make vc6-relink         # the byte-for-byte relink (needs VC6_ROOT, see below)
 make vc6-link ARGS=--run    # a runnable image linked by the real LINK.EXE
 make all                # the injected harness: am2hook.dll + launcher.exe
@@ -126,8 +128,8 @@ make check              # every static check
 ## Layout
 
     src/game/        the reconstructed game (C++); src/game/win32/ is the part that calls Win32/DirectX
-    src/platform/    Win32/DirectX/CRT over SDL3 for the native port; src/platform/crt/ is MSVC 6's CRT, reconstructed
-    src/hybrid/      the PE loader that runs the original EXE over src/platform
+    src/crt/         the game's MSVC 6 C runtime, reconstructed
+    src/hybrid/      the PE loader that runs the original EXE over win32_layer
     src/vc6/         the native VC6 host, the relink and the LINK.EXE driver
     src/inject/      the Wine injection harness (C) and shared headers
     src/standalone/  generated and hand-written glue for the standalone builds
@@ -135,6 +137,7 @@ make check              # every static check
     tests/           selftest vectors and recorded replays
     docs/            findings, plus generated .tsv datasets
     build/           build output (ignored)
+    third_party/     vendored: win32_layer (Win32/DirectX over SDL3), libsmacker, Lua
     reference/       scratch reference material (ignored, never committed)
     .wine/           Wine prefix with the GOG install (ignored)
 
@@ -187,8 +190,9 @@ consulted stays in the ignored `reference/` directory.
 This project's reconstructed source is licensed under the **GNU General Public
 License, version 2** — see [`LICENSE`](LICENSE) for the full text.
 
-Vendored third-party code keeps its own license: `third_party/lua` (MIT) and
-`third_party/libsmacker` (LGPL 2.1 or later; see its `COPYING` and `UPSTREAM`).
+Vendored third-party code keeps its own license: `third_party/lua` (MIT),
+`third_party/libsmacker` (LGPL 2.1 or later; see its `COPYING` and `UPSTREAM`),
+and `third_party/win32_layer` (GPL 2; see its `LICENSE` and `UPSTREAM`).
 
 The license covers the reconstruction in this repository only. It does not grant
 any rights to *Army Men II* itself or its assets: the original game, its data

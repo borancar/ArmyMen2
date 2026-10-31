@@ -14,13 +14,13 @@ The platform renders those faces with stb_truetype, and stb_truetype does
 not rasterise like Wine's FreeType: the same 640x480 dialog differs from
 the Wine frame by about 1,400 pixels and every one of them is text. So the
 reference is taken from the original under Wine -- the process the A/B
-suite already runs -- and src/platform/gdi32.cpp replays it: a CreateFontA
+suite already runs -- and third_party/win32_layer/src/gdi32.cpp replays it: a CreateFontA
 naming one of the three faces gets the recorded bitmaps back from
 TextOutA and their sizes from GetTextExtentPoint32A, glyph for glyph.
 
     tools/glyphdump.py --port 31436 --merge tests/glyphs-reference.txt \\
                        --out tests/glyphs-reference.txt
-    tools/glyphdump.py --emit src/platform/glyphs.inc
+    tools/glyphdump.py --emit third_party/win32_layer/src/glyphs.inc
 
 The reference file is text, one font header and one line per glyph, so a
 change in Wine's rendering shows as a diff. --emit turns it into the C
@@ -161,14 +161,14 @@ def emit(path, fonts):
                         byte |= row[b * 8 + i] << (7 - i)
                     bits.append(byte)
         font_lines.append('    { "%s", %d, %d, %d, %d },' % (face, height, style, first, len(recs) - first))
-    lines.append("static const AM2_GlyphFont am2_glyph_fonts[] = {")
+    lines.append("static const W32L_GlyphFont w32l_glyph_fonts[] = {")
     lines += font_lines
     lines.append("};")
-    lines.append("static const AM2_Glyph am2_glyphs[] = {")
+    lines.append("static const W32L_Glyph w32l_glyphs[] = {")
     for ch, w, h, off in recs:
         lines.append("    { 0x%02x, %d, %d, %d }," % (ch, w, h, off))
     lines.append("};")
-    lines.append("static const uint8_t am2_glyph_bits[] = {")
+    lines.append("static const uint8_t w32l_glyph_bits[] = {")
     for i in range(0, len(bits), 24):
         lines.append("    " + " ".join("0x%02x," % b for b in bits[i:i + 24]))
     if not bits:
@@ -191,7 +191,7 @@ def main():
     # No arguments: regenerate the C tables from the reference, which is what
     # `make check` runs to catch drift between the two.
     if not args.port and not args.emit:
-        args.emit = os.path.join(REPO, "src", "platform", "glyphs.inc")
+        args.emit = os.path.join(REPO, "third_party", "win32_layer", "src", "glyphs.inc")
 
     fonts = load(args.merge)
     if args.port:

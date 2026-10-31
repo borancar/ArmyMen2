@@ -7,7 +7,7 @@
  * logger. There are no patch stubs here, so no counters; no arena, so no
  * savestates; and the logger goes where the game's own log goes.
  */
-#include "../platform/platform.h"
+#include "../../third_party/win32_layer/src/platform.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -38,4 +38,3 @@ extern "C" int32_t devtools_command(int32_t argc, char **argv, char *out, size_t
     return 0;
 }
 
-extern "C" void devtools_hotkey(int32_t which) { (void)which; }

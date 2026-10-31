@@ -724,8 +724,8 @@ L41c6f8:
     }
 }
 #else
-extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
+extern "C" int32_t w32l_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!(&w32l_trace_window) || w32l_trace_window())
 
 
 enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
@@ -743,7 +743,7 @@ enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
  * jb/jae the compiler emitted, and the running x advances by different amounts
  * on the skipped and drawn paths. Both are load-bearing.
  */
-extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+extern "C" uint32_t w32l_host_pump_number(void) __attribute__((weak));
 static int32_t trace_px = -1, trace_py = -1;   /* AM2_TRACE_PIX=x,y */
 
 /* AM2_TRACE_BLIT=1: one line per blit with its position and source rect, so
@@ -752,7 +752,7 @@ static int32_t trace_px = -1, trace_py = -1;   /* AM2_TRACE_PIX=x,y */
  * that emits the same line. The raw data pointer is left out on purpose: it is
  * a heap address and differs between the builds, which would be noise; x, y and
  * the rect are what a caller computes and what a divergence in a caller shows.
- * Window-gated by AM2_TRACE_FROM/TO like the other traces. */
+ * Window-gated by W32L_TRACE_FROM/TO like the other traces. */
 static const char *am2_blit_name(int fill, int offset32)
 {
     switch (fill) {
@@ -774,7 +774,7 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
         if (tb && AM2_TRACE_ON())
             fprintf(stderr, "BLIT %s pump %u x=%d y=%d src=%d,%d-%d,%d\n",
                     am2_blit_name(fill, offset32),
-                    (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                    (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u),
                     x, y, src.left, src.top, src.right, src.bottom);
     }
     if (trace_px == -1) {
@@ -786,7 +786,7 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
     if (trace_px >= 0 && AM2_TRACE_ON() && y <= trace_py && trace_py < y + (src.bottom - src.top)
         && x <= trace_px && trace_px < x + (src.right - src.left))
         fprintf(stderr, "PIX pump %u fill=%d at=%d,%d src=%d,%d-%d,%d wide=%d before=%02x\n",
-                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), fill, x, y,
+                (unsigned)(w32l_host_pump_number ? w32l_host_pump_number() : 0u), fill, x, y,
                 src.left, src.top, src.right, src.bottom, offset32,
                 g_frameBuf[(uint32_t)(trace_py * g_pitch + trace_px)]);
     const uint8_t *rowPtr = data + src.top * step + 4;

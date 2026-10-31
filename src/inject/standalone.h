@@ -28,7 +28,7 @@
 #include <time.h>
 #include <direct.h>
 #include <io.h>
-#include "../platform/crt/crt.h"
+#include "../crt/crt.h"
 #include "../game/origstate.h"   /* AM2_OrigState, so redirects can name members */
 
 #ifdef __cplusplus
@@ -380,7 +380,7 @@ extern const float  am2_hud_slide_shut, am2_hud_slide_open, am2_roach_reach, am2
 /* The DEVELOPMENT binary (make native-dev, AM2_DEVTOOLS) adds savestates
  * and the per-frame heap scan; src/standalone/devtools.cpp. Its heap is the
  * same as the player's -- the CRT's, over the platform's fixed-address
- * arena (src/platform/fixedheap.cpp) -- so nothing here is redirected. */
+ * arena (third_party/win32_layer/src/fixedheap.cpp) -- so nothing here is redirected. */
 #ifdef AM2_DEVTOOLS
 #ifdef __cplusplus
 extern "C" {

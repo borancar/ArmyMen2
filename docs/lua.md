@@ -85,7 +85,7 @@ The same chunk runs in both builds, so it resolves `CheatLine` either way:
 `sym("CheatLine")` in the native build, and the raw `0x00417B80` in the hybrid,
 where that symbol does not exist (`sym` returns 0 there -- and 0 is truthy in
 Lua, so test `== 0` explicitly, not `or`). Each game queues the line in
-`am2_step_wait` and runs it in `am2_replay_apply`, on the game thread, at the
+`w32l_step_wait` and runs it in `w32l_replay_apply`, on the game thread, at the
 pump boundary before that pump's frame is produced -- so both apply it at the
 identical point and stay frame-exact. The line is also recorded into the
 run's `input.txt`, so a replay reproduces the give. Writing to the inject file

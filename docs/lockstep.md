@@ -3,7 +3,7 @@
 **THE HYBRID RUNS THE ORIGINAL OVER OUR PLATFORM, and it is the check the
 native build cannot be.** `make hybrid` is a PE loader of our own: the
 retail image mapped at `0x00400000`, its import table bound by module and
-name from `src/platform`'s export table, a TEB per thread for the SEH chain
+name from `third_party/win32_layer`'s export table, a TEB per thread for the SEH chain
 at `fs:[0]` -- the only TEB field the image touches, 340 sites -- and the
 MSVC CRT's entry point called. Every call the original makes out of itself
 lands in the same platform layer the reconstruction runs over, so a defect
@@ -25,7 +25,7 @@ three fonts from `TextOutA`'s pixels, so text is exactly as good as the
 rasteriser, and stb_truetype disagreed with Wine's FreeType on about 1,400
 pixels of one dialog. `tests/glyphs-reference.txt` is those fonts read out
 of the ORIGINAL under Wine by `tools/glyphdump.py` (672 glyphs, the number
-`font.h` already gives for a session), `src/platform/glyphs.inc` is
+`font.h` already gives for a session), `third_party/win32_layer/src/glyphs.inc` is
 generated from it, and `gdi32.cpp` paints the recorded bitmaps for those
 faces. To re-record: drive the injected build to the title
 (fonts 1 and 2) and into a mission (font 0), and run the tool with `--port`
@@ -47,7 +47,7 @@ stepped wined3d's truncated 16.16 increment to match that Wine frame -- but it
 was not the cause. (And the truncation turned out to be Wine's artifact, not
 the game's: it made the pointer's 12x16 -> 32x32 -> 12x16 save/restore round
 trip land a pixel left of where it came from, the residue that smears on
-non-repainting screens. am2_stretch samples pixel centres now, which makes the
+non-repainting screens. w32l_stretch samples pixel centres now, which makes the
 round trip exact -- see its comment and STATUS's 2026-09-16 entry.)
 
 **`-isystem` HEADERS ARE INVISIBLE TO `-MMD`, AND A HEADER CHANGE THEN
@@ -63,9 +63,9 @@ code.
 
 **LOCKSTEP IS THE PLATFORM'S TO PROVIDE, and it made "frame-by-frame" a
 real comparison.** Every source of nondeterminism between two runs was in
-`src/platform`: the clocks, the multimedia timer thread, the audio thread,
-input timing. `AM2_LOCKSTEP=1` replaces all of them with a pump count,
-`AM2_REPLAY` scripts input by pump number, `AM2_FRAMELOG` hashes every
+`third_party/win32_layer`: the clocks, the multimedia timer thread, the audio thread,
+input timing. `W32L_LOCKSTEP=1` replaces all of them with a pump count,
+`W32L_REPLAY` scripts input by pump number, `W32L_FRAMELOG` hashes every
 presented frame, and `tools/lockstep.sh` runs two binaries headless and
 names the first frame that differs. The hybrid against the native build
 diverged on frame 80 of Boot Camp by 26 pixels and on nothing else through
@@ -74,7 +74,7 @@ where the pixel budgets were blunt; reach for it before any screenshot.
 
 **THE SIDE-BY-SIDE IS THE LOCKSTEP PLAYED LIVE, AND ITS FIRST HOUR FOUND
 WHAT `lockstep.sh` HAD CALLED CLEAN.** `tools/sidebyside.py` runs the
-hybrid and the port under `AM2_STEP`: each game blocks on a socket before
+hybrid and the port under `W32L_STEP`: each game blocks on a socket before
 every pump, reports the frames it presented and the host input it took,
 and the coordinator hands the leader's input to the follower, steps it
 through the same pump and compares. On a difference BOTH games stop where
@@ -229,9 +229,9 @@ two objects by comparing their POINTERS, so which of two overlapping
 sandbags is drawn last -- and one corner pixel -- is decided by where
 malloc put them. Faithfully reproduced on both sides, the hybrid and the
 port still differed: the original CRT's `HeapAlloc` reached glibc and the
-port's reached the dev arena. `src/platform/fixedheap.cpp` is one heap
+port's reached the dev arena. `third_party/win32_layer/src/fixedheap.cpp` is one heap
 for both, at fixed addresses, under `HeapAlloc` and `VirtualAlloc`'s
-reservations; `AM2_FIXED_HEAP=0` bisects it. `sessions/corner-1276.txt`
+reservations; `W32L_FIXED_HEAP=0` bisects it. `sessions/corner-1276.txt`
 is the replay, identical since. The reading to carry: when both
 transcriptions are right and the frames still differ, the difference is
 below the game, and the platform is where every remaining source of

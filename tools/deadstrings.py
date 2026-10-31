@@ -94,7 +94,7 @@ def src_text():
 #   DLL-name string pool that follows. The native build is an ELF: there is no PE
 #   image mapped at 0x400000 and no loader that walks these, so nothing reads the
 #   region (0 refs anywhere in 0x004716C8..0x00472658, checked; imports resolve
-#   through src/platform, and mkglobals binds them from the real image, not this
+#   through third_party/win32_layer, and mkglobals binds them from the real image, not this
 #   blob). Unlike the others this is a DATA range, not a pointer table: its own
 #   descriptor/thunk dwords point at the names inside it, which is exactly why the
 #   string sweep cannot see the names as dead (a name is referenced only at the
@@ -115,7 +115,7 @@ _DEAD_TABLE_DECL = [
     # the DIOBJECTDATAFORMAT axis/button GUIDs (GUID_XAxis/YAxis/ZAxis/Button/Key)
     # and the DI property/format blocks: reached only through the c_dfDIMouse /
     # c_dfDIKeyboard rgodf arrays, which live in .text (0xCC .origgap in native) and
-    # feed SetDataFormat -- and src/platform/dinput.cpp's Dev_SetDataFormat only
+    # feed SetDataFormat -- and third_party/win32_layer/src/dinput.cpp's Dev_SetDataFormat only
     # null-checks the format, never walking it. So nothing in the ELF build reads
     # these (0 src refs, 0 blob dwords point in -- checked). Each gap sits between
     # placed live GUIDs, so the ranges are stable.

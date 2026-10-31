@@ -193,10 +193,10 @@ void am2_sa_log(const char *fmt, ...)
 }
 
 /* Host/harness/comm symbols the excluded runtime.cpp and dplay.cpp defined;
- * milestone stubs so the runnable image links.  am2_host_pump_number is a
+ * milestone stubs so the runnable image links.  w32l_host_pump_number is a
  * lockstep/trace hook; patch_replace is unused in a drop-in. */
-unsigned int am2_host_pump_number(void) { return 0; }
-int am2_trace_window(void) { return 0; }
+unsigned int w32l_host_pump_number(void) { return 0; }
+int w32l_trace_window(void) { return 0; }
 int patch_replace(unsigned int t, const void *r, const char *n, int a)
 { (void)t; (void)r; (void)n; (void)a; return 0; }
 
@@ -219,7 +219,7 @@ uint32_t am2_rand_seed = 1;
  * calls WinMain, so "static-init" printing but no further output localises a
  * hang to WinMain or its early callees. */
 /* The game's own static initializers -- the XC half of am2_crt_inittab
- * (src/platform/crt/startup.cpp), which crt_cinit walks in the reconstructed-
+ * (src/crt/startup.cpp), which crt_cinit walks in the reconstructed-
  * CRT build.  Under real MSVCRT nothing walks it (LIBC runs only its own
  * .CRT$XC), so InitRemapIdentity never filled g_remapIdent and SetGamePalette
  * wrote through NULL.  The XI half is CRT internals (onexit/stdio/mbc/SEH) that

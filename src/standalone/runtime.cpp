@@ -12,7 +12,7 @@
 #include "../game/gameproc.h"
 #include "../inject/control.h"
 #include "../inject/luaconsole.h"
-#include "../platform/platform.h"
+#include "../../third_party/win32_layer/src/platform.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -121,7 +121,7 @@ extern "C" void trace_describe(char *out, uint32_t cap, const char *want)
 
 /* ---- the seams src/inject/standalone.h declares ---------------------- */
 
-/* rand is src/platform/crt/rand.cpp's now, over the image's own seed; the
+/* rand is src/crt/rand.cpp's now, over the image's own seed; the
  * note that used to sit here about StartPacketThread and BuildRespawnPool
  * seeding a private word is in that file. */
 
@@ -279,7 +279,7 @@ static LONG CALLBACK am2_sa_gap_filter(EXCEPTION_POINTERS *ep)
 #ifdef AM2_NATIVE
 /* The host layer keeps the game's cursor under the pointer; this is how it
  * learns where the game's cursor is. See platform.h. */
-#include "../platform/platform.h"
+#include "../../third_party/win32_layer/src/platform.h"
 
 static void am2_sa_cursor_query(int32_t *x, int32_t *y)
 {
@@ -317,12 +317,12 @@ static void am2_sa_cursor_set(int32_t x, int32_t y)
  * heap and the question does not arise. */
 extern "C" void am2_standalone_init(void)
 {
-    /* The CRT's own heap, src/platform/crt/heap.cpp: one allocator for the
+    /* The CRT's own heap, src/crt/heap.cpp: one allocator for the
      * game and the CRT's internals, so a block crossing between them --
      * a FILE's buffer, getcwd's malloc'd answer -- is freed where it was
      * made. Both binaries, now: the development one used to keep a
      * fixed-address arena of its own so a savestate could carry the heap,
-     * and that arena is the platform's (src/platform/fixedheap.cpp), under
+     * and that arena is the platform's (third_party/win32_layer/src/fixedheap.cpp), under
      * the CRT's HeapAlloc and VirtualAlloc, where the hybrid has it too. */
     am2_malloc = crt_malloc;
     am2_realloc = crt_realloc;
@@ -336,8 +336,8 @@ extern "C" void am2_standalone_init(void)
     am2_chdir = _chdir;
     am2_getcwd = _getcwd;
 #ifdef AM2_NATIVE
-    am2_host_cursor_query = am2_sa_cursor_query;
-    am2_host_cursor_set = am2_sa_cursor_set;
+    w32l_host_cursor_query = am2_sa_cursor_query;
+    w32l_host_cursor_set = am2_sa_cursor_set;
 #endif
     /* FIRST: the original's IAT as we carry it is the FILE's, which no
      * loader has fixed up, so every seam calling through it was jumping to a
@@ -346,7 +346,7 @@ extern "C" void am2_standalone_init(void)
     am2_bind_imports();
     am2_apply_fixups();
 
-    /* The CRT's startup, src/platform/crt/startup.cpp: the version words,
+    /* The CRT's startup, src/crt/startup.cpp: the version words,
      * the heap, lowio, the command line and environment, argv and envp,
      * then _cinit -- the C initializers and the C++ static initializers,
      * each through the image's own table, whose entries the fixups above
@@ -356,7 +356,7 @@ extern "C" void am2_standalone_init(void)
      * for that reason. */
     /* The command line has to be the CRT's BEFORE its startup parses it:
      * this runs from a static constructor, ahead of main(), so main's own
-     * am2_set_command_line came too late and the CRT's argv was built from
+     * w32l_set_command_line came too late and the CRT's argv was built from
      * the bare program name -- 21 bytes of heap where the original's
      * startup, seeing "-nointro -dbg", took 43. Every heap address after
      * that differed between the two games. glibc has not handed us argv
@@ -383,7 +383,7 @@ extern "C" void am2_standalone_init(void)
                 }
                 start = i + 1;
             }
-            am2_set_command_line(line);
+            w32l_set_command_line(line);
         }
     }
     crt_startup();
@@ -407,7 +407,7 @@ extern "C" void am2_standalone_init(void)
     devtools_init();
     /* Let the step socket's `lua` action run on the game thread at a pump
      * boundary, so a give-weapon is frame-exact across two lockstep games. */
-    am2_host_lua = am2_lua_eval;
+    w32l_host_lua = am2_lua_eval;
 #endif
 }
 

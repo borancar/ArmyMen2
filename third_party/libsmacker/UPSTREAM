@@ -7,5 +7,5 @@ libsmacker 1.2.0, vendored unmodified.
 
 Only the library is kept: smacker.c, smacker.h, smk_malloc.h, plus README and
 COPYING. The sample drivers, build files and project files are left out. It is
-linked into the native port alone (src/platform/smackw32.cpp); the hybrid keeps
-smackw32's inert stubs.
+linked into the native port alone, behind src/game/win32/smackw32.cpp; the
+hybrid does not link it.
