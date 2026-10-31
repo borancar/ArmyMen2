@@ -113,6 +113,41 @@ typedef struct AM2_DC {
 
 PALETTEENTRY am2_screen_palette[256];
 
+/* GDI's system palette, which is not the same thing as what the screen shows.
+ * Windows keeps twenty STATIC colours in it -- 0-9 and 246-255 -- under
+ * SYSPAL_STATIC, the mode the game leaves it in, and a realised palette fills
+ * only the 236 between them. An exclusive-mode DirectDraw palette replaces
+ * all 256 on the screen (am2_screen_palette) without touching this. The one
+ * reader is the film's palette snapshot (SnapshotSystemPalette), which keeps
+ * these twenty for the entries a film does not own: a film drawn against the
+ * Windows statics -- the 3DO logo's greys sit on entry 7 -- shows them. */
+static const PALETTEENTRY am2_static_colours[20] = {
+    {   0,   0,   0, 0 }, { 128,   0,   0, 0 }, {   0, 128,   0, 0 },
+    { 128, 128,   0, 0 }, {   0,   0, 128, 0 }, { 128,   0, 128, 0 },
+    {   0, 128, 128, 0 }, { 192, 192, 192, 0 }, { 192, 220, 192, 0 },
+    { 166, 202, 240, 0 },
+    { 255, 251, 240, 0 }, { 160, 160, 164, 0 }, { 128, 128, 128, 0 },
+    { 255,   0,   0, 0 }, {   0, 255,   0, 0 }, { 255, 255,   0, 0 },
+    {   0,   0, 255, 0 }, { 255,   0, 255, 0 }, {   0, 255, 255, 0 },
+    { 255, 255, 255, 0 },
+};
+static PALETTEENTRY am2_system_palette[256];
+static int32_t      am2_system_palette_ready;
+
+/* The default system palette: the statics at either end, black between. */
+static void am2_system_palette_init(void)
+{
+    int32_t i;
+
+    if (am2_system_palette_ready)
+        return;
+    for (i = 0; i < 10; i++) {
+        am2_system_palette[i]       = am2_static_colours[i];
+        am2_system_palette[246 + i] = am2_static_colours[10 + i];
+    }
+    am2_system_palette_ready = 1;
+}
+
 static AM2_FontFile *am2_font_files;
 
 /* ---- device contexts ------------------------------------------------------------------- */
@@ -257,9 +292,14 @@ UINT WINAPI RealizePalette(HDC dc)
     if (!d || !d->palette)
         return 0;
     am2_plat_debug("RealizePalette: %d entries", d->palette->count);
+    am2_system_palette_init();
     for (i = 0; i < d->palette->count; i++) {
         am2_screen_palette[i] = d->palette->entries[i];
         am2_screen_palette[i].peFlags = 0;
+        if (i >= 10 && i < 246) {
+            am2_system_palette[i] = d->palette->entries[i];
+            am2_system_palette[i].peFlags = 0;
+        }
     }
     if (d->target.changed)
         d->target.changed();
@@ -281,9 +321,10 @@ UINT WINAPI GetSystemPaletteEntries(HDC dc, UINT start, UINT count, LPPALETTEENT
         return 0;
     if (start + count > 256)
         count = 256 - start;
+    am2_system_palette_init();
     if (out)
         for (i = 0; i < count; i++)
-            out[i] = am2_screen_palette[start + i];
+            out[i] = am2_system_palette[start + i];
     return count;
 }
 
