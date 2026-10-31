@@ -244,6 +244,20 @@ void am2_set_command_line(const char *args);
 /* A plain function for the IAT, where windows.h has an inline. */
 LONG WINAPI am2_InterlockedExchange(volatile LONG *target, LONG value);
 
+/* smackw32.dll (smackw32.cpp): the Smacker entry points the game imports. */
+void *WINAPI SmackOpen(const char *name, uint32_t flags, uint32_t extra);
+void WINAPI SmackClose(void *smack);
+void WINAPI SmackDoFrame(void *smack);
+void WINAPI SmackNextFrame(void *smack);
+uint32_t WINAPI SmackWait(void *smack);
+void WINAPI SmackSoundUseDirectSound(void *dsound);
+uint32_t WINAPI SmackDDSurfaceType(void *surface);
+void WINAPI SmackToBuffer(void *smack, uint32_t left, uint32_t top,
+                          uint32_t pitch, uint32_t destHeight, void *dest,
+                          uint32_t flags);
+void WINAPI SmackVolumePan(void *smack, uint32_t trackFlags, uint32_t volume,
+                           uint32_t pan);
+
 #ifdef __cplusplus
 }
 #endif

@@ -141,28 +141,6 @@ static int32_t WINAPI am2_import_missing(void)
     return 0;
 }
 
-/* Smacker: no movie can be opened, so every entry point is inert and
- * SmackOpen answers NULL, which PlayMovie treats as a missing file. */
-static void *WINAPI am2_SmackOpen(const char *name, uint32_t flags, int32_t extra)
-{
-    (void)flags; (void)extra;
-    am2_plat_log("SmackOpen(%s): movies are not available in this build", name);
-    return NULL;
-}
-static void WINAPI am2_Smack_void1(void *smack) { (void)smack; }
-static uint32_t WINAPI am2_SmackDDSurfaceType(void *surface) { (void)surface; return 0; }
-static void WINAPI am2_SmackToBuffer(void *smack, uint32_t left, uint32_t top,
-                                     uint32_t pitch, uint32_t height, void *buf,
-                                     uint32_t flags)
-{
-    (void)smack; (void)left; (void)top; (void)pitch; (void)height; (void)buf; (void)flags;
-}
-static void WINAPI am2_SmackVolumePan(void *smack, uint32_t tracks, uint32_t vol,
-                                      uint32_t pan)
-{
-    (void)smack; (void)tracks; (void)vol; (void)pan;
-}
-
 #define X(mod, fn) { mod, #fn, (const void *)&fn }
 static const AM2_Export am2_exports[] = {
     X("ADVAPI32.dll", RegCreateKeyExA), X("ADVAPI32.dll", RegCloseKey),
@@ -249,15 +227,15 @@ static const AM2_Export am2_exports[] = {
     X("WINMM.dll", mmioGetInfo), X("WINMM.dll", mmioClose), X("WINMM.dll", mmioSetInfo),
     X("WINMM.dll", mmioSeek), X("WINMM.dll", mmioOpenA), X("WINMM.dll", mmioAscend),
     X("ole32.dll", CoInitialize), X("ole32.dll", CoCreateInstance),
-    { "smackw32.dll", "_SmackOpen@12", (const void *)&am2_SmackOpen },
-    { "smackw32.dll", "_SmackClose@4", (const void *)&am2_Smack_void1 },
-    { "smackw32.dll", "_SmackDoFrame@4", (const void *)&am2_Smack_void1 },
-    { "smackw32.dll", "_SmackNextFrame@4", (const void *)&am2_Smack_void1 },
-    { "smackw32.dll", "_SmackWait@4", (const void *)&am2_Smack_void1 },
-    { "smackw32.dll", "_SmackSoundUseDirectSound@4", (const void *)&am2_Smack_void1 },
-    { "smackw32.dll", "_SmackDDSurfaceType@4", (const void *)&am2_SmackDDSurfaceType },
-    { "smackw32.dll", "_SmackToBuffer@28", (const void *)&am2_SmackToBuffer },
-    { "smackw32.dll", "_SmackVolumePan@16", (const void *)&am2_SmackVolumePan },
+    { "smackw32.dll", "_SmackOpen@12", (const void *)&SmackOpen },
+    { "smackw32.dll", "_SmackClose@4", (const void *)&SmackClose },
+    { "smackw32.dll", "_SmackDoFrame@4", (const void *)&SmackDoFrame },
+    { "smackw32.dll", "_SmackNextFrame@4", (const void *)&SmackNextFrame },
+    { "smackw32.dll", "_SmackWait@4", (const void *)&SmackWait },
+    { "smackw32.dll", "_SmackSoundUseDirectSound@4", (const void *)&SmackSoundUseDirectSound },
+    { "smackw32.dll", "_SmackDDSurfaceType@4", (const void *)&SmackDDSurfaceType },
+    { "smackw32.dll", "_SmackToBuffer@28", (const void *)&SmackToBuffer },
+    { "smackw32.dll", "_SmackVolumePan@16", (const void *)&SmackVolumePan },
 };
 #undef X
 
