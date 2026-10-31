@@ -22,6 +22,7 @@
 #include "../misc.h"      /* MovieBuildName -- reconstructed */
 #include "../image.h"
 #include "palette.h"
+#include "smackw32.h"    /* the native port's smackw32, over libsmacker */
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -119,6 +120,27 @@ __declspec(dllimport) uint32_t __stdcall SmackDDSurfaceType(void *surface);
 #define smack_use_dsound SmackSoundUseDirectSound
 #define smack_open       SmackOpen
 #define smack_ddtype(s)  SmackDDSurfaceType((void *)(s))
+#elif defined(AM2_NATIVE)
+/* The native port links its own smackw32 (smackw32.cpp, over libsmacker) and
+ * calls it by name -- what the import was. */
+#undef smack_volumepan
+#undef smack_tobuffer
+#undef smack_doframe
+#undef smack_nextframe
+#undef smack_wait
+#undef smack_close
+#undef smack_use_dsound
+#undef smack_open
+#undef smack_ddtype
+#define smack_volumepan  SmackVolumePan
+#define smack_tobuffer   SmackToBuffer
+#define smack_doframe    SmackDoFrame
+#define smack_nextframe  SmackNextFrame
+#define smack_wait       SmackWait
+#define smack_close      SmackClose
+#define smack_use_dsound SmackSoundUseDirectSound
+#define smack_open       SmackOpen
+#define smack_ddtype     SmackDDSurfaceType
 #endif
 
 /* Smack handle fields used only by the opener. */

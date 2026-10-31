@@ -31,6 +31,17 @@ original code at run time.
 - **Two binaries.** `build/armymen2` is the player's. `build/armymen2-dev` is the
   same game plus the development hooks every tool here drives: a control socket
   (port 31337), savestates, injected input.
+- **Films** (the 3DO intro, the campaign cutscenes) play through
+  [libsmacker](https://libsmacker.sourceforge.net), vendored in
+  `third_party/libsmacker`, behind the game's own Smacker calls
+  (`src/game/win32/smackw32.cpp`). `-nointro` skips the intro.
+- **The game still believes it owns the screen.** It asks DirectDraw for
+  exclusive full-screen at 640x480 in 8 bits, and the platform answers
+  success, enforces nothing and gives it a window instead. This is deliberate
+  and is to stay: the game keeps running its full-screen code paths (a full
+  256-entry DirectDraw palette among them), which are the ones every
+  comparison against the original exercises. Its `-w` windowed mode exists but
+  is not the port's default.
 - **Window and pacing knobs**: `AM2_SCALE=N` (integer window scale; default
   the largest that fits), `AM2_RESIZABLE=1` (a free-size, letterboxed window
   instead of a fixed one), `AM2_FPS=N` (the 60 Hz pacing Flip stands for; 0
@@ -175,6 +186,9 @@ consulted stays in the ignored `reference/` directory.
 
 This project's reconstructed source is licensed under the **GNU General Public
 License, version 2** — see [`LICENSE`](LICENSE) for the full text.
+
+Vendored third-party code keeps its own license: `third_party/lua` (MIT) and
+`third_party/libsmacker` (LGPL 2.1 or later; see its `COPYING` and `UPSTREAM`).
 
 The license covers the reconstruction in this repository only. It does not grant
 any rights to *Army Men II* itself or its assets: the original game, its data
