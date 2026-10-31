@@ -39,14 +39,18 @@ void __cdecl AimMarkerAge(void);
  * unread, so this struct stops at the parent rather than inventing names for
  * the gap, and the label's own fields are reached by offset below.
  */
-/* Byte-match (VC6 relink) builds make the widget classes POLYMORPHIC: the
- * compiler then writes each vtable pointer itself, and a destructor's comes
- * FIRST -- before the unwind state that opens the body, where no statement
- * of ours can go. The hidden vptr sits at offset 0, where every other build
- * keeps an explicit field. AM2_VTBL(w) reaches it either way; stores inside
- * converted constructors/destructors are AM2_CTOR_VTABLE, which the
- * polymorphic build leaves to the compiler. */
-#if defined(__cplusplus) && defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_RELINK)
+/* The standalone builds (VC6 relink and runnable image, the GCC standalone
+ * and native port) make the widget classes POLYMORPHIC: real virtuals, with
+ * the vtables and every vtable-pointer store the compiler's own -- a
+ * destructor's comes FIRST, before the unwind state that opens the body,
+ * where no statement of ours can go. Each compiler lays them out by its own
+ * ABI; VC6's is the image's, and the relink maps each ??_7Class@@6B@ to the
+ * original vtable. The hidden vptr sits at offset 0, where the injected
+ * build -- whose objects must carry the image's own vtables, for the original
+ * code that still calls them -- keeps an explicit field. AM2_VTBL(w) reaches
+ * it either way; stores inside constructors/destructors are AM2_CTOR_VTABLE,
+ * which the polymorphic build leaves to the compiler. */
+#if defined(__cplusplus) && defined(AM2_STANDALONE)
 #define AM2_POLYMORPHIC 1
 #endif
 #ifdef AM2_POLYMORPHIC
@@ -238,7 +242,15 @@ typedef struct AM2_Widget {
     struct AM2_NoInit { };
     explicit AM2_Widget(AM2_NoInit) { }
 #ifdef AM2_POLYMORPHIC
+    /* The five virtuals, in the image's slot order: the destructor (slot 0,
+     * MSVC's scalar deleting destructor), then paint, update, focus and
+     * repaint. Each class below overrides the slots its own vtable changes;
+     * the bodies are the members named for the original functions. */
     virtual ~AM2_Widget();
+    virtual void Paint(RECT clip) { WidgetPaint(clip); }
+    virtual void Update() { WidgetUpdate(); }
+    virtual void TakeFocus(int32_t announce) { WidgetTakeFocus(announce); }
+    virtual void Repaint() { WidgetRepaint(); }
 #else
     ~AM2_Widget();
 #endif
@@ -256,7 +268,7 @@ typedef struct AM2_Widget {
 #ifdef __cplusplus
 /* AM2_TEMP -- the address of a fresh temporary -- is rect.h's. */
 /* Which original vtable each class's constructor and destructor install --
- * the compiler's ??_7Class@@6B@ in the polymorphic (relink) build, which
+ * the compiler's ??_7Class@@6B@ in the polymorphic VC6 build, which
  * src/vc6/relink.py maps to that address. Expands to nothing. */
 #define AM2_CLASS_VTABLE(Class, VT)
 AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
@@ -321,6 +333,10 @@ struct AM2_Panel : AM2_Widget {
     AM2_Panel(const char *bmp, int32_t flag, AM2_Rect box);
     explicit AM2_Panel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Panel();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { WidgetPaintFwd1(clip); }
+    virtual void Update() { WidgetUpdateThunk(); }
+#endif
 };
 
 struct AM2_ScreenBase : AM2_Panel {
@@ -329,6 +345,10 @@ struct AM2_ScreenBase : AM2_Panel {
     AM2_ScreenBase(const char *bmp, int32_t flag);
     explicit AM2_ScreenBase(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
     ~AM2_ScreenBase();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { WidgetPaintFwd2(clip); }
+    virtual void Update() { WidgetUpdateCancel(); }
+#endif
 };
 
 struct AM2_Label : AM2_Widget {
@@ -341,6 +361,9 @@ struct AM2_Label : AM2_Widget {
     AM2_Label(const char *text, AM2_Rect box, int32_t font, uint8_t ink, uint8_t paper);
     explicit AM2_Label(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Label();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { LabelDraw(clip); }
+#endif
 };
 /* A key-binding row on CONTROLS: a label with focus colours and the key it
  * shows. Its destructor is the compiler's (FocusLabelDestruct, one jump). */
@@ -353,6 +376,12 @@ struct AM2_KeyRow : AM2_Label {
     int32_t     key;                /* 0x0068  KEYROW_OFF_KEY */
     AM2_KeyRow(int32_t nameIndex, const char *caption, AM2_Rect box, int32_t font,
                uint8_t ink, uint8_t ink2, uint8_t ink3, uint8_t ink4);
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { FocusLabelDraw(clip); }
+    virtual void Update() { KeyRowUpdate(); }
+    virtual void TakeFocus(int32_t announce) { FocusLabelTakeFocus(announce); }
+    virtual void Repaint() { WidgetRepaintThunk(); }
+#endif
 };
 
 struct AM2_ButtonBase : AM2_Widget {
@@ -363,6 +392,9 @@ struct AM2_ButtonBase : AM2_Widget {
     void (__cdecl *onRight)(AM2_Widget *); /* 0x0064  BUTTON_OFF_ON_RIGHT BUTTON_BASE_OFF_C */
     AM2_ButtonBase();
     explicit AM2_ButtonBase(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+#ifdef AM2_POLYMORPHIC
+    virtual void Update() { ButtonUpdate(); }
+#endif
 };
 
 struct AM2_Button : AM2_ButtonBase {
@@ -376,6 +408,9 @@ struct AM2_Button : AM2_ButtonBase {
     AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
     explicit AM2_Button(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_Button();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { ButtonPaint(clip); }
+#endif
 };
 /* A scroll arrow: a Button with no normal-state bitmap, its own vtable and a
  * pointer back to the bar that owns it. The constructor is inline -- no
@@ -414,6 +449,9 @@ struct AM2_CheckBox : AM2_ButtonBase {
     AM2_CheckBox(const char *b0, const char *b1, const char *b2, const char *b3, AM2_Rect box, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *));
     explicit AM2_CheckBox(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_CheckBox();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { CheckboxPaint(clip); }
+#endif
 };
 
 struct AM2_ListRows;
@@ -500,6 +538,12 @@ struct AM2_ListBox : AM2_Widget {
     AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
     explicit AM2_ListBox(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ListBox();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { ListDraw(clip); }
+    virtual void Update() { ListUpdate(); }
+    virtual void TakeFocus(int32_t announce) { ListTakeFocus(announce); }
+    virtual void Repaint() { WidgetRepaintThunk(); }
+#endif
 };
 
 struct AM2_TextList : AM2_ListBox {
@@ -510,6 +554,9 @@ struct AM2_TextList : AM2_ListBox {
      * without a destructor carries one. */
     typedef AM2_ListBox Base;
     AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows);
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { TextListPaint(clip); }
+#endif
 };
 
 struct AM2_ArrowBar : AM2_Widget {
@@ -525,6 +572,10 @@ struct AM2_ArrowBar : AM2_Widget {
     AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
     explicit AM2_ArrowBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ArrowBar();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { MultiSpritePaint(clip); }
+    virtual void Update() { MultiUpdateThunk(); }
+#endif
 };
 
 struct AM2_ScrollBar : AM2_Widget {
@@ -542,6 +593,9 @@ struct AM2_ScrollBar : AM2_Widget {
     AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span);
     explicit AM2_ScrollBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_ScrollBar();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { ScrollBarPaint(clip); }
+#endif
 };
 
 struct AM2_Edit : AM2_Widget {
@@ -562,6 +616,12 @@ struct AM2_Edit : AM2_Widget {
     AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), void (__cdecl *onChange)(AM2_Widget *), AM2_Widget *owner);
     explicit AM2_Edit(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Edit();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { EditDraw(clip); }
+    virtual void Update() { EditUpdate(); }
+    virtual void TakeFocus(int32_t announce) { EditTakeFocus(announce); }
+    virtual void Repaint() { EditRepaint(); }
+#endif
 };
 
 struct AM2_MpSpin : AM2_Widget {
@@ -577,6 +637,10 @@ struct AM2_MpSpin : AM2_Widget {
     void  (__cdecl *handler)(AM2_Widget *);   /* SPIN_OFF_HANDLER */
     AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), uint8_t c0, uint8_t c1, uint8_t c2, int32_t row);
     explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+#ifdef AM2_POLYMORPHIC
+    virtual void Update() { }
+    virtual void Repaint() { MpSpinRepaint(); }
+#endif
 };
 
 struct AM2_Blinker : AM2_Panel {
@@ -603,6 +667,10 @@ struct AM2_Blinker : AM2_Panel {
     AM2_Blinker(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
     explicit AM2_Blinker(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
     ~AM2_Blinker();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { TogglePaint(clip); }
+    virtual void Update() { BlinkerUpdate(); }
+#endif
 };
 
 struct AM2_Typer : AM2_Widget {
@@ -613,6 +681,10 @@ struct AM2_Typer : AM2_Widget {
     AM2_Widget *blinker;            /* 0x0460  TYPER_OFF_BLINKER, ticked on every reveal */
     AM2_Typer(AM2_Rect box, const char *message);
     explicit AM2_Typer(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { TyperPaint(clip); }
+    virtual void Update() { TyperUpdate(); }
+#endif
 };
 
 struct AM2_HudRadar : AM2_Widget {
@@ -621,6 +693,11 @@ struct AM2_HudRadar : AM2_Widget {
     AM2_HudRadar();
     explicit AM2_HudRadar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudRadar();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudRadarPaint(clip); }
+    virtual void Update() { HudRadarUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 /* One weapon row of the SARGE panel, HUDSARGE_REC_STRIDE bytes. */
@@ -638,6 +715,11 @@ struct AM2_HudSarge : AM2_Widget {
     AM2_HudSarge();
     explicit AM2_HudSarge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudSarge();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudSargePaint(clip); }
+    virtual void Update() { HudSargeUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 /* One squad panel slot, HUD_SQUAD_REC_SIZE. */
@@ -662,6 +744,11 @@ struct AM2_HudSquad : AM2_Widget {
     AM2_HudSquad();
     explicit AM2_HudSquad(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudSquad();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudSquadPaint(clip); }
+    virtual void Update() { HudSquadUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 struct AM2_HudCmd : AM2_Widget {
@@ -671,6 +758,11 @@ struct AM2_HudCmd : AM2_Widget {
     AM2_HudCmd();
     explicit AM2_HudCmd(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudCmd();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudCommandsPaint(clip); }
+    virtual void Update() { HudCmdUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 struct AM2_HudEdge : AM2_Widget {
@@ -686,6 +778,11 @@ struct AM2_HudEdge : AM2_Widget {
     AM2_HudEdge();
     explicit AM2_HudEdge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudEdge();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudEdgePaint(clip); }
+    virtual void Update() { HudEdgeUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 /* The multiplayer panel's per-row buttons. The name shows a player; the
@@ -701,16 +798,25 @@ struct AM2_MpName : AM2_ButtonBase {
     AM2_MpName(const char *text_, AM2_Rect box, int32_t flag_, uint8_t ink_, uint8_t paper_, int32_t row);
     explicit AM2_MpName(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_MpName();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { MpNamePaint(clip); }
+#endif
 };
 struct AM2_MpColour : AM2_ButtonBase {
     typedef AM2_ButtonBase Base;    /* VC6's C2437: see AM2_TextList */
     AM2_MpColour(int32_t left, int32_t top, int32_t row);
     explicit AM2_MpColour(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { MpColourPaint(clip); }
+#endif
 };
 struct AM2_MpTeam : AM2_ButtonBase {
     typedef AM2_ButtonBase Base;    /* VC6's C2437: see AM2_TextList */
     AM2_MpTeam(int32_t left, int32_t top, int32_t row);
     explicit AM2_MpTeam(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { MpTeamPaint(clip); }
+#endif
 };
 
 struct AM2_CountButton : AM2_ButtonBase {
@@ -727,6 +833,9 @@ struct AM2_CountButton : AM2_ButtonBase {
     AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
     explicit AM2_CountButton(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_CountButton();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { CountButtonPaint(clip); }
+#endif
 };
 
 struct AM2_HudPanel : AM2_Widget {
@@ -742,6 +851,11 @@ struct AM2_HudPanel : AM2_Widget {
     AM2_HudPanel();
     explicit AM2_HudPanel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudPanel();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudPanelPaint(clip); }
+    virtual void Update() { HudPanelUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 /* One row of the top strip's message log, AM2_HUD_MSG_SIZE bytes. */
@@ -775,6 +889,11 @@ struct AM2_HudTop : AM2_Widget {
     AM2_HudTop();
     explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudTop();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { HudTopPaint(clip); }
+    virtual void Update() { HudTopUpdate(); }
+    virtual void TakeFocus(int32_t) { }
+#endif
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -847,6 +966,9 @@ struct AM2_DlgGameMenuScreen : AM2_ScreenBase {
     int32_t     abort;              /* 0x0064  GAMEMENU_OFF_ABORT, set by ABORT */
     AM2_DlgGameMenuScreen(const char *bmp, int32_t flag);
     ~AM2_DlgGameMenuScreen();
+#ifdef AM2_POLYMORPHIC
+    virtual void Update() { GameMenuUpdate(); }
+#endif
 };
 struct AM2_DlgOverwriteScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
@@ -889,6 +1011,9 @@ struct AM2_MpOptionsScreen : AM2_ScreenBase {
      * indexed by the record's `widget`, filling the object to its end. */
     AM2_CheckBox *boxes[AM2_OPTION_COUNT];
     AM2_MpOptionsScreen(const char *bmp);
+#ifdef AM2_POLYMORPHIC
+    virtual void Update() { OptionsUpdate(); }
+#endif
 };
 struct AM2_MpPanelScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
@@ -911,6 +1036,10 @@ struct AM2_MpPanelScreen : AM2_ScreenBase {
     int32_t       colourSel[AM2_COMM_SLOTS]; /* 0x0268 MP_PANEL_OFF_COLOUR_SEL */
     AM2_MpPanelScreen(const char *bmp);
     ~AM2_MpPanelScreen();
+#ifdef AM2_POLYMORPHIC
+    virtual void Paint(RECT clip) { MpPanelPaint(clip); }
+    virtual void Update() { MpPanelUpdate(); }
+#endif
 };
 struct AM2_OptionsMenuScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
@@ -1320,11 +1449,14 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
  * at any of the ~77 call sites. GCC keeps the function-pointer call, which
  * its thiscall attribute already makes exact. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
-/* Not in the runnable VC6 image (AM2_VCALL_PMF, src/vc6/include/stdint.h):
- * its vtables hold the header's forwarders -- cdecl under VC6, which cannot
- * spell thiscall -- so its calls must be cdecl too. A PMF call there left
- * `this` in ecx and the forwarder read the clip's left edge as the widget. */
-#if defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_VCALL_PMF)
+/* Under VC6 the call keeps that byte-matching shape in every build: the
+ * slots are the compiler's own (MSVC layout, the image's order), so indexing
+ * them is the virtual call. Spelled `w->Paint(clip)` instead it compiles the
+ * same call but tips an unrelated register tie in PlacementScreenClick (0 ->
+ * 28 bytes). GCC's polymorphic builds make the virtual calls in its own ABI;
+ * only the injected build, whose objects carry the image's vtables, still
+ * calls through the slot array. */
+#if defined(_MSC_VER) && !defined(__GNUC__)
 typedef AM2_Widget *(AM2_Widget::*AM2_WidgetDeletePmf)(int32_t flags);
 typedef void (AM2_Widget::*AM2_WidgetPaintPmf)(RECT clip);
 typedef void (AM2_Widget::*AM2_WidgetUpdatePmf)();
@@ -1340,6 +1472,24 @@ static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
 { (w->*((AM2_WidgetFocusPmf *)AM2_VTBL(w))[WIDGET_VSLOT_FOCUS])(announce); }
 static inline void WidgetVRepaint(AM2_Widget *w)
 { (w->*((AM2_WidgetRepaintPmf *)AM2_VTBL(w))[WIDGET_VSLOT_REPAINT])(); }
+#elif defined(AM2_POLYMORPHIC)
+/* Slot 0 is MSVC's scalar deleting destructor; every caller passes 1. */
+static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
+{
+    if (flags & 1)
+        delete w;
+    else
+        w->~AM2_Widget();
+    return w;
+}
+static inline void WidgetVPaint(AM2_Widget *w, RECT clip)
+{ w->Paint(clip); }
+static inline void WidgetVUpdate(AM2_Widget *w)
+{ w->Update(); }
+static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
+{ w->TakeFocus(announce); }
+static inline void WidgetVRepaint(AM2_Widget *w)
+{ w->Repaint(); }
 #else
 static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_WidgetDeleteFn *)AM2_VTBL(w))[WIDGET_VSLOT_DTOR](w, flags); }

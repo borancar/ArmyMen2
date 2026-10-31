@@ -65,6 +65,19 @@ Boran (2026-10-18): the stand-ins are fine for now; revisit them once the binary
 That is the point where each can be traded against a real source shape without losing a
 match: replace one, run `tools/relinkscreen.py`, keep whichever form keeps the function at 0.
 
+## A local that picks a symbol-table tie (2026-10-31)
+
+`int32_t vx = g_viewRect.left;` before `where.x = (int16_t)(vx + g_cursorPoint);` in
+CheatLine's jumpjets case (22 -> 0). Which of the two dword loads gets `edx` follows the
+order of the two globals' symbols in VC6's front end, and that order moves with the
+headers' contents: deleting the 51 hand-written vtable declarations from `standalone.h`
+flipped the plain spelling from 0 to 22, and restoring 51, 25 or 10 dummy declarations
+flipped it back (50, 2 or 1 did not). The local inverts the dependency rather than
+removing it -- it gives 22 in exactly the header states where the plain form gives 0 --
+so a later `standalone.h` edit can flip it again. PlacementScreenClick computes the same
+sum and sits on the same tie (0 with today's headers). No spelling tried holds in every
+header state. Revisit.
+
 ## Relink-only symbols (not number wins, but per-build seams)
 
 `am2_rl_army_points` in `MpPanelScreen` (relink builds only; the other builds read `g_armyPoints`).

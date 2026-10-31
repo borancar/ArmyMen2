@@ -247,6 +247,65 @@ def emit_tables(img, out):
             fh.write("\n};   /* was 0x%08X */\n\n" % addr)
     return len(TEXT_TABLES)
 
+# Original data that NO build reads any more, zeroed in the carried blob as
+# tools/deadstrings.py zeroes the unreachable strings: the menu/HUD widget and
+# movie vtables. The standalone builds' classes are polymorphic, so each
+# compiler emits its own tables (VC6's are the image's, mapped by the relink);
+# the injected build runs the image's own copies, not this blob.
+DEAD = (
+    (0x0046FAB4, 0x0046FACC),      # am2_movie_vtable    (movie.cpp)
+    (0x0046F8B8, 0x0046F8CC),      # am2_vtable_hud_radar
+    (0x0046F8CC, 0x0046F8E0),      # am2_vtable_hud_sarge
+    (0x0046F8E0, 0x0046F8F4),      # am2_vtable_hud_squad
+    (0x0046F8F4, 0x0046F908),      # am2_vtable_hud_commands
+    (0x0046F908, 0x0046F91C),      # am2_vtable_hud_top_strip
+    (0x0046F930, 0x0046F944),      # am2_vtable_count_button
+    (0x0046F944, 0x0046F958),      # am2_vtable_hud_panel
+    (0x0046F960, 0x0046F974),      # am2_vtable_hud_edge_strip
+    (0x0046F9D0, 0x0046F9E4),      # am2_vtable_comm_panel
+    (0x0046F9E4, 0x0046F9F8),      # am2_vtable_war_menu
+    (0x0046F9F8, 0x0046FA0C),      # am2_vtable_battle_join
+    (0x0046FA0C, 0x0046FA20),      # am2_vtable_battle_name_dlg
+    (0x0046FA20, 0x0046FA34),      # am2_vtable_mp_panel
+    (0x0046FA34, 0x0046FA48),      # am2_vtable_options_menu_mp
+    (0x0046FA48, 0x0046FA5C),      # am2_vtable_mp_name
+    (0x0046FA5C, 0x0046FA70),      # am2_vtable_mp_colour
+    (0x0046FA70, 0x0046FA84),      # am2_vtable_mp_team
+    (0x0046FA84, 0x0046FA98),      # am2_vtable_text_list
+    (0x0046FACC, 0x0046FAE0),      # am2_vtable_movies
+    (0x0046FAE0, 0x0046FAF4),      # am2_vtable_dlg_difficulty
+    (0x0046FAF4, 0x0046FB08),      # am2_vtable_quit_dialog
+    (0x0046FB08, 0x0046FB1C),      # am2_vtable_dlg_replay
+    (0x0046FB1C, 0x0046FB30),      # am2_vtable_dlg_audio
+    (0x0046FB30, 0x0046FB44),      # am2_vtable_dlg_options
+    (0x0046FB44, 0x0046FB58),      # am2_vtable_delete_game
+    (0x0046FB58, 0x0046FB6C),      # am2_vtable_dlg_overwrite
+    (0x0046FB6C, 0x0046FB80),      # am2_vtable_dlg_delplayer
+    (0x0046FB80, 0x0046FB94),      # am2_vtable_keyrow
+    (0x0046FB94, 0x0046FBA8),      # am2_vtable_dlg_controls
+    (0x0046FBA8, 0x0046FBBC),      # am2_vtable_select_player
+    (0x0046FBBC, 0x0046FBD0),      # am2_vtable_enter_name
+    (0x0046FBD0, 0x0046FBE4),      # am2_vtable_load_game
+    (0x0046FBE4, 0x0046FBF8),      # am2_vtable_dlg_message
+    (0x0046FBF8, 0x0046FC0C),      # am2_vtable_dlg_gamemenu
+    (0x0046FC0C, 0x0046FC20),      # am2_vtable_save_list
+    (0x0046FC20, 0x0046FC34),      # am2_vtable_widget_base
+    (0x0046FC34, 0x0046FC48),      # am2_vtable_button
+    (0x0046FC48, 0x0046FC5C),      # am2_vtable_button_base
+    (0x0046FC5C, 0x0046FC70),      # am2_vtable_checkbox
+    (0x0046FC70, 0x0046FC84),      # am2_vtable_icon
+    (0x0046FC84, 0x0046FC98),      # am2_vtable_dialog
+    (0x0046FC98, 0x0046FCAC),      # am2_vtable_edit
+    (0x0046FCAC, 0x0046FCC0),      # am2_vtable_label
+    (0x0046FCC0, 0x0046FCD4),      # am2_vtable_list
+    (0x0046FCD4, 0x0046FCE8),      # am2_vtable_arrow
+    (0x0046FCE8, 0x0046FCFC),      # am2_vtable_arrowbar
+    (0x0046FCFC, 0x0046FD10),      # am2_vtable_scrollbar
+    (0x0046FD10, 0x0046FD24),      # am2_vtable_mp_spin
+    (0x0046FD24, 0x0046FD38),      # am2_vtable_typer
+    (0x0046FD38, 0x0046FD4C),      # am2_vtable_blinker
+)
+
 def main():
     if not am2.exe_present():
         print("mkglobals: ArmyMen2.exe absent -- keeping committed generated "
@@ -264,6 +323,8 @@ def main():
         raw = img.pe.get_data(s.VirtualAddress, s.SizeOfRawData)
         off = va - BLOB_LO
         blob[off:off + len(raw)] = raw
+    for lo, hi in DEAD:
+        blob[lo - BLOB_LO:hi - BLOB_LO] = bytes(hi - lo)
 
     # THE GAP IS FILLED WITH int3, AND THAT IS A DIAGNOSTIC.  The range the
     # original's .text occupied is not carried, but the PE loader commits it
@@ -387,11 +448,10 @@ def main():
     # Function-pointer TABLES that have been transcribed into hand-written C
     # (src/game, redirected under AM2_STANDALONE) no longer need their blob
     # copies fixed up -- the copy is dead, read through the C symbol instead.
-    # checkimagedata.py verifies the C against the image. See STATUS.md's
+    # checkimagedata.py verifies the C against the image. See docs/status-history.md's
     # MIGRATION note.
     MIGRATED = (
         (0x0048654C, 0x00486584),      # am2_state_actions   (movie.cpp)
-        (0x0046FAB4, 0x0046FACC),      # am2_movie_vtable    (movie.cpp)
         (0x00473000, 0x00473090),      # am2_crt_inittab     (startup.cpp) XC/XI/XP/XT
         (0x00476FE0, 0x0047749C),      # am2_def_keywords    (definfo.cpp) 101 x 12: handlers are ours
         (0x0047588C, 0x00475894),      # am2_write_dot_record (misc.cpp)
@@ -403,57 +463,6 @@ def main():
         # rewrite those cells to function pointers at startup. The placed .inc
         # holds the real bytes; skip the range like any other transcribed table.
         (0x00478CDC, 0x004850DC),      # am2_aim_displace_map (mapdraw.cpp) 112x112 int16 pairs
-        # --- the menu/HUD widget class vtables (widget.cpp) ---
-        (0x0046F8B8, 0x0046F8CC),      # am2_vtable_hud_radar
-        (0x0046F8CC, 0x0046F8E0),      # am2_vtable_hud_sarge
-        (0x0046F8E0, 0x0046F8F4),      # am2_vtable_hud_squad
-        (0x0046F8F4, 0x0046F908),      # am2_vtable_hud_commands
-        (0x0046F908, 0x0046F91C),      # am2_vtable_hud_top_strip
-        (0x0046F930, 0x0046F944),      # am2_vtable_count_button
-        (0x0046F944, 0x0046F958),      # am2_vtable_hud_panel
-        (0x0046F960, 0x0046F974),      # am2_vtable_hud_edge_strip
-        (0x0046F9D0, 0x0046F9E4),      # am2_vtable_comm_panel
-        (0x0046F9E4, 0x0046F9F8),      # am2_vtable_war_menu
-        (0x0046F9F8, 0x0046FA0C),      # am2_vtable_battle_join
-        (0x0046FA0C, 0x0046FA20),      # am2_vtable_battle_name_dlg
-        (0x0046FA20, 0x0046FA34),      # am2_vtable_mp_panel
-        (0x0046FA34, 0x0046FA48),      # am2_vtable_options_menu_mp
-        (0x0046FA48, 0x0046FA5C),      # am2_vtable_mp_name
-        (0x0046FA5C, 0x0046FA70),      # am2_vtable_mp_colour
-        (0x0046FA70, 0x0046FA84),      # am2_vtable_mp_team
-        (0x0046FA84, 0x0046FA98),      # am2_vtable_text_list
-        (0x0046FACC, 0x0046FAE0),      # am2_vtable_movies
-        (0x0046FAE0, 0x0046FAF4),      # am2_vtable_dlg_difficulty
-        (0x0046FAF4, 0x0046FB08),      # am2_vtable_quit_dialog
-        (0x0046FB08, 0x0046FB1C),      # am2_vtable_dlg_replay
-        (0x0046FB1C, 0x0046FB30),      # am2_vtable_dlg_audio
-        (0x0046FB30, 0x0046FB44),      # am2_vtable_dlg_options
-        (0x0046FB44, 0x0046FB58),      # am2_vtable_delete_game
-        (0x0046FB58, 0x0046FB6C),      # am2_vtable_dlg_overwrite
-        (0x0046FB6C, 0x0046FB80),      # am2_vtable_dlg_delplayer
-        (0x0046FB80, 0x0046FB94),      # am2_vtable_keyrow
-        (0x0046FB94, 0x0046FBA8),      # am2_vtable_dlg_controls
-        (0x0046FBA8, 0x0046FBBC),      # am2_vtable_select_player
-        (0x0046FBBC, 0x0046FBD0),      # am2_vtable_enter_name
-        (0x0046FBD0, 0x0046FBE4),      # am2_vtable_load_game
-        (0x0046FBE4, 0x0046FBF8),      # am2_vtable_dlg_message
-        (0x0046FBF8, 0x0046FC0C),      # am2_vtable_dlg_gamemenu
-        (0x0046FC0C, 0x0046FC20),      # am2_vtable_save_list
-        (0x0046FC20, 0x0046FC34),      # am2_vtable_widget_base
-        (0x0046FC34, 0x0046FC48),      # am2_vtable_button
-        (0x0046FC48, 0x0046FC5C),      # am2_vtable_button_base
-        (0x0046FC5C, 0x0046FC70),      # am2_vtable_checkbox
-        (0x0046FC70, 0x0046FC84),      # am2_vtable_icon
-        (0x0046FC84, 0x0046FC98),      # am2_vtable_dialog
-        (0x0046FC98, 0x0046FCAC),      # am2_vtable_edit
-        (0x0046FCAC, 0x0046FCC0),      # am2_vtable_label
-        (0x0046FCC0, 0x0046FCD4),      # am2_vtable_list
-        (0x0046FCD4, 0x0046FCE8),      # am2_vtable_arrow
-        (0x0046FCE8, 0x0046FCFC),      # am2_vtable_arrowbar
-        (0x0046FCFC, 0x0046FD10),      # am2_vtable_scrollbar
-        (0x0046FD10, 0x0046FD24),      # am2_vtable_mp_spin
-        (0x0046FD24, 0x0046FD38),      # am2_vtable_typer
-        (0x0046FD38, 0x0046FD4C),      # am2_vtable_blinker
         (0x00489880, 0x00489B40),      # am2_weapon_handlers  (widget.cpp)
         (0x004761A8, 0x004766C0),      # am2_hud_commands     (widget.cpp)
     )

@@ -180,366 +180,24 @@ extern "C" const int16_t am2_keyrow_positions[42] = {
     298,74, 298,99, 298,124, 298,149, 298,174, 298,257, 298,282,
 };
 
-/* ---- Widget class vtables (0x0046F8B8..0x0046FD48) --------------------
- * The menu/HUD widget classes each carry a 5-slot vtable {dtor, paint,
- * update, focus, repaint}; the original stored the raw method addresses
- * and mkglobals rewrote them to our reconstructions at startup. Transcribed
- * here as named fn-ptr tables so no fixup is needed -- each slot references
- * the reconstructed C function directly (checkseams passes) and
- * checkimagedata verify_mixed checks it against the image address it
- * patches (or the ADDR_LOG seam, for MP_SPIN slot 2). The VTABLE_* macros
- * redirect to these in standalone.h; the ranges are in mkglobals.py's
- * MIGRATED list. VTABLE_SELECT_MAP aliases into am2_movie_vtable[1]. */
-extern "C" const am2_widget_vfn am2_vtable_hud_radar[5] = {   /* 0x0046F8B8 VTABLE_HUD_RADAR */
-    (am2_widget_vfn)HudRadarDelete,
-    (am2_widget_vfn)HudRadarPaint,
-    (am2_widget_vfn)HudRadarUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_sarge[5] = {   /* 0x0046F8CC VTABLE_HUD_SARGE */
-    (am2_widget_vfn)HudSargeDelete,
-    (am2_widget_vfn)HudSargePaint,
-    (am2_widget_vfn)HudSargeUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_squad[5] = {   /* 0x0046F8E0 VTABLE_HUD_SQUAD */
-    (am2_widget_vfn)HudSquadDelete,
-    (am2_widget_vfn)HudSquadPaint,
-    (am2_widget_vfn)HudSquadUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_commands[5] = {   /* 0x0046F8F4 VTABLE_HUD_COMMANDS */
-    (am2_widget_vfn)HudCommandsDelete,
-    (am2_widget_vfn)HudCommandsPaint,
-    (am2_widget_vfn)HudCmdUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_top_strip[5] = {   /* 0x0046F908 VTABLE_HUD_TOP_STRIP */
-    (am2_widget_vfn)HudTopDelete,
-    (am2_widget_vfn)HudTopPaint,
-    (am2_widget_vfn)HudTopUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_count_button[5] = {   /* 0x0046F930 VTABLE_COUNT_BUTTON */
-    (am2_widget_vfn)CountButtonDelete,
-    (am2_widget_vfn)CountButtonPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_panel[5] = {   /* 0x0046F944 VTABLE_HUD_PANEL */
-    (am2_widget_vfn)HudPanelDelete,
-    (am2_widget_vfn)HudPanelPaint,
-    (am2_widget_vfn)HudPanelUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_hud_edge_strip[5] = {   /* 0x0046F960 VTABLE_HUD_EDGE_STRIP */
-    (am2_widget_vfn)HudEdgeDelete,
-    (am2_widget_vfn)HudEdgePaint,
-    (am2_widget_vfn)HudEdgeUpdate,
-    (am2_widget_vfn)NullStub4,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_comm_panel[5] = {   /* 0x0046F9D0 VTABLE_COMM_PANEL */
-    (am2_widget_vfn)CommPanelDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_war_menu[5] = {   /* 0x0046F9E4 VTABLE_WAR_MENU */
-    (am2_widget_vfn)MpDialogDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_battle_join[5] = {   /* 0x0046F9F8 VTABLE_BATTLE_JOIN */
-    (am2_widget_vfn)BattleJoinDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_battle_name_dlg[5] = {   /* 0x0046FA0C VTABLE_BATTLE_NAME_DLG */
-    (am2_widget_vfn)MpDialogDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_mp_panel[5] = {   /* 0x0046FA20 VTABLE_MP_PANEL */
-    (am2_widget_vfn)MpPanelDelete,
-    (am2_widget_vfn)MpPanelPaint,
-    (am2_widget_vfn)MpPanelUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_options_menu_mp[5] = {   /* 0x0046FA34 VTABLE_OPTIONS_MENU_MP */
-    (am2_widget_vfn)MpDialogDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)OptionsUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_mp_name[5] = {   /* 0x0046FA48 VTABLE_MP_NAME */
-    (am2_widget_vfn)MpNameDelete,
-    (am2_widget_vfn)MpNamePaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_mp_colour[5] = {   /* 0x0046FA5C VTABLE_MP_COLOUR */
-    (am2_widget_vfn)WidgetDeleteAlt,
-    (am2_widget_vfn)MpColourPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_mp_team[5] = {   /* 0x0046FA70 VTABLE_MP_TEAM */
-    (am2_widget_vfn)WidgetDeleteAlt,
-    (am2_widget_vfn)MpTeamPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_text_list[5] = {   /* 0x0046FA84 VTABLE_TEXT_LIST */
-    (am2_widget_vfn)TextListDelete,
-    (am2_widget_vfn)TextListPaint,
-    (am2_widget_vfn)ListUpdate,
-    (am2_widget_vfn)ListTakeFocus,
-    (am2_widget_vfn)WidgetRepaintThunk,
-};
-extern "C" const am2_widget_vfn am2_vtable_movies[5] = {   /* 0x0046FACC VTABLE_MOVIES */
-    (am2_widget_vfn)MoviesDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_difficulty[5] = {   /* 0x0046FAE0 VTABLE_DIFFICULTY_DIALOG */
-    (am2_widget_vfn)DlgDifficultyDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_quit_dialog[5] = {   /* 0x0046FAF4 VTABLE_DLG_QUITGAME */
-    (am2_widget_vfn)DlgQuitGameDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_replay[5] = {   /* 0x0046FB08 VTABLE_DLG_REPLAY */
-    (am2_widget_vfn)DlgReplayDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_audio[5] = {   /* 0x0046FB1C VTABLE_DLG_AUDIO */
-    (am2_widget_vfn)DlgAudioDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_options[5] = {   /* 0x0046FB30 VTABLE_OPTIONS_MENU */
-    (am2_widget_vfn)DlgOptionsDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_delete_game[5] = {   /* 0x0046FB44 VTABLE_DLG_DELGAME */
-    (am2_widget_vfn)DlgDelGameDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_overwrite[5] = {   /* 0x0046FB58 VTABLE_DLG_OVERWRITE */
-    (am2_widget_vfn)DlgOverwriteDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_delplayer[5] = {   /* 0x0046FB6C VTABLE_DLG_DELPLAYER */
-    (am2_widget_vfn)DlgDelPlayerDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_keyrow[5] = {   /* 0x0046FB80 VTABLE_KEYROW */
-    (am2_widget_vfn)FocusLabelDelete,
-    (am2_widget_vfn)FocusLabelDraw,
-    (am2_widget_vfn)KeyRowUpdate,
-    (am2_widget_vfn)FocusLabelTakeFocus,
-    (am2_widget_vfn)WidgetRepaintThunk,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_controls[5] = {   /* 0x0046FB94 VTABLE_DLG_CONTROLS */
-    (am2_widget_vfn)DlgControlsDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_select_player[5] = {   /* 0x0046FBA8 VTABLE_SELECT_PLAYER */
-    (am2_widget_vfn)DlgSelectPlayerDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_enter_name[5] = {   /* 0x0046FBBC VTABLE_ENTER_NAME */
-    (am2_widget_vfn)DlgNameEntryDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_load_game[5] = {   /* 0x0046FBD0 VTABLE_DLG_LOADGAME */
-    (am2_widget_vfn)DlgLoadGameDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_message[5] = {   /* 0x0046FBE4 VTABLE_DLG_MESSAGE */
-    (am2_widget_vfn)DlgMessageDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dlg_gamemenu[5] = {   /* 0x0046FBF8 VTABLE_DLG_GAMEMENU */
-    (am2_widget_vfn)DlgGameMenuDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)GameMenuUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_save_list[5] = {   /* 0x0046FC0C VTABLE_SAVE_LIST */
-    (am2_widget_vfn)SaveListDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_widget_base[5] = {   /* 0x0046FC20 VTABLE_WIDGET_BASE */
-    (am2_widget_vfn)WidgetDelete,
-    (am2_widget_vfn)WidgetPaint,
-    (am2_widget_vfn)WidgetUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_button[5] = {   /* 0x0046FC34 VTABLE_BUTTON */
-    (am2_widget_vfn)ButtonDelete,
-    (am2_widget_vfn)ButtonPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_button_base[5] = {   /* 0x0046FC48 VTABLE_BUTTON_BASE */
-    (am2_widget_vfn)WidgetDeleteAlt,
-    (am2_widget_vfn)WidgetPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_checkbox[5] = {   /* 0x0046FC5C VTABLE_CHECKBOX */
-    (am2_widget_vfn)CheckBoxDelete,
-    (am2_widget_vfn)CheckboxPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_icon[5] = {   /* 0x0046FC70 VTABLE_PANEL */
-    (am2_widget_vfn)IconDelete,
-    (am2_widget_vfn)WidgetPaintFwd1,
-    (am2_widget_vfn)WidgetUpdateThunk,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_dialog[5] = {   /* 0x0046FC84 VTABLE_DIALOG */
-    (am2_widget_vfn)DialogDelete,
-    (am2_widget_vfn)WidgetPaintFwd2,
-    (am2_widget_vfn)WidgetUpdateCancel,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_edit[5] = {   /* 0x0046FC98 VTABLE_EDIT */
-    (am2_widget_vfn)EditDelete,
-    (am2_widget_vfn)EditDraw,
-    (am2_widget_vfn)EditUpdate,
-    (am2_widget_vfn)EditTakeFocus,
-    (am2_widget_vfn)EditRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_label[5] = {   /* 0x0046FCAC VTABLE_LABEL */
-    (am2_widget_vfn)LabelDelete,
-    (am2_widget_vfn)LabelDraw,
-    (am2_widget_vfn)WidgetUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_list[5] = {   /* 0x0046FCC0 VTABLE_LIST */
-    (am2_widget_vfn)ListDelete,
-    (am2_widget_vfn)ListDraw,
-    (am2_widget_vfn)ListUpdate,
-    (am2_widget_vfn)ListTakeFocus,
-    (am2_widget_vfn)WidgetRepaintThunk,
-};
-extern "C" const am2_widget_vfn am2_vtable_arrow[5] = {   /* 0x0046FCD4 VTABLE_ARROW */
-    (am2_widget_vfn)ArrowDelete,
-    (am2_widget_vfn)ButtonPaint,
-    (am2_widget_vfn)ButtonUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_arrowbar[5] = {   /* 0x0046FCE8 VTABLE_ARROWBAR */
-    (am2_widget_vfn)ArrowBarDelete,
-    (am2_widget_vfn)MultiSpritePaint,
-    (am2_widget_vfn)MultiUpdateThunk,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_scrollbar[5] = {   /* 0x0046FCFC VTABLE_SCROLLBAR */
-    (am2_widget_vfn)ScrollBarDelete,
-    (am2_widget_vfn)ScrollBarPaint,
-    (am2_widget_vfn)WidgetUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_mp_spin[5] = {   /* 0x0046FD10 VTABLE_MP_SPIN */
-    (am2_widget_vfn)WidgetDeleteAlt,
-    (am2_widget_vfn)WidgetPaint,
-    (am2_widget_vfn)am2_sa_log,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)MpSpinRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_typer[5] = {   /* 0x0046FD24 VTABLE_TYPER */
-    (am2_widget_vfn)WidgetDeleteAlt,
-    (am2_widget_vfn)TyperPaint,
-    (am2_widget_vfn)TyperUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
-extern "C" const am2_widget_vfn am2_vtable_blinker[5] = {   /* 0x0046FD38 VTABLE_BLINKER */
-    (am2_widget_vfn)BlinkerDelete,
-    (am2_widget_vfn)TogglePaint,
-    (am2_widget_vfn)BlinkerUpdate,
-    (am2_widget_vfn)WidgetTakeFocus,
-    (am2_widget_vfn)WidgetRepaint,
-};
+#if defined(__GNUC__)
+/* misc.h's ObjV*, for flat code that cannot see AM2_Widget: the real virtual
+ * calls, in GCC's own ABI. (VC6 reaches the slots by index, as the original.) */
+void *ObjVDelete(void *o, int32_t flags)
+{
+    return WidgetVDelete(static_cast<AM2_Widget *>(o), flags);
+}
+void ObjVPaint(void *o, AM2_Rect r)
+{
+    RECT clip = { r.left, r.top, r.right, r.bottom };
+
+    static_cast<AM2_Widget *>(o)->Paint(clip);
+}
+void ObjVUpdate(void *o)
+{
+    static_cast<AM2_Widget *>(o)->Update();
+}
+#endif
 
 /* am2_option_table -- 0x004865B8, the OPTIONS dialog declaration: 43 records,
  * each eight int32 fields (widget index, x, y, group, first, last, bit, which)
@@ -738,12 +396,13 @@ struct AM2_HudCommandBlock am2_hud_commands = {
 #define kOnDifficultyOk   OnDifficultyOk
 
 /* The layout claims above are compiler-checked rather than commented. */
-static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
-static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
-/* Both derive from AM2_Widget, so GCC calls them non-standard-layout; the
- * offsets are still fixed and these are the checks that say so. */
+/* The widget classes derive from AM2_Widget -- and are polymorphic in the
+ * standalone builds -- so GCC calls them non-standard-layout; the offsets are
+ * still fixed and these are the checks that say so. */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
+static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
 static_assert(offsetof(AM2_HudTop, rows)     == HUDLOG_OFF_ROWS,    "hud log rows");
 static_assert(offsetof(AM2_HudTop, typing)   == HUDLOG_OFF_TYPING,  "hud typing");
 static_assert(offsetof(AM2_HudTop, count)    == HUDLOG_OFF_COUNT,   "hud log count");
@@ -6703,11 +6362,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCommandsDelete(int32_t fla
  */
 AM2_HudCmd::~AM2_HudCmd()
 {
-    AM2_Widget *w = this;
-
     AM2_CmdRec *rec;
 
-    AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
+    AM2_CTOR_VTABLE(this, VTABLE_HUD_COMMANDS);
 
     /* signed address compare, as the original (`jl`), on the sprite field */
     for (rec = g_hudCmdSpec;
@@ -7096,9 +6753,7 @@ AM2_CLASS_DELETE(MpName)
  * WndProc calls on the next keystroke. */
 AM2_HudTop::~AM2_HudTop()
 {
-    AM2_Widget *w = this;
-
-    AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
+    AM2_CTOR_VTABLE(this, VTABLE_HUD_TOP_STRIP);
 
     ReleaseSprite(sprite0);
     ReleaseSprite(spriteHot);
@@ -9071,11 +8726,9 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview)
  * is safe in a program with no throw. */
 AM2_MpPanelScreen::~AM2_MpPanelScreen()
 {
-    AM2_Widget *w = this;
-
     AM2_Sprite **p;
 
-    AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
+    AM2_CTOR_VTABLE(this, VTABLE_MP_PANEL);
 
     /* signed address compares, as the original (`jl`) */
     for (p = g_mpPanelSpritesA;
@@ -10440,6 +10093,11 @@ void __attribute__((thiscall)) AM2_Widget::OptionsUpdate()
  * against the strength-reduced cursor, which a pointer walk would make `jb`. */
 #define OPT(i) (g_optionTable[i])
 
+/* Values the one-byte forcePlain never holds; OptionsDefaults tests it against
+ * both at once -- never true -- as a number win (docs/numberwins.md). Named so
+ * GCC does not warn that the byte cannot hold them; VC6 sees the same constants. */
+enum { kNever5002 = 5002, kNever5003 = 5003 };
+
 void __cdecl OptionsDefaults(AM2_Widget *button)
 {
     AM2_Widget *parent = button->parent;
@@ -10456,7 +10114,7 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
         const AM2_OptionRec *r = &g_optionTable[i];
         box = OptionBox(parent, r->widget);
         if ((r->which && !(box->disabled == 5000 && box->disabled == 5001))
-            || (box->forcePlain == 5002 && box->forcePlain == 5003)) {  /* a number win: dead impossible pairs move the rotation cursor */
+            || (box->forcePlain == kNever5002 && box->forcePlain == kNever5003)) {  /* a number win: dead impossible pairs move the rotation cursor */
             { uint32_t t = *(volatile uint32_t *)&flags; mask = t; }   /* a number win */
             bit = (uint32_t)r->bit;
         } else {
@@ -11484,12 +11142,10 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesDelete(int32_t flags)
  * 24 and this is where they go back. */
 AM2_MoviesScreen::~AM2_MoviesScreen()
 {
-    AM2_Widget *w = this;
-
     AM2_Sprite **pair;
     int32_t      i;
 
-    AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
+    AM2_CTOR_VTABLE(this, VTABLE_MOVIES);
 
     pair = &this->sprites[0][0];
     for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++) {
@@ -12538,10 +12194,8 @@ AM2_KeyRow::AM2_KeyRow(int32_t nameIndex, const char *caption, AM2_Rect box, int
     : AM2_Label(caption, box, font, focInk, ink3)
 #endif
 {
-    AM2_Widget *w = this;
-
     focInk = ink;
-    AM2_CTOR_VTABLE(w, VTABLE_KEYROW);
+    AM2_CTOR_VTABLE(this, VTABLE_KEYROW);
     focInkFocus   = ink2;
     focPaper      = ink3;
     focPaperFocus = ink4;
@@ -13781,9 +13435,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SaveListDelete(int32_t flags)
  * would be worth less than the gap. */
 AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen()
 {
-    AM2_Widget *w = this;
-
-    AM2_CTOR_VTABLE(w, VTABLE_SAVE_LIST);
+    AM2_CTOR_VTABLE(this, VTABLE_SAVE_LIST);
     FreeFont(AM2_SAVE_LIST_FONT);
 }
 
@@ -14687,9 +14339,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::IconDelete(int32_t flags)
 
 AM2_Panel::~AM2_Panel()
 {
-    AM2_Widget *w = this;
-
-    AM2_CTOR_VTABLE(w, VTABLE_ICON);
+    AM2_CTOR_VTABLE(this, VTABLE_ICON);
     /* No null test, as in the original. */
     ReleaseSprite(this->panelSprite);
 }
@@ -14768,9 +14418,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
 
 AM2_ScreenBase::~AM2_ScreenBase()
 {
-    AM2_Widget *w = this;
-
-    AM2_CTOR_VTABLE(w, VTABLE_DIALOG);
+    AM2_CTOR_VTABLE(this, VTABLE_DIALOG);
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetPaintFwd2(RECT clip)
@@ -14946,9 +14594,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelDelete(int32_t flags)
 
 AM2_Label::~AM2_Label()
 {
-    AM2_Widget *w = this;
-
-    AM2_CTOR_VTABLE(w, VTABLE_LABEL);
+    AM2_CTOR_VTABLE(this, VTABLE_LABEL);
 }
 
 void __attribute__((thiscall)) AM2_Widget::LabelDraw(RECT clip)

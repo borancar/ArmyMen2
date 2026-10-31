@@ -154,8 +154,15 @@ again:
         PlayDynamicSound("portal2_8bit.wav", 0, 0, 0, 0, 0x10, 3, 0);
 
         /* x adds the two PACKED dwords and keeps the low word; y adds the
-         * two high words as words. */
-        where.x = (int16_t)(g_cursorPoint + g_viewRect.left);
+         * two high words as words. The view's local is a number win: which
+         * of the two loads VC6 gives edx follows its symbol table, so the
+         * plain `g_cursorPoint + g_viewRect.left` matches or not depending
+         * on what the headers declare (docs/numberwins.md). */
+        {
+            int32_t vx = g_viewRect.left;
+
+            where.x = (int16_t)(vx + g_cursorPoint);
+        }
         where.y = (int16_t)(((const int16_t *)&g_cursorPoint)[1]
                             + *(const int16_t *)&g_viewRect.top);
         if (!PointInRect(&g_secondRect, &where))

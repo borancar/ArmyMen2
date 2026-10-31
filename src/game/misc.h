@@ -130,9 +130,7 @@ void __attribute__((thiscall)) am2_dtor_AM2_PtrList(AM2_PtrList *l);
  * opaque class (one code pointer; see widget.h's WidgetV* for the why), the
  * function-pointer call under GCC. */
 struct AM2_VObj { };
-/* Not in the runnable VC6 image, as widget.h's WidgetV*: its vtables hold
- * cdecl forwarders (AM2_VCALL_PMF, src/vc6/include/stdint.h). */
-#if defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_VCALL_PMF)
+#if defined(_MSC_VER) && !defined(__GNUC__)
 typedef void (AM2_VObj::*AM2_VObjPaintPmf)(AM2_Rect r);
 typedef void (AM2_VObj::*AM2_VObjUpdatePmf)();
 typedef void *(AM2_VObj::*AM2_VObjDeletePmf)(int32_t flags);
@@ -146,6 +144,14 @@ static inline void ObjVUpdate(void *o)
 typedef int32_t (AM2_VObj::*AM2_VObjPollPmf)();
 static inline int32_t ObjVPoll(void *o)
 { return (((AM2_VObj *)o)->*((AM2_VObjPollPmf *)*(void **)o)[0])(); }
+#elif defined(AM2_STANDALONE)
+/* GCC's standalone builds: the classes are polymorphic in GCC's own ABI, so
+ * a slot index means nothing here -- these make the real virtual calls, out
+ * of line where the classes are visible (widget.cpp; ObjVPoll in movie.cpp). */
+void *ObjVDelete(void *o, int32_t flags);
+void ObjVPaint(void *o, AM2_Rect r);
+void ObjVUpdate(void *o);
+int32_t ObjVPoll(void *o);
 #else
 typedef void (__attribute__((thiscall)) *AM2_VObjPaintFn)(void *o, AM2_Rect r);
 typedef void (__attribute__((thiscall)) *AM2_VObjUpdateFn)(void *o);

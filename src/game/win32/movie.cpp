@@ -50,23 +50,14 @@ extern "C" const AM2_StateAction am2_state_actions[5] = {
       (am2_state_action_fn)StateMessageMovieToMenu,  0x64657263u },
 };
 
-/* am2_movie_vtable -- 0x0046FAB4, the movie widget's vtable. MovieStop/MovieStart
- * stamp its address into the object, and MovieStepCurrent calls slot 0 (MoviePoll)
- * through it; the other five are the widget base slots, dispatched by the (still
- * original) widget layer. The original stored the raw function addresses here and
- * mkglobals rewrote them to our reconstructions at startup; transcribed as a named
- * C table it needs no fixup -- checkimagedata verifies each pointer against the
- * reconstruction that patches its image address, and the MIGRATED range in
- * mkglobals.py drops the six blob fixups. Six slots; anything past them
- * (0x0046FACC on) stays a fixed-up blob vtable and is unaffected. */
-extern "C" const am2_movie_vfn am2_movie_vtable[6] = {
-    (am2_movie_vfn)MoviePoll,
-    (am2_movie_vfn)DlgSelectMapDelete,
-    (am2_movie_vfn)WidgetPaintFwd2,
-    (am2_movie_vfn)WidgetUpdateCancel,
-    (am2_movie_vfn)WidgetTakeFocus,
-    (am2_movie_vfn)WidgetRepaint,
-};
+#if defined(__GNUC__)
+/* misc.h's ObjVPoll: slot 0 of the movie's table is Poll, a real virtual
+ * call in GCC's own ABI. */
+int32_t ObjVPoll(void *o)
+{
+    return static_cast<AM2_Movie *>(o)->Poll();
+}
+#endif
 #endif
 
 /* The movie object and the Smacker handle are typed in movie.h. */
@@ -196,7 +187,9 @@ AM2_Movie::~AM2_Movie()
 
     /* Re-stamped before anything else, and unconditionally -- so it happens
      * even on the early returns below. */
+#ifndef AM2_STANDALONE   /* the compiler's own store in the polymorphic builds */
     movie->vtbl = g_movieVtable;
+#endif
 
     if (!movie->smack)
         return;
@@ -341,7 +334,9 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
 
     AM2_Smack *smack;
 
+#ifndef AM2_STANDALONE   /* the compiler's own store in the polymorphic builds */
     movie->vtbl = g_movieVtable;
+#endif
     movie->active = 0;
     movie->big = big;
     movie->wantW = wantW;

@@ -20,8 +20,14 @@ struct AM2_Smack {
     uint32_t frameNum;              /* +0x374 */
 };
 
+/* Polymorphic in the standalone builds, as widget.h's classes: one virtual,
+ * Poll, the only slot of the movie's vtable at 0x0046FAB4 (VC6's
+ * ??_7AM2_Movie@@6B@, mapped there by the relink). The injected build keeps
+ * the explicit field and stamps the image's table. */
 struct AM2_Movie {
+#ifndef AM2_STANDALONE
     const void         *vtbl;       /* +0x00 re-stamped on stop */
+#endif
     LPDIRECTDRAWSURFACE surface;    /* +0x04 the surface it decodes onto */
     int32_t             active;     /* +0x08 */
     int32_t             running;    /* +0x0C cleared at the last frame */
@@ -51,8 +57,14 @@ struct AM2_Movie {
      * re-stamps the vtable first, as a destructor does, and the original's
      * teardowns are `delete` -- test, this call, then operator delete. Inline,
      * VC6 loaded the pointer straight into esi; out of line it goes through
-     * ecx as `this` first, which is what the image's delete sites do. */
+     * ecx as `this` first, which is what the image's delete sites do.
+     * Virtual under GCC alone, by its own convention for a class with a
+     * virtual: the image's table has no destructor slot. */
+#if defined(__GNUC__) && defined(AM2_STANDALONE)
+    virtual ~AM2_Movie();
+#else
     ~AM2_Movie();
+#endif
     /* 0x00445170, in the movie's own address band and called with the movie
      * in ecx: a member that ignores `this`. Defined in palette.cpp. */
     void __attribute__((thiscall)) SnapshotSystemPalette();
@@ -61,13 +73,24 @@ struct AM2_Movie {
     int32_t __attribute__((thiscall)) MovieStart(void *arg);
     void __attribute__((thiscall)) MovieDrawFrame(void *arg);
     int32_t __attribute__((thiscall)) MoviePoll();
+#ifdef AM2_STANDALONE
+    virtual int32_t Poll() { return MoviePoll(); }
+#endif
 };
+#ifndef AM2_CLASS_VTABLE
+#define AM2_CLASS_VTABLE(Class, VT)   /* widget.h's: which image vtable */
+#endif
+AM2_CLASS_VTABLE(AM2_Movie, ADDR_MOVIE_VTABLE)
 static_assert(offsetof(AM2_Smack, newPalette) == 0x068, "smack newPalette");
 static_assert(offsetof(AM2_Smack, palette)    == 0x06C, "smack palette");
 static_assert(offsetof(AM2_Smack, frameNum)   == 0x374, "smack frameNum");
+/* Checked where the class is standard-layout: the polymorphic builds hold
+ * the same offsets, their hidden vptr taking the explicit field's place. */
+#ifndef AM2_STANDALONE
 static_assert(offsetof(AM2_Movie, smack)      == 0x1C, "movie smack");
 static_assert(offsetof(AM2_Movie, timerId)    == 0x28, "movie timerId");
 static_assert(offsetof(AM2_Movie, srcX)       == 0xAC, "movie srcX");
+#endif
 static_assert(sizeof(AM2_Movie)               == AM2_MOVIE_SIZE, "movie size");
 static inline void __attribute__((thiscall)) MovieApplyPalette(void *movie, LPDIRECTDRAWSURFACE surf)
 { ((AM2_Movie *)movie)->MovieApplyPalette(surf); }

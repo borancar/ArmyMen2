@@ -285,18 +285,19 @@ def main():
     # the original data range count -- one outside it was not placed.
     placed = placed_data_symbols()
     ng = len(placed)
-    # Polymorphic widget classes (relink build): the compiler stores
-    # ??_7Class@@6B@ into each object; widget.h's AM2_CLASS_VTABLE(Class, VT)
-    # says which original vtable that is.
+    # Polymorphic classes (the widgets and the movie): the compiler stores
+    # ??_7Class@@6B@ into each object; AM2_CLASS_VTABLE(Class, VT) in widget.h
+    # and movie.h says which original vtable that is.
     vtaddr = {}
     for hdr in ("src/inject/orig.h", "src/game/win32/widget.h"):
-        for mm in re.finditer(r"#define\s+(VTABLE_\w+)\s+0x([0-9A-Fa-f]+)u?",
+        for mm in re.finditer(r"#define\s+((?:VTABLE|ADDR)_\w+)\s+0x([0-9A-Fa-f]+)u?",
                               open(os.path.join(BM.REPO, hdr)).read()):
             vtaddr.setdefault(mm.group(1), int(mm.group(2), 16))
-    for mm in re.finditer(r"^AM2_CLASS_VTABLE\((\w+),\s*(\w+)\)",
-                          open(os.path.join(BM.REPO, "src/game/win32/widget.h")).read(), re.M):
-        if mm.group(2) in vtaddr:
-            sym_va["??_7%s@@6B@" % mm.group(1)] = vtaddr[mm.group(2)]
+    for hdr in ("src/game/win32/widget.h", "src/game/win32/movie.h"):
+        for mm in re.finditer(r"^AM2_CLASS_VTABLE\((\w+),\s*(\w+)\)",
+                              open(os.path.join(BM.REPO, hdr)).read(), re.M):
+            if mm.group(2) in vtaddr:
+                sym_va["??_7%s@@6B@" % mm.group(1)] = vtaddr[mm.group(2)]
     # Standalone stand-ins for original functions: standalone.h redirects
     # ADDR_X to AM2_SA(am2_sa_y) (operator new/delete, the logger, the DirectX
     # creators), so a call compiles to a direct e8 at am2_sa_y -- which stands
