@@ -708,7 +708,7 @@ void __cdecl State1Frame(void)
  * same poke was run on the PARENT COMMIT, where this function is still the
  * original's and its callees are already ours: DestroyWeapon reads 0 there
  * too. So the divergence is somewhere else on the path and predates this
- * commit by an unknown margin; see STATUS.md. One control run separated
+ * commit by an unknown margin; see docs/status-history.md. One control run separated
  * "my change broke it" from "nothing has ever tested this path". */
 void __cdecl LevelTeardown(void)
 {

@@ -3,7 +3,7 @@
 
 Every hand-kept count of this in the project has gone stale, and three
 separate methods have been wrong in ways that got WORSE as the work
-finished.  The failures are all recorded in STATUS.md; this tool exists so
+finished.  The failures are all recorded in docs/status-history.md; this tool exists so
 the number is regenerated instead of quoted.
 
 Two corrections are what make it right, and both were found by measuring:

@@ -45,7 +45,7 @@ diff, and for every block that is identical in both, read what jumps to it.
 
 | tool | use |
 |---|---|
-| `make vc6host`, `make vc6-relink` | build the PE host; run the full relink and print the per-function result |
+| `make vc6`, `make vc6-relink` | build the PE host; run the full relink and print the per-function result |
 | `tools/relinkscreen.py` | the loop's instrument: baseline, one-second single-unit screen, full confirm |
 | `tools/vc6asm.py FILE.cpp` | compile a snippet with the real compiler and print each function's code |
 | `tools/vc6lab.py` | scratch compile of a cloned function with stub declarations, for experiments that must not touch the tree |
@@ -87,7 +87,7 @@ corrupt each other's results.
 5. `--confirm` every win. The screen compiles one unit, and a change to a shared
    header or a sibling that shares the edited text can move other functions.
    Check the `lost`/`gained` line and every other changed function.
-6. Apply the edit, plain `make` (read the warnings, never grep for `error`),
+6. Apply the edit, plain `make` and `make all` (read the warnings, never grep for `error`),
    relink, `--rebase`, commit with the new count in the message.
 7. Update `STATUS.md` when the count moves.
 
@@ -406,7 +406,7 @@ for the allocator model (keys, penalty vector, hints, rotation) and the tools (`
 
 Levers that are known NOT to exist: a zero-code rotation consumer, a hint without code (hints point at
 fixed registers only), a pair on a local or register operand (folds in c1), a dead non-volatile read
-(deleted in c1). Levers that work only with a measured prerequisite are listed with each win in STATUS.md.
+(deleted in c1). Levers that work only with a measured prerequisite are listed with each win in docs/status-history.md (VC6 BYTE-MATCH).
 
 **Subsets of hunk fixes (Round BJ, FindPath 66 -> 54).** In a function whose residue is a few hunks, list every known
 single fix per hunk and test ALL subsets: each fix alone changes the length and shifts every jump displacement

@@ -2,126 +2,163 @@
 
 Reconstructing the source of **Army Men II** (3DO, 1999) and porting it to Linux.
 
-The approach is incremental rather than big-bang: keep the original
-`ArmyMen2.exe` running under Wine, and progressively replace its functions with
-reimplemented ones, verifying against real gameplay at every step. Only once
-enough of the engine is reconstructed does the port become standalone.
+Every function of the game has been reconstructed in C++ from the disassembly of
+the shipped `ArmyMen2.exe`. The result runs as a native Linux executable that
+plays frame-for-frame identically to the original. The same source, compiled
+with the original Visual C++ 6.0, reproduces the shipped machine code
+byte for byte for all but seven of its functions.
+
+## Build and run
+
+```sh
+make                    # = make native: build/armymen2 and build/armymen2-dev
+AM2_GAMEDIR="/path/to/Army Men II" build/armymen2 -nointro
+```
+
+`make` with no target builds the native port: an i386 ELF linked against
+`src/platform/`, which implements the Win32, DirectDraw, DirectSound,
+DirectInput and C-runtime surface the game calls over SDL3. No Wine, and no
+original code at run time.
+
+- **You need your own copy of the game.** The port reads the original's data
+  files (maps, sprites, sounds, `aai/*.aai`) from `AM2_GAMEDIR`, the directory of
+  an installed Army Men II (the GOG release is what this was built against).
+  Unset, it uses the working directory, as the original does.
+- **Build dependencies** (32-bit, because the game's data assumes 4-byte
+  pointers): `gcc`/`g++` with `glibc-devel.i686`, `libstdc++-devel.i686` and
+  `SDL3-devel.i686` (Fedora names). The build compiles committed sources only;
+  it does not need `ArmyMen2.exe`.
+- **Two binaries.** `build/armymen2` is the player's. `build/armymen2-dev` is the
+  same game plus the development hooks every tool here drives: a control socket
+  (port 31337), savestates, injected input.
+- **Window and pacing knobs**: `AM2_SCALE=N` (integer window scale; default
+  the largest that fits), `AM2_RESIZABLE=1` (a free-size, letterboxed window
+  instead of a fixed one), `AM2_FPS=N` (the 60 Hz pacing Flip stands for; 0
+  turns it off), `AM2_VSYNC`.
+
+## Status of the byte-for-byte reconstruction
+
+As of **2026-10-31** (details and every command in [`STATUS.md`](STATUS.md)):
+
+| | |
+|---|---|
+| game functions reconstructed | **all**: 0 of 1,654 left in the original (`tools/remaining.py`) |
+| functions recompiled by MSVC 6 and compared | 1,646 |
+| **byte-identical to `ArmyMen2.exe`** | **1,639** (99.6% of functions) |
+| original code bytes still unmatched | **305 of 389,636** (99.92% identical) |
+| native port vs the original | 16 of 16 recorded play sessions frame-exact |
+
+The comparison is a whole-image relink. `build/vc6host` runs the original
+Visual C++ 6.0 toolchain (build 12.00.8168, the build the game's own objects
+carry) natively on Linux, through our own PE loader and a Win32/MSVCRT shim
+(`src/vc6/`). `src/vc6/relink.py` compiles every translation unit with it,
+lays each function at its original address, resolves every relocation to the
+address the original linker would have written, and compares the bytes with
+the shipped image. Nothing about the reconstructed targets is wildcarded.
+
+```sh
+make vc6
+./.venv/bin/python tools/relinkscreen.py --baseline   # 1646 functions, 7 differ, total 610 bytes
+./.venv/bin/python tools/relinkscreen.py --list       # the seven, largest first
+```
+
+The seven that still differ are LoadMap, RowUpdate, FindPath, SightScan,
+ScriptParseEvent, ScriptPad and UpdateTrooperAction. Two of them (FindPath,
+ScriptPad) differ only in register choice. SightScan and RowUpdate are each
+traced to a single decision inside the compiler's code generator for which no
+source spelling has been found. A few dozen spellings that exist only to steer
+the register allocator are marked "number win" in the source and listed in
+[`docs/numberwins.md`](docs/numberwins.md), to be traded back for real source
+shapes once everything matches. The method is
+[`docs/bytematching.md`](docs/bytematching.md),
+[`docs/bytematch-lab.md`](docs/bytematch-lab.md) and
+[`docs/vc6-regalloc.md`](docs/vc6-regalloc.md).
+
+## How it got here
+
+The reconstruction was piecewise, never a big-bang rewrite. The original EXE
+kept running under Wine with `am2hook.dll` injected (`make run`), and its
+functions were replaced one at a time, each verified against real gameplay
+before the next. Once the Win32/DirectX boundary was closed, the same sources
+linked into a standalone executable, then into the native Linux port. Two
+references are used to check it:
+
+- **The hybrid** (`make hybrid`): the *original* `ArmyMen2.exe`, loaded by our own
+  PE loader over the same `src/platform/` as the port, with no Wine. Run against
+  the port in lockstep, it is the behavioural oracle:
+
+  ```sh
+  ./.venv/bin/python tools/sidebyside.py --replay tests/replays/bootcamp.txt
+  ```
+
+  steps both games through the same input and stops on the first frame that
+  differs, with both games left alive at that frame for inspection.
+- **The VC6 relink** above: the same source, the original compiler, the
+  original bytes.
+
+`make check` runs the 71 static analysis tools and enumerating oracles that need
+no running game (about 35 minutes), plus a drift check over the generated files
+in `docs/` and `src/standalone/`.
+
+## Other targets
+
+```sh
+make hybrid             # the original EXE over src/platform (the oracle)
+make vc6-relink         # the byte-for-byte relink (needs VC6_ROOT, see below)
+make vc6-link ARGS=--run    # a runnable image linked by the real LINK.EXE
+make all                # the injected harness: am2hook.dll + launcher.exe
+make run                # ...launched into the original under Wine
+make run-stock          # the unpatched GOG binary, the Wine A/B reference
+make check              # every static check
+```
 
 ## Layout
 
-    tools/      analysis tooling (Python, run from .venv)
-    docs/       findings, plus generated .tsv datasets
-    src/        reconstructed source
-    build/      build output (ignored)
-    reference/  scratch reference material (ignored, never committed)
-    .wine/      Wine prefix with the GOG install (ignored)
+    src/game/        the reconstructed game (C++); src/game/win32/ is the part that calls Win32/DirectX
+    src/platform/    Win32/DirectX/CRT over SDL3 for the native port; src/platform/crt/ is MSVC 6's CRT, reconstructed
+    src/hybrid/      the PE loader that runs the original EXE over src/platform
+    src/vc6/         the native VC6 host, the relink and the LINK.EXE driver
+    src/inject/      the Wine injection harness (C) and shared headers
+    src/standalone/  generated and hand-written glue for the standalone builds
+    tools/           analysis and verification tooling (Python, run from .venv)
+    tests/           selftest vectors and recorded replays
+    docs/            findings, plus generated .tsv datasets
+    build/           build output (ignored)
+    reference/       scratch reference material (ignored, never committed)
+    .wine/           Wine prefix with the GOG install (ignored)
 
-Start with [`docs/00-recon.md`](docs/00-recon.md), then
-[`docs/01-harness.md`](docs/01-harness.md).
+Read [`CLAUDE.md`](CLAUDE.md) for the working conventions, [`STATUS.md`](STATUS.md)
+for where things stand, and [`docs/00-recon.md`](docs/00-recon.md) for what the
+binary is.
 
-## Running the harness
-
-```sh
-make run                # harness + the game's own 1999 debug logger
-make run TRACE=1        # argument-trace every patched function
-make run OBSERVE=1      # log call sites of the observed functions
-make run GAMELOG=0      # leave the logger stubbed
-make run-stock          # unpatched GOG binary, the A/B reference
-```
-
-`make run` is the only launch target — variations are knobs (`GAMELOG`, `TRACE`,
-`OBSERVE`, `ARGS`, `DESKTOP`, `ID`, `ISOLATE`), not separate targets.
-
-Runs are independent. Desktop name, control port, log file and screenshot
-directory all derive from `ID`, which defaults from `$DISPLAY`. Running two
-games at once additionally needs `ISOLATE=1`, because the game guards itself
-with a named mutex that is scoped to the wineserver, i.e. to the prefix:
-
-```sh
-make run                  # ID from DISPLAY
-make run ID=7 ISOLATE=1   # a second game, own prefix, own everything
-make config ID=7          # what is that instance called?
-```
-
-Watch the recovered debug commentary from another terminal (`make config`
-prints the exact path for an instance):
-
-```sh
-tail -f ".wine/drive_c/GOG Games/Army Men II/am2-0.log"
-```
-
-`launcher.exe` starts the game suspended, injects `am2hook.dll`, and resumes it,
-so patches are in place before the entry point runs. No shipped file is
-modified — skip the launcher and the install is stock. Set `AM2_TRACE=1` for
-generic argument tracing of every patched function.
-
-## Setup
-
-The Wine prefix lives in-tree at `.wine/` and is not committed. Always point
-Wine at it explicitly:
-
-```sh
-export WINEPREFIX="$PWD/.wine"
-wine explorer /desktop=amii,800x600 "C:\GOG Games\Army Men II\ArmyMen2.exe"
-```
+## Development setup
 
 Python tooling:
 
 ```sh
-python3 -m venv .venv && ./.venv/bin/pip install pefile capstone Pillow numpy
+python3 -m venv .venv && ./.venv/bin/pip install pefile capstone unicorn Pillow numpy
 ```
 
-`pefile` and `capstone` cover the static analysis. `Pillow` and `numpy` are
-needed only by `tools/point.py`, which imports them inside the function that
-locates the cursor — so a venv without them looks fine until the first time
-something actually points at the screen.
+`pefile` and `capstone` cover the static analysis, `unicorn` the emulating
+oracles (`make selftest`, `tools/vectors.py`). `Pillow` and `numpy` are needed
+only by the screenshot tools.
 
-Host toolchain: `i686-w64-mingw32-gcc/g++` (32-bit PE — Wine 11 here is
-new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
-
-## Tools
-
-| | |
-|---|---|
-| `tools/am2.py` | PE loader addressed by VA, resilient linear disassembly, string/xref search |
-| `tools/find_savetags.py` | savegame chunk tags + the file/line anchors that bound translation units |
-| `tools/functions.py` | function inventory with translation-unit attribution |
-| `tools/find_logs.py` | recovers the stubbed-out debug log format strings |
-| `tools/checkdetour.py` | verifies an address is safe to overwrite with a 5-byte jmp |
-| `tools/checkabi.py` | audits declared calling conventions against the machine code |
-| `tools/callsites.py` | exact direct call sites of a function, for observation |
-| `tools/imports.py` | every use of the import table, and which function makes it |
-| `tools/comcalls.py` | COM vtable dispatch — the DirectX calls no import scan sees |
-| `tools/disasm.py` | one function, annotated with imports, COM slots and strings |
-| `tools/coverage.py` | how much of the boundary is reconstructed, and what is left |
-| `tools/am2ctl.py` | client for the control socket — drives the running game |
-| `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
-| `tools/ab.sh` | plays a run on the original code and on ours, and compares |
-
-Most write a `.tsv` into `docs/`. Regenerate in dependency order:
+The Wine-side builds (the injected harness, the Windows standalone) need
+`i686-w64-mingw32-gcc/g++`. The Wine prefix lives in-tree at `.wine/`, is not
+committed, and is always named explicitly:
 
 ```sh
-./.venv/bin/python tools/find_savetags.py
-./.venv/bin/python tools/functions.py
-./.venv/bin/python tools/find_logs.py
-./.venv/bin/python tools/imports.py
-./.venv/bin/python tools/comcalls.py
-./.venv/bin/python tools/coverage.py
+export WINEPREFIX="$PWD/.wine"
 ```
 
-`imports.py` and `comcalls.py` together map the boundary between the game and
-the outside world — the one being closed by reconstruction. Neither alone is
-enough: DirectDraw, DirectSound and DirectInput are reached through vtables and
-never appear in the import table, while the game's own C++ virtual calls have
-the identical machine-code shape. `comcalls.py` separates them by chasing the
-object pointer back to a global.
+The VC6 targets need a Visual Studio 6.0 install. Point `VC6_ROOT` at it (the
+directory holding `VC98/`) and build the host with `make vc6`.
 
 ## Conventions
 
 - Reconstructed code uses `<stdint.h>` fixed-width types throughout
   (`uint32_t`, `int16_t`, …) — never bare `int`/`long` or Win32 `DWORD`/`WORD`.
-  The original is 32-bit x86 where `long` is 32 bits; the target is 64-bit
-  Linux where it is not.
+  The original is 32-bit x86, where `long` is 32 bits; a 64-bit host is not.
 - All addresses are absolute VAs. Relocations are stripped from the executable,
   so it always maps at `0x400000` and addresses are stable.
 

@@ -28,7 +28,7 @@
  * match standalone.h's shared declaration. */
 uint32_t am2_opt_df = 1u;
 /* The float/double CONSTANTS the reconstruction reads out of the carried
- * .rdata blob, transcribed into typed C (STATUS.md's MIGRATION note). Each is
+ * .rdata blob, transcribed into typed C (docs/status-history.md's MIGRATION note). Each is
  * verified to round-trip to the image's exact bit pattern -- the decimal
  * literals below reproduce the stored bytes byte-for-byte -- and every reader
  * is a `*(const double *)` or `*(const float *)` at a known address (the type

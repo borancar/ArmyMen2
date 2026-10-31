@@ -2,7 +2,7 @@
 """Verify every global structure transcribed out of the carried data blob.
 
 The native/standalone builds carry the original's `.rdata`/`.data` at its own
-VAs and read each global out of it; the migration (STATUS.md's MIGRATION note)
+VAs and read each global out of it; the migration (docs/status-history.md's MIGRATION note)
 carves a table at a time into hand-written, typed C and redirects the `ADDR_*`
 macro at the C symbol under AM2_STANDALONE. A transcribed table is right ONLY
 if its bytes equal the image's -- and nothing checked that, so a mistyped value

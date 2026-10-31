@@ -21,7 +21,7 @@ SCEN arm `consumed += size` comes before the `ParseScenarios` call).
 
 ## The compiler
 
-`build/vc6host` (built by `make vc6host`, source `src/vc6/vc6host.cpp` and
+`build/vc6host` (built by `make vc6`, source `src/vc6/vc6host.cpp` and
 `shim.c`) is our own PE loader plus a Win32/MSVCRT shim. It runs the original
 toolchain from `VC6_ROOT` (default `/home/boran/claude/en_vs6_ent`) on Linux
 with no Wine: `CL.EXE`, `C1.DLL`/`C1XX.DLL` (front end) and `C2.DLL` (code
@@ -84,8 +84,8 @@ fairer size measure; the distance double counts.
 (every occurrence is replaced, so anchor it, or a sibling function sharing the
 lines gets the edit too). `make vc6-relink ARGS=--diffs` lists every difference.
 
-A screen is not a build. After a change is adopted run a plain `make`, read the
-warnings, and run `make check`; the relink and `make check` skip some sources.
+A screen is not a build. After a change is adopted run a plain `make` (the native
+port) and `make all` (the injected harness), read the warnings, and run `make check`; the relink and `make check` skip some sources.
 
 ## Reading a difference
 

@@ -38,7 +38,7 @@ import merges
 # The narrative extractions out of CLAUDE.md are checked too: moving prose
 # into docs/ must not move it out of the ratchet's reach, which is exactly
 # how a stale "still original" would come back.
-DOCS = ("CLAUDE.md", "STATUS.md",
+DOCS = ("CLAUDE.md", "STATUS.md", "docs/status-history.md",
         "docs/screen-mpoptions.md",
         "docs/saveload.md",
         "docs/movement.md",

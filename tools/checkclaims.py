@@ -339,6 +339,7 @@ def deadstring_totals():
 PROSE = (
     "CLAUDE.md",
     "STATUS.md",
+    "docs/status-history.md",
     "docs/boundary-notes.md",
     "docs/screen-mpoptions.md",
     "docs/saveload.md",

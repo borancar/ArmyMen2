@@ -1,0 +1,7413 @@
+# Status history (to 2026-10-31)
+
+The dated log `STATUS.md` grew into between 2026-09-04 and 2026-10-31, moved
+here unchanged when `STATUS.md` became a current snapshot again. **Nothing in
+this file is current by default**: each entry is true as of its own date, and
+many headed OPEN were closed later -- the trooper jerkstep (`ac65b13f`), the
+09-10 divergence batch (WHOLE FIXTURE SUITE GREEN, 2026-09-19), the flame-trail
+trap in `flameaim-3587` (identical as of 2026-10-31). For where things stand,
+read `STATUS.md`; for how a subsystem works, the topic docs in `docs/`. Section
+names below (MIGRATION, LINKER PLACEMENT, VC6 BYTE-MATCH, ...) are the ones
+code comments and docs point at.
+
+Last updated: **2026-09-27**: the VC6 toolchain runs natively (no Wine) and the
+reconstruction now recompiles to byte-identical machine code for a first tranche
+of functions (see VC6 BYTE-MATCH below). Earlier, **2026-09-19**: the port builds
+without ArmyMen2.exe (see the build note below), the roach SightScan divergence
+cluster is confirmed closed, and the tankstore bridge divergence is fixed --
+`RunScriptAction` case 0x36 had dropped the point-target FIREWEAPON branch (see
+OPEN DIVERGENCES). Blob-migration history from **2026-09-11**, when
+the first global structures were transcribed out of the carried data blob (see
+MIGRATION below).
+
+## VC6 BYTE-MATCH (2026-09-27): the reconstruction recompiles to the shipped bytes
+
+The Visual C++ 6.0 toolchain now runs natively on Linux with no Wine, via our
+own PE loader over a Win32/CRT shim (`src/vc6/`, `make vc6` -> `build/vc6host`,
+the same trick as the hybrid game loader). `make vc6-match` recompiles each
+`patch_replace`'d reconstruction with the *original* compiler at /O2 and
+byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
+
+Piecewise: **399 of ~1640 compiled `src/game` functions are byte-identical as
+written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
+`make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
+class (unsigned `jb` where the original compared signed `jl`) is closed --
+ResetTimers and the four sprite/sound table-walk loops now spell the compare
+`(int32_t)`.
+
+**The `AM2_IMAGE` fold (+36)** was the largest single lever: in the injected and
+byte-match builds `am2_image_slide` is always 0, so `AM2_IMAGE(addr)` now folds
+to the plain `((void*)(uintptr_t)addr)` there (only the relocatable standalone
+build keeps the runtime `addr + slide`). That reproduces the original's direct
+`[addr]` access instead of an `addr + slide` read it never had -- see
+`src/game/image.h`.
+
+**Thiscall functions are now modelled as C++ classes** so MSVC 6 recompiles them
+as the thiscall members they were (a free `__attribute__((thiscall))` function
+can't be spelled thiscall in VC6, so the byte-match compiled it __cdecl and it
+never matched). ~178 functions across 6 classes -- AM2_Widget (147), AM2_Comm
+(14, spanning msgslot+misc), AM2_Movie (7), AM2_Rec (7), AM2_SelList (2),
+AM2_Bitmap (1). The body is untouched (first param re-aliased to `this`), inline
+thiscall forwarders keep every call site and the caller codegen byte-identical,
+and install goes through `pmf_addr(&Class::Fn)`; verified codegen-neutral for
+the GCC build. Left free: functions flat modules forward-declare with `void *`
+(comm-networking in commmsg/dplay) and the AM2_*_DTOR macro pairs.
+
+What matches is bounded by the piecewise model, and characterising that is the
+main result so far (details in `src/vc6/README.md`):
+
+- **Matches now:** leaf functions, and functions that touch original globals
+  only as absolute scalars (`mov [abs]`) or call reconstructed siblings.
+- **AM2_IMAGE is gone (917 sites -> 0).** Every global the reconstruction
+  reached through the `((T*)AM2_IMAGE(ADDR))` slide-wrapper is now a spelled-out
+  placed symbol reached directly: 154 .bss globals migrated to typed
+  `am2_origstate` members (extracted to `src/game/origstate.h` so standalone.h
+  can name them), the rest redirected to their existing placed symbols, and all
+  sites converted to `((void*)(uintptr_t)(ADDR))`.  `am2_image_slide` is 0 in
+  every build that runs the reconstruction, so the conversion is identical
+  codegen for native/injected/hybrid (all build clean) and the relink; piecewise
+  stays 354, relink 468, checkplacement/imagedata/seams green.  `am2_image_slide`
+  survives only for the offline selftest's image loader -- and that Wine PE still
+  MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
+  style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
+  is unaffected.
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1578 of
+  1646 byte-identical (2026-10-10), piecewise 399.** ParseScenarioPart
+  matches: `took = 8` before the first count test, no separate
+  `count <= 0` return ahead of the row loop, and `rows = p->rows =
+  malloc(...)`. Also: FindPath 82 -> 60 (the budget test's refusal
+  written in its own arm), SightScan 78 -> 66 (the kind-7 arm scores in
+  place, `score:` at the loop end), ScriptParseActionRecon 243 -> 234
+  (DROPITEM jumps into 0x1F's count test). Sixth round (2026-10-11): ScriptIf
+  had a behaviour bug the relink exposed -- `timeabsolute N` jumped past
+  the testvar clause the original then parses; fixed (bytes 8 -> 12 after
+  re-shaping). RegionFindPath 11 -> 4 (the row shift as a uint16 cast),
+  Step3Drive 83 -> 61 (two nested AngleDelta calls computed before their
+  Clamp, the gun row taken after the turn-state call, copies re-read),
+  SightScan 66 -> 52 (its sight test opens as AM2_AI_SIGHT_TEST does,
+  AngleOfDelta getting the unread distance argument), MpPanelScreen 27 ->
+  23 (the row loop on the army-points pointer, colour reset first),
+  UpdateTrooperAction 99 -> 90 (one move call with the value chosen
+  first), FindPath 60 -> 56, ObjHitMaskAction 54 -> 51, AiTrooperStep
+  52 -> 47, ScriptPad 110 -> 105 counting code only (each pad-centre scan
+  declares its own locals; the jump table after the code had been
+  inflating its score, and ScriptParseActionRecon's, by about a hundred),
+  SelectFirePose 34 -> 24 (`case 43` written where the image lays it out;
+  the order of a switch's case bodies follows the source), ObjTileHook to
+  shape 0 (its five flags zeroed in the image's store order), DepthInsert
+  6 -> 3 (`link_after` before the cursor re-read). Counted with registers
+  AND stack slots treated alike (a spill is register allocation too, as is
+  `lea` against `add` and a zero register against an immediate 0), 18 of
+  the 68 differing functions have the image's shape and the rest total
+  832. Much of what remains follows from register choice rather than
+  source: VC6 cross-jumps two identical tails only when their registers
+  agree (PointerPickMode0, HudPostUpdate, FlowRecvMessage, ScriptPad's
+  inlined ScriptExpect copies), and block placement that four source
+  orderings of UpdateTrooperAction's stop arms all compiled identically.
+  Then registers on the ones already at the image's shape: DepthResort
+  matches (its unlinks written straight through `n`, without the `pv`/`nx`
+  copies, and the backward walk's ran-off-front arm inside the loop),
+  PointerActionMode5 matches (an empty selection returns before the anchor
+  is read), ObjTileHook 22 -> 18 bytes; the relink is at 1580. The rest of
+  that set resisted every spelling tried: WndProc's PAINTSTRUCT slot,
+  MovieStart's `delete`, LoadOptions' epilogue copy, ShotHitsObj's refusal
+  survivor, OptionsDefaults, SelectionClick and TrooperFire one scratch
+  register out, PointerPickMode6's split of `o`. Later rounds, by scanning
+  the listings for one tell at a time: UpdateTrooperAction 86 -> 30 (three
+  stop arms, each with its own copy of the body), ScriptPad 96 -> 87
+  (PadFinalise written twice), Step3Drive 42 -> 30 (the turret stamp
+  through `turret`, the aim spot reset as one struct, FireWeapon with the
+  byte heading), SightScan 32 -> 26 (a null test the image repeats),
+  AiTrooperStep 37 -> 32 (a uint16 waypoint index), ObjHitMaskAction
+  48 -> 45 (a cell index beside the pointer), DrawMapObjects 190 -> 92
+  bytes. The register-normalised total over the 50 still off in shape is
+  737. Eighth round (2026-10-11), after finding that the sweeps scored an
+  exact match as a regression (an empty listing): DiedEffectB,
+  HudEdgeUpdate (captionB cleared through the widget, then taken as a
+  pointer), Type2PlayerInput (the keep-facing test as two arms) and
+  CollapseEqualDeltas (no inner counter of its own) match, so the relink
+  is at 1585. RegionFindPath 24 -> 6 bytes (the path copied by index).
+  DamageTrooper logged `UIDN:%x` where the image's string is `uid:%x`;
+  fixed. Then ViewUpdate 238 -> 112 bytes (the snap arm's eye takes each
+  word from the register it was loaded into), LoadMap 300 -> 296 (each arm
+  stores the record's owner), and AirFrameDraw reaches the image's shape by
+  testing the sum rather than `f`, which keeps VC6 from folding the
+  increment to a constant (bytes 58 -> 74: two registers swap). Counting
+  `inc`/`dec` on a register as the `add`/`lea` it replaces, 43 functions
+  are still off in shape, about 700 in total. Then PausedFrameStep
+  reaches the image's shape (the badge drawn by two calls rather than a
+  ternary argument, `badge` an int32: 482 -> 4 bytes), the HudPanel
+  constructor (`%i`, as the image's literal) and UpdateTrooperAction
+  28 -> 10 (BlockWeightRoute takes the fifth argument every caller pushes,
+  the stop arms written in different orders so VC6 keeps them apart,
+  `klass` an int32): 41 off in shape. Then ScriptPad 87 -> 60 (the
+  delay's second integer check written out, so VC6 does not merge it with
+  the first; 726 -> 648 bytes), FindPath 51 -> 50 (the budget test's frame
+  charge doubled at both uses, as its `lea` has it), ListMaskAction 43 -> 41
+  (the row walk has no entry test) and SelectFirePose 22 -> 21 (the bazooka
+  kneel arm returns where it sets the pose): about 625 in total over the 41.
+  Then ScriptParseActionRecon 129 -> 74: where the image keeps two copies of
+  an arm's tail and VC6 had merged ours, two statements are swapped in one
+  copy (SETFACING's VARNAME, ADDEXP, INACTIVATEREGION); TRIGGERDELAY's refvar arm folds
+  its step into its own end-of-script test; and the creates' location and
+  army tail is written out per arm instead of through one inline helper
+  (docs/vc6-regalloc.md). Then HudSquadUpdate 16 -> 7 and SelectFirePose
+  21 -> 20, each by an if/else where ours stored a default and overwrote
+  it. About 560 over the 41. A function that ends in jump tables has those
+  tables read as code by the shape count, so a change in its length moves
+  the count by a few even where the code itself matches better; score such
+  a change on the code alone (up to the first table). Then the
+  MpPanelScreen constructor 19 -> 18 (its army-points loop compares the end
+  address signed, `jl`), RegionFindPath to the image's shape (the next open
+  head read through CUR) and ScrollMapCache 11 -> 10 (BltFast's `This` read
+  from the global), the last two from substituting a copy for its source
+  one use at a time. DepthInsert 3 -> 2 (append through the cursor, which
+  is `at` on both ways in) and AiTrooperStep 16 -> 14 (the waypoint test
+  reads `moveAt` itself) by the same substitution: 40 off in shape, 551 on
+  code alone. Each candidate the sweeps offer must be read before it is
+  kept -- most substitute a value that is NOT equal on every path. Then
+  FlowRecvMessage 16 -> 15 (the data arm's sequence read through `msg`),
+  SightScan 28 -> 25 (`cand` cleared first and set when not refused; the
+  retry deadline stored before the sight count), Step3Drive 29 -> 28 on code
+  (CanPickUp takes the unread second argument it is pushed), MissionEnded
+  4 -> 2 and AiTrooperStep 14 -> 12 (stores moved into the image's order)
+  and ScriptParseActionRecon 70 -> 68 on code: 40 off in shape, about 540
+  on code alone. Statement-move sweeps (adjacent, two to six apart, and past
+  whole blocks) offer many candidates that read a value before it is set;
+  read every one. RowUpdate 13 -> 12 (the top written through a pointer to
+  the rect) and RefundPlacedUnit to the image's shape (a volatile re-read of
+  the follower uid; docs/vc6-regalloc.md): 39 off in shape, about 538 on
+  code alone (487 counting a constant held in a register as a register).
+  Then ObjHitMaskAction 40 -> 24 and ListMaskAction 41 -> 32, from how the
+  ring-marking helper is written, the column and row-end counters as words,
+  and the box stores in the image's order (docs/vc6-regalloc.md); SightScan
+  25 -> 23 with the rank's sight range re-read at each box edge: about 511
+  on code alone over the 39. HudPostUpdate 8 -> 4 (the idle overlay row
+  re-read), FindPath 50 -> 47 (PathUnwind indexes `out[i--]`, so the
+  pointer forms after the `end` test as the image's does) and ScriptPad
+  60 -> 53 (the pad slot takes g_padCount itself, not the id read back) and
+  ObjRemap 7 -> 6 (the bottom cell from the saved top) and MpPanelScreen
+  18 -> 11 (the arrow bar's span read at its use): about 489 on code
+  alone -- and 487 once the per-TU scorer's symbol table was rebuilt
+  (it dated from before the trooper-AI retyping, so a retyped callee's
+  pushed address scored as `push 0`: SightScan 23 -> 21, WndProc's last
+  byte was that and not a relocation; docs/vc6-regalloc.md). A per-hunk
+  sweep of every function then (each hunk read with its raw context, asking
+  what expression makes VC6 emit the image's load or store): Step3Drive
+  30 -> 21, ListMaskAction 32 -> 29 and ObjHitMaskAction 24 -> 21, RowUpdate
+  12 -> 10, EncodeGlyph 11 -> 10, UpdateTrooperAction 10 -> 5, ScrollMapCache
+  10 -> 9: 39 off in shape, 465 on code alone. The dead reads, impossible conditions and similar edits are listed in docs/numberwins.md for review. In bytes: 6,402 (register-only residues, the masked check in docs/bytematching.md: UpdateTrooperAction, ScriptParseEvent, ScriptPad, and FindPath by the spill rule (confirmed by Boran, 2026-10-26); SightScan and RowUpdate are not; 610 after ScriptPad 10 -> 16, trading distance for a residue that is register choice only -- the `sy` store moved between n's load and store, as the image orders them; 604 after LoadMap returned to the plain TRIG compare, 2 -> 356, withdrawing the `sub` number win; 250 after FindPath 54 -> 32 (the two-spelling distance helper, `nb = (cur & 0xFFFF) + *sp`, `g = (uint16_t)(dd + node.g)` and the flag byte through a pointer local, together), 272 after LoadMap 12 -> 2 (the reveal-grid slot pointer built from an integer expression with a runtime read, so c2 loses its provenance and keeps the store ordered before the map-size reload; toy-clone method), 282 after TrooperFire 6 -> 0 and OptionsDefaults 4 -> 0, UpdateTrooperAction 18 -> 8, ScriptPad 12 -> 10 (never-true pairs on a byte field of a register-held pointer each supply one rotation-cursor event with no code; the total event count must stay = 0 mod 3 downstream; see docs/numberwins.md), 304 after ListMaskAction 6 -> 0 (the loop text of the matched sibling ObjHitMaskAction transplanted: `bias` named inside the do-loop is hoisted to the preheader, `cx` and `tab` inlined) and MpPanelScreen ctor 6 -> 0 (a named local `ys = 37 + i * 32` flips the loop latch's induction-update order in an EH-frame function at zero code cost), 316 after ScriptIf 4 -> 0 (a relink-only own symbol `am2_rl_scriptif_end` for the repeated "Unexpected end of script." address stops VC6 cross-jumping identical tails the image keeps apart) and PausedFrameStep 4 -> 0 (pointer `xy` replaced by an index `shown`), 324 after SightScan 38 -> 26 (the weapon arm's `DistAndAngle` third argument through a pointer `kp` assigned `&keep->pos` in both branches of `if (flags)`: two reaching definitions make `kp` a coloured web instead of a rotation temporary, so it stops advancing the temp-register cursor and the other two `lea` temps land in ecx/edx as in the image; the same trick as UpdateTrooperAction's `pos`), 336 after ObjRemap 90 -> 0, REWRITTEN FROM THE IMAGE a second time with all the levers found since the first re-derivation (scored 278 at first, 218 once the layout matched: the off-grid arm at the end, the volatile read of x only; pairs on the flag test took it to 70, a permutation search over the six hit statements to 0): `if (!force) { if (PointsEqual(...)) return; }`, `y = o->pos.y` plain and `x` through a volatile dword read, the hit stores in the order left, hit.left, top, hit.right, hit.top, hit.bottom, two never-true pairs in the flag test (`force == 1000 && force == 1001` and `d->shift == 1000 && d->shift == 1001`: exact-parity triggers, each alone gives 48), `shift = d->shift` hoisted, the skip-unchanged walk test as `continue`; the two old dead volatile reads and the unreachable one are gone; 9 bytes shorter, now the image's 536), 426 after ObjHitMaskAction 8 -> 0 (the guard moved before the `f.end` store and the `c` computation, with a never-true pair written on the INLINE product: a pair in an already-live condition ahead of the consuming statement makes c1 evaluate that sub-expression at the pair, fixing its IL position without emitting code; a one-use named local is forwarded and gives 60, a named local plus a pair on it 2), ListMaskAction 14 -> 6 (the same with a local `cx` and a pair on it) and ScriptParseEvent 22 -> 18 (the never-true pair moved from the line to `ctx->tokens`, which makes the base pointer a shared value), 446 after FindPath 66 -> 54, a three-edit SUBSET that only works together (each alone is worse: `uint16_t after` 98, `before = 0` moved after the `if (!from)` block 100, `dd <<= 1` with a never-true pair on `dd` 132; the first two 90; all three 54): the combination brings the function to the image's length (1798), and when the length matches the jump-displacement differences all disappear), 458 after Update3DAudioVolumes 2 -> 0 (the slot's buffer tested through the array element, `g_dynamic[i]->buffer`, and read for the call through a pointer to the same element, `dyn->buffer`: two spellings of one object, so the second load is a CSE of the first and leaves the image's `mov eax,ecx` copy; the reverse order gives 26; the volatile test and the `buf` local are gone) and LoadMap 18 -> 12 (the `numb` store through `objs[index]` instead of the volatile through `r`, where `r` is `&objs[index]`: it lands after `xor eax,eax` as in the image), 466 after HudPanel ctor 6 -> 0 (`self->stop = w->x; ...; g_hudPanelX = this->x;`: two spellings of ONE base object make c1 treat the second load as a CSE of the first, which leaves a register copy (`mov ecx,eax`) where a reload was; a named single-use local, an inline wrapper, a cast and `::Wrapper(w, ...)` were all forwarded by c1 and gave no copy; `w`-then-`this` is the order that works, the reverse gives 68 and the `self->` spellings 164; this also drops the last dead volatile read in HudPanel), 472 after MpPanelScreen ctor 30 -> 6 and HudPanel ctor 22 -> 6: in a function with an EXCEPTION-HANDLING frame (any function holding `new T(args)` with a constructor, or a local with a destructor) c1 does not forward a single-use named local, or a load passed through a static-inline wrapper's parameter, into its use, so the load becomes a named web coloured globally with no rotation event; the DIRECT MEMBER CALL `w->WidgetAddChild(x)` makes it an ordinary rotation temporary. `::WidgetAddChild(w, p->typeBox)` became `w->WidgetAddChild(p->typeBox)` (same call; the wrapper forwards), and in HudPanel the `pointsField` store moved before `btn->disabled = 1`, the image's order (it differs from the old order only for a null `btn`, where both orders fault), the old dead read of `self->open` dropped), 512 after ObjRemap 92 -> 90 (the volatile read of `pos.y` before the one of `pos.x`, and the six hit stores as right, top, bottom, left, hit.top, hit.left; two independent reads of one object with no writes between, equal for all inputs), 514 after AddToItemList 8 -> 0 (the counter read once into `n`, stored back as `*counter = n + 1`, plus a dead `if (owner > 7) break;`: `owner` is `id & 7` so it never leaves, but it keeps `owner` live past the load, so the load takes ecx as in the image and VC6 stops sharing this arm's store with the overflow-path tail; alone the cached-counter form costs 58 to 162), 522 after ScriptPad 84 -> 12, by deliberate design from the allocator's penalty vector: the g_padCount web's allowed set {ebp, edi} tied at penalty 0 and the earlier candidate (edi) won; the shared zero web had cost -1 and allowed {ebp}, so inert; writing `n = 0` before `i = 0` in the second scan's initialisers gives the zero web cost +1 and allowed {ebp, edi} with hints (ebp,1) and (edi,2), so g_padCount takes ebp (52 of 720 initialiser orders do it; every one has `n = 0` before `i = 0`; `i = 0` inside a `for` init costs an extra `xor edi,edi` and shifts the jump table by 2). The trigger switch regrouped (HALFTRACK after NPC, GREEN/ARMY0 merged, GREY and ARMY3 split) so the three flag constants hoist 0x200, 0x40, 0x80 as in the image: hoist order follows first use in the IL, ties go to the higher web id, and a web's key rises with the number of blocks that reference it. Alone the regrouping is worse (104). Neither edit is a number win), 594 after ScriptPad 158 -> 84 (the first scan loop back to a plain `for`, with `n` stepped as a volatile read into a named temporary then a volatile store, after `sy` as in the image: the temporary is a web of its own in the loop body and raises the counter's key above ctx's, so the counter takes edi and ctx ebx; the 6-byte difference latch that shifted the jump table is gone and the function is the image's length, 2072; both the volatile read AND the volatile store matter: read only 90, plain `n++` 200 or more), 668 after ObjRemap 96 -> 92 (the position read through volatiles into temporaries: the x through its dword, `(int16_t)t`, the y as an int16; the old dead reads stay; a single int32 read of both halves would change `x`, so the cast is what makes it equal) and the last impossible pair removed from FindPath (distance unchanged), 672 after MissionEnded 12 -> 0 (`g_attemptCount = 0` stored plainly, and the level index through a volatile read into a temporary then a plain write, `{ int32_t t = *(volatile int32_t *)&g_levelIndex; g_levelIndex = t + 1; }`: the volatile read is a scheduling barrier, so the independent plain store lands inside strcpy's expansion as in the image; the old volatile-store hack is removed at the same time, the pair is a unit) and OptionsDefaults 10 -> 4 (`{ uint32_t t = *(volatile uint32_t *)&flags; mask = t; }` in the `-r->which` arm; the only residue is `neg eax` against the image's `test eax,eax`), 690 after EncodeGlyph 6 -> 0 (the image's row counter is a real frame local counted DOWN from `height`, entered through a `height > 0` guard; the old up-counting loop was strength-reduced onto `height`'s argument-home slot: `if (height > 0) for (f.row = height; ; ) { ...; if (--f.row == 0) break; }`), 696 after MpPanelScreen ctor 60 -> 30 (found by re-deriving the function from the image first: the army points need a symbol of their own. In the image the loop keeps `&army_points[i]` as a separate induction variable in a frame slot and tests it against the end address; `g_armyPoints` is a view into the 0x00515FD8 settings aggregate, which VC6 folds into the panel's own induction variable. A real `extern` array symbol `am2_rl_army_points; /* 0x00515FE0 */`, mapped by the address comment as the other `am2_rl_*` are, keeps it separate, and the pointer-loop hack is replaced by an index loop), 726 after ScrollMapCache 138 -> 0, REWRITTEN FROM THE IMAGE DISASSEMBLY before looking at the old source: the full repaint last, reached by forward jumps from the `g_fullRedraw` test and both size tests (nested `if (!g_fullRedraw) { ...; if (abs(dx) < W && abs(dy) < H) { ...; return; } }`), `abs(dx)`/`abs(dy)` written at each of three uses instead of named locals (the named locals took ebp and moved the frame), the strip order `tall.left = right - dx; tall.right = tall.left + dx; wide.right = tall.left`, and block-local `nx`/`ny` in the camera blocks. The old hacks (`tt`, `px`, the clamp order) are gone, 864 after HudSquadUpdate 20 -> 0 (the true 16-bit compares `hp <= (int16_t)(mh >> k)` plus one impossible pair on `obj->uid` inside the SQUAD_BAR clamp test: the pair's load is shared with the existing `uid` load, so no instruction is left, and the extra web lowers the record pointer's key from 68 to 64 so the divisor temporary takes ecx and the pointer esi), 884 after ScriptPad 178 -> 158 (plain `kind == CONTROL_CHAR`, the dead read of `number` gone, HALFTRACK moved after ARMY1, and the first scan loop as a guarded do-while with a difference latch `i - total + 1 < 1`, whose temporary is a web that raises the counter's key from 84 to 92 above ctx's 86 so the counter takes edi and ctx ebx as in the image; none of the pieces works alone: 230 to 232), 904 after SightScan 52 -> 38 (the two score-block increments swapped to the image's order, both as volatile read-modify-writes; volatile accesses are scheduling barriers, which moves the AngleDelta argument loads; neither change helps alone: swap 64, one volatile 118 to 134), 918 after HudSquadUpdate 86 -> 20 (the three sibling arms' common stores written once after the colour chain, `hp` and `mh` read after SQUAD_BAR, the compare spelled `hp < X + 1`, which is identical to `hp <= X` for every int16 and lowers the record pointer's key from 68 to 64 so `hp` takes ecx first and the pointer gets esi; the 16-bit compare form ties and loses) and ScrollMapCache 142 -> 138 (`tt` a volatile read of `tiles.top` used twice, as the image reloads it once), 988 after SelectionClick 8 -> 0 (the plain-click path written first with its own copy of the tail, the ctrl path after it: c2's scratch-register rotation walks blocks in SOURCE order, so the ctrl arm's zero-point load is reached after the first tail's and lands on ecx as in the image; the duplicated tails cross-jump back into one; the old and new call traces were checked over 168 cases), 996 after ObjRemap 108 -> 96 (the dead read of `y` moved from after the `hit.bottom` store to after the unreachable `return`, and the six `hit` stores in the image's order: right, bottom, top, left; found by enumerating topological permutations of independent statement groups, which one-move swapsearch cannot reach) and RowUpdate 164 -> 154 (a dead read of `rect.left` after the rect stores), 1,018 after ScriptParseActionRecon 42 -> 0 (the SETITEMFLAG `kn` web dropped so the kind-name load sits in the error block as in the image; one impossible pair in a call-argument ternary in the setspeed log resyncs the rotation cursor; the second damage-kind expansion in setdamagepad written out by hand with an `ActHasKindWord` helper so its early exits land on the image's last return-1 copy; the three edits are one unit), 1,060 after Update3DAudioVolumes 12 -> 2 (a volatile test of the buffer field, then a plain read of it, replaces the self-referential ternary: the volatile load is a separate single-use temporary) and ScriptParseEvent 24 -> 22 (PADOFF back to `!=` now that the argument-list pairs put the loads in place), 1,072 after TrooperFire 26 -> 6 (`def` replaced by `w->typeRec->kind` twice, which turns a web into rotation temporaries and shifts every later temp one slot, then one impossible pair on `o->facing` in each of two later conditions resyncs the cursor; the three edits are one unit) and ListMaskAction 18 -> 14 (a pair on `f.world.top` in the `bits[off]` test), 1,096 after DrawSelection 22 -> 0 (`obj->health > 0` tested directly, no `hp` alias, and two impossible pairs on `drop` in the `mh / 2 < wide` test; k=2..4 all give 0, k=1 gives 170) and two obsolete `goalTile` pairs removed from FindPath (distance unchanged), 1,118 after DirtyCollect 10 -> 0 (`at = e->next` so the `at*20` temp is a rotation temp, not a shared web), StepRowAnim 12 -> 0 (pairs on `anim->cells` and `r->sprite` instead of on `g_spriteList`), ScriptParseEvent 30 -> 24 and OptionsDefaults 12 -> 10, from the scratch-register rotation model in docs/vc6-regalloc.md (tools/c2rot.py), 1,148 after DrawSelection 28 -> 22 (`hp = obj->health` is the value injected in each arm instead of `maxHealth`; against the full image the gain is 3 bytes, 35 -> 32, since the function got 3 bytes shorter), 1,154 after ParseScenarios 26 -> 0 (the parameter used in place, `!digit` back, and the two entry stores of 0 written as one 8-byte `memset` as FreeScenarios does: the stores gave the shared zero web a cost, and with `test al,al` making it a singleton {ebx} it charged ebx 100 to every web coloured before it) and DrawSelection 68 -> 28 (`int32_t fill`; the RECT stores left, right, top, bottom; `maxHealth` read into `mw` in each arm of the earlier branch, which adds a live web there and raises `drop`'s key above `wide`'s), 1,220 after FindPath 68 -> 66 (the pointer-walk bound compared as `intptr_t`, which gives the image's signed `jl`; intptr_t keeps it exact on the 64-bit port), 1,222 after FindPath 120 -> 68 (the column mask held in a local, `PathDistXYM`, so the two masking ands consume it in the image's order; a pointer walk over `g_tileStep8` initialised before `considered += 8`; `toTile` uint16_t, `h` int32_t, a `dd` local; the 66 form compared the pointers as int32_t, which would truncate on the 64-bit build, so the plain pointer compare is used), 1,274 after BlockWeightTroops 30 -> 0 (`return (int8_t)w == 0 ? w : w;` byte-restricts `w` to a singleton {ebx}, so the webs coloured before it avoid ebx) and ParseScenarios 38 -> 26 (`digit < 1` for `!digit` removes a byte use of the shared zero web that had charged ebx 100; found by instrumenting C2.DLL's colouring pass), 1,316 after RowUpdate 138 -> 164, a CORRECTION: the earlier `(uint32_t)(cl) <= (uint32_t)(0)` clamp was true only for cl == 0 and left a negative cl unclamped (a rect hanging off the left edge); it is `cl < 0 ? 0 : cl` again, and the dead read of `rect.left` that went with it is gone, 1,290 after HudPanel ctor 30 -> 22 (`btn->disabled = 1` stored before `self->pointsField = btn`; a plain statement order, found by swapsearch with MAXMOVE 24), 1,298 after BlockWeightRoute 16 -> 0 (the first distance shares a frame struct with the escaping leg copy instead of being a volatile local), ListMaskAction 24 -> 18 (`y` loaded a second time from `f.world.top`), UpdateTrooperAction 22 -> 18 (arm 1 in the image's store order, ending in `goto settle_facing`, plus a pair on `i`) and HudPanel ctor 32 -> 30 (`w->x` read once into `px`), 1,326 after SelectFirePose 114 -> 0 (every switch arm that ended in `break` before the shared `return 1;` now returns directly, and the `raise_k` label is inlined, so the epilogue copies VC6 cross-jumps match the image's; found by toggling `break;`/`return 1;` sites), 1,440 after SightScan 76 -> 52 (the three dead volatile reads in `finish:` had gone obsolete and cost 10 bytes the image does not have; deleting them together is the win, any one alone is worse), 1,464 after RowUpdate 154 -> 138 (both impossible pairs gone, a dead read of `rect.left`, an unsigned `cl` compare), ScrollMapCache 148 -> 142 (a named `px` and a dead read of `tiles.top`) and SightScan 86 -> 76 (the best-score stores reordered, a dead read of `o->pos`), 1,496 after BlockWeightRoute 26 -> 16 (the impossible pair on `f->pos.x` went obsolete once other levers landed, and it also read `fl` before assignment, so deleting it is a cleanup), 1,506 after ObjRemap 124 -> 108 (`y` widened to int32_t and `cb` built from `top`, which reproduces the image's spill of `top`; the old dead reads of `desc->cols` and `o->flags` went obsolete and two new ones, of `y` and `o->pos.y`, took their place), 1,522 after ScriptPad 182 -> 178 (the specific-item name resolves into `number`, so it shares that frame slot as the image does), 1,526 after Update3DAudioVolumes 16 -> 12 (a self-referential ternary gives `buf` a second reaching definition; the old dead read is gone), 1,530 after DrawMenuCursor 30 -> 0 (a dead volatile read of `g_menuRow` after the return in TickMenuAnimation, and `f >= 0`), 1,560 after OptionsDefaults 16 -> 12 (`-r->which` test and `disabled` stored before `checked`; the dead read of `bit` is gone), 1,564 after ScriptIf 8 -> 4 (unsigned compares keep the three end-of-script blocks inline; the STEP_LATE_R macro is gone), 1,568 after ListMaskAction 56 -> 24 (a loop-index copy `y` kept in step at the latch gives the image's `mov esi,eax` at loop entry; two impossible pairs in the rowbits guard shift the rest into place) and BlockWeightTroops 58 -> 30 (the first distance taken into a named local first, as the image takes it, which frees f's register and reproduces the per-iteration reload of f; two more impossible pairs on o; w as uint32_t), 1,628 after the MpPanelScreen constructor 292 -> 60 (the score-limit tail written out in each arm, which VC6 cross-jumps back into the image's per-arm `mov esi,eax` plus shared `xor esi,esi`; the type box and chat box reached as p->typeBox and p->chatBox instead of *slot, which flips the first loop's register rotation back; the old g_nameTableCount dead read, which only compensated the join mismatch, removed) and ObjRemap 132 -> 124 (the off-grid checks in the image's order, rows before cols, the clamps cl then ct, and a dead read of desc->cols), 1,868 after PointActionC 14 -> 0 byte-identical (two more impossible pairs on o at the second condition, after the ternary), StepRowAnim 20 -> 12 (two impossible pairs on g_spriteList in the sprite test; the pair count matters by parity) and OptionsDefaults 18 -> 16 (box->disabled stored after box->checked), 1,892 after PointActionC 24 -> 14 (the sprite address through `sp = o ? &rows->sprite : &rows->sprite`, a second definition that gives the image's `lea ebx,[edi+4]`, and a second impossible pair on i) and LoadMap 28 -> 18 (DEFAULT_LAYER written out for the slot loop with a volatile pointer store, and a volatile store of numb), 1,912 after RowUpdate 156 -> 154 (the first clamp `<= 0`, the second `< 1`) and ScriptPad 186 -> 182 (the dead read in the unexpected-symbol arm reads number instead of name), 1,918 after BlockWeightTroops 74 -> 58 (ref taken by reference in the helper, impossible pairs on f and o in the helper's refusal guards, and an early copy of ref in the caller) and ScriptParseEvent 38 -> 30 (the pad macro takes its kind test as an argument: != for PADON and a difference for PADOFF, plus a named name pointer), 1,942 after UpdateTrooperAction 122 -> 22 (a self-referential ternary `pos = klass ? pos : &o->pos`: the false arm is a different tree with the same value, so c2 keeps pos as a real variable and the branch folds, leaving no dead compare), SightScan 100 -> 86 (a null weapon goes to score, the dead read of the candidate moved to the end) and HudSquadUpdate 100 -> 86 (the dead read now an int16 read right after mh), 2,070 after LoadMap 66 -> 28 (the object loop back to `i < objCount`, which brings back the image's loop-entry re-test of the count; one impossible pair instead of two; the owner guard back to `!=`; the three only work together) and BlockWeightRoute 40 -> 26 (f's heightSet read first through a volatile byte, and the first distance stored straight to a volatile local so it goes to its slot instead of through edx), 2,122 after FindPath 126 -> 120 and RowUpdate 160 -> 156 by pairs of impossible-pair raises on different variables (each alone makes it worse, so no single-edit sweep sees them; found with an exact one-function clone at 0.1 s per compile, and a pair-of-pairs search), 2,132 after SelectFirePose 142 -> 114 (the ten-term pose chain as a flag-returning inline function BracedPose, which makes VC6 lay out every site aimed-first with jne to the shared raise block, a second stand-raise label raise_s2 for the GREN default, and the kneel sites returning inside the aimed arm) and ScriptPad 192 -> 186 (a dead volatile read of name before the return 0 of the comparison switch default), 2,166 after UpdateTrooperAction 142 -> 122 (the three later stop arms written with identical bodies, the bearing stored through the volatile reload as an expression with no named alias; had/want stores swapped), 2,186 after SightScan 202 -> 100 (the one shared score block after the kind-7 arm that the image has: the candidate moved out of the struct whose members escape into a second struct so it is no longer reloaded after every call, the kind-7 arm jumping to score, a null weapon going straight to next, the allied arm's tail rewritten so it never branches to score conditionally with a dead volatile read plus a retest of the candidate, and the two counters incremented in the image's order; c2 places a join block after its last predecessor that reaches it by a real edge), 2,288 after Step3Drive 222 -> 0 byte-identical (a block-scoped `want` holds the ramp speed so that only the limiter writes the `speed` frame slot, with plain ifs for the two halvings and the limiter arms written `if (want <= v) speed = v; else speed = want;`; and the turret aim no longer a named local, because any named byte local gets the spill-and-reload through a byte slot: `swing = AngleDelta(o->turretFacing, r->aim = (uint8_t)(r->aim + turn))`; the two edits only work together), 2,510 after HudSquadUpdate 176 -> 100 (a dead volatile read of the loop counter after the destroyed-flag test, which takes its address) and the MpPanelScreen constructor 310 -> 292 (a dead volatile read of g_nameTableCount before the map list), 2,604 after OptionsDefaults 26 -> 18 and Update3DAudioVolumes 26 -> 16, one dead volatile read each (r->bit; g_dynamic[i]->buffer), 2,622 after LoadMap 98 -> 66 (impossible pairs on g_gameOverFlags in the item arm), the HudPanel constructor 100 -> 32 (h and x read straight from the widget, plus two dead volatile reads that stand in for a register copy the image has), BlockWeightRoute 54 -> 40 (a second impossible group on f->pos.x and fl) and ObjRemap 156 -> 132 (a dead volatile read of the flags between cr and ct); dead reads and impossible pairs must use values the function already reads, harvested from the body, 2,760 after UpdateTrooperAction 166 -> 142 (impossible disjuncts on `want` swap had/want into the image's registers; two stop arms load the volatile out pointer first, found by a joint search of the four arms), 2,784 after ObjHitMaskAction 134 -> 8 and ListMaskAction 174 -> 56 (a named local `bias = 0xFFFFFFF0 - out` defined inside the do-loop is hoisted to the loop preheader without becoming an induction variable, which is the image's per-row ebx constant; with ebx taken `marked` stays in memory on its own; a redundant `if (rowbits == 0) return 0;` at the top of the row body keeps the hoist from leaving the row loop; the ring index is computed before the OR so byte registers are scarce; ListMaskAction also reads the loop top through a pointer to the world rect and has rowbits as int32_t again), 3,028 after UpdateTrooperAction 302 -> 166 (pos given two reaching definitions, `klass ? &o->pos : &o->pos`, so it is not propagated away and the image's `lea edi,[esi+0x12]` appears; rows loaded late; the four stop arms share one `speed = 0` tail; AngleDelta reads out->bearing; frame-slot order follows reference counts, so removing the repeated speed stores put turned, i, speed in the image's order), 3,164 after ViewUpdate 10 -> 0 (each loaded word through its own int16_t local, stored to the global first), AirFrameDraw 44 -> 0, DrawMapObjects 18 -> 0 and PointActionC 30 -> 24 by a new lever: impossible disjuncts on a variable (`|| (v == 7 && v == 8)`, distinct constants per pair) fold away in the code but add to the variable's pre-CSE use count, which decides the callee-saved register order; they must sit in a live condition and identical pairs are merged, so DrawMapObjects needed four pairs), 3,242 after SightScan 218 -> 202 (the kind-7 arm stores the candidate first, then the bearing call, then tests keep rather than the stored copy; the best of all 168 orderings of its seven statements), 3,258 after ScriptPad 198 -> 192 (the control-char token test as a difference; 206 -> 196 against the full image), 3,264 after DrawSelection 84 -> 68 by a two-step swap search (fill computed before the x shift, the box top and bottom stored before left and right; the plain single-swap search misses it), 3,280 after PointerPickMode0, 4, 5 and 6 byte-identical and BlockWeightTroops 80 -> 74: the friend tail written out in each mode (one positive condition, a single return 0), the vehicle object kept in a separate variable `keep` assigned inside the type-3 test, and the selection loop reusing `o` as its temporary, which is what stops VC6 propagating keep back to o and gives the image's `mov ebp,esi` copy and late uid read; for Troops the `o == f` test moved out of the inline function, which flips the f/w register ranking), 3,492 after ScriptIf 12 -> 8 (the butnot arm's end-of-script test as `*at - count >= 0`), 3,496 after SightScan 240 -> 218 by writing the weapon arm's score test as a difference (`(bestScore - n) >= 0`; n is a small thing code, so it cannot overflow), 3,518 after ListMaskAction 306 -> 174 (the frame as a struct in the image's slot order, the flag helper as in ObjHitMaskAction, the row width re-derived from the box in the loop, one neighbour-table store moved down, and rowbits as int16_t), 3,650 after FlowRecvMessage 18 -> 0 and WndProc 4 -> 0 byte-identical and EncodeGlyph 38 -> 6 (frames as structs in the image's slot order: one function-level struct with unions for the three arms of FlowRecvMessage that share a slot; a 36-byte pad before the PAINTSTRUCT in OnPaint so it overlays the top of the name array; out, key and row in one struct in EncodeGlyph), 3,704 after DrawMapObjects 62 -> 18 (the six values the image spills sit in a struct in its slot order, and the two subdivision rects are one 32-byte array, because VC6 places a 24-byte struct below a 32-byte object; nesting all of them in one struct failed since its address escapes), 3,748 after ObjHitMaskAction 182 -> 134 (the frame as one struct in the image's slot order, world and tile last, and the flag's address passed to an inline ring helper) and SightScan 248 -> 240 (facing and look inside the hold struct, with a pad before look, so every stack slot matches the image), 3,804 after LoadMap 124 -> 98 (the ObjConceal owner guard tested as a difference, and the object loop written `objCount > i`; found by a mutation sweep of every integer comparison in the function, which also moved RowUpdate 164 -> 160 with `ct < 1`), 3,834 after LoadMap 290 -> 124 (the scenario arm expanded so size is re-read for malloc and fread as in the image, MapAllocFill removed, and the TRIG plane test written as a difference, which supplies the one scratch temporary the rotation was missing) and HudSquadUpdate 194 -> 176 (the Sarge arm reads the max health into an int16_t local before the bar), 4,018 after RunScriptAction 60 -> 0 byte-identical (one hand-ordered frame struct for the frame-resident temporaries, the rest block-scoped so they fall into the dead argument-home slots; the image shares one slot between the temporaries of three disjoint arms), PointerPickMode0 172 -> 68 (an unused label on the hint's final return keeps the second shared return-0 block), ScrollMapCache 150 -> 148 (the positive part of dx recomputed at its three uses) and PointerPickMode6 24 -> 48 on this metric but 263 -> 45 against the full image: the earlier size-pragma win was a truncation artifact, the pragma outlines the tail and the relink compares only our 30 bytes of call against the first bytes of a 277-byte image, so it is gone and mode 6 now reads the uid before the board hint, 4,160 after UpdateTrooperAction 312 -> 302 by storing the bearing in two stop arms through a volatile re-read of the out pointer (a number win: the image reloads out from its argument slot for those stores; against the full image the gain is 2), 4,170 after SightScan 268 -> 248 by a swap-search move (the weapon arm stores bestScore after bestRange and bestBearing), 4,190 after SightScan 300 -> 268 (in the kind-7 arm the candidate store follows the bearing call and the range store; AngleBetween does not read it), 4,222 after BlockWeightTroops 82 -> 80 (the weight local as int16_t), 4,224 after DrawSelection 94 -> 84 (fill as int16_t: |fill| is at most maxHealth / 2) and ListMaskAction 308 -> 306 (the column-loop end tested as `col - MARGIN == tilew`, recomputed in the loop as the image does, instead of a hoisted colEnd), 4,236 after ListMaskAction 320 -> 308 by declaring the row-end offset int16_t (an automated sweep of integer-type changes over every local of the 44 differing functions found it; the other hits were rejected for changing values: tailUid narrowed to 16 bits would truncate a 32-bit uid, ObjRemap y unsigned would break negative positions, UpdateTrooperAction pose narrowed changes out-of-range poses), 4,248 after FindPath 150 -> 126 (the next-node load and the heuristic as unsigned types) and Step3Drive 232 -> 222 (the stop flag taken directly into the shift sum, since it was just stored 0 or 1, and the army local as int16_t, which gives the image's movsx ax), 4,282 after ScriptParseEvent 94 -> 38 (the bare-name tail is `return 1`, which merges with the pad tail as the image does; the pad macro tests the token kind as a difference, which loads it into a register first) and ScriptParseActionRecon 50 -> 42 (the damage-kind tail of `damage` and `setdamagepad` as an inline function expanded twice, so the second arm's early exits land on the last bare return-1 copy), 4,346 after ObjHitMaskAction 234 -> 182 by making `marked` a two-element array (a number win: it gives the image's extra 4-byte frame slot; `marked[3]` is 226, a struct of two ints is also 182), 4,398 after SelectFirePose 178 -> 142 by giving the rifle/gun arm's movement-gate early return its own epilogue copy (a third return-1 label after the final return; the image has 21 rets, ours had 20), 4,434 after DrawSelection 130 -> 94 by reading the max health once into an int16_t local (the compare, the halve and the divide then share one load, as in the image; an int32_t local is 174) and computing `x` before `fill`, 4,470 after SightScan 388 -> 300 by keeping the scan state in three local structs, one with an escaping member, and writing the scoring block out in the kind-7 arm (c2 lays blocks out by a depth-first finish order, taking the branch target before the fall-through; with the candidate reloaded in both copies the labelled copy merges into the first and the sight and allied arms reach it by backward jumps, as in the image), 4,558 after AiTrooperStep 110 -> 0 byte-identical (the early still-routing check jumps straight to walk instead of through after_region, which re-tests the same condition; this also removed the surviving zero register) and PointerPickMode6 34 -> 24 (its own copy of the friend tail reads the hover uid after the board-hint call; sharing that with modes 0, 4 and 5 makes them far worse), 4,678 after the MpPanelScreen constructor 344 -> 310 by passing each RectSet a temporary (AM2_TEMP) instead of one function-scope rect, which removes a 16-byte frame slot the original lacks, and by reading `visible` into a local in the list-scroll clamp, 4,712 after DepthInsert 322 -> 0 byte-identical (found by the IL probe: the walk pointer of the two flag loops was the same variable as the tail pointer `at`, so its in-loop uses gave that web the loops' weight and swapped eax/ecx for the whole function; a separate loop local `p`, a count local `n`, re-read after each DepthCompare, and a flags local `f` reproduce the original), 5,034 after MovieStart 10 -> 0 byte-identical by copying the global into a local before the test and calling the destructor on a second read of the global (found with the code-generator IL probe: c2 coalesces the single-value forms into one callee-saved web; the image has the destructor argument as a CSE of the global read and the free argument as a separate temp copied before the test), 5,044 after PointerPickMode6 50 -> 34 by compiling that one function under #pragma optimize("s", on) (guarded for MSVC; found by tools-free sweep of per-function optimisation pragmas, the first win of that kind: the whole-file settings all broke other functions), 5,060 after ListMaskAction 322 -> 320 by computing the column-loop end once into a local, 5,062 after ObjHitMaskAction 246 -> 234 by initialising marked at its declaration, taking rowbytes from rowbits, and spelling the bit table out at each use instead of a local #define, 5,074 after ShotHitsObj 56 -> 0 byte-identical by sending the first refusal to a label after the final return, which moves VC6 merged epilogue to that block, 5,130 after SightScan 430 -> 388 by holding the RegionsNear result in a temp and storing solve = 0 before the branch, 5,172 after Step3Drive 282 -> 232 by writing the approach and stop halvings as one shift by the sum of two byte-wide flags, which removes the speed write-through stores, 5,222 after PointerPickMode4 48 -> 46 by reading the uid after the flags test, 5,224 after ObjAfterMove 2 -> 0 byte-identical by a dead byte read before a dword test of the height (a number win), 5,226 after SightScan 438 -> 430 by storing the slack reset after the best-candidate stores, 5,234 after SelectFirePose 222 -> 178 by a second return-1 label for the FLAM default and the field-44 return and a `break` for the BAZ class-1 tail, 5,278 after three adjacent-statement swaps found by tools/swapsearch.py: ScrollMapCache 168 -> 150 (the bottom clamp before the top clamp, and the else arm's top store first), DrawMapObjects 68 -> 62 (dh before right), OptionsDefaults 32 -> 26 (disabled before bit), 5,308 after MissionEnded 14 -> 12 by writing the attempt-count store through a volatile pointer after the copy (a number win: the image stores it inside strcpy's expansion), 5,310 after AddToItemList 64 -> 8 by taking the default owner once, masking it, and shifting it as a multiply by the owner-shift constant (the shift spelling stays at 64: VC6 folds both to shl but picks different registers), 5,366 after SelectFirePose 240 -> 222 by sending the FLAM default's `return 1` to a label after the final return, 5,384 after ScriptPad 272 -> 198 by writing GREEN/ARMY0 and TAN/ARMY1 as separate switch arms with identical bodies (found by attributing each hunk to its source block), 5,458 after RegionFindPath 8 -> 0 and LoadOptions 4 -> 0 byte-identical (the return-0 of the active test jumps to a label after the final return; the three volume migrations moved after the if/else, where the failure branch's zeroes cannot equal the sentinel) and AiTrooperStep 134 -> 110 (the BeginMoveTo arm joins the else arm's moveAt/moveCount suffix), 5,494 after SightScan 466 -> 438 by writing phase two as an if/else whose two candidate-producing arms both fall into the scoring block after it (no `goto score`), 5,522 after ScriptParseActionRecon 218 -> 50 by taking the kind-name pointer right after the first step of the SETITEMFLAG case, in a block of its own, instead of inside the error block (the earlier diagnosis had blamed the ADDEXP tail; the four hunks were in this case), 5,690 after LoadMap 294 -> 290 by reading a scenario chunk through a value-returning inline helper and counting its size before the parse (the same reorder written with the read inline costs +136; a void helper changes nothing), 5,694 after SelectFirePose 300 -> 240 by sending the two raise poses to one store each after the final `return 0` and writing the aimed pick as an inline function, 5,754 after the MpPanelScreen constructor 350 -> 344 by calling ScriptListFind before the loop counter's initialisation, 5,760 after DepthInsert 324 -> 322 by writing the node through a slot pointer, 5,762 after ScriptPad 280 -> 272 by declaring `total` once at the top of the function, 5,770 after the PointerPick friend tail took the uid as a parameter read by each caller at its own spot: Mode0 214 -> 172, Mode4 108 -> 48, Mode5 108 -> 44, Mode6 64 -> 50, 5,950 after HudPostUpdate 32 -> 0 byte-identical by testing the changed button first and writing the claim inline, DrawMenuCursor 36 -> 30 and AirFrameDraw 74 -> 44 by number-win spellings (`f > -1`; `f >= 1 &&` guard), 6,018 after UpdateTrooperAction 332 -> 312 by reading the row table once into a local for the stop test and writing the item walk as a `while` with one `goto` for its `continue`, 6,038 after the relink resolved a repeated floating-point constant at every site of a function and not only the first, which had left FindPath's three later loads at address 0: a scoring fix, 18 bytes, no source change, 6,056 after FindPath 172 -> 168 by passing `cur & 0xFFFF` to the neighbour distance, 6,060 after ScriptParseEvent 130 -> 94 by returning `*val >= 0` from the bare-name tail, which keeps VC6 from merging it with the pad tail: a number win, 6,096 after ObjRemap 168 -> 156 by testing the left edge in the combined early-exit and loading the column count after it, 6,108 after HudSquadUpdate 250 -> 194 by storing the icons before the bar colour in the third arm, 6,164 after RowUpdate 176 -> 164 by `cl < 0` for `cl <= 0` (a number win: the image's setle becomes setl, the gain is in the registers and slots it shifts), 6,176 after DepthInsert 326 -> 324 by a byte-wide flag test, 6,178 after the MpPanelScreen constructor 360 -> 350 by the map loop's own counter and an `if (maps)` around the loop, 6,188 after UpdateTrooperAction 378 -> 332 by the order of the stores in three stop arms, 6,234 after Step3Drive 382 -> 282 by declaring the target point inside the `state != 1` block, ListMaskAction 328 -> 322 by the phase as a mask, and SightScan 528 -> 466: every `continue` in phase two written `goto next`
+  to one label at the loop end, and `slack = 0` stored before `best`; the scoring block is still
+  placed after the sight test, 0x5f5 against the image's 0x2b0, see docs/bytematching.md) of edit
+  distance over the 52 functions that are not byte-identical (147,586
+  bytes between them; 14,622 at the day's first run), the largest
+  ScriptParseActionRecon 2,336, Step3Drive 974 -> 382 (the turret aim held in a local keeps `speed` in ebp; then the first block through `gun`, the gun facing straight from its RoundTo8, the approach test as one expression; docs/vc6-regalloc.md; its dead `step`
+  initialiser dropped: the image's prologue zeroes two slots, not four),
+  SightScan 910 -> 808 (the box left edge first; AiSightTrace's walk as a `for` reading the table at each use; the result in a variable starting at zero), FindPath 834, UpdateTrooperAction 380 -> 382 after a behaviour fix (the held weapon is dropped unless one of the things at the point IS it: CanPickUpWeapon's last argument, not a scratch quantity), ListMaskAction 342 -> 328 (the pixel row as int32), SelectFirePose 304 -> 300, HudSquadUpdate 278 -> 276 (a second-model review of it, FlowRecvMessage, AiTrooperStep and DepthInsert found one behaviour bug, DepthInsert's append linking the new node to itself, now fixed; nothing else moved; docs/vc6-regalloc.md); MissionEnded's attempt-count store after
+  the close is 2 -> 4. ObjTileHook byte-identical (the mask entry read
+  into a local for both tests puts it first in the `test`; found in the
+  lab, docs/vc6-regalloc.md), and RefundPlacedUnit byte-identical (the
+  pillbox weapon's uid passed straight to LookupByUID: a local for it was
+  a web in eax where the image's rotation temporary is ecx), and
+  VehicleBlockWeight byte-identical (one weight returned explicitly from
+  the TANK and JEEP sound arms too, so the tail's four reads earn it the
+  register copy the image reloads after the clamp; `i` zeroed with the
+  declarations; the final sample in the loop's `pt`), and
+  DrawEffectLayer byte-identical (the A frame as a min over a sum VC6
+  sees twice, which puts the frame in memory and the sum in a `lea`;
+  the B test on the same sum; the B point read from the array at each
+  use rather than through a pointer local, which is what keeps the base
+  register every aim array shares on the A point), and DamageTrooper
+  byte-identical (its armour scan stops at the first empty inventory slot;
+  the reconstruction skipped empty slots): relink 1594 of 1646 (CommSend, the MoviesScreen constructor, VehicleUpdateAppend and BoxAction byte-identical by lab sessions), 52 differ. ScriptParseActionRecon 2,336 -> 1,862 bytes and
+  shape 70 -> 63 from a lab clone of the whole function (ADDEXP as a
+  positive test owning the shared type-error block, SETUILOCK's own
+  copy, SETITEMFLAG's kind name through a local, INACTIVATEREGION's
+  value read before the zero store), then 1,862 -> 1,834 (MAKESMOKE
+  and MAKEFLAME storing inside a positive INTEGER test so the early
+  return is the shared return-1 block; SETITEMOWNER's two paths joined
+  on one `return 1`, which keeps the sign test a branch), then
+  1,834 -> 1,498 (ADDEXP and SETUILOCK both as the plain WANT and
+  stores: VC6 then keeps ADDEXP's copy as the owner of the shared
+  type-error block and makes SETUILOCK's tail one jump into it, and
+  FIREWEAPON's and UNITFIRE's kind tests fall into the image's forms
+  with it). What is left in the lab is two placements: the end-of-script
+  block, whose owner is now understood (the label block merges into the
+  first identical block in layout once its own fall-through is
+  redirected, and the image's private copies are later duplicates) but
+  not yet reproduced, and SETFACING's VARNAME block, which merges into
+  SETGUNFACING's identical one in every spelling tried
+  (docs/vc6-regalloc.md). Re-transcribing FindPath whole from its listing scored worse than
+  the source in every structural form, and a round of alternative spellings
+  over SelectFirePose, RowUpdate, BoxAction, EncodeGlyph, VehicleUpdateAppend
+  and UpdateTrooperAction moved nothing; the measurements are in
+  docs/vc6-regalloc.md.
+
+  2026-10-23: the last seven are LoadMap 356, RowUpdate 154, FindPath 32,
+  SightScan 26, ScriptParseEvent 18, ScriptPad 10, UpdateTrooperAction 8 --
+  relink 1639 of 1646, 604 bytes (302 unmatched after alignment; re-measure
+  with `tools/relinkscreen.py --list`). New negatives (docs/bytematching.md,
+  Round BX): LoadMap's missing rotation event rides SCEN's third read of
+  `size`, a two-use load that c2 always webs -- a ten-shape battery (local,
+  global, pointer-deref, push+push, push+store, push+lea, branch-split,
+  16-bit, three-use) never produced a temporary for a two-use load; and
+  RowUpdate's image wants one load feeding two unmerged same-input add
+  tuples, reachable only with code the image lacks.
+  PlacementAllowed
+  matches: each refusal is its own `return 0` rather than a shared `fail:`
+  label. ObjSetFootprint,
+  ObjClearFootprint and ObjClearRoachFootprint match, and
+  ObjSetRoachFootprint is down to 6 bytes: each indexes its stamp window
+  from two coordinate locals at the test and again at the store, where we
+  had kept one pointer to the slot (docs/vc6-regalloc.md). SelectionClick
+  14 -> 8: its drag arm calls OnSelectionChanged and returns rather than
+  jumping to the shared tail. RecvThreadProc
+  (0x00401F00) is in the manifest now, beside the other OS callbacks
+  (bytematch.REGISTERED_FNS): it was reconstructed but never patched, so the
+  relink did not know it and FlowRecvMessage's span ran on through it
+  (FlowRecvMessage's real shape is 26, not 124). Its loop is `while (1)`,
+  which VC6 does not rotate (122 -> 16 bytes). Step3Input matches:
+  it read g_mouseButton/g_mouseChanged through local pointers, which put the
+  load in ecx (a six-byte `mov`) where the image's eax takes the five-byte
+  short form, shifting every later jump by one. SelectionClick 46 -> 14
+  bytes: its ctrl-click deselect passes the zero point through a local
+  copy. PointerActionFollow
+  matches: its leader is a ternary between the live lookup and the dead scan
+  as an inline of its own, which lays the scan between the arms with its NULL
+  falling into the shared test. RecvThreadProc matches: `while (1)`, the
+  receive called on the comm object directly rather than through dplay.h's
+  inline wrapper, and `got` set on both arms of the flow test, which is what
+  puts the store between the call and the test. ReceivePlayerMsg matches:
+  the army-points loop is `for (i = 0; i < 4; i++)` over `g_armyPoints[i]`,
+  which VC6 strength-reduces into the walking pointer the image tests, and
+  `msg` is read through a local copy, which moves its reload to the loop's
+  bottom.
+  Biggest-first pass (2026-10-10), by block layout: SightScan 1324 -> 1048
+  (allied arm as an else), PointerActionFollow 226 -> 112 (its leader scan
+  written out, scan first), Step3Input 96 -> 54 (mouse arm reordered, its
+  cooldown by goto), ListMaskAction 682 -> 670 (neighbour stores in image
+  order), SelectFirePose 320 -> 268 (case 43 before the machine-gun arm).
+  Tried without effect, all register or scheduling: VehicleUpdateAppend
+  (the image tests the position bit twice; split, it is worse until `seq`
+  and `flags` swap registers), ParseScenarioPart (walking-pointer anchor
+  on +6 against +0, unmoved by indexing, pointer walks or store order),
+  BoxAction, RowUpdate (the image re-reads rect.top after
+  storing it). PlacementAllowed, listed here once as compiling the same
+  every way, matches since the fifth round below.
+  Shape-first pass (2026-10-10, Boran: "ignore register differences if
+  the shape is the same"): ranked by a register-masked diff
+  ($T/shape.py, reg-reg moves and spills dropped), total 1884 -> about
+  1760. FindPath 1358 -> 1162 (top-tested loop, stamp arms, uint16 g,
+  front insert through `from`), ViewUpdate 186 -> 90 (store order, eye y
+  from the clamp), DrawEffectLayer 616 -> 584 (indexed A point moves the
+  anchor), ScrollMapCache 252 -> 236, SightScan 1048 -> 1028,
+  UpdateTrooperAction 952 -> 934; AiTrooperStep, DepthResort, Step3Drive and
+  DrawMapObjects took the image's shape at a small byte cost from moved
+  registers (see docs/vc6-regalloc.md, "Shape first, then registers"). Second
+  round, shape (instructions off) then bytes: DepthResort 16 -> 0 and
+  DepthInsert 14 -> 6 (the forward walk's run-off arm inside the loop,
+  leaving by break), FindPath 126 -> 95 (unlink read at each use, the
+  insertion walk a for loop), DrawSelection 23 -> 13 (box stores in the
+  image's order), HudPostUpdate 12 -> 8, VehicleUpdateAppend 19 -> 13 (an
+  else-if with two copies of the or), Step3Drive 110 -> 108,
+  CollapseEqualDeltas 6 -> 4, OptionsDefaults 2 -> 0. Then a sweep that swaps each
+  pair of adjacent independent single-line assignments and keeps the ones the
+  shape prefers, run to a fixed point: UpdateTrooperAction 109 -> 101,
+  ListMaskAction 49 -> 44, Step3Drive 108 -> 105, AiTrooperStep 56 -> 52,
+  FindPath 95 -> 93, ObjHitMaskAction 59 -> 57, ParseScenarioPart 17 -> 15,
+  RowUpdate 23 -> 21, DrawMapObjects 11 -> 9, ViewUpdate 9 -> 7,
+  ScrollMapCache 15 -> 14. Sweeps that flip ternaries or split `||` into
+  else-if found nothing further. Third round: LoadMap 15 -> 11 (height and
+  row shift stored before the width -- found by taking a step the shape
+  scored WORSE and sweeping again), Step3Drive 105 -> 98 (the headlight
+  palette as an if/else storing through a fresh row load per arm),
+  Type2PlayerInput 7 -> 2 (the facing read inside the angle test; bytes
+  90 -> 104), DrawSelection 13 -> 10, BoxAction 11 -> 10, FlowRecvMessage
+  127 -> 124 (the delivery gap as a ternary). Sweeps of comparison operand
+  order, local declaration order and ternary/if-else conversion found
+  nothing else. FlowRecvMessage's four "Can't find FlowQ" logs share one
+  block in the image; ours copied the small return-0 epilogue into each
+  site, which left nothing to merge. Writing the last site's `break` as
+  `return 0` makes its log the survivor for two of the other three
+  (shape 25 -> 19); the first still keeps its own copy. `g_attemptCount` and
+  `g_levelAttempt` are two names for 0x512330. Copy substitution, rerun over the
+  74 (2026-10-10) and then scored on shape rather than bytes: where we held a
+  local copy, the image re-reads the expression it copied. DrawEffectLayer
+  28 -> 4, Step3Drive 101 -> 83, FindPath 93 -> 82, RowUpdate 21 -> 14,
+  ObjTileHook 5 -> 1, ObjRemap 11 -> 9, ViewUpdate 7 -> 5, and smaller.
+  Every hit is vetted for a write between the copy and the use: re-reading
+  g_regionOfCell in AiTrooperStep and FindPath and the draw target in
+  DrawEffectLayer would change behaviour (TileRegionOrBorrow and
+  SetDrawTarget write them; the image tests the saved copies) and were
+  refused. DiedEffectB 204 -> 38 bytes: `angle + sector` written twice
+  raises sector's register priority (uses are counted before CSE). Fourth round: ParseScenarioPart
+  17 -> 3 (82 -> 48 bytes; the row loop advances `rows` itself, which moves
+  VC6's walking-pointer anchor from pos.y to the row start), and
+  Step3Drive's +0x59C clear now goes through its steering record as the
+  image's does: `AM2_SteerOut` gained `gate` at +0x24 (0x28 bytes) and the
+  object's separate `gate` became `ctl.gate`. Found by scanning every
+  mismatch for the same instruction at a different displacement. The pointer
+  handler globals (`g_pointerPick`, `g_pointerAction`, `g_weaponFnSlot0/1`)
+  and ADDR_WEAPON_HANDLERS are typed as function pointers and records
+  (pointerfn.h), removing 19 casts at use; relink unchanged. A lab clone of
+  FlowRecvMessage shows why its log blocks stay apart: under /O2 VC6 copies
+  a constant-return epilogue into inline predecessors, and blocks that end in
+  `ret` are never cross-jumped (docs/vc6-regalloc.md). The rest of the top of the list is register priority: FindPath
+  (from/curTile/goal), Step3Drive (`r` against `speed`), VehicleUpdateAppend
+  (`seq` against `flags`), ScriptPad and AiTrooperStep (a zero or region
+  value the image keeps in memory). Fifth round (shape total 1349 -> 1225
+  over 73 -> 69 mismatches): the footprint quartet's stamp window indexed
+  from two coordinate locals at the test and the store (three match, one
+  at 6 bytes); PlacementAllowed's refusals each their own `return 0`
+  (matches); DrawMapObjects 9 -> 0 (the wide arm settles `deep` as the tall
+  arm does); ScriptParseActionRecon 295 -> 243 (one `goto` into the first
+  copy of a repeated return makes it the merge survivor); EncodeGlyph 13 ->
+  10; SelectionClick 14 -> 8 bytes (the drag arm's own tail). Sweeps of
+  goto-to-return, return-to-shared-label (one and two statements), loop and
+  operand forms found nothing else. Shorthand read macros and
+  file-local global aliases are gone from `src/game` (2026-10-10, ~640 of
+  them), and the globals they re-typed have their real types in
+  `globals.h`; every function compiled identically. Left for later:
+  `AM2_Rec` carries five `AM2_PtrList` methods (PtrListPush, ListRemoveAt,
+  ...), so their 47 callers cast to `AM2_Rec *`. MpOptionsScreen fell to a
+  record pointer, which moves the loop's walking-pointer anchor (see
+  docs/vc6-regalloc.md), and to RectMake by value. AddSightBlocker fell to a
+  16-bit delta pair. An address-taken local reused for unrelated work lives in
+  memory: UpdateTrooperAction's pickup quantity, given its own local, went
+  511 -> 420 bytes off. Two misses were hiding BEHAVIOUR gaps (2026-10-10).
+  MpPanelScreen never set its game and map lists' chosen row and joiner lock,
+  nor cleared their scrollbars' +0x50: 918 -> 644 bytes off. Its map
+  selection also belongs outside the null/empty guard (the image looks up
+  `maps->maps[sel]` either way, faulting on an unknown rules name); it is
+  642 now. A scan of image
+  stores that ours lacks, per miss (`$T/storegap.py`), found that one.
+  PointerActionMode5 re-read its formation anchor on every pass, so each unit
+  was placed off the previous unit's slot; the image reads it once, before
+  the loop. Bytes are unchanged there, because the load only moved. A big diff
+  is worth reading for a missing store or a moved loop head before treating it
+  as register noise. All 78 misses were then screened with an order-free diff
+  (normalised instructions, registers and frame offsets abstracted; what does
+  not cancel is a real difference). Every remaining entry traced to merged or
+  duplicated tails, register choice or scheduling, not to behaviour. Five of the last six came from
+  writing code the compiler MERGES as separate source. FormationPoint and
+  FormationPointFar write `case 2:` and `case 8:` as two arms. Step3RouteAndBoard
+  writes its stop/approach pair once per distance band instead of jumping to
+  one shared pair. VC6 merges the copies into identical code, but the extra
+  source decides the spill slots and the register weights. Where our source
+  shares a tail through a `goto` or a stacked `case` label, try duplicating
+  it. `$T/casesplit.py` and `$T/gotodup.py` try every such site; PlacementAllowed
+  went 85 -> 77 bytes off. ScriptIf went 9 -> 3 by declaring the after-chain's event locals in
+  the loop: VC6 reads a block-scoped, address-taken local before a store
+  through a heap pointer, and a function-scope one after it.
+  WeaponPoseIndex writes the class-table return in both arms of its weapon
+  test. `$T/sinkdup.py` copies the statement after an if into both arms and
+  scores each site: VehicleBlockWeight went 72 -> 60, UpdateTrooperAction
+  519 -> 511 and, without its empty `default:`, SelectWeapon 55 -> 46.
+  The biggest was HudEdgeUpdate, 129 -> 8 with `$T/swsink.py`: its two caption
+  switches pick a name and strcpy it once after the switch, but the image
+  strcpy's a literal in every arm.
+  ScriptParseActionRecon's call counts differ from the image's, but
+  tools/actcheck.py finds no behavioural difference in 13,122 cases: the
+  image keeps apart copies that VC6 merges for us, because their registers
+  differ. RemapSpriteRuns,
+  ObjInitCommon and ObjMoveAlongFacing fell to COPY SUBSTITUTION (and
+  StepType5 to a struct local: a point built in an AM2_Point and stored a
+  field at a time gives `mov bx, ax` where two int16 scalars give a 32-bit
+  move), and GenerateObjScriptFromTokens to hoisting (a pointer to the
+  repeated table entry, then the uid read into its own local). A by-size
+  sweep (2026-10-09) took every remaining function under ~600 bytes through
+  the searches and by hand: OptionsDefaults, SaveListOnPick, PointActionC,
+  SpriteRebuildAlt, StepRowAnim, BoxAction, the two footprint pairs,
+  ParseScenarioPart, PointerActionMode5, SelectWeapon,
+  BlockWeightTroops, AddToItemList and SelectionClick are each held by two
+  variables in swapped registers, a scratch-register rotation offset by one,
+  a scheduling swap, or (SelectWeapon) VC6 keeping the EARLIER copy of a
+  cross-jumped switch tail where the image kept the later one. For those,
+  every source rewrite tried compiles to identical code or worse. Note the
+  instruction scorer and the relink's byte distance can disagree: an arm
+  reorder that cut SelectWeapon from 39 to 28 instructions grew its bytes
+  124 -> 230 by moving the jump table.: where one local is a plain copy
+  of another (`cols = width`, `x = at.x`), a use that names the other one
+  changes which value stays live, and that decides the register tie. The
+  run loop closes on `width`, not `cols`; three hit-box edges add `at.x`
+  rather than its int16 copy. These were exactly the misses called
+  "unreachable from source" a few hours earlier -- that claim was wrong.
+  `$T/copygreedy2.py FILE FUNC` searches it greedily (it does not check that
+  neither side is reassigned between copy and use, so a match is verified by
+  hand). The last four
+  (SelectBestWeapon, SelectRankedWeapon, ObjCollidesWith, HudTopUpdate) came
+  from holding a call result in a typed local and from spelling a stored
+  value differently from the one compared next, which stops VC6 threading the
+  compare. A greedy mutation climber (operand swaps, relational flips, hoisted
+  call results) over 30 of the remaining 93 moved none of them.
+  EvtCondition's two-byte miss (base/index order in one address) was taken to
+  the IL: c2 compiles operand-swapped IL to identical code, so the order is
+  NOT an IL operand-order matter. It was reachable from source after all:
+  the condition parameter copied into a local (`AM2_ScriptCond *c = cond;`)
+  matches. Found by decomp-permuter in two minutes (2026-10-09). The CheatLine /
+  PlacementScreenClick coin pair both match. It is an operand-order tie that
+  VC6 breaks by state the whole TU builds up: adding struct members or
+  externs can tip it, renaming them cannot. relinkos.py KEEP_DECLS (harness
+  only) is the knob that settles it; retune it by searching the subsets,
+  empty first, whenever it flips. Earlier: 1507 before the typed structs, 384 at start,
+  468 after the global migration, 510 once the VC6 LINK work settled the data
+  layout, 627 before the widget classes, 686 before the screens, 719 before
+  the near-miss sweep, 758 before the row pools, 1480 before the aggregates.
+  From 758 to 1507:
+  - **The image's stack frame names its locals** (2026-10-04). Reading each
+    slot of the image's frame against our `/FAs` layout showed what the
+    source declared. LoadMap went 502 -> 135 and its frame is now exact:
+    `path` is function-scope and `scri` is 0x40 bytes. The MHDR rects are
+    three by-value RectMake results. `at` and OLAY's `first` share a slot,
+    so both are block-scoped. The record count is read into `v`. Two
+    behaviour fixes came out of it. OLAY's `first` stays 0 when a chunk
+    declares no records. On the respawn path the weapon's quantity is what
+    RandomRespawnKind writes through its pointer; we had passed the record's
+    NUMB. Frames also fixed for SightScan (a 1024-entry line buffer) and
+    PausedFrameStep (buffer sizes; three separate pause-bit tables,
+    `am2_mp_pause_bits_a/_b/_c`). ObjHitMaskAction went 265 -> 218 once its
+    tile clamps are raw locals and the record's parts are not variables.
+    AM2_LoadGameScreen matches once its panel offsets are assigned just
+    before the state test rather than at their declaration: initialised
+    locals get frame slots, while the image keeps them in registers. The
+    rest are still short of exact, on register choice. AM2_MpPanelScreen's
+    five operator-new-plus-construct calls are plain `new X(...)` in the
+    image: each allocation carries its own unwind state (26 of them).
+    HudPostUpdate's empty-pointer action takes a literal null, which the
+    image emits as a register known to hold zero. EditCharHandler matches
+    once the text extent is assigned to a function-scope local: inline, the
+    `+ margin` became one lea where the image copies eax and adds later.
+    CreateWeapon matches once the missile definition is read back from
+    the weapon's own +0xC0 at each use instead of being held in a local.
+    PollMouse matches once the button state is read back from the global
+    for its change test (a `now` local let VC6 store the constant itself),
+    and once a successful lost-device retry falls into the same `hr` test
+    as the plain path rather than skipping it from an else-if.
+  - **A stored value is read back from where it was stored** (2026-10-04
+    evening). `$T/storeback.py` sweeps every `LHS = local;` for later uses
+    of the local that the image reads back from LHS. State2Enter logs the
+    attempt count from the global; DeployTrooper hands SetFieldInAll the
+    slot from TABLE_REC_KIND and -- the other half -- takes
+    NearestClearPoint's answer in a second point rather than the input
+    one; both match. CommRegisterSelf 42 -> 34, SightScan 362 -> 360
+    (`theirs` and `cand` were one variable), FindPath, ScriptPad,
+    UpdateTrooperAction a few each. Rejected hits: the sweep matches a
+    MACRO as the local (TOKVAL, AM2_POSE_CARRY) and cannot see a
+    conditional store (HudEdgeUpdate). Two `} else if` arms whose test
+    excludes the first are separate ifs in the image (Step3Drive 428 ->
+    419, ScrollMapCache 171 -> 167); the same split in HudSquadUpdate and
+    ObjCollidesWith only scores when it changes behaviour, so it stays.
+    CommRegisterSelf matches: its empty-slot search jumps straight into
+    the registration (no second `slot < NRECS` test), each bit is made
+    where it is stored, and the ring clear is a `for` VC6 rotates into the
+    image's pointer-walking count-down. `$T/framegap2.py` lists eleven
+    functions whose frame differs from the image's (RowUpdate, DiedEffectB,
+    UpdateTrooperAction, ObjHitMaskAction, AiTrooperStep, ListMaskAction,
+    MakeBitmap, ListUpdate, MpPanelScreen, HudEdgeUpdate, CheckMapRules);
+    the ones read so far are register-allocation choices -- which value
+    gets ebp, which is spilled -- that no spelling tried moved.
+  - **Three more distance reductions that do not flip to exact**
+    (2026-10-04). `$T/cntgap.py SRC FN img|ours` lists the normalised hunks
+    where one side holds more instructions than the other -- the structural
+    (not register) gaps. It found: ObjHitMaskAction's 20-entry neighbour
+    ring wants index-order source (VC6 schedules the scramble itself),
+    218 -> 162; StepType5's floor clamp must share the flat-on-the-floor
+    block that also zeroes MISSILE_OFF_VZ (a real behaviour fix -- an
+    undershooting missile kept a frame of negative velocity), 110 -> 106;
+    HudTopUpdate reads g_mouseGrab fresh in the off-button arm, 74 -> 67.
+    None reaches 0, so the relink stays 1507. DepthResort (31) and the rest
+    of the near-miss band are register-colouring losses: DepthResort's head
+    pointer lands in edx in the image and eax in ours, with the two unlink
+    exits already separate blocks in both -- nothing to fold, nothing a
+    spelling moves.
+  - **All 138 remaining differ-functions triaged** (2026-10-04, Opus).
+    `$T/triage.py RL.json` scores each by its largest single image-longer
+    and ours-longer NORM hunk -- the fold / missing-block candidates sort to
+    the top, the register-colouring losses (only small scattered hunks) sink.
+    The outcome: the two biggest apparent gaps are NOT source-spellable.
+    FlowRecvMessage's `img+129` is `PacketThreadProc` (0x00401F00, dplay.h):
+    an original thread proc that is still UNRECONSTRUCTED and sits unlabelled
+    inside FlowRecvMessage's scored span (0x4014C0..0x4020A0), so the relink
+    charges its ~406 bytes to FlowRecvMessage -- the real FlowRecvMessage
+    ends at the ret+pad at 0x00401EFC. FindPath's `img+57` is a differ
+    misalignment: its terrain-penalty branch (AM2_TILE_NO_WEIGHT_NEAR /
+    AM2_TILE_LITTLE_COVER_NEAR) IS present, the bytes differ only in register
+    choice and block order. And the FlowRecvMessage span's extra ~406 bytes
+    are RecvThreadProc (0x00401F00), which turns out to be ALREADY
+    reconstructed in dplay.cpp -- just never installed, so the relink never
+    scored it and FlowRecvMessage's span ran across it. Installing it
+    (patch_replace at ADDR_PACKET_THREAD_PROC + the dllmain guard) scores it
+    at NORM 27, NOT exact: the image keeps one WaitForMultipleObjects at the
+    loop top that every path jmps back to and caches PostMessageA in ebx
+    across the whole function, where VC6 gives us a duplicated bottom wait and
+    a fresh import load -- loop rotation and register caching, the same wall.
+    A receive thread that is not byte-identical cannot be installed without
+    behavioural verification this byte-match pass cannot do, so it stays
+    un-installed. NET: there is NO genuinely-missing function left; all 138
+    look like VC6 register-allocation and loop-rotation differences. That
+    reading is premature, not a ceiling: a body still reaching memory
+    through `t + OBJ_OFF_*` casts on a stub struct has not had its real
+    source shape tried yet (next bullet).
+  - **Typed AM2_Object, no offset casts** (2026-10-05). `objtable.h`'s stub
+    AM2_Object now names the shot/target fields at their offsets (owner,
+    facing, health, heightAdj, the type record, shooterUid, formationSlot,
+    power, soldierKind), with GCC-side offsetof asserts. ShotHitsObj and its
+    three helpers (ShotPiercesArmour, ShotBeatsClass, ShotFacingArc) take
+    `AM2_Object *` and read members, with no casts. ShotHitsObj stays NORM 0 /
+    raw 7: its refusals jump to a trailing epilogue copy, where the image
+    jumps back to the first arm's `return 0`. The extra struct members
+    flipped the coin (PlacementScreenClick lost). Dropping the menu cursor's
+    range 0x004FCAA8 from KEEP_DECLS settles both sides again, and the count
+    holds at 1507 with nothing lost.
+  - **Typed structs close matches** (2026-10-05/06), 1507 -> 1509.
+    SetAnimFrame matches over AM2_MapRow, the drawable node's fields, once
+    the hit re-test reads `i >= t->count`. SendPlayerMsg matches once AM2_Comm
+    has data members (four 0x70-byte player slots from +0x20C, selfId,
+    playerCount, isHost, connected, the send thresholds) and the player
+    message is AM2_PlayerMsg. relinkos.py gives a scalar typed member an
+    address-of redirect. Closer, still off:
+    - ReceivePlayerMsg 60 -> 2: index the records, set slotSetting before i.
+      (Matched 2026-10-10: see the relink entry above.)
+    - AddToItemList 72 -> 41: a select for the counter, count-first grow
+      test, a local n for the memmove.
+    - AppendTroopState 31 -> 19: typed trooper sent-state fields, and the
+      position compared through the fields rather than int16 locals.
+    The movie destructor is out of line, as the image has it: the function
+    at 0x00445120 is `~AM2_Movie`, installed with AM2_DTOR. The rest (113
+    of 136 by a register-renaming classifier) are register-assignment and
+    scheduling ties, which no source spelling tried moves: declaration
+    order, operand order, scope, typed or untyped, bitfields, statement
+    order. ObjCollidesWith's swap is use weight: in the source, obj
+    outweighs from by two uses.
+  - **What c2 keys the ties on** (2026-10-06). build/vc6host can now compile
+    hand-edited IL (VC6_IL_OVERRIDE, with VC6_KEEPTMP to keep c1xx's
+    output), and a function's bytecode is found through gl's
+    `0e <id> 00 <name>` and the `53 53 26 <id> 46` prologue in ex. On
+    EvtRuleA none of these move the register choice: jump-label numbering,
+    local symbol numbering, line numbers, commuting a comparison, where a
+    comma expression sits in an argument list. Statement order in the IL
+    does move it. With the DeployItem call ahead of the facing store, the
+    spawn point lands in eax as in the image, but the store then follows the
+    call, which the image does not do. So the original's IL has a shape not
+    yet reproduced, and no source form tried yields it: an inline respawn
+    helper, a comma in the call, dword- or mixed-typed point arguments.
+    FormationPoint/Far differ only in which frame slot two compiler
+    temporaries take, and no spelling tried moves that either.
+  - **DrawMapObjects fixed, not matched** (2026-10-07, still 92). A cell
+    node with no object is skipped. It used to end the walk of that cell's
+    list, so every object linked after it went undrawn. Found by
+    `$T/callguard.py`.
+  - **RowUpdate 150 -> 117** (2026-10-07).
+    - The cell loop tests in ObjRemap's order: unlinked, or linked
+      elsewhere, else resort.
+    - cr and cb are rect.left / rect.top plus the sprite bounds re-read.
+    - Both near edges are branchless conditional expressions.
+    - Left: VC6 merges the first and the out-of-grid RowUnregisterAll
+      blocks, where the image keeps three separate calls.
+  - **TrooperFire fixed, not matched** (2026-10-07; 9 -> 14 bytes, the
+    first site's registers rotated). A trooper with a sight point but no
+    target used to fire one weapon-range down its heading whenever it was
+    standing on that point. The original only skips the turn and still fires
+    at the point: its PointsDiffer `je` lands on the jitter, not on the
+    no-point arm. Found by `$T/callguard.py`.
+  - **Step3Drive 372 -> 309** (2026-10-07). The wheeled (kind 1) engine
+    sounds are an `else if` after the tracked kinds. That lets VC6 merge all
+    eight PlaySoundAt arms into the one call the image has. Found by
+    `$T/callguard.py RL.json`, which compares, call by call, the jumps that
+    land in each call's argument setup.
+  - **MpPanelScreen fixed, 175 -> 171** (2026-10-07). FillListFromRules
+    is called even when the name table is empty: the image's `je` jumps
+    straight to the call. It used to sit inside the test. The native build
+    clears the path buffer first, so that case reads an empty name rather
+    than stack garbage.
+  - **Offset casts become struct members across the tree** (2026-10-08),
+    1548 held, nothing lost. Every object-taking function in region, item,
+    army, objtype, misc, gameproc, air, widget, place, cheat, event,
+    mapdraw, armymsg and commmsg takes AM2_Object, and object locals are
+    typed. New records replace the offset families they named:
+    AM2_ObjMask (OBJMASK_/MASKREC_), AM2_TileMask (TILEMASK_), the record
+    list AM2_RecordList and its AM2_ListRec (LISTHDR_/LISTREC_/DEFSPEC_),
+    AM2_RowSpec, AM2_SpriteGroupC, AM2_ParticleKind, AM2_UidList, the
+    effect sequences (AM2_Seq/AM2_SeqCtx), the routing graph (AM2_Region),
+    pads (AM2_Pad/AM2_PadNumber), sounds (AM2_Sound/AM2_SoundSlot), the
+    map descriptor queries, unit types, levels and the name registry
+    (AM2_Level/AM2_NameRec), AAI records (AM2_AaiRec) and the air block.
+    AM2_RowSet is the full 0x20-byte set, so the object's loose box is
+    rowSet.looseBox. Map-row and sprite reads go through AM2_MapRow and
+    AM2_Sprite; the anim, sprite and army-list globals are typed.
+    - Several offset families turned out to be one record under two
+      names: SOUND_REC/SOUND_SLOT/FreeSound's SOUND_*, NAMEREC and
+      MP_GAMETYPE, AAIREC and AAI. The missile-def names mixed two
+      layouts: the runtime table at ADDR_MISSILE_DEFS is the parsed
+      record with five fields permuted (AM2_ItemType vs
+      AM2_MissileDefRec), so its +0x1C is the base damage.
+    - The comm layer is typed end to end: AM2_Comm and AM2_CommSlot in
+      full (g_commObject is an AM2_Comm *), the flow queue AM2_Flow
+      (FindPlayerById's answer), AM2_MsgNode/AM2_MsgList for every message
+      list and the packet pool, AM2_Packet and the AM2_FlowMsg union the
+      flow handler switches on, and one struct per army message kind.
+      The HUD and screen widget classes carry their members too.
+    - The widget layer, the gameproc block, the army and comm messages
+      (item, pair, set-weapon, deploy, damage, create, fire, vehicle,
+      death, chat, pause, flow control) and the HUD command, build-menu
+      and pointer-mode tables are typed too. `*_OFF_*` uses outside
+      static_asserts are down to about 30, and raw `*(T *)(p + 0xNN)`
+      reads to about 25. What is left is mostly flat code reading widget
+      memory it cannot name (commmsg's dialog rects and chat box), byte
+      streams (sprite and surface encoders, the save header's object
+      prefix), and a few records not yet modelled (the start message,
+      the CRT debug-heap block ReportLeaks walks).
+    - Parameters followed: army messages pass as AM2_ArmyMsgHdr and comm
+      messages as AM2_CommMsgHdr (senders hand over `&msg.hdr`), the map
+      rows, message nodes and lists, flows, def records, row-pool slots and
+      the misc helpers take what they read, and the object creators,
+      UnitByUid and PreloadArmySprite return typed pointers.
+      g_paintObject is an AM2_ScreenBase. `void *` parameters left are the
+      generic ones -- qsort comparators, pixel/palette buffers, thread and
+      callback contexts. `-Wuseless-cast` found 120 casts made redundant by
+      all this; they are gone.
+    - KEEP_DECLS kept flipping between empty and one or two of the
+      0x004FC8C8/0x00511BC8/0x00515FD8/0x005127C8 blocks; CheatLine and
+      PlacementScreenClick are the two functions it decides. The two comm flag walks spell the slot id twice, which is
+      what puts VC6's induction pointer on the id; a pointer-to-member
+      helper put it on the flag.
+    - A struct-by-value parameter changes the CALLER's register
+      allocation; RoachMaskWeight keeps its scalar point.
+    - KEEP_DECLS flipped four times on the way and settles between empty
+      and one block; see relinkos.py for the history.
+  - **Typed vehicle and roach steps** (2026-10-07), 1548 held, nothing lost.
+    Step3ChooseFacing/TurnState/TurnBlocked/Drive/Input, Type2PlayerInput,
+    and the roach step family (RoachAliveStepB, RoachStepAllowed,
+    RoachStepTailA, RoachBite, StepType8) take AM2_Object and their record
+    types. AM2_Object's tail 0x538..0x5AC is now one union with a unit, a
+    vehicle and a roach arm, so vehicle code reads vehicle names.
+    - A typed LOCAL COPY of a pointer parameter (`AM2_Object *o = obj;`) is
+      kept where the original had one: VC6 enregisters the copy and not the
+      parameter (RoachStepTailA, RoachStepAllowed).
+    - SetFacing08/14 share a macro body that names the members; an inline
+      over field pointers did not match.
+    - KEEP_DECLS: the 0x00511BC8 block and the sprite list.
+  - **Typed AI records and point parameters** (2026-10-07), 1547 -> 1548,
+    nothing lost. The vehicle, trooper and roach AI families take typed
+    records instead of `void *`: AM2_AiCtx (0x44, AiBuildContext),
+    AM2_RoachCtx (0x40), AM2_SightCtx (0x58), and three DIFFERENT output
+    records at +0x578, +0x57C and +0x540 (AM2_SteerOut, AM2_SightOut,
+    AM2_RoachOut), which overlap but do not share a layout. Packed points
+    are AM2_Point throughout: TileOfPoint, BeginMoveTo, PlanPathTo,
+    NearestAllowedTile, the block-weight family, the event point arms and
+    ActionPoint/PointOfTile/ObjAnchorPoint returns. BoatExitPoint matched
+    on the way.
+    - RoachMaskWeight keeps a SCALAR point: as a struct parameter it cost
+      its caller RoachStepTailA its registers.
+    - KEEP_DECLS moved to the 0x00511BC8 block (the CheatLine coin).
+    - A retyped pointer silently scales a surviving `+ *_OFF_*` macro;
+      AM2_SIGHTC_PROMOTE_FOUND did exactly that until a clang-query scan
+      found it.
+  - **ArmyMessageSend matched** (2026-10-07), 1546 -> 1547. Same lever:
+    the packet append goes through an inline PacketAppend wrapper, which
+    puts the saved length in edx as the image has it.
+  - **LoadType2, 3, 6 and 8 matched** (2026-10-07), 1542 -> 1546. The
+    record copy at the end goes through an inline helper,
+    CopyTypeRecord(dst, src, n), not a bare memcpy. The arguments then become
+    temporaries evaluated right to left, so VC6 sets up the count and the
+    source before the destination (`mov ecx, N; lea esi; lea edi`). Found in
+    the lab: every bare memcpy form put the destination first.
+  - **Probe sweep over all remaining functions** (2026-10-07). This was
+    unhoist, hoist, swap, commute and ternary, in a second scratch tree.
+    Gains:
+    - ObjAfterMove 23 -> 17: the cell flags and the tile are re-derived at
+      each use.
+    - ScrollMapCache 98 -> 75: the clamps go left, right, top, bottom; the
+      positive part of dy is recomputed at each use; `tiles.top` is
+      compared as `0 < dy`.
+    Everything else was unchanged, or moved by 1-3 bytes and not taken.
+  - **ObjMoveAlongFacing 30 -> 7** (2026-10-07).
+    - The row count is re-read at each use; there is no `nrows` local.
+    - The sub-row loop reads row 0 through a `lead` pointer. It is
+      initialised to null and set inside the row-0 block: the image's
+      `xor ebp, ebp` at entry.
+    - The final heading is a new variable written after `reverse`'s last
+      read, so VC6 homes it in that dead parameter slot.
+    - Left: `angle` is spilled around RoundTo8, where the image keeps it in
+      al.
+  - **AppendTroopState matched** (2026-10-07), 1541 -> 1542. The position
+    and facing ages are recomputed from `seq` at each test, with no `age`
+    locals. The extra uses of `seq` give it the lower stack slot, as in the
+    image.
+  - **DrawEffectLayer fixed, not matched** (2026-10-07), still 1541. The B
+    pair was skipped whenever the A pair was idle: a `continue` where the
+    image jumps on to the B test. Now an `if` around the A part. The
+    remaining diff (230) is the loop's strength-reduced pointer: the image
+    bases it on A's point, ours on B's.
+  - **LoadShadowBmp matched** (2026-10-07), 1540 -> 1541.
+    - Fixed a real bug: the palette read is biClrUsed * 4 bytes, not
+      biHeight * 4. The old count overran the 0x400-byte table for any shadow
+      taller than 256 rows.
+    - The info header and colour table are one local object. As two, VC6
+      put the file header above the info header.
+    - The hot spot is read as words, through a union view of the header.
+    - The loops read the header's width and height. The row table is indexed
+      (VC6 strength-reduces it inside the loop guard). x = 0 comes before the
+      row-table store.
+    - MpPanelScreen 230 -> 175: the game box's 0x40 path is function-scope,
+      which makes the frame 0x1a4 as in the image.
+  - **HudEdgePaint matched** (2026-10-07), 1539 -> 1540.
+    - The ammo text buffer is three bytes, not four ("**" or two digits, and
+      the terminator). As four bytes, VC6 placed it above x and y rather than
+      below them.
+    - The ammo sprite stores x before y; the other two sprites store y first.
+  - **CheckMapRules matched** (2026-10-07), 1538 -> 1539.
+    - The complaint line is formatted into the caller's 0x40-byte rules-path
+      buffer: MpComplain takes it as a parameter and has no local of its own.
+    - path, amm and bmp are all function-scope. As block locals, amm and bmp
+      would share a slot. VC6 overlaps sibling-block and inline-local arrays,
+      but not function-scope ones.
+    - The preview pointer is read at the MpPreviewSetBitmap call.
+  - **AirPassesDraw matched** (2026-10-07), 1537 -> 1538.
+    - Half the pass time is recomputed at each use: no `half` local.
+    - x is computed before y.
+    - ViewUpdate 76 -> 68, likewise without a `halfH` local.
+    - unhoist.py now also handles locals that are declared first and
+      assigned exactly once later.
+  - **The reverse-hoist probe** (`unhoist.py`, session tmp directory),
+    still 1537 (2026-10-07).
+    - It replaces a local initialised from a plain expression with that
+      expression at each use, and scores the result.
+    - CheckMapRules 95 -> 9:
+      - the map name is recomputed, as in OnMpGameType;
+      - the rules path buffer is 0x40 bytes, as the image's 0x248 frame
+        needs. Only the three buffers' slot order is left.
+    - MpPanelScreen 257 -> 230: the map count is re-read in the loop test.
+    - ObjAfterMove 26 -> 23: the mask rectangle is read at each use.
+  - **OnMpGameType matched** (2026-10-07), 1536 -> 1537.
+    - The map name is recomputed from the record at each of its two uses.
+      It does not go through an `nm` local.
+    - The map box is read at its store, after FindLevelByName. It was not
+      read into `maps` before that call.
+    - This is the reverse of the hoisting lever. A local the original did
+      not have changes register weights just as a missing one does.
+  - **RecvTrooperWantItem matched** (2026-10-07), 1535 -> 1536.
+    - The give amount is one if/else between the quantity and the
+      target's count. The original was not `give = quant` and then a
+      clamp.
+    - Found by `ablate2.py` (session tmp directory). It deletes each
+      statement in turn and reports the ones whose removal makes our code
+      contain the image's first differing instruction. Run over every
+      unmatched function, it listed more leads (STATUS keeps the method,
+      not the list).
+  - **BuildVehicleMask and BuildRoachMask matched** (2026-10-07), 1533 ->
+    1535.
+    - Same method: ablate each statement and look for the image's exact
+      instruction.
+    - Deleting the index clamp after `AnimIndexOfId` produced it. The
+      helper's parameter and return were the invisible temporaries. The
+      original writes the search out, as the helper's own comment says.
+    - BuildRoachMask also indexes `g_roachMasks[facing]` instead of
+      walking a pointer. VC6 strength-reduces the index to the image's
+      pointer, set up inside the loop's entry test.
+  - **PointerPickRepair matched with the minimal-clone lab** (2026-10-07),
+    1532 -> 1533.
+    - The function was copied into a standalone file with raw offsets and
+      compiled by `tools/vc6lab.py`. The clone reproduced the relink's
+      diff, so the tie was local.
+    - Deleting statements one at a time, at a second per compile, found
+      the cause. A private copy of the leader lookup,
+      `OurLeaderUnitUidLocal`, held the uid in a local. That one extra
+      temporary shifted every later scratch register.
+    - The shared `OurLeaderUnit()` from item.h matches. The private copy
+      is deleted.
+    - Lesson: a register difference far from the code that causes it, in
+      blocks that compile identically, comes from a temporary that never
+      appears in the output. The lab finds it quickly. The source-wide
+      probes cannot.
+  - **Step3Drive 419 -> 372, still 1532** (2026-10-07).
+    - A combined pass (hoist, swap, operand order, ternary, each repeated
+      until nothing improves) found little more: the remap choice in
+      Step3Drive as a ternary (377 -> 372), and FormationPointFar storing
+      the leader's y before its x (12 -> 6).
+    - A second hoist round, in apply mode, found four reads in Step3Drive
+      that the image takes ahead of their statement:
+      - the gun's heading;
+      - the turret's direction bits and bias;
+      - the army byte for CommMustBroadcast;
+      - the y for the engine sound, read ahead of ListFirstField548,
+        which takes a const object and only reads.
+  - **Constructor and operand-order sweeps, still 1532** (2026-10-07).
+    - All three probes can now find constructors (`??0Class` names).
+    - HudPanel 64 -> 19: the panel's height goes through a local.
+    - MpPanelScreen 260 -> 257: the bar's span goes through a local.
+    - `commute.py` swaps the operands of one comparison or commutative
+      operator at a time:
+      - ObjCollidesWith 17 -> 15.
+      - BoxAction, ListMaskAction and LoadShadowBmp, a byte or two each.
+  - **Probe sweeps, still 1532** (2026-10-07).
+    - Guarded `swap.py` over every unmatched function:
+      - ScriptParseActionRecon 478 -> 458.
+      - ObjHitMaskAction 163 -> 154.
+      - AiTrooperStep 130 -> 126.
+      - FindPath 378 -> 375.
+      - ListMaskAction 211 -> 208.
+      - ParseScenarioPart 24 -> 22.
+    - `tern.py` (ternary <-> if/else assignments): SelectFirePose 72 -> 70.
+    - A swap that moved a statement into an unbraced `else` scored 12 -> 4
+      in FormationPoint. It changed what the code does, so it was rejected,
+      and swap.py now skips unbraced bodies.
+  - **LoadAnimTable matched; two search tools** (2026-10-07), 1531 -> 1532.
+    - LoadAnimTable stores -2 only when `next` is zero. The ternary
+      stored in both arms. It also takes the count into a local for the
+      allocation (17 -> 0).
+    - `hoist2.py` (session tmp directory) generalises `hoist.py`. It moves
+      any memory read in a statement, not just a call argument, into a
+      local and scores the result.
+    - `swap.py` swaps adjacent independent statements and scores them.
+      Calls and statements that read each other's target are skipped.
+    - Gains kept, all semantics-preserving:
+      - Type2PlayerInput 61 -> 11 (the facing through a local).
+      - ScrollMapCache 156 -> 98 (Clamp and rectangle field order).
+      - StepType5 22 -> 8 (fraction stored before height, both sites).
+      - ScriptParseActionRecon 501 -> 478.
+      - LoadMap 70 -> 65.
+      - ObjRemap 65 -> 56.
+      - ObjMoveAlongFacing 35 -> 30.
+      - HudSquadUpdate 84 -> 79.
+      - ViewUpdate 79 -> 76.
+      - HudPostUpdate and DepthResort, one each.
+    - The probes edit the source blindly. Each kept change was checked for
+      semantics: one of hoist2's nested hoists shadowed another and only
+      scored better by computing the wrong value. Its names are unique
+      now.
+  - **A value read into a local before the call** (2026-10-07), 1529 ->
+    1531.
+    - VC6 picks a different scratch register for a value read straight
+      into a call argument than for one read into a local first. A local
+      shifts every later register choice by one.
+    - ScriptSetObjBitmap matched with the name's uid in a local before
+      LookupByUID. UpdateObjectScript matched with `frame->b` in a local
+      before ChangeObjectFrame.
+    - RefundPlacedUnit (14 -> 7) takes the trooper's weapon uid into a
+      local before LookupByUID.
+    - Found with `hoist.py` in the session tmp directory. For every call
+      argument that reads memory, it tries the read in a local and scores
+      the result. A sweep over all unmatched functions found these
+      three, plus smaller gains not yet taken.
+  - **ObjAttachTo matched: one shared tail** (2026-10-07), 1528 -> 1529.
+    - Three arms each did `s->followUid = t->uid`. The image loads it
+      into eax in two of them and edx in the third. Ours rotated
+      eax/edx/ecx.
+    - Deleting either of the other two stores flipped the third's
+      register. So the choice follows how many copies of the statement
+      the source has, not the code around it.
+    - The aiMode 6 and aiMode 0 arms share one
+      `s->followUid = t->uid; return;` after an if/else. VC6 copies that
+      tail into both arms with the same register.
+    - Found by deleting statements one at a time and watching the one
+      register (`ablate.py` in the session tmp directory).
+  - **MpPanelScreen builds its children with `new`** (2026-10-07), 339 ->
+    260, still 1528.
+    - Every child the image constructs carries an EH state store around
+      its constructor call (`mov byte [esp+0x1BC], N`). That is VC6's
+      code for `new T(...)`. The placement form
+      `p = operator_new(n); p = p ? ::new (p) T(...) : 0` produces
+      different code.
+    - Converted to real `new`: the four ArrowBars, the three ListBoxes,
+      the TextList, the chat Edit, the MpSpin, and the four rows records
+      (`new AM2_Rec(0)` in place of RecordCtor).
+    - The rest of the diff is the per-player loop's induction variables.
+      The image keeps `&g_armyPoints[i]` in a frame slot and ends the loop
+      on it (`cmp eax, 0x515FF0`). Ours folds it into the `this + 0x230`
+      walk, and our frame is 0x1C bytes smaller. An explicit pointer walk
+      and a direct `am2_origstate` reference both scored worse or the same.
+    - ObjAfterMove (30 -> 26) increments `idx` before `cell`, as
+      ItemTeardown does.
+  - **Five functions closer, none matched** (2026-10-07), still 1528. Each
+    change follows something the image shows directly.
+    - ObjAfterMove (66 -> 30) shifts the row by the whole dword at
+      0x00514DE4 (`mov ecx, dword`). It reads it through
+      `am2_rl_map_row_shift32`, declared beside the function. relink.py
+      now maps an `am2_rl_*` declared in any game source, not only in
+      globals.h. Declaring it in globals.h instead changed codegen in
+      other files: it flipped CheatLine.
+    - ObjAfterMove's height is an `int8_t`, so VC6 keeps it on the stack
+      as the image does. An int32 takes ebx. The image still stores it as
+      a dword, so the true form is not found yet.
+    - RegionFindPath (36 -> 35) bumps the generation before setting the
+      goal and head: the image loads it ahead of those stores.
+    - ViewUpdate (81 -> 79): the eye's stepped y lands in `vpt.y`. The
+      image stores it at frame +0x16, half of a point, not in its own
+      slot.
+    - ObjCollidesWith takes `from` first in the height difference and in
+      both owner compares, which is the image's load order. The remaining
+      diff is which of esi/edi holds which argument.
+    - Type2PlayerInput takes the cursor x before the view's left edge.
+    - Tried without a gain:
+      - ScriptIf: the allof/inorder step and the event-append store order.
+      - LoadOptions: the last migration's epilogue merge, under
+        if/else, goto and return layouts.
+      - MovieStart's delete, UpdateObjectScript, BoatExitPoint,
+        DirtyCollect, StepRowAnim, ChangeObjectFrame (including a
+        bitfield key), PointActionC's `&rows->sprite` pointer.
+      - SelectBestWeapon (the same tie as SelectRankedWeapon), ObjTileHook
+        (`i = 0` hoisted: the image's zero register), AppendTroopState
+        (spill slots), GenerateObjScriptFromTokens.
+  - **TrooperBuildContext and PointerActionMode4 matched** (2026-10-07),
+    1526 -> 1528.
+    - TrooperBuildContext reads the context's leader at each use instead
+      of holding it in a local.
+    - Its leader block sits inside the `else` of the lookup test. The
+      image's null-leader path jumps straight past the block, where ours
+      had been re-testing the null it had just stored.
+    - Its vehicle distance takes the object's position first (ApproxDist
+      is symmetric).
+    - PointerActionMode4 stores the follow uid before AI mode 3: the image
+      loads the uid ahead of the constant store.
+  - **MakePlacedUnit matched: the pillbox HP is a scalar** (2026-10-07),
+    1525 -> 1526.
+    - The image loads the pillbox trooper's health with one 16-bit
+      `mov ax` and stores it to both fields. VC6 gives that load only to
+      a lone short global copied into a local. An element of a larger
+      object gets a dword load. Every spelling that reads the global twice
+      reloads after the first store, `const` included.
+    - The relink build now gives the value its own symbol: globals.h
+      declares `am2_rl_pillbox_trooper_health` under AM2_RELINK with its
+      VA in a comment, and relink.py maps every `am2_rl_*` that way. The
+      other builds keep the view into am2_rank_records.
+    - Scans written along the way, in the session tmp directory:
+      - widthscan: global load widths;
+      - reloadscan: global load counts;
+      - immscan: immediate constants;
+      - ternscan: zero-then-set against a ternary.
+      Most hits were register ties, or jump tables disassembled as code.
+  - **MakePlacedUnit passes the caller's name to CreateVehicle: 84 -> 5**
+    (2026-10-07), no count change.
+    - A real argument bug: the vehicle arm handed CreateVehicle the
+      directory scratch where the image pushes MakePlacedUnit's own
+      `name` argument (0x0043AE12), as the trooper arm does.
+    - The row loop is the image's plain `for` with the sprite re-read at
+      each use. Both `rows` and the shot-proof flag are zeroed and then
+      conditionally set, which is the image's `xor; test; jle; mov`
+      rather than a ternary's `mov; jmp; xor`.
+    - The pillbox weapon is `kind == 1 ? BAZOOKA : MG`. It was the same
+      choice spelled from the other end; for kinds 0..2 the two agree.
+    - What is left is one register for the occupant's height.
+  - **ScriptParseActionRecon 518 -> 501; ParseScenarioPart 52 -> 24**
+    (2026-10-07), no count change.
+    - activateregion/inactivateregion store the subject before n0. The
+      image loads the token's value before the constant store, and VC6
+      reorders stores but does not hoist loads over them. (/Oa and /Ow
+      were tried for script.cpp and make every function in it far worse.)
+    - ParseScenarioPart clears the part with memset, which is VC6's
+      inline three dword stores through a copy of the pointer. It reads
+      the header count through a cursor it then advances, takes the two
+      counts as `a` and then `b` with a 4-byte step after each, and sets
+      `took` before stepping `cur` in the first arm.
+    - ScrollMapCache was looked at: the image saves ebp only after its
+      early exits and keeps dy in ebx, and three ways of initialising
+      dx/dy did not get ours there.
+  - **FindPath 381 -> 378** (2026-10-07), no count change.
+    - `cur` is a uint16_t: the image copies it unmasked and compares it
+      with `cmp ax`, masking only curTile.
+    - A neighbour's region is tested `> 0`.
+    - What is left:
+      - The image's outer `while` is not rotated: its back-edge jumps to
+        the test at the top. Every loop spelling tried scored worse.
+      - The image holds the region byte in al where ours spills it.
+    - Also tried without gain:
+      - ScriptParseEvent: two tail layouts.
+      - Step3RouteAndBoard: the image rematerializes `&o->C0` where ours
+        keeps a pointer.
+      - AppendTroopState: the image spills `seq` into a dead argument
+        slot.
+  - **AM2_Object's route fields typed** (2026-10-07), no count change.
+    - routeGoal (+0x118), moveUntil, and the waypoint array at +0x120 (a
+      union with moveFrom, moveTo and moveEnd), plus moveAt and moveCount
+      (+0x520).
+    - AiTrooperStep uses them and stays at 130. What is left there is
+      which of the region hop's values spill: the image keeps toTile and
+      toRegion on the frame.
+    - The new members tipped the CheatLine/PlacementScreenClick coin.
+      KEEP_DECLS is now the sprite list's range alone.
+    - Also tried without gain:
+      - BlockWeightRoute: the height operands and the distance compare
+        swapped, and the typed waypoint read.
+      - PointActionC: a pointer to the head row's sprite slot.
+      - HudTopUpdate: one read of the grab, reused.
+      - LoadOptions: early-return and explicit-return shapes.
+      - Step3Drive: the gun heading through a byte prototype. The image
+        shifts in 8 bits and pushes unextended, yet FireWeapon's body masks
+        an int.
+  - **The MpPanel constructor gets its joiner arm: 422 -> 339** (2026-10-07),
+    no count change.
+    - The per-row arm that greys the points spinner for a joiner is
+      written as the image has it. It was left out after a transcription
+      that also disabled the row's name, which the image does not do (see
+      docs/screen-mpoptions.md).
+    - The row loop stores through the typed member arrays (names, colours,
+      teams, armyRows, colourSel, playerNames).
+    - The spinner is added before it is stored in armyRows[i].
+    - `i == 3` is taken into a local before the allocation.
+    - AM2_MpSpin's three colours are uint8_t: the image pushes the bytes
+      without zero-extending them. The spinner's own constructor still
+      matches. Its child pointers, range and step are typed fields now.
+    - Still differing: the image walks g_armyPoints with a pointer of its
+      own, which also drives the loop's exit. Ours reaches it relative to
+      the `this` arrays, because the relink folds it into the 0x515FD8
+      aggregate. Splitting the aggregate made it worse.
+  - **DrawEffectLayer clamps in 16 bits; RowUpdate 166 -> 150** (2026-10-07),
+    no count change.
+    - DrawEffectLayer copies each displacement pair as one dword and clamps
+      its x and y in place as int16: the image's `xor cx, cx`, `add cx, bp`
+      and `movsx`. The frame is now 0x3144 as in the image. The score moved
+      from 165 to 230 because of the registers. What is left is the
+      per-army induction pointer: the image bases it on the aim point's y.
+    - RowUpdate reads the sprite's width and height into locals before the
+      rect is built, as the image loads both bounds up front. The image
+      then computes each right/bottom edge twice, once for the rect and
+      once for the cell. No spelling tried reproduces that: locals for the
+      corner, mixed reads, or a branchless top clamp.
+    - Also tried without gain:
+      - ObjRemap: clamp and shift order (65 is still the best).
+      - SelectFirePose: the mortar and airstrike arms written as a switch
+        (no change).
+      - DiedEffectB: three spellings of the angle test.
+  - **ListUpdate matched; PausedFrameStep fixed and 238 -> 151**
+    (2026-10-07), 1524 -> 1525.
+    - ListUpdate repaints both row bands from a left and right it reads
+      once per block, passed as scalars to ListRepaintBand. Both survive the
+      PlaySoundAt between the two repaints, as in the image.
+    - ListUpdate's hover arm takes `wasSel` again after the focus call: the
+      image reloads that register.
+    - ListUpdate writes the row straight into `lb->selected`, reads
+      `selected` only after the mouse-button test, and re-reads the
+      blinker in the key arms.
+    - PausedFrameStep had three behaviour differences, all found from the
+      bytes:
+      - the column advances only for a slot that is drawn (the empty-slot
+        `continue` skips the image's `add esi, 4`);
+      - the game-type line uses the row's start, not the advanced pointer;
+      - a paused slot skips only its score text, not its name box.
+    - PausedFrameStep's team badge x is `variant == 3 ? 0x5E : 0x3E`.
+      `sub; neg; sbb; and; add` is VC6's two-constant ternary, not a
+      rounding.
+    - PausedFrameStep calls CommArmyOfSlot inside DrawSprite's argument.
+    - PausedFrameStep's buffers are sized from the frame offsets:
+      teamText[20] and buf[300].
+    - NearestPalIndex takes `from` as a uint8_t. MakeBitmap writes its
+      copy as a byte and pushes the dword. NearestPalIndex still matches,
+      and MakeBitmap went from 153 to 152.
+    - Looked at without gain:
+      - HudEdgeUpdate and UpdateTrooperAction keep a `this + const`
+        pointer in a register, which ours folds wherever it is assigned. A
+        lab case keeps it, so this is allocator cost.
+      - CheckMapRules: path scoped to its block.
+      - ScriptSetObjBitmap: eight shapes.
+      - PointerActionFollow: the first OurLeaderUnit's dead loop is placed
+        at the end.
+      - ScriptPad: the image cross-jumps its first ScriptExpect error into
+        its last.
+  - **RunScriptAction 129 -> 30** (2026-10-07), no count change.
+    - The setbriefvo arm (0x28) sits between setbriefing (0x27) and
+      setstratmap (0x29), which is where the image lays out its strcpy to
+      g_levelSoundName.
+    - Arm 0x2E assigns `army` in both branches: CommSlotForArmy(act->army)
+      in a session, and act->army otherwise. Defaulting `army` and then
+      overwriting it put the session flag in ecx where the image tests it
+      in eax.
+    - What is left is which frame slot each variable read takes. The order
+      of the eleven function-scope declarations has no effect on that: 400
+      permutations all scored 30.
+  - **Frame size as evidence, again: ListMaskAction 227 -> 211** (2026-10-07),
+    no count change. Twelve differing functions have a frame size that
+    differs from the image's:
+    - one dword short: AiTrooperStep, ListUpdate, HudEdgeUpdate,
+      UpdateTrooperAction, ObjHitMaskAction, MakeBitmap, CheckMapRules;
+    - one dword long: RowUpdate, ScrollMapCache, DiedEffectB;
+    - more: ListMaskAction (0x14 short) and the MpPanel constructor
+      (0x24 short).
+    ListMaskAction now has its sibling's shape: a `tile` rect clamped
+    before `box` is written (the image makes all eight Clamp calls first),
+    and separate `rowbytes` and `splitOdd` locals. These replace
+    `world.right` and `rowbits` reused for them, and `tilew` is computed
+    from `tile`. The frame is 0x40 as in the image. Its sibling's ring
+    order and a width re-read after the memset both made it worse.
+  - **VehicleBlockWeight passes its sound point as two int16 fields**
+    (2026-10-07), no count change. The image's dword loads at the point
+    and at point+2 are VC6 pushing two int16 lvalues, since PlaySoundAt's
+    x and y are int16_t. The composed `sy` workaround is gone and the three
+    calls have the image's shape. The score went from 52 to 58: the per-call
+    register rotation (eax, ecx, edx) follows the earlier allocation, which
+    still differs (the image spills `weight` and gives `pt` its own slot).
+  - **AM2_Button typed; ObjMoveAlongFacing 40 -> 35** (2026-10-07), no count
+    change.
+    - AM2_Button names its three sprites and the owns-sprites byte, and the
+      movies screen fills them and its own button and sprite arrays through
+      the types (it stays at 12).
+    - ObjMoveAlongFacing passes the direction bits straight from the
+      animation; the `uint32_t` local zero-extended them where the image
+      pushes the byte.
+    - Tried without gain: the use-weight and zero-register ties in
+      HudPostUpdate (`repeat = 0` in edi), ObjTileHook, DiedEffectB and
+      PointerPickMode4. Also SelectWeapon's case order, which decides how
+      the identical SetWeaponTarget arms tail-merge, and DepthResort's arm
+      layout.
+  - **ControlsDialogScreen matched: a typed array in an index loop**
+    (2026-10-07), 1523 -> 1524. The key-row loop counts i from 0 to 21 over
+    the bindings and positions globals and stores `this->rows[i]` into the
+    now-typed screen (21 row pointers at 0x64, the whole object). The image
+    closes the loop with a signed `jl`, which marks an index loop. The
+    pointer walk it replaced compared unsigned. With a cast pointer instead
+    of the typed member, VC6 folded the row store into the position pointer
+    (35), and a separate `*rows++` stopped at 2.
+    - FindPath went from 384 to 381. A neighbour is a signed int
+      range-checked with `<= 0` and `>= 0x10000`, then masked to a 16-bit
+      tile for every later use.
+    - LoadShadowBmp went from 50 to 49: an unsigned image size (the image
+      tests it with `ja`), and the headers as the SDK's BITMAPFILEHEADER and
+      BITMAPINFOHEADER.
+  - **Three more distance reductions, and a classifier** (2026-10-06), no
+    count change.
+    - AddToItemList went from 29 to 25: the given uid is masked in place
+      before the counter is raised.
+    - RecvTrooperWantItem went from 30 to 29: the pickup arm sets
+      `unused = 0` before stamping the clock.
+    - BlockWeightTroops went from 32 to 29: the riding-leader test returns
+      0 directly instead of jumping to the shared zero.
+    The register-renaming classifier, re-run (registers and stack slots
+    renamed away, then diffed),
+    puts 15 of the 122 at zero structural difference: BuildVehicleMask,
+    EvtCondition, FormationPoint and FormationPointFar, HudEdgePaint,
+    ObjAttachTo, PointerPickRepair, RecvTrooperWantItem, UpdateObjectScript
+    and WndProc, plus DrawMenuCursor, ObjCollidesWith, ScriptSetObjBitmap
+    and SelectionClick, which differ only in padding. ShotHitsObj is the
+    fifteenth. What is left in them is register and stack-slot choice.
+    ObjCollidesWith's swap is confirmed as use weight in the clone lab:
+    deleting any single `obj` use (the flags test, or the deadline test)
+    gives `from` esi as in the image. So the original has one `obj` use
+    fewer, or one `from` use more, than ours. These did not move it:
+    restructured conditions, inline helpers (their parameters propagate),
+    expression order, and dead uses (removed before allocation).
+  - **BuildFont matched: a zeroing loop, not memset** (2026-10-06),
+    1522 -> 1523. The first 32 glyph offsets are cleared by a `for` loop.
+    VC6 turns it into `rep stosd` and sets up the destination first, as
+    the image does; memset sets it up last. The converse holds in
+    LoadType2: its dword clear was a memset, and the loop form made it
+    worse. Copy loops are not turned into `rep movs`, so the LoadType
+    copies stay open. ObjRemap went from 73 to 65 by clamping ct before cl.
+    ItemLinkCells, which has the same code, needs the opposite order.
+  - **Byte parameters, and three shape fixes** (2026-10-06), no count
+    change; nothing lost.
+    - CreateExplosion's facing and TimedDirFrame's direction are byte
+      parameters. The image pushes the byte register without masking or
+      zero-extending it, which VC6 does only for a char parameter. Both
+      functions still match.
+    - StepType5 went from 58 to 22 with these and with three shape fixes:
+      `travel` written as one product per branch; the row pointer re-read
+      from the object at the trail's 0x54 test; the case-2 impact's y left
+      as int arithmetic, not cast to int16.
+    - SelectFirePose went from 76 to 72. RAISE_STAND now sits in the grenade
+      arm's default case and RAISE_KNEEL in the bazooka arm, as the image
+      lays them out. The flamethrower arm gets an explicit
+      `default: return 1`.
+    - CollapseEqualDeltas went from 38 to 34 with `prev = *wr++` as one
+      statement.
+    - A search that added each global a function touches, one at a time,
+      to the shared aggregate object found nothing in 88 functions.
+      Aggregated ranges are members of the one am2_origstate struct, so any
+      two of them alias each other. That is why RunScriptAction needed two
+      ranges and neither alone did anything.
+  - **The alliance test calls the comm object directly** (2026-10-06),
+    1520 -> 1522. ArmyAlliedWithObjInline's last line went through the
+    AllyFlag wrapper. The image pushes the owner byte before it loads the
+    comm pointer, which the direct member call gives. PointerPickHeal and
+    PointerPickEnemyTrooper match; ObjAttachTo (13) and PointerActionMode4
+    and 5 (12 each) are down to 2. Also:
+    - ScriptIf 18 -> 6. Six of its eight "unexpected end" steps compare
+      `++*at >= count`. The allof and inorder steps keep the reversed
+      comparison (STEP_LATE_R). Their two steps are tail-merged, so they
+      flip only together, and together they get worse.
+    - RunScriptAction 137 -> 129. relinkos.py gets two more aggregates,
+      the message request pair and the message text and bitmap name. Its
+      showfailure and showpda arms then keep their stores after the
+      strcpys. One range over both would also hold the game clock and
+      cost AimStart and AimStartB.
+    - AppendTroopState 19 -> 18 with the position compare flipped.
+    - AM2_MoviesScreen typed (the twelve sprite pairs, the four buttons),
+      no score change. The image computes the pair's address once with an
+      lea, and no spelling tried does that.
+    Tried without effect: the last 2 in EvtCondition, MovieStart,
+    BuildVehicleMask, UpdateObjectScript, SelectBestWeapon, ReceivePlayerMsg
+    and LoadType2/3/6/8. These are register and schedule choices, and none
+    of the following moved them: declaration order, inline helpers,
+    struct copies, operand order, or loop and case orders.
+  - **The multiplayer panel screen typed** (2026-10-06), no count change.
+    AM2_MpPanelScreen has its name, chat and score buffers, its list boxes
+    and bars, and the four per-player widget arrays with the colour
+    selections. In the constructor, index loops over the two sprite arrays,
+    an unsigned slot test, and a name rect built before the `new` take it
+    from 461 to 422. The image walks the player arrays from one pointer at
+    +0x230, and `this->` members made it worse (586).
+  - **The squad panel and the list box typed** (2026-10-06), no count
+    change. AM2_HudSquad has its icon sprite, its two sprite arrays and twelve
+    AM2_SquadRec slots. AM2_ListBox has all sixteen fields. HudSquadUpdate
+    and ListUpdate use them, and AM2_Object's +0x98 is a union with a unit's
+    rank. Both scores are unchanged (84, 113); what remains is register
+    choice.
+    The original's Rich header records VC6 RTM (build 8168) for both front
+    ends, which matches ours. Compiling clones as C instead of C++ changed
+    nothing, so the front end is not where these ties come from.
+  - **BuildRemapTables matched; HudTopUpdate 67 -> 2** (2026-10-06),
+    1519 -> 1520. A scan for base/index swaps in addresses found
+    BuildRemapTables. Its two army tables are arrays of 256-byte rows,
+    indexed `[army][i]`; a row pointer held per army put the index first.
+    HudTopUpdate took these, in order:
+    - the blip deadline as one expression, with no `jitter` local;
+    - both scroll clamps as conditionals over a DOUBLE step (the image
+      compares on the FPU and stores the winner through it);
+    - the strip and button tests nested positively, with the miss arms
+      after them (the image lays the hit path first);
+    - the button rect built in place;
+    - the mouse grab read from its global.
+    What is left (2) is VC6 jumping straight past `grab != button` after
+    storing the grab, which the image does not do. AirFrameDraw's last
+    difference is the same kind: VC6 knows the frame is 2 after `f++`. In
+    small test files VC6 makes these jumps under every optimisation flag
+    tried, so the original's compiler may have behaved differently there.
+    AM2_HudEdge is typed (its captions, bars, ammo and sprites), and
+    AM2_Object's +0xCC is a union with a weapon's ammo.
+  - **TileRegionOrBorrow matched through an aggregate** (2026-10-06),
+    1518 -> 1519. Its last instruction was `[eax + ebx]` where the image has
+    `[ebx + eax]`. The clone lab (`tools/vc6lab.py`) isolated the rule. VC6
+    puts a HOISTED global load first in the address and a held local second.
+    It hoists the two cell tables in member order only when they are one
+    object. So the weights pointer is re-read each pass (VC6 hoists it as a
+    temporary), and relinkos.py aggregates 0x514EC0..0x514ED0, the weights
+    and the regions at +0xC. A search tool that tries every pair of a
+    function's globals as one object found nothing else in 19 more
+    functions.
+  - **One cell-entry type for rows and objects; the free family typed**
+    (2026-10-06), no count change. AM2_RowEntry became AM2_CellEntry. An
+    object's OBJ_OFF_CELL_ENTRIES holds the same 16-byte entries for
+    g_objMapDesc, with the owner a union of row and object. ListUnlink,
+    ListPushFront, DepthLink and DepthResort take it, and the `(void **)`
+    head casts are gone. Also typed: ObjRemap, ItemPreDestroy, ItemSetBox
+    and ItemLinkCells, using AM2_Object's new box (+0x20), hit rect (+0x30),
+    cell count (+0x8C) and entries (+0x90). The same goes for FreeItem, the
+    eight per-kind destructors, FreeSubrecordRows (an AM2_RowSet),
+    RowRelease, RowUnregisterAll, the row pools' slots and the ObjFlag
+    helpers, which work on a row's flags whatever their names say. A
+    vehicle's rider list is a named `riders` struct like `followers`. Every
+    function that matched still does; RowUnregisterAll no longer needs its
+    integer-address workaround. ObjRemap went 92 -> 73 by walking the grid
+    as ItemLinkCells does: `cols` held, both clamps branchless, and a running
+    `cell += stride`. DepthResort stays 32: the image's two unlinks load
+    prev and next before branching, and unifying ours as locals or as one
+    inline helper made it worse (36/41).
+  - **The map row's cell entries and the map descriptor typed** (2026-10-06),
+    no count change. AM2_RowEntry is a row's 16-byte cell entry (the row,
+    the depth-list links and the cell). AM2_MapDesc is the cell grid (cols,
+    rows, shift, cells). g_mapDesc and g_objMapDesc are typed. RowInit,
+    RowAlloc, RowSetSprite, RowRegisterAll and RowUpdate take AM2_MapRow and
+    AM2_MapDesc. The untyped callers cast at the call, leaving their address
+    arithmetic as it was. All of them still match except RowUpdate, which
+    stays NORM 166. The image keeps `left` in a register for `right` but
+    re-reads `top`, has a 0x1C frame against our 0x20, and clamps the top
+    edge branchlessly too. Spelling the clamps and the held `cols` as
+    RowRegisterAll does gives 172. A local for `left` gives 319, and RectSet
+    gives 377.
+  - **ShotHitsObj, narrowed** (2026-10-06), still raw 7. Putting the
+    `refuse:` label on the FIRST arm's `return 0` makes all seven refusals
+    target one shared block, as in the image. But VC6 then cross-jumps that
+    block into the identical `return 0` at the end of the function, moving
+    the first arm out of line (NORM 16). The image keeps two copies and
+    aims the refusals at the first. Plain `return 0`s give inline epilogue
+    copies (95). An `else` wrapping everything after the first arm changes
+    nothing on its own (7), and with the label it gives 108. Recasting the
+    final armour test as `!checks || pierces`, a nested first test, and
+    inverting the first test around the label all still merge. The whole
+    function as `if (proof) return 0; else { ... }` with the seven refusals
+    falling out to a closing `return 0` is back to raw 7: VC6 merges that
+    closing block into the LAST identical epilogue, the armour test's.
+    So the end of the original must differ in some way VC6 does not merge
+    across. Rewriting ShotPiercesArmour's tail as `power >= need` is worse
+    (47).
+  - **The object table returns AM2_Object** (2026-10-06), no count change.
+    LookupByUID, LookupByUIDInline, FirstItem, NextItem, ObjByUidAlias and
+    the table entry's `obj` are `AM2_Object *` now, which removed the casts
+    at their typed callers outright. A pointer cast changes no code, so all
+    148 call sites compiled unchanged under VC6. AM2_Object's +0xA4 is a
+    union: an item's chain uids or, for types 2, 3 and 8, the follower list
+    ObjAttachTo maintains. +0xB0 and +0xC0 also have the two-int16 view the
+    per-type destroy arms clear. +0x1A is the tile index, and +0x550 a
+    vehicle's weapon uid. Typed with it are ApplyHeightItem, DamageItemChain,
+    DestroyObjCommon, DestroyType2/3/8, the pointer picks for modes 0, 4, 5
+    and 6 with their shared friend tail and leader lookup, ObjAttachTo's
+    follower walk, and the scenario header (AM2_ScenHdr). DestroyByType keeps
+    `void *` for its 22 untyped callers. Splitting the picks' board hint
+    into an inline did not reproduce the image's copy of the object either.
+  - **The object script, the frame step and the movie typed** (2026-10-06),
+    no count change. AM2_Object gains the script id/state/frame/deadline at
+    +0xB0..+0xBC, the previous position at +0x16 and the chain uids at
+    +0xA8/+0xAC. UpdateObjectScript, SetObjScriptState, ObjFrameSweep,
+    ObjFrameStep, StepType1And4 and ChangeObjectFrame take or walk
+    AM2_Object. The movie is AM2_Movie with real fields, and the Smacker
+    handle is AM2_Smack (the palette at +0x6C is why the opener's +0x8A is
+    entry 10). g_movieCurrent and g_stateMovie are typed, and the `fld()`
+    offset macro is gone. UpdateObjectScript went 7 -> 9 with the parameter
+    used directly and back to 7 through a working copy, which is
+    kept. Typing did not move MovieStart (4), ChangeObjectFrame (14) or
+    ScriptSetObjBitmap (8). Their remaining differences are which register a
+    temporary takes.
+  - **ListDraw matched** (2026-10-06), 1517 -> 1518: a `for` loop that tests
+    the count at the top, so VC6 does not peel the first visible-row check
+    out ahead of the loop, and the row text addressed as `text + idx *
+    stride` in place rather than through a running offset local.
+  - **The default `make` was broken by the PtrList typing and nothing
+    noticed** (2026-10-06). OurLeaderUnit, an inline in item.h, walks
+    AM2_PtrList, which misc.h declares only for C++, and selfcheck.c includes
+    item.h. `make check` and the relink never compile selfcheck.c, so both
+    stayed green for three commits. It is behind `__cplusplus` now. Run the
+    plain build too before committing a header change.
+  - **DepthCompare matched by reading the image's shape** (2026-10-06),
+    1516 -> 1517. It had been written as four self-contained arms; the image
+    has each arm answer 1 itself and fall into ONE shared "less is -1, a tie
+    goes to the pointers" tail, and it reads b's y where it is used -- a `by`
+    local made VC6 re-read the field after the first projection instead of
+    spilling it. 175 differing instructions to 0. The map row's +0x26/+0x28
+    are the depth layer and slope, and the depth list's node holds an
+    AM2_MapRow.
+  - **Alliance and the pointer picks typed** (2026-10-06), 1514 -> 1516.
+    ArmyAlliedWithObj and ObjsAreAllied match once they take
+    `const AM2_Object *` and the two army-4 tests are ONE condition,
+    `army == 4 || b->owner == 4`: as two ifs VC6 lays the shared `return 1`
+    out mid-function instead of last. army.h's inline expansion gets the
+    same shape. AM2_Object grows the variant overlays honestly, as anonymous
+    unions: +0x52C vehicleKind / tableRec2, +0x538 pose / a vehicle's rider
+    list, +0x54C inventory / seats. OurLeaderUnit, WeaponByUid,
+    ObjAttachTo, the select-weapon pair and six pointer handlers are typed;
+    those stay at register ties.
+  - **Rows and sprites typed** (2026-10-06), 1514 held. AM2_MapRow is the
+    whole 0x60-byte record, the object carries its rows as AM2_RowSet (the
+    {list, count, rows, capacity} header at +0x6C), and AM2_Sprite moved to
+    the flat spritetype.h, its surface arm a forward-declared
+    `struct IDirectDrawSurface *`. StepObjRows keeps its match only through a
+    local `AM2_RowSet *set`: through `o` VC6 adds `i*stride + rows`, which is
+    what the old void*-plus-alias version had been imitating. PointActionC
+    173 -> 20 bytes. KEEP_DECLS is empty again.
+  - **A void* parameter plus a typed alias is two variables** (2026-10-06),
+    1513 -> 1514. RevealObj took `void *obj` and cast it into a local; VC6
+    gives the alias its own register. It matches once the parameter is
+    `AM2_Object *` and the flags are re-read through it. A sweep that turned
+    every remaining such alias into a macro moved no other function to 0.
+  - **Forwarders are not free** (2026-10-06), 1511 -> 1513. The inline
+    `CommFoo(comm, ...)` forwarders in msgslot.h are meant to compile to the
+    same caller code as `comm->CommFoo(...)`, and usually do. BattleJoinOk
+    and ReceiveArmyMsg match only with the direct method call
+    (CommJoinSession, ArmyInPlay). A sweep of all 222 one-line forwarders over
+    the unmatched functions found no others. EvtRuleA matched through
+    tools/vc6lab.py, the single-function clone lab: the original passes the
+    spawn point once in place and once from a local copy.
+  - **Initialisers the original did not have** (2026-10-06), 1509 -> 1510.
+    A local zeroed at its declaration when the original zeroes it later,
+    or never, makes VC6 keep 0 in a register, and that shifts allocation
+    through the whole function. AudioTimerProc matches once `status` loses
+    its `= 0` (GetStatus writes it). BuildVehicleMask goes 34 -> 4 with its
+    count zeroed just before the scan. Sweeps over all unmatched functions
+    (drop or move a constant initialiser, flip a local's signedness,
+    commute a comparison) found these and FindPath's unsigned neighbour
+    tile. Most other hits change behaviour (a jump past the moved
+    assignment) or contradict the image's sar/shr and jl/jb choices, so
+    every hit is checked before it is kept.
+  - **Which copy of a shared exit survives, and where locals go**
+    (2026-10-04). VC6 folds identical return blocks, and the site carrying
+    the label decides which copy is kept and where it sits. `if (c) goto L;`
+    pulls L's block inline, while `if (!c) { ...; return; } goto L;` does
+    not. That took EditCharHandler 26 -> 2, ShotHitsObj 32 -> 7 and
+    ScriptParseActionRecon 865 -> 823. FireWeapon matches
+    once its grenade arm has a case-scoped copy of the target point: VC6
+    parks block-scoped address-taken locals in dead argument slots, as the
+    image does.
+  - **VC6 saves registers lazily** (2026-10-04). After an early-return
+    region it pushes ebx/edi/ebp at the point they are first needed, but
+    only when the paths after that point converge on one exit. StepType2
+    and PlaceScenario match once their mid-function `return`s jump to the
+    single tail (`goto tail` / `goto done`). SightScan and the two mask
+    builders also lost a redundant early return. Two more VC6 spellings:
+    a single-case `switch` compiles to `sub eax, K; jne` (PlaceScenario),
+    and `while (1)` is the unrotated loop where `for (;;)` rotates
+    (CommRegisterSelf 65 -> 44). Two transcription errors turned up along
+    the way: ReceivePlayerMsg's log line had lost its "for id %x\n" tail,
+    and StepType5 cut a blast's y to sixteen bits where the image passes
+    the whole sum.
+  - **Where VC6 puts a shared exit follows the shape of the source**
+    (2026-10-04). EnumSessionsCb matches once its three refusals are separate
+    `if (x) goto refuse;` statements jumping forward to the failed
+    allocation's inline return. `||` moves that block to the end, and separate
+    `return`s each get their own epilogue. UnitKindMatches matches once kinds
+    0-2 end in `if (E) return 1; break;` with `return 0` after the switch:
+    that sets which arm keeps the sete tail VC6 shares and which jumps into
+    it. Two more cases of shared blocks: MissionEnded 26 -> 2 (a strcpy
+    ordered before an independent flag store stops a cross-jump the image
+    lacks) and SelectFirePose 194 -> 183 (the raise poses are one labelled
+    block each). RoachBehaviour matches once its leader-unseen arm calls the
+    tail itself rather than `goto tail`: VC6 then keeps that copy of the
+    route block and folds the far arm into it, as the image does. The image's "first inline return, later sites jump back"
+    (ShotHitsObj, 58 -> 32 so far) only comes out of VC6 for returns inside
+    a loop; that is not written yet.
+  - **Pointer aliases are second variables** (2026-10-04): `AM2_Widget *w =
+    this;`, `uint8_t *h = (uint8_t *)set;` and `T *x = g_table;` each make VC6
+    reassociate or reorder (`(right - left) - width` where the image keeps
+    `(right - width) - left`; `rows + i*stride` for its `i*stride + rows`).
+    Where the image has no alias the alias is now a macro over the parameter,
+    `this` or the global -- BlitCentred, HudSquadDetail, HudTopPaint,
+    MultiSpritePaint, ScrollBarPaint and BuildRowSet match -- and where the
+    image walks its argument in place the parameter itself is the walked
+    byte pointer (VehicleUpdateApply matches, RefundPlacedUnit 74 -> 48).
+    Matched functions keep their aliases: the change is made only where it
+    scores better. An inlined helper's by-value parameters are the same kind
+    of copy: as references (or a macro) RegionFindPath 96 -> 37 and
+    PointerPickMode0 303 -> 120; AimStartB matched with its index and
+    element pointer as macros. Reference parameters on RegionSpan made VC6
+    exit silently on region.cpp without AM2_RELINK (the relink's baseline
+    compile) -- it is a macro now; base-compile every file after such
+    changes. CommRegisterSelf 75 -> 65: an answer that merges at one
+    `return result` stays in a register as the image's does.
+  - **Globals that were one object** (2026-10-04): when the image keeps a
+    load before a store that ours hoists past it, the globals were members of
+    one object in the original, which VC6 must assume may alias. relinkos.py
+    AGGREGATE_RANGES now also holds the menu cursor's animation state
+    (OverlayPrepare matches), the sprite list (LoadSpriteSet matches) and the
+    aim markers' tables as a RANGE -- the old `aim_` name prefix swept in
+    far-away lone globals (AimStartB 15 -> 10).
+  - **A local versus re-reading the field** (2026-10-04) changes instruction
+    selection away from the statement itself: SetSoldierKind matches once the
+    kind-7 name index is stored and read back from the object (a local turned
+    an earlier flag set into `or [m], imm`), CreateMissile once its 16-bit row
+    adjust is written from the ground field just stored rather than from the
+    argument.
+  - **Order of independent initialisations** (2026-10-04): ReceivePlayerMsg
+    25 -> 7 by initialising its loop index after the setting pointer in the
+    for-list; an adjacent-statement swap search over all mismatches
+    (semantics-preserving: distinct locals, no calls) found ViewUpdate
+    101 -> 95. Also DrawMenuCursor 155 -> 19, LoadMap 567 -> 548,
+    BlockWeightTroops 65 -> 50, StepType5 189 -> 169, BuildFont 37 -> 32.
+  - **Game code names globals, never addresses** (2026-10-04): every data
+    `ADDR_` use in src/game (900 globals) goes through a `g_` name bound in
+    `src/game/globals.h` (Win32-typed ones in `win32/globals.h`); 405 local
+    `g_` defines folded into it, checkglobals' drifts 15 -> 0. Bindings are
+    still the address dereference except g_pathNodes, which is typed per
+    build; uses at another width read `*(T *)&g_x` and bare addresses
+    `((uintptr_t)&g_x)` -- 613 and 326 of them, to clean up per function.
+  - **More global tables are record arrays** (2026-10-04): AM2_RankRec,
+    AM2_SightDirRec, AM2_FormationSlot and AM2_MaskRec in globaltypes.h,
+    bound as typed arrays (g_rankRecords, g_sightBlockByDir,
+    g_formationSlots, g_roachMasks, g_vehicleMasks). FormationPoint 47 -> 12,
+    BuildVehicleMask 72 -> 67, the roach footprint pair 41/38 -> 36 each.
+    AM2_OptionRec likewise (OptionsDefaults 18 -> 13).
+  - **What the remaining 165 are** (2026-10-04): a source-mutation search
+    (operand and comparison swaps, if/else and block flips, increment and
+    not-forms; 200 tries a function) over all of them found one (SetGamePalette),
+    a declaration-order permutation found none, and a per-file sweep of ~18
+    VC6 flags found nothing that does not lose matched functions -- so the
+    flags are right and what is left is register ties, which copy of an
+    identical block VC6 keeps (ScriptParseActionRecon, MissionEnded,
+    CommRegisterSelf), loop rotation (PlaceScenario's form-up), and the
+    CheatLine/PlacementScreenClick coin pair. Progress now comes from reading
+    the image's full disassembly for the original's shape: variable widths
+    (AiTrooperStep's int16 regions), field-wise copies (Step3Drive's spot),
+    case order, exit shape.
+  - **Exits shaped as the image lays them out** (2026-10-04):
+    VehicleBlockWeight 167 -> 83 (the boat arm returns through the shared
+    `return answer`, each damage arm assigns hp, the type-2 test inverted);
+    PlaceScenario 127 -> 62 (rows loaded after the army lookup, the form-up
+    list re-read from the table at each use, its counters zeroed before the
+    leader lookup).
+  - **Global tables are arrays of structs** (2026-10-03): FindPath's path
+    nodes are AM2_PathNode[0x10000] indexed by tile, as the image addresses
+    them (`[tile*16 + base + field]`), not through an element pointer
+    (487 -> 478; the start node's stores now match); SightScan's rank and
+    per-direction sight records likewise (532 -> 454).
+  - **UpdateTrooperAction walked a separate cursor** (2026-10-03): the
+    claimed-vehicle search in the route sweep walks `at` itself in the image,
+    so an exhausted sweep with a claimed vehicle reaches the item walk with
+    nothing to walk; ours kept the last swept cell's objects in `at`.
+  - **StepType3 matches: VC6 copies a short join into its predecessors**
+    (2026-10-03). Arms ending `lea eax,[out]; push eax; jmp <shared call>`
+    are ONE Step3ChooseFacing after the occupant if/else -- VC6 duplicates
+    a jump-ended join into each predecessor -- and the shared call itself
+    is an `else` arm laid out last (`if (gate == 0 && local) {...} else
+    choose`), not a `goto choose` label. UpdateTrooperAction's three stop
+    arms are likewise one `||` block copied three times (442 -> 420).
+  - **ViewUpdate wrote the glide back into the target** (2026-10-03): the
+    stepped point went into ADDR_VIEW_TARGET every frame, so a glide ended
+    after one step unless something re-aimed it. The image keeps it in two
+    locals and moves only the eye; a target it has not reached is still
+    there next frame. Visible on a diagonal edge scroll, where ApproxDist
+    exceeds the step and the eye moves less than the target did: the original
+    carries on, the reconstruction stopped short. Found by the byte-match
+    (the image has no store to the target after the glide), 132 -> 100.
+  - **Per-file prototypes** (2026-10-03): the original's TUs did not all see
+    the same declarations. Type2PlayerInput's AngleBetween returns int (the
+    byte result is used unmasked), TrooperFire's FireWeapon takes a byte
+    heading (pushed from a byte slot unmasked); both are reproduced with a
+    cast at the call, and every use downstream reads only the low byte.
+    With them, and the jitter / face-to / fire calls laid out as the image
+    has them, TrooperFire 123 -> 37 and Type2PlayerInput 197 -> 95 (its
+    cursor filter was a switch with a byte index table, not a table lookup).
+  - **Written-out copies, not shared labels** (2026-10-03): DirtyCollect's
+    unlink is a macro expanded in every case that needs it -- VC6 merges the
+    copies that come out identical and keeps three -- where the
+    reconstruction had one `goto unlink` target (89 -> 5); ScriptIf's late
+    "Unexpected end of script" steps are inline the same way (156 -> 138).
+    VehicleBlockWeight builds its offset points a word at a time in a
+    block-scoped AM2_Point, which VC6 packs into the dead `facing` slot,
+    and computes `facing & 0xFF` per branch: frame 8 as the image (221 ->
+    167). ObjMoveAlongFacing's and TrooperFire's floats are plain float
+    arithmetic: the `long double` casts changed VC6's instruction choice,
+    not the value. GCC (-m32, x87) emits the same code for TrooperFire's
+    either way; for ObjMoveAlongFacing the one change is that vel_z's zero
+    test now reads the unrounded register, which is what the image's
+    `fst` / `fcomp qword` does (80 -> 56).
+  - **SeqStepKind0 matches; a range check that is a switch** (2026-10-03):
+    the life clamp is `abs(life >> 1) - 2 >= 7 ? 7 : ...` with the
+    expression written twice. Type2PlayerInput's `add eax,-0x18` filter is
+    a five-case switch with a byte index table, not a static lookup table
+    (283 -> 197); HUD edge's old table was already a switch and is gone.
+  - **More frame-size fixes** (2026-10-03): RunScriptAction gives every
+    variable read its own function-scope slot (frame 0x60 as the image; 347
+    -> 189); UpdateTrooperAction reuses its settled flag as the found flag
+    (frame matches, 451 -> 442); HudTopUpdate's `acc` is set before a call so
+    it lives in memory like the image's (158 -> 85); ListMaskAction and
+    VehicleBlockWeight read their packed point argument as two words.
+  - **TrooperFire handed SetFieldInAll a zero** (2026-10-03): it moves the
+    table record from TABLE_REC_SLOT to TABLE_REC_KIND, zeroes the slot, then
+    passed the slot (via a macro that re-reads it) -- always 0. The image
+    passes the record (TABLE_REC_KIND). Found by the frame/argument compare;
+    every trooper leaving a table state had its subrecords cleared instead of
+    pointed at the record.
+  - **Frame size is evidence** (2026-10-03): 21 unmatched functions had a
+    different `sub esp` from the image. A bigger frame in ours meant the
+    original reused a dead variable (ItemLinkCells counts its entries in
+    `rows` -> exact match; FireWeapon keeps one point for both arcs and the
+    sweep point in `from`, 215 -> 2) or wrote helpers in place (LoadMap,
+    whose chunk tag is also signed: 713 -> 616); a smaller one meant the
+    original cached a value (ScrollMapCache's surface, 189 -> 179). An
+    automatic merge pass proposes many merges the scorer rewards that are
+    wrong (overlapping lifetimes); each must be checked by hand.
+  - **An exact scorer, and what it found** (2026-10-03): every per-function
+    scorer masked absolute operands, so WHICH global an instruction reads was
+    invisible -- LoadMap's plane size was H*W where the image has W*H (57
+    instructions), and the cursor-plus-view sums read their operands the
+    other way round. `$T/xsc.py SRC` resolves one TU the way the relink does
+    (from a saved symbol table, `$T/rl1.py SAVE=/LOAD=/ONLY=`) in under a
+    second. The hill climb rerun with it over all 162 diffs moved ~30
+    functions closer (ObjHitMaskAction 372->338, ListDraw 86->65,
+    DrawEffectLayer 285->231, ScriptParseActionRecon 910->843) but closed
+    none; uncache, for-header and case-order passes found nothing more.
+    What is left is VC6's own choice -- register ties, tail merging of
+    identical return blocks, goto-target placement -- that no source
+    spelling tried in the lab moves. NOT a different compiler: VS6 SP2 ships
+    no compiler, and SP3 updates only c1/c1xx (12.00.8472) and LINK, never
+    c2.dll -- so the image's 8168 objects were built by exactly our RTM
+    CL/C1XX/C2. The remaining differences are source (or flag) choices not
+    yet found; a sweep of /Oa /Ow /Op /Ob0 /Ob2 /Oi- /Oy- /G5 /G6 /GB /J
+    over the near misses made nothing better.
+  - **Unrotated loops are `while (1) { if (!cond) break; ... }`**
+    (2026-10-03): VC6 duplicates a loop's test at the bottom for `while
+    (cond)`, `for`, `for (;;)` with breaks, and goto loops alike; the image's
+    loops that test once at the top and close with a `jmp` are `while (1)`
+    with the test as an in-body break (and, for a counted loop, the step
+    written last in the body). ReadScript, DefDispatchFile and the AM2_Typer
+    constructor now match; `$T/w1pass.py`/`w2pass.py` applied it across the
+    rest wherever the distance dropped.
+  - **PlaceScenario's .cof form-up pass** (2026-10-03): the original clears
+    OBJ_OFF_SCRIPT_STATE for every listed unit that passes the flag, type
+    2/3/8 and field-94 tests -- before it asks "type 2 and not Sarge" -- so
+    vehicles and Sarge get it cleared too. The reconstruction only cleared
+    it for the units it formed up. Found by reading the image's store order
+    (0x0043E0D5); only reachable with default.cof present.
+  - **Mechanical passes over the 171 that differ** (2026-10-03): the summed
+    normalised distance (`tusc.py`) went 12,801 -> 11,189 with no new exact
+    match. What paid: re-reading a cached global or object field at each use
+    where the image does (`$T/uncache.py`, two dozen functions), the image's
+    case order read from its jump table (RunScriptAction 891 -> 185), for-
+    header comma order, and hill-climbed operand/arm swaps. What did NOT:
+    narrowing local types scored ~60 "wins" and produced no exact match
+    (normalised scoring rewards truncation) -- all reverted.
+  - **BuildRegionGraph, AddSightBlocker, ReceivePlayerMsg, LoadMap**
+    (2026-10-03): the image re-reads globals at every use where the
+    reconstruction cached them in locals -- the weights and region tables,
+    the map width, the stride after a realloc, the comm object, the map's
+    H*W per chunk -- and `$T/rereads.py`-style global-load counts find
+    them. BuildRegionGraph matches (also a uint16 cell index and tile
+    stepping before x); AddSightBlocker 176 -> 38 (generation in a
+    register, do-while sweep over a0, per-arm tails; checked equal to the
+    original over 6,000 Unicorn cases); ReceivePlayerMsg 161 -> 4, and
+    it now STOPS AFTER THE FOURTH RECORD -- the reconstruction ran a fifth
+    through the log and CommSetSlotRemote, which the original's `jl` never
+    does; LoadMap's path buffer is the original's 0x40 bytes.
+  - **DrawText** (2026-10-02): the glyph width and height are uint16_t
+    locals (the image's `mov bx,[..]; and ebx,0xFFFF`), the pen and the
+    index are set before the length test, and the loop steps i then j.
+  - **InitDirectDraw and the AM2_Movie constructor** (2026-10-02): a
+    ternary feeding a call or a store is an if/else in the image -- two
+    SetCooperativeLevel calls, two smack_open calls -- and the movie stores
+    its vtable and clears ACTIVE before the parameters. Step3Input took the
+    same treatment (two facing stores, abs() on the aim, `steered` set first,
+    the SightScan outs at function scope; 128 -> 19). checkcom now credits
+    the scan's undercount where the sweep found the uncounted call inside
+    the original (InitDirectDraw's `call [ebx+0x54]` at 0x0041AAEA).
+  - **DamageItem** (2026-10-02): the record re-read at each use, the armour
+    through abs(), the immune case on a shared label, and DamageItemChain's
+    pass-through direction a byte (it stays matched).
+  - **RemapRleRuns, AiStepAttach, SpriteReloadNamed, ItemTeardown**
+    (2026-10-02): `width` a local and `row` initialised in each loop header;
+    the army list re-read after rand(); the hot-spot clamp applied to the
+    stored FIELD; and in ItemTeardown a 0x1010-byte tile mask (the
+    0x1020 constant was the image's whole frame, not the mask), the rank read
+    before the attribute compare, a uint16 tile, and the add arm's cover walk
+    as its own inline. ObjTileHook's damage pass indexes the pad layer with
+    no null test, as the image does.
+  - **ObjectsInRect and AllObjectsInRect** (2026-10-02): the clip is x0,
+    x1, y0, y1 in that order -- the low clamps as `(v >> 8) < 0 ? 0 : v >> 8`
+    (the image's `test reg, 0xFFFFFF00`), x1 as an if/else, y1 as a ternary,
+    which VC6 turns into a store and a conditional override.
+  - **Four from source shape alone** (2026-10-02): OpenAudioStream zeroes its
+    DSBUFFERDESC with memset before the field writes and routes both early
+    failures into the close block's return; CreateOffscreenSurface stores the
+    caps then overrides them under the system-memory flag, computed after
+    GetSurfaceDesc; ReadDibChunk writes the round-and-multiply out in both
+    arms (VC6 merges the tail); FindGameCD keeps the bare length and nests
+    the label compare.
+  - **PollKeyboard's keyboard state is aggregated** (0x005127C8..
+    0x00512FD0 in relinkos.py's AGGREGATE_RANGES): the loop re-reads the
+    current buffer pointer every key and walks the deadline and pressed
+    halves with one pointer, as the image does. The last instruction was
+    the XOR's width -- the buffers are read as signed chars. Dropping the
+    four members' extern DECLARATIONS turned CheatLine's cursor sum around
+    although CheatLine names none of them, so that range is in KEEP_DECLS:
+    redirects gone, declarations kept. Which declaration set is right is
+    empirical; keeping the other two ranges' declarations costs CheatLine.
+  - **A member array re-read after every store** (KeyRowUpdate): the
+    dialog's row pointers are `parent->rows[i]` through a typed struct, not a
+    local `rows[i]` copy -- the image reloads the element after each store.
+    SeqAddKind5/7 were statement order (kind, flag, owner).
+  - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
+    the relink compares against the retail bytes (`RETAIL` in
+    `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
+    retail CD check (`cdcheck.h`), and `src/vc6/link.py` flips the linked
+    image's five `call FindGameCD; test; jne` to `jmp` afterwards. OnBootCamp,
+    OnSinglePlayer and OnStartWar matched on that alone; the VC6 image plays
+    Boot Camp pixel-identical to stock with the patch applied.
+  - **The Damage family's direction is a byte** (2026-09-29): RoachBite's
+    image pushes a byte local's whole dword slot, which is how VC6 passes a
+    `uint8_t` argument, so DamageObject/Trooper/Vehicle/Item/Roach take
+    `uint8_t` for it; neutral or better in all five.
+  - **PlaceObj never advances its row loop** (2026-09-29): the image re-reads
+    OBJ_OFF_ROWS (row 0) every pass and takes row 0's sprite offset, so rows
+    1+ of a multi-row object are never placed and row 0 is pushed once per
+    extra row. The reconstruction had indexed the rows; it now reproduces
+    the image. `where` is an AM2_Point by value. Lockstep unchanged (Boot
+    Camp's one PlaceObj is on a one-row object).
+  - **Step3RouteAndBoard cleared a destination it did not have** (2026-10-09):
+    the image resets `o->dest` to the zero point only inside the
+    `dest.x != 0` test (0x0045D4C9 jumps past it); ours did it always, so a
+    unit with dest.x == 0 had its dest.y cleared too. Found by byte-matching;
+    not driven.
+  - **PointerActionMode5 chains its formation slots** (2026-09-30): the image
+    passes the address of its own `at` argument as FormationSlotPoint's out
+    slot and re-reads `at` as the next unit's base, so each selected unit's
+    slot is computed from the previous unit's slot, not from the clicked
+    point. The reconstruction had used a fresh copy per unit; it now
+    reproduces the chain. Not driven (mode 5 is the move-without-engaging
+    order).
+  - **Missing calls the per-function call-count scan found** (2026-10-01):
+    three script actions in RunScriptAction were short. `playmusic` with no
+    file name now stops the stream, as the image does; `unitfire` at a point
+    fires the unit's own weapon there instead of doing nothing; and the
+    army form of `setaimode + move` moves the whole army through
+    EvtArmyAtPoint/EvtAtObjPosB instead of the one resolved unit. Also:
+    LoadMap fails on a chunk-size mismatch, Step3Drive's two skipped calls
+    are back. Found by counting each callee's calls, image against ours.
+  - **HudSquadDetail was 0x37E bytes short** (2026-10-01): a size scan
+    (ours vs the image's unpadded extent) caught what call counts could
+    not. The vehicle readout's armour is clamped to 99 before `%d mm`, which
+    the transcription dropped; the stat tables are stack locals and the
+    speed table has no uninitialised slot -- it is {5,3,4,4,2,4}.
+    The same scan put HudSquadUpdate 0x218 short, and rewriting it from the
+    image found two more: the clear pass resets HILITE (not the uid, which
+    it leaves alone), and a vanished rider is removed from the vehicle's
+    list AND stepped past, so the next rider is skipped for that frame.
+    MpPanelScreen's score limit is a spinner for the host OR a label for a
+    joiner (one child, its +0x50 cleared); ours gave the host both. The
+    per-row joiner-disable arm at 0x00430849 is in since 2026-10-07: the
+    image clears names[i]'s +0x50 and sets +0x4C on the spinner's three
+    children (+0x58/+0x5C/+0x60) -- not on names[i]. See
+    docs/screen-mpoptions.md.
+  - **FireWeapon: the flat arm 2 never passes spot.ground** (2026-10-02):
+    weapon kind 3 hands CreateMissile the HEIGHT for both a5 and a6
+    (`push eax; push eax` at 0x0045FA24), so a ground the caller supplied
+    is ignored and the missile starts level; ours passed spot.ground. The
+    out-of-budget test in FindPath compares the two heuristics as uint16
+    (`cmp di, ax`). Also from the image, no behaviour change: CreateMissile's
+    speed scale is a float and its script id a byte, FireWeapon's height is
+    an int16, the retag arm passes SetObjTablePair the firer's army and
+    position (unread), and the mine arms pass CreateWatched* the weapon.
+  - **HudEdgePaint rebuilt from the image** (2026-10-02): the health and
+    second bars are filled UNCLIPPED (the image does no IntersectRect before
+    ClearRegion; ours clipped them), every text block clips against the whole
+    widget rect rather than a box starting at the pen, and the ammo count is
+    formatted only once its box is known visible, into a 4-byte buffer.
+    RunScriptAction: the deferral, moveto, setaimode and the two
+    variable-or-n0 arms read their variable WITHOUT zeroing it first (a
+    failed read passes stack garbage, as the original does), and
+    setdamagepad is the switch's last arm.
+  - **ScriptParseActionRecon rewritten from the image and checked under
+    Unicorn** (2026-10-01): tools/actcheck.py runs the original and our
+    relinked bytes side by side over every action in the shipped scripts
+    (13,122) and over error shapes; all agree. The table-driven version it
+    replaces was wrong on six inputs no shipped script contains: facings and
+    fire bearings are cut to a byte, setfacing steps over a non-number,
+    setitemowner steps past its number, setobjstate/makesmoke/createpowerup
+    read their trailing number unbounded, createpowerup ends silently, and
+    createroach/ally/setforcecolor return whether the army parsed.
+  - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
+    simulated the departed player's acks against GetReSendMask (+0x18) where
+    the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked
+    CommArmyOfSlot at four sites -- one with the pickup `slot`, one with 0 --
+    where the image asks CommMustBroadcast of the unit's army, and its mine
+    test asks it of the MINE's army, not the unit's. All multiplayer-only;
+    found by `$T/callscan2.py`-style comparison of direct call targets.
+  - **AiGuardStep's out-of-sight arm adopted the leader** (2026-09-30): the
+    image steps toward an unseen leader and goes straight to the react block
+    (0x00405671 -> 0x004056BA), skipping the TARGET_UID/observer adopt at
+    0x0040569C; the reconstruction fell into the adopt. It now skips it, as
+    AiPatrolStep's matching arm already did. Guard-post units only; not
+    driven.
+  - **AiEngageStep's too-close retreat was a charge** (2026-09-30): the image
+    calls RandomPointToward(self, observer, MAX_RANGE, &c0) -- the observer as
+    the mover, so the point is MAX_RANGE out from the enemy on the line toward
+    the unit, a back-off to its weapon's range. The reconstruction passed the
+    two swapped, a point MAX_RANGE from the unit toward the enemy. Found by
+    byte-matching; not driven.
+  - **ScriptIf stepped past a leading `butnot`, and freed on a wrong token
+    kind** (2026-09-30): the image's keyword switch (0x004435B0, table at
+    0x00443E24) sends 47 to the no-step default with ALLOF/INORDER's
+    neighbours stepping only for 46/48/49/50; the reconstruction stepped for
+    the whole 46..50 range. The image's "found, but expected token of type"
+    arms (REPEAT/COUNT's number, onobjstate's name) return without freeing
+    the record, as ScriptExpect does; the reconstruction freed it. Found by
+    byte-matching; the shipped scripts never lead with `butnot`.
+  - **PlaceCursorPrepare's row 0x22 overlay was the wrong sprite**
+    (2026-09-30): the image packs `army + 0x3D5` in set 0x2B (0x00412C27
+    reads the fourth argument, `[esp+0x28]` under six pushes); the
+    reconstruction packed `row + 0x3D5`, a constant 0x3F7, and its header
+    explained why. It now agrees with UnitKindMatches' kind 5. Found by
+    byte-matching; placement screen, not driven.
+  - **AirPassStrike concealed the wrong side's paratroopers** (2026-09-30):
+    the image adds OBJ_FLAG_CONCEALED (0x200) when the drop is NOT the
+    default owner's and fog is on (0x00409557 `je` past it on equal); the
+    reconstruction tested `army == owner`, so under fog our own drop landed
+    hidden and an enemy's in plain view. Found by byte-matching; air passes
+    are not driven.
+  - **LoadWaveSound stored NULL where the original stores the device**
+    (2026-09-30): on success the image writes the DirectSound object into the
+    sound record's +8 (0x0040C6B4 `mov [ebx+8], esi`, esi = the `ds`
+    argument), as PlayDynamicSound does with g_dsound; the reconstruction
+    wrote NULL. Nothing reconstructed reads the field. Found by
+    byte-matching.
+  - **MissionInput played the level's info sound in the wrong slot**
+    (2026-09-30): the image calls PlayDynamicSound(name, 0, 0, 0, 0, 0, 1, 0)
+    -- slot 0, priority 1 (0x00424D3C pushes ebx=0, esi=1 last-first); the
+    reconstruction passed slot 1 at priority 0. Found by byte-matching; the
+    info key in a mission with a briefing sound reaches it.
+  - **MakePlacedUnit swapped the army and the slot in its three creator
+    calls** (2026-09-30): the image passes CreateTrooper/CreateVehicle
+    `(CommArmyOfSlot(slot), slot)` -- 0x0043AD33 pushes the slot, then the
+    comm call's result -- as every other caller of both does; the
+    reconstruction passed `(slot, CommArmyOfSlot(slot))`. Invisible wherever
+    the comm slot and the army coincide, as in single player. Found by
+    byte-matching; the creators' facing parameter is a byte, which is why
+    the image pushes it unmasked.
+  - **OnSelectionChanged un-destroyed a destroyed unit** (2026-09-30): a
+    selected unit found DESTROYED (0x4) leaves the selection with its
+    SELECTED flag (0x400) cleared -- 0x00427A2C is `and ah, 0xfb`. The
+    reconstruction cleared DESTROYED instead, reviving the flag word of a
+    dead unit still in the selection. Found by byte-matching; not driven.
+  - **CommDispatchMessage handed every handler the message LENGTH as the
+    sender** (2026-09-30): the queue node is +0x08 sender, +0x0C addressee,
+    +0x20 message, +0x24 length (what IDirectPlay::Receive fills), and both
+    CommDrainMsgs targets get (message, length, sender, addressee). The image
+    dispatches the THIRD argument to every handler (0x0040FEE6 et seq.); the
+    reconstruction dispatched the second, so ReceivePacket, ReceivePlayerMsg
+    and the rest looked players up by byte count. Multiplayer only; found by
+    byte-matching, not driven.
+  - **StepType3's kind-5 death ran both tails on a destroyed vehicle**
+    (2026-09-30): after the sound and DestroyByType the image returns
+    (0x0045D7D0 is the epilogue), skipping Step3Drive and the footprint
+    reset; the reconstruction went on to both. Found by byte-matching; not
+    driven.
+
+
+  - **Two menu behaviours the byte-match corrected** (2026-09-29):
+    RefreshMapSelection plays its error sound only when there is a preview
+    widget (it was unconditional), and HudChatSend treats a line as a cheat
+    when `strlen > 1`, not `> 2` -- so `!x` now reaches CheatLine as in the
+    image.
+  - **PlaySoundAt's restart flag was inverted** (2026-09-29): with bit 0 the
+    image rewinds a playing sound only when fewer than 0x1130 bytes remain
+    (`cmp; jae play`) and otherwise lets it run; the reconstruction had it
+    the other way round. Roach, vehicle and kind-7 sounds pass that flag.
+  - **EnsureSpriteAaiRecord writes all twelve bytes of its list entry**
+    (2026-09-29): the third dword is the def-obj record's +0x20, as
+    ChangeObjectFrame's own build path has it. The reconstruction had left
+    it holding stale stack, on a comment that said the original did too;
+    the byte-match's frame-size scan turned it up.
+  - **MissionEnded's probe buffers were undersized** (2026-09-29): the path
+    it formats "<map><n>.txt" into is 0x100 bytes in the image, not 0x10,
+    and the _finddata_t beside it 0x118, not 0x110 -- a map name of eleven
+    characters or more overran the stack. Same scan.
+  - **HudTopPaint returns when the surface will not lock** (2026-09-29): the
+    image's failed-lock branch goes to the epilogue, so the chat line, the
+    widget sprite and the button row are all skipped; ours had wrapped only
+    the text in the lock and painted the rest regardless.
+  - **OPEN, a decision for Boran: MpNamePaint's dot buffer.** The image's
+    frame (0x20: the clip rect and 16 bytes) holds a 16-byte `dots`, and the
+    count is one dot per 7.5 s of silence with no clamp -- so the ORIGINAL
+    overruns its stack once a player has been silent for two minutes, if the
+    session keeps them that long. Ours is 64 bytes and does not byte-match;
+    shrinking it would put that overrun into the port.
+  - **Parameterised helpers the original wrote twice**: the two row pools
+    and the sixteen sprite-loader functions were one helper over a struct
+    of pointers, which VC6 cannot fold. Inline helpers over the pool's own
+    globals, with the pool one aggregate {count; tail; slots[]}, match all
+    ten; the loaders re-read their globals at every use.
+  - **The pointer list is a class** (ctor 0x0042A660, dtor 0x0042A670):
+    `new` of it, the vehicle record's compiler-written destructor, and the
+    savegame loaders' stack objects all take their shape from that.
+  - **VC6 emits no unwind frame inside an `extern "C"` function** -- a
+    function whose original has one needs C++ linkage. The same assumption
+    runs down call chains: with rect.h `extern "C"`, the widget base
+    constructor looked nothrow, so a `new AM2_Edit` lost its EH state.
+    rect.h, movie.h and startgame.h are C++ linkage under VC6 only (the C harness
+    calls them). The movie object is `new AM2_Movie(...)`, as PlayMovie's
+    EH frame says; its constructor (MovieOpen) is still a near miss, and
+    SnapshotSystemPalette at 0x00445170 is really one of its methods
+    (called with the movie in ecx).
+  - **Member initializers run before the vptr store**: MpSpin's commit
+    handler is a `: handler(commit)` member, which is why the original
+    stores it ahead of the vtable; so are MpName's text, flag and inks.
+  - **The multiplayer panel's row buttons are classes**: AM2_MpName,
+    AM2_MpColour and AM2_MpTeam, built with `new`. MpName takes its
+    rectangle by value (the four "loose" ints were always a struct copy).
+  - **Recurring source shapes**, each found more than once: a switch VC6
+    compiled to range tests or byte-index tables (MapCode, ObjNextKind538);
+    an inlined ObjIsType2/3 (null check and `sete` included); `max()`/`min()`
+    macro expansions evaluating an operand twice; byte parameters
+    (RoundTo8, AngleDelta); `memset` for a 12-byte clear; globals and
+    array elements re-read at every use rather than held in a local;
+    `strlen(s) < 1` for an emptiness test; a by-value AM2_Point read out of
+    its argument slot; clipping written back over the `clip` parameter.
+  - **Behaviour fixed on the way**: the AUDIO dialog's OK commits the raw
+    bar volume (not BarVolume's silence substitute); LoadType3 passes the
+    saved slot as CreateVehicle's `table` (it read +0x494); the build-menu
+    tooltips pair each name with its own button's rectangle (they were one
+    button to the right); partly clipped HUD command icons
+    draw at ClipRect's adjusted position; a missing squad pip sprite skips
+    that pip instead of ending the row; the Typer wraps at a 0x100-byte
+    line (the constant had been read off its 0x10C frame); LoadOneItem's
+    null test is per case and a saved object type outside 1..8 now reads
+    through the NULL it produces, as the original does (it had returned
+    NULL); DepthInsert's equal-depth insert guards a null successor before
+    linking it back, as the image does (the shared link-after helper it
+    had used did not, and a tail cursor would have written through NULL);
+    StepType6's crater-spawn test reads the cell weight SIGNED, as the
+    image's `jl` does (a weight byte >= 0x80 no longer counts as blocked),
+    and so does BoatExitPoint's passability test (the image's `jge`).
+    Found by comparing each function's image extent with ours --
+    `src/vc6/extent.py`, a branch-reachability sweep -- since the relink json
+    slices the image to OUR length and hides code we omitted.
+  - **A "fix" undone**: a vehicle whose first occupant is not Sarge
+    offers the trooper's three commands. Relink 869 briefly made it offer
+    nothing, from a branch target misread as the trooper arm's null test;
+    `je 0x004173F6` lands on its first store.
+  - **Close but not matched**: HudSargeUpdate and HudTopPaint are within
+    a few instructions; HudEdgeUpdate's two switches follow the
+    original's jump tables and what remains is register choice. So is
+    all that is left of AimMarkerAge, TileRegionOrBorrow and
+    OptionsDefaults; ArrowBarFollowEnd/ShowRow are one `sub` early;
+    MakeAaiRecord's early exits share the loop's tail where the image
+    gives them their own; AimStartB keeps its point pointer in `edi`.
+  - **The comm layer re-reads the comm object at every use**: sixteen
+    send/receive/DirectPlay functions matched once `g_commObject` (and the
+    message fields, the running enumeration count, the DirectPlay pointer)
+    were macros instead of locals. The slot loops in CommConstruct and
+    CommDropDirectPlay index the slot rather than walking a pointer.
+    MsgListSetFlag's per-path releases are ONE `break`-then-release tail
+    that VC6 duplicates; MsgListTakeFlags keeps the found node apart from
+    the cursor and returns `found ? taken : 0`.
+  - **Multiplayer fixes found on the way** (no drive reaches them):
+    CommEnumSessions asks for DPENUMSESSIONS_ALL, not AVAILABLE (0x12, ours
+    0x11), so full sessions are listed; the battle browser marks a session
+    "In Progress" on DPSESSION_JOINDISABLED (0x20), not NEWPLAYERSDISABLED
+    (0x1); CommOnConnected clamps the maximum buffer against the literal
+    0x400 rather than the field's current value. CommCreatePlayer sets
+    +0x404 (messages enabled), not +0x3D8 (IS_HOST) -- ours made every
+    client that created its player call itself the host. CommReceive's
+    flow check reads the pool's free count through MsgField12; ours CALLED
+    ADDR_MSG_LIST_POOL, the list itself, as a function. WndProc's
+    mid-mission PLAYER_GONE destroys the departed player's flow BEFORE it
+    may end the setup (it held CommPlayerLeft's answer across DestroyFlow);
+    ours ended the setup first. FlowRecvMessage (0x004014C0) was a third of
+    the image: the DATA arm never delivered in order, advanced
+    NEXT_EXPECTED, queued out-of-order messages or nacked a gap -- it
+    answered 0 and let the caller queue everything unordered -- and the
+    NACK arm returned its node to the incoming list instead of the pool.
+    Written out from the image (2026-10-01); still a near miss on register
+    allocation and one shared log call. The lobby panel's constructor also
+    ends with MpPanelUpdate and scrolls the chat list to its last row, which
+    ours did not (same day, found the same way).
+  - **Globals held in locals, found by counting**: a scan of each near
+    miss for absolute loads the image makes more often than ours
+    (`rereads.py` over the relink json) lists the functions that re-read a
+    global where ours cached it. The comm-object locals were converted
+    mechanically (kept only where the hunk count fell); the object-script
+    save/load re-read every level of `kObjScripts[i].states[j].frames[k]`,
+    and the save writes a struct copy of each action with its length in
+    `text`. Tables of offsets and loops the image writes out: the radar
+    blips are pixel stores through a per-row pointer (the pitch read again
+    per row, arms laid out 2, 1, 0), FreeMapLayers frees each layer by name,
+    UpdateMouseState handles its three buttons one by one, and the menu
+    cursor's animation tick is inlined into DrawMenuCursor.
+  - **LoadScriptSection fixed**: after loading the name table it sets
+    `difficulty` and `systemspeed` to the CURRENT settings, as the image
+    does; ours kept whatever the save held. The script-name writers
+    re-index `kScriptNames[kScriptNameCount]` at every use and copy with
+    strcpy; AddNameTableName's switch has three identical arms (one arm
+    with three labels compiles to a range test, not the image's table).
+  - **Call counts, ours against the image's** (`callees.py` over the relink
+    json) find arms the image writes out in full: SaveEventSection's three
+    handler kinds each write their whole record (fifteen WriteSaveTag
+    calls to our seven), LoadEventSection registers once per kind. The
+    scan has false positives where a function's byte range in the json
+    runs on into the next one.
+  - **`abs()` is the `cdq; xor eax, edx; sub eax, edx` idiom**: a scan of
+    the near misses for that triple found eleven functions spelling it
+    `if (x < 0) x = -x` or a ternary; SightScan went from 74 hunks to 27.
+    ScriptParseNumber compares plain (signed) chars and recomputes strlen
+    each pass; ScriptRunLine zeroes its context with a memset (the zero in
+    a register for the struct, an immediate for the other local).
+  - **The pointer-pick functions have ArmyAlliedWithObj written in**
+    (`ArmyAlliedWithObjInline`, army.h): six of them moved a long way
+    toward the image -- PointerActionMode5 from 123 edits to 20. What they
+    still lack is the image's separate epilogue at every `return 0`, where
+    VC6 merges ours; PointerPickMode0 is worse inlined and keeps the call.
+  - **Signed loop tests mean an index**: a `jl` against a strength-reduced
+    cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
+    walk gives `jb`. The cursor's bias is the field the body reads first.
+  - **Result shapes**: `setge al`/`xor al, al` is a byte result written as
+    branches (CommSendLobbyProperty); CommCreateDirectPlay ends in one
+    `return hr == S_OK`; WaveReadFile's end-of-file `-1` goes through the
+    failure label, and its clamp is `>=`.
+  - **The AI dispatchers inline their helpers**: react, the AI_MODE switch
+    (arms laid out 2, 0, 3, 6, 7, default) and the region write are all
+    written into SargeAiStep and TrooperAiStep; the trooper's mode-6 arm
+    calls the thunk at 0x00405D10, and its 0x540 tail is if/else arms laid
+    out 3, 2, 1 -- arm 2 tests `c0 != 1` before `c0 == 0`. The point rule
+    takes a `uint16_t` tile, and BeginMoveTo's count is uninitialised (it
+    lives in the dead `obj` slot). PortalSpawn's weapon table is a stack
+    array indexed by a signed `% 4`.
+  - **`[a + b]` operand order follows how the base is spelled**: a local
+    alias of a parameter or global (`o = (uint8_t *)obj`, `w = g_widget`)
+    flips `rows + i*stride` and `[w + len]`. Casting the parameter or
+    re-reading the global at each use matches SubrecHideRows, ObjConceal,
+    DestroyObjCommon and HudChatChar; StepObjRows needs the alias
+    everywhere except the row address.
+  - **ObjConceal fixed**: an object with BIT4 set that is not a type-2
+    keeps REVEALED (ours cleared it).
+  - **Screen constructors missing links**: the save-game list's list box
+    and scroll bar now point at each other (ours left the bar wired to
+    nothing), and BATTLE JOIN's blinker is its name field's dot. The save
+    list's directory buffer is 0x100 bytes, not AM2_MASK_PATH_MAX, and
+    ENTER NAME stores its second field's charset twice, as the original
+    does.
+  - **Wrong globals, found by comparing the relink's resolved addresses**
+    (onefn masks relocations, so it cannot see these): the HudTop
+    constructor tests ADDR_MP_SESSION, not ADDR_NET_GAME; OnAppActivated
+    raises ADDR_FULL_REDRAW, not ADDR_APP_ACTIVE; Type2ActionAll (the
+    `night of the walking dead` cheat) walks the list that
+    ADDR_ARMY_OBJ_LISTS[1] points to, where ours read the pointer array
+    as the list. The rest of that scan was layout and operand order.
+  - **InitInput's buffer clears are swapped memsets** --
+    `memset(buf, 0x100, 0)`, so nothing is cleared; VC6 drops the `rep
+    stos` and keeps the setup, which is the "unused registers" the image
+    shows. Reproduced.
+  - **Harness code kept out of the relink**: ReportError's standalone log
+    and device.cpp's input-injection hooks are `AM2_STANDALONE &&
+    !AM2_RELINK`, so the comparison sees the original's bodies. So are the
+    AM2_TRACE_* hooks inside DrawSprite, DrawMapObject, ApplyHeightItem,
+    ApplyObjHeight, CreateWeapon and LoadAnimTable; DepthCompare's trace
+    wrapper is dropped and its body is the function.
+  - **PadNumberEnter/Leave take the object's uid unguarded**, as the
+    original does (ours substituted 0 for a null object).
+  - **ApplyHeightItem's height is an int16**: the original reads the
+    argument as a word and sign-extends it.
+  - **Smacker is dllimport under VC6**: repeated calls to an import load
+    its IAT slot into a register, which a call through our pointer macro
+    cannot reproduce. `relink.py` now resolves decorated import names
+    (`_SmackOpen@12`); until this change such imports were left
+    unresolved and wildcarded. SnapshotSystemPalette is an AM2_Movie
+    member (the movie is in ecx), and being C++ is what gives
+    PlayMovie's `new` its EH state.
+  - **FireWeapon's spot is six bytes**, {AM2_Point at; int16 ground}: every
+    caller copies it into the argument area as a dword and a word, and the
+    point is filled a word at a time. The old eight-byte struct with a `pad`
+    could not produce that copy; all four event.cpp fire helpers match now.
+  - **ToggleSelect fixed**: toggling off the only selected unit returns
+    without OnSelectionChanged (ours called it on that path too).
+  - **GetArmyScore fixed**: it maps the slot to its army with
+    CommArmyOfSlot; ours called the inverse, CommSlotForArmy, so the
+    multiplayer score column could show the wrong army's score.
+  - **SlotBandHeading fixed**: for slots up to 24 the heading index is
+    `(slot - 9) / 2 + 1` -- base 9 inside the division, 1 outside -- where
+    ours read `9 + (slot - 9) / 2`, eight entries further into the table.
+    The upper two bands were right. Not reached by Boot Camp.
+  - **FreeScenarios fixed**: it clears the scenario header (one 8-byte
+    memset over unread/count/table) even when there is no table to free.
+  - **Comm and row-list calls are direct member calls**:
+    `AM2_THE_COMM->CommMustBroadcast(army)`, `((AM2_Rec *)list)->ListAdd(...)`.
+    The inline forwarders (`CommMustBroadcast(comm, army)`) change VC6's
+    register allocation at the call site; a sweep of ~200 call sites matched
+    RankPromote, TrooperDropItem, ExitAllFromVehicle and FlushDelayedSends
+    with no losses.
+  - **More source shapes**: an else-if chain setting a local ahead of one
+    store compiles to per-arm `mov eax, n; mov [g], eax; ret`
+    (TakeNumberKey, which was a loop); three `case X: return 1;` arms give
+    the `sub; je; dec; je` chain where one arm with three labels gives a
+    range test (CanPickUp); an empty-looking `case 29: return 0;` keeps its
+    own jump-table slot (TypesCompatible); a local AM2_Point is how
+    PointOfTile builds its result in the dead argument slot; `strlen` is the
+    intrinsic, not a helper loop (TitleCaseName).
+  - **The binary searches share one shape**: `while (hi > lo)` with
+    `mid = ((hi - lo) >> 1) + lo` (a `sar`, no rounding fix-up), `<` taking
+    the low arm, and every global re-read where it is used -- including the
+    count, whose copy in `hi` is what keeps VC6 testing `hi` on entry.
+    FindSlot, FindRecordList, AddRecordList, AddAaiRecord and SpriteRegister
+    all match written that way.
+  - **LookupByUID is inlined at several sites** (`LookupByUIDInline`,
+    objtable.h): its uninitialised out-slot lands in the caller's dead
+    argument slot, which is what ObjDie's frame shows; DeselectAll has it
+    twice with two slots. DamageObject and OnSelectionChanged use it too.
+  - **Helpers of ours that the original inlined**: SightResolve (both AI
+    context builders, which then re-read the leader from its slot),
+    RowMidAnimation, and DismissKeyReleased's key table (four tests written
+    out). A per-call-site count of callees, ours against the image's, is
+    what finds these: a callee the image never calls is one it inlined.
+  - **MenuMessage's colour is a byte parameter**: callers push a whole
+    register with garbage above the byte, and the callee masks it.
+  - **Two identical functions folded by the linker**: SeqRun has separate
+    arms for kinds 2 and 3 that both call 0x00461310. VC6 merges identical
+    arms for one callee, so the source had two functions and LINK's
+    /OPT:ICF folded them; SeqStepKind3 is the twin, uninstalled. FreeItem
+    is the same: types 1, 5, 6 and 8 have four arms onto 0x0043BBB0, so
+    DestroyPlain5/6/8 are DestroyItemCommon's folded twins, and
+    State2Frame's arms 29 and 30 make OpenDeleteGameB OpenDeleteGame's.
+  - **A store kept after a strcpy by aliasing**: LoadGameProcSection's two
+    flags live inside the saved block, and writing them through the block
+    (GAMEPROC_OFF_LOAD_PENDING) is what keeps VC6 from hoisting them above
+    the strcpy into it. Its stashes are two 0x40 buffers, not 0x50.
+  - **Parked**: the five copy-protection call sites (OnStartWar and four
+    more) cannot match while the reference keeps GOG's `jmp`s -- a policy
+    question, not a source one; MultiSpritePaint and OverlayPrepare
+    scheduling; HudTopPaint's two swapped loads.
+
+  From 719 to 758:
+  - **The title screen and the remaining openers match**, and the relink's
+    reference is RETAIL at the one byte where this project undoes GOG's
+    MULTI-PLAYER patch for good (`bytematch.RetailImage`).
+  - **A sweep of near-misses by edit distance** (onefn.py per function):
+    branch polarity, which buffer a statement writes, statement order
+    (permute.py found CheckBox's, OnDifficultyOk's and EvtPushObjCtx's),
+    globals re-read where the original re-reads them, float vs double
+    in x87 expressions (`fidiv` appears only with a float quotient).
+  - **Helpers the original inlined** are `static inline` now -- SendValueMsg,
+    FreeDefTable, LoadGrid, and twelve others whose callers all got closer;
+    ten tried the same way made callers worse and stay out of line.
+  - **Identical arm tails are VC6's, not a helper's**: CheatLine's nineteen
+    item cheats each write the CreateWeapon call out and the compiler
+    cross-jumps them into one tail. HudMessage's colour is a byte parameter
+    (callers push the register with no zero-extension), and the `doctor
+    doctor` callback at 0x00417A90 is installed so the relink can place it.
+  - **Compiler-generated `$E` functions are size-optimised**: the two
+    atexit registrations pop their argument (`#pragma optimize("s")` under
+    VC6). The RLE encoders build in a 200,000-byte STACK buffer (`_chkstk`),
+    not a static one, and are two bodies; so are MaskPixelSolid/32, whose
+    `while (1)` loop VC6 does not rotate where `for (;;)` would be.
+  - **The five RLE blitters are inline assembly** (an ebp frame in an /O2
+    build, a `nop` on the loop's exit label): under VC6 they are `__asm`
+    bodies transcribed from the image, naming the three globals as
+    `[am2_origstate.member]`; every other build keeps the C.
+  - **LoadMask's DIB header buffer was 0x1C bytes and ReadDibChunk writes a
+    BITMAPINFO** -- 40 bytes plus the colour table -- so the loose-file mask
+    path smashed its own stack, the bug LoadAtlFile's note already records.
+    The frame (0x5E0) says 0x428. Found by laying the locals out as the
+    original does. DrawLatencyBar is `(row, slot)`, not `(slot, row)`: ours
+    had both ends swapped, so it behaved and could not match.
+  - **Parameter widths read from the call sites**: PlaySoundAt's position is
+    two `int16_t` (every caller pushes words it loaded as words), as are
+    VehicleBlockWeight's facing and DrawSeqBar's/DrawRect's colour bytes;
+    SwapColourBytes and CommDispatchMessage take the argument counts their
+    callers push. A narrow parameter is visible only at the caller -- the
+    callee reads the same slot either way. Cos8/Sin8 take a byte heading,
+    and the placement and watched-item functions a byte facing; a scan of
+    every original call site for arguments pushed from a register last
+    written by a 16- or 8-bit move finds these, once it recognises
+    `xor r,r; mov r8, ...` as zero-extension (that idiom means `int`).
+  - **Callbacks the game hands to someone else are measured too**: WndProc,
+    AudioTimerProc, MedkitHealOne and MovieTimerProc are registered rather
+    than patched, so the relink's manifest never listed them and every
+    reference to them stayed unresolved (`push 0` where the image pushes the
+    address). `bytematch.REGISTERED_FNS` adds them -- four more functions
+    counted, two matching. OurLeaderUnit, which the image inlines at every
+    site, is `static inline` in item.h.
+  - **Two `else` arms storing the same value are one block in the image**:
+    HudSargeUpdate's `-1` store is reached from two tests, and writing both
+    arms is what puts the loop pointer's bias back on the record's start.
+  - **Comm methods that ignore `this`**: CommClose and CommEnumPlayers are
+    AM2_Comm members -- their callers load ecx with the comm object.
+  - **Virtual calls from flat code must be pointer-to-member calls**
+    (ObjVUpdate, ObjVPoll): a function pointer cast to thiscall is a cdecl
+    call under VC6, which has no thiscall spelling.
+  - **Our inline forwarders `F(obj, args)` evaluate the object first**; the
+    original's direct member calls evaluate the argument first (SendChatMsg).
+  - **Bugs fixed on the way**: ListGrowFind never stored its incremented
+    count (ours grew the multiplayer game-type list by a garbage row per
+    call); a spinner's typed value skipped SpinCommit; BattleJoin's chosen
+    row was uninitialised and its name field used the wrong charset; the
+    overwrite prompt's dot never blinked; CommPanel never focused its panel.
+
+  From 686 to 719:
+  - **Every widget destructor matches**, and 30-odd constructors: the HUD
+    classes, KeyRow, the scroll/arrow family, and DifficultyDialog,
+    DlgMessage, Quit/Replay/DelPlayer, Options, GameMenu, Audio,
+    Overwrite, DeleteGame, EnterName, SelectMap, CommPanel and
+    SelectPlayer. Left: ControlsDialog (induction-variable merge), LoadGame
+    (local layout), BattleJoin (one unwind temporary short), HudPanel,
+    HudTop, Typer, Edit, MpSpin (a TU boundary), and the screens not yet
+    classes (BattleName, SaveList, Movies, MpOptions, MpPanel, WarMenu,
+    the Mp name/colour/team buttons) and the `Open*` openers.
+  - **widget.cpp is in the original's address order** (`src/vc6/reorder.py`,
+    rerun after adding a function): VC6 treats a callee as unable to throw
+    only if it is defined earlier in the TU, and that shows in the bytes.
+  - **Where our reconstruction factored the original's repetition, the
+    bytes want it back**: ConfirmDialogBuild, MakeButton, MakeVolumeBar,
+    the options and game-menu button tables are expanded as the original's
+    straight-line code.
+  - **VC6's scheduler is order-sensitive in ways reading does not predict.**
+    CheckBox, CountButton and KeyRow each match in exactly one order of
+    their trailing stores, found by compiling every permutation.
+  - **Byte parameters**: Label's, KeyRow's and Edit's colour arguments are
+    `uint8_t` -- the original pushes them without widening.
+  - **Bugs the comparisons exposed**: the overwrite prompt never linked its
+    typewriter to the blinking dot; CommPanel never focused its panel;
+    BattleJoin never initialised its chosen row (-1) -- a join with no row
+    clicked read allocator garbage -- and left its name field on the
+    permissive charset; a spinner's edit called the caller's commit handler
+    with the edit instead of going through SpinCommit.
+  - **A hazard worth knowing**: dropping our `AM2_Widget *w = this;` alias
+    (it changes register allocation) leaves any stray `w` bound to
+    AM2_Widget's WIDTH member -- it still compiles. Rewrite every token.
+
+  From 627 to 686:
+  - **The widget layer is real C++ now, class by class.** Widget, Panel,
+    ScreenBase, Label, ButtonBase, Button, Arrow, CheckBox, ListBox, TextList,
+    ArrowBar, ScrollBar, Edit and MpSpin are classes: constructors build their
+    base in the mem-initializer, destructors end in the compiler's base call,
+    and `new T(...)` is `new`. Under `AM2_RELINK` they are polymorphic and
+    `AM2_CLASS_VTABLE` maps each `??_7` to the original's vtable; GCC keeps
+    the explicit vtable field and installs through `am2_ctor_`/`am2_dtor_`
+    thunks. Still to convert: the HUD classes, Typer, MultiSprite, Blinker,
+    MpName/MpColour/MpTeam, and every screen (their `AM2_XScreen` classes
+    still forward to the old construct functions).
+  - **VC6 drops a constructor's unwind frame for a callee DEFINED EARLIER IN
+    THE SAME TU that cannot throw** -- and only then. So definition order
+    matters (the original's is its address order), and the converse is
+    evidence about the original's files: MpSpin's `new AM2_Edit` keeps an
+    unwind state in the original, so the Edit constructor (0x00454C10) was in
+    a different source file from MpSpin (0x00456300). Ours are one TU, which
+    is why MpSpin cannot match yet.
+  - **Rectangles pass by value.** Label, Button, CheckBox, ListBox, Edit,
+    ArrowBar, ScrollBar and MpSpin take `AM2_Rect box` where we had four
+    ints -- the same stack ABI, visible as `lea r, [esi+4]` and four stores.
+  - **Each .bss global is its own symbol in the relink build**
+    (`src/vc6/relinkos.py`): as members of one `am2_origstate` struct VC6
+    loaded a byte global as `mov eax,[g]; and eax,0xFF`; the original's lone
+    global is `xor eax,eax; mov al,[g]`. The `aim_*` members stay on the
+    struct -- the original walked them as one object.
+  - **A real bug:** a spinner's edit was given the caller's commit handler
+    where the original gives it `SpinCommit`, so typing into a multiplayer
+    spinner skipped the parse and clamp and called the handler with the
+    edit rather than the spinner.
+  - **A VC6 quirk:** a base mem-initializer fails with C2437 ("already
+    initialized") when the constructor is the class's first member; a class
+    with no fields of its own (TextList) leads with a typedef.
+
+  What moved it from 510 to 606:
+  - **Harness fixes.** Data symbols resolve from the native placed build's own
+    symbol table (placement lays each at its original VA). `AM2_SA` stand-ins
+    map to the `ADDR_` they replace. References into a function's own jump
+    tables resolve. A duplicated string or float constant resolves to the
+    original's own pointer when the bytes there are ours.
+  - **A comparison bug in BOTH harnesses.** A function ended at the next symbol
+    in its section, and MSVC emits case labels as `$L…` symbols, so every
+    switch function was compared only up to its first case label. Fixed; the
+    counts stayed level as false matches left and real ones arrived.
+  - **Every free thiscall function is now a member** (no
+    `__attribute__((thiscall))` free definition is left in `src/game`). That
+    covers 30 comm functions into `AM2_Comm` (flat `msgslot.h`, forwarders for
+    the flat callers), the list records into `AM2_Rec`, the widget
+    destructor pairs, and three small opaque classes. `AllyFlag` is a comm
+    member that ignores `this`.
+  - **Deleting destructors call `operator delete`** (0x004648F5), not `free`
+    (+33).
+  - **Inline helpers.** VC6's `/O2` implies `/Ob1`, which inlines only functions
+    declared `inline`, so helpers the original inlined must say so
+    (`RequestScreen`, `GameMenuGoto`, `SetSlot`, `ReturnToOptions`). Tried on 23
+    and kept only those with evidence; `BarVolume` is out of line in the
+    original.
+  - **Per-function source shape,** ranked by instruction edit distance
+    (`relink.py --json`): statement order, a switch where a function-pointer
+    table was written, signedness, and buffer sizes.
+  - **Real bugs the resolved compare exposed** (piecewise wildcards targets and
+    fields): `TellEachSlot` tested `COMM_ARMY_OFF_REMOTE` instead of
+    `COMM_ARMY_OFF_WAS_HERE`. `AiStep` had two switch arms in the wrong
+    source order; the same jump table, but not the same code.
+  - **More real bugs from the resolved compare (2026-09-29).**
+    `CommFindPlayer` returned `AM2_PLAYER_INDEX` where the original returns
+    `AM2_PLAYER_ARMY`. The comm layer used `Ticks()` in six places where the
+    original calls `GetTickCount`, and `StateEnter3` did the same.
+    `Ticks` uses the performance counter, so stamps and readers could be on
+    different clocks.
+  - **The C++ object model: 95 functions** (conversion under way, above). 95 of the
+    diffs have, in the original, the `/GX` unwind frame (`push -1; push
+    handler; mov eax, fs:[0]`): 42 widget constructors, 25 `Open*` screen
+    openers, and 28 destructors and builders. A scratch prototype reproduces
+    `OpenDifficulty` instruction for instruction as `delete g_paintObject;
+    g_paintObject = new DifficultyScreen("…");`. So the original widget layer
+    is real C++: virtual deleting destructors, constructors that return
+    `this`, and `new` and `delete`. Our reconstruction models it with explicit
+    vtables and constructor functions called by hand. `/GX` is now the
+    harnesses' default, which is neutral today. The conversion itself is not
+    started, because GCC constructors do not return `this` in `eax` and the
+    original callers rely on it, so the injected and hybrid builds need a
+    plan.
+  - **What else is left** is dominated by register choice (~227), frame and
+    prologue scheduling (sub esp size, push/mov order), and per-function
+    shape. Rather than a bit-exact PE (unneeded for *function*
+  byte-match), it simulates the link: lays every reconstructed function at its
+  real VA and RESOLVES each relocation to the address the linker would fill,
+  comparing with no wildcarding. Compiled with `AM2_RELINK`, so the
+  reconstruction calls the game CRT by symbol (direct `e8`) via `crt.h`'s
+  `AM2_ORIGFN` rather than a runtime pointer (`ff15`) -- the form the original
+  linked, which the piecewise harness can never reproduce. Resolves siblings
+  (manifest), the CRT (`AM2_ORIGFN`->`ADDR_*`), Win32 imports (IAT), `__ftol`,
+  string literals (`.rdata` content), and discovers static-helper VAs from
+  installed callers' shipped call targets. **This closed the call-form class
+  (ff15->e8): +30 free/malloc/log-heavy functions** (FreeIfNotNull,
+  PtrListGrow/Shrink, FreeRecordList; `ARGS=--newly`).
+  - **The second relink class -- the `((T*)ADDR)` indexed-global fold** (base
+    folded into the index vs the original's `[idx*4 + &symbol]`) -- is the next
+    phase: it needs the migrated globals declared as SYMBOLS under `AM2_RELINK`
+    (the data analogue of `AM2_ORIGFN`), which is why finishing the origdata
+    symbol migration feeds this. `ARGS=--unresolved` names what remains (the C++
+    static screen helpers, and the global symbols).
+  - Register-allocation and other source-shape diffs are unchanged by the relink
+    -- same classes as piecewise, closed per function.
+- **The VC6 LINK milestone (`make vc6-link`, `src/vc6/link.py`) -- REAL PE,
+  not simulated.** Drives the actual MSVC6 `LINK.EXE` (now runnable under
+  vc6host) to produce `build/vc6sa/ArmyMen2.exe` (503,808 bytes, valid PE,
+  Subsystem WINDOWS, entry at `WinMainCRTStartup`, imports KERNEL32/USER32/
+  GDI32/ole32/WINMM): every VC6-buildable game TU compiled with CL, the full
+  byte-exact data blob (`src/vc6/mkcoff.py`), the CRT seams bound to VC6's real
+  MSVCRT (`src/vc6/glue.cpp`), and the DirectX/Win32 import libs.  Getting here
+  took: five vc6host/shim fixes so LINK runs at all (LoadString(NULL), _tzset/
+  _seh_longjmp_unwind/DeleteFileA, and the output file-mapping ftruncate +
+  MAP_SHARED); glue stubs for the comm/MP layer (dplay.cpp is the VC98-header
+  holdout), trig, and the injected harness (hooklog/restore/patch_replace); and
+  a LINK **response file** (a 49-obj + 12-lib command line overran vc6host's
+  argv reconstruction and dropped trailing libs -- WINMM went unresolved though
+  searched).
+  - **It LINKS but does NOT run correctly yet, by design (the chosen
+    "link-only first" milestone).** `LINK.EXE` has no `--section-start` and lays
+    sections sequentially, ALL CODE before ALL DATA, so it cannot reproduce the
+    native layout (our code at 0x700000, int3 gap at 0x401000, blob at its VAs):
+    it put our `.text` at 0x401000 and the carried `.origdat` blob at 0x666000
+    instead of 0x46F000.  So the blob's baked absolute code-pointers still aim
+    at original VAs and the reconstruction's global reads hit the wrong bytes.
+  - **The next goal reframed (Boran, 2026-09-28): make it RUN with NON-matching
+    addresses.** If the image only works with the blob and code at the original
+    VAs, the reconstruction still leans on absolute addresses -- undefined
+    behavior.  Getting the VC6-linked EXE to run while LINK places sections
+    *wherever* is the real proof that every global is a proper struct/symbol and
+    every call a proper function pointer -- that the data and global format are
+    genuinely extracted.  So the work is NOT a fixups dataset + exact-VA
+    placement; it is finishing the symbol/struct migration so the reached paths
+    touch ZERO absolute addresses, driven by running the LINK'd image (Wine,
+    Xvfb :99) and fixing each absolute-address reliance the run faults on.  The
+    link-only image above compiles WITHOUT the placed-symbol redirects (absolute
+    VA), which is exactly the reliance to remove; the runnable build switches to
+    the placed-symbol model.  Proven viable on size: the VC6 `.text` is 0x626F0
+    (403 KB), inside the original `.text` extent 0x6E000 (450 KB).
+  - **The runnable symbol-relative image (`make vc6-link ARGS=--run`) RUNS
+    relocatably (2026-09-28).** Compiled WITH `AM2_STANDALONE` (globals are
+    placed C structs/symbols, DirectX/IAT imports redirect to symbols), linked
+    by `LINK.EXE` at NON-matching VAs (our `.text` at 0x401000, blob at 0x666000
+    -- not 0x46F000), with `src/vc6/vc6run.cpp` as the slim runtime (real MSVCRT
+    seams, the `am2_sa_*` DirectX wrappers to real Wine DirectDraw/Input/Sound,
+    and milestone stubs for the comm/trig/harness gaps).  Run under Wine on Xvfb
+    :99 with `-w` (windowed skips the fullscreen mode change Xvfb can't do), it
+    runs through **172 lines of init + the entire audio subsystem** -- static
+    init, WinMain, ParseCommandLine, CoInitialize, DetectCpuSpeed ("system speed
+    1"), the high-performance timer, DirectDraw + DirectInput creation, and the
+    56-entry wave table -- before a NULL write in **SetGamePalette+0xE2**
+    (`ArmyMen2.map` translated the crash EIP).  That it gets this far at
+    non-matching addresses is the proof the reconstruction uses proper
+    structs/function-pointers, not absolute-address UB.
+  - **It now PLAYS Boot Camp at non-matching addresses, matching stock
+    (2026-09-28).** Title and briefing are pixel-identical to the stock GOG
+    binary. The live mission shows the same HUD (Sarge selected, HP 140/140, the
+    squad panel), and the edge-scroll matches too: VC6-vs-stock differs by 22,744
+    px after 8 s of scrolling, while stock-vs-stock run to run differs by 19,369
+    (the scroll distance depends on frame timing). Drive: `wine explorer
+    /desktop=am2drv,640x480 "C:\GOG Games\Army Men II\<exe>" -nointro` on
+    Xvfb :99 (a virtual desktop gives full colour; the GDI `-w` path went
+    black after mission start for stock too), cwd = the game folder, BOOT CAMP
+    at (307,142), then Return and space.
+    - **It stopped linking at relink 957 and nothing said so (fixed
+      2026-09-29).** The relink work that matched call shapes also broke the
+      runnable image, which no check builds: Smacker became `dllimport` (no SDK
+      import library -- `link.py` now makes SMACKW32.LIB, patched to import the
+      DLL's DECORATED names), two declarations disagreed with their definitions
+      in ways only MSVC's mangling sees (LoadBitmap's return type, StateLeave's
+      linkage), and virtual calls became pointer-to-member thiscalls while this
+      image's vtables still hold cdecl forwarders -- the title screen faulted
+      in WidgetPaint with the clip's left edge as `this`. `AM2_VCALL_PMF`
+      (src/vc6/include/stdint.h) keeps the PMF calls everywhere but here. A
+      crash now writes `C:\vc6crash.txt` (registers and every code address on
+      the stack; `ArmyMen2.map` names them) -- under explorer's desktop winedbg
+      prints nothing. Boot Camp matches stock again (vcdrive `bootcamp --ab`).
+    - **No carried blob.** The `--run` image links NO copy of the original
+      data. A `.guard` section (0x270000 bytes, patched to
+      CNT_UNINITIALIZED_DATA only, so no access) sits where the original data
+      range would have been, and any raw original-VA access faults. Linked
+      `/MT` against LIBCMT (single-threaded LIBC crashed a diagnostic watcher
+      thread in `_flsbuf`). The game's own 21-entry `_cinit` table is walked
+      from a static ctor in `vc6run.cpp` after `am2_bind_imports()`.
+    - **What running at other addresses found, in order.** Each item compiled,
+      placed, and passed every static check; each surfaced only because it
+      stopped holding once LINK put things somewhere else. (1) 455 `.bss`
+      globals redirected into `am2_origstate` members. (2) Pointer tables whose
+      entries were raw VAs (kNamedColours, kCommMessages, kCleared, region's
+      kAction*, armymsg's row coords) rewritten by name. (3) Tables written at
+      runtime but transcribed `const`: the roach params (`am2_roach` struct),
+      map field descs, sprite groups. (4) The HUD command records, the pointer
+      modes and the build menu as ONE struct (`am2_hud_commands`), since they
+      are views of one table. (5) SPRITE_GROUPS B/C bounds: C was aliased to
+      B's end, which produced a 3.4 GB malloc. (6) Four comm-object
+      dereference bugs (UseInventoryItem, TrooperDropItem, BlockWeightDamaging,
+      EnterVehicle passed the SLOT's address as `this`; checked against the
+      disassembly). (7) sprite.cpp's 18 `patch_replace` calls, spliced into
+      LoadBitmapDescriptor's body since c1455272, moved back to
+      `sprite_install`. (8) **`am2_difficulty_scale` was a lone float; it is
+      `float[3]`** (4.0, 2.0, 1.5), indexed by difficulty. Only index 0 ever
+      read correctly. Under VC6 the neighbour was 0, so every friendly trooper
+      spawned with 0 HP, and the per-frame selection prune dropped the Sarge
+      (empty squad panel, no health bar). A scan of the original's indexed
+      accesses against every scalar redirect found no other case.
+    - **Two vc6host toolchain bugs, both in the FPU path.** (a) `_atoldbl` was
+      a zeroing stub, so every float constant was 0.0 and game time froze.
+      (b) `_vc6_ftol`'s `fistpll` overwrote its own saved control word.
+      After any negative conversion the "restore" left the FPU in round
+      toward zero, and glibc's `strtold` (which honours the rounding mode)
+      then truncated every literal that should round up: `0.001f` came out
+      `0x3A83126E` against the original's `0x3A83126F`. That one ulp made the
+      frame delta in seconds sit under 0.001 on a 1 ms frame, so the
+      edge-scroll step `1000*dt` truncated to 0 and the view never scrolled.
+      `_ftol` has its own stack slots now, `_atoldbl` forces round-to-nearest
+      (MSVCRT's parser ignores the FPU mode), and `_controlfp` is real rather
+      than a constant. Byte-match after the fix: 360/1637.
+    - **Detectors** (`src/vc6/`): `rawaddr.py` disassembles the VC6 objects
+      for unrelocated values in the original data range (or `--text` for the
+      code range). Both ranges read **0**: data went 2716 -> 0 (the last hit
+      was ASCII inside the build-menu records, now range-whitelisted), code
+      went to 0 once `OnMpMapPick` (0x00431D80, the MP map list's row
+      callback, byte-identical under VC6) replaced the raw address
+      MpPanelConstruct passed. `constwrites.py` flags direct writes into
+      `const` symbols: 0.
+    - **Campaign and save/load (2026-09-28).** `src/vc6/vcdrive.py ROUTE --ab`
+      drives stock and the VC6 image through the same route in a Wine
+      virtual desktop and diffs every frame; it places the cursor by writing
+      the game's own cursor globals through /proc/PID/mem, because Wine's
+      relative-DirectInput pointer acceleration made synthetic motion land
+      anywhere. `campaign` (NEW -> Kitchen) plays; `load` restores a save
+      pixel-identical to stock. The load route found a divergence: the Sarge
+      panel drew two of six weapons. The data was intact; ADDR_HUD_SARGE_
+      OFFSETS is six (x,y) cells, 24 bytes, and the last 8 had been
+      transcribed as a separate `am2_build_menu_end_data` that LINK put
+      elsewhere. Now one struct member (`am2_hud_commands.sarge_tail`).
+    - **`tools/checkviewspan.py`** (in `make check`) generalises that: every
+      ADDR_ whose orig.h comment declares an extent must fit inside the one
+      placed symbol it lands in. It found a second case at once: the roach's
+      seven animation-frame ids (ADDR_FIELD_530_FRAMES, indexed unbounded by
+      state) were two struct scalars plus a separate `am2_roach_score_ints`;
+      now `am2_roach.field_530_frames[7]`. 98 declared views, 0 overruns.
+    - **Multiplayer reached (2026-09-28).** GOG's MULTI-PLAYER patch is undone
+      for good (Boran): every build shows the button, and the original side of
+      every A/B gets the byte back (restore.c, the hybrid loader, vcdrive's
+      stock copy); `AM2_MULTIPLAYER` is gone. `vcdrive.py multi --ab` drives
+      MULTI-PLAYER -> the DirectPlay channel list -> START A WAR -> ENTER
+      BATTLE NAME and types into it: every frame within 4 px of stock, through
+      our VC6-compiled dplay.cpp. Two drive artefacts found on the way, neither
+      in the game: the channel list fills over ~9 s (TCP/IP arrives last), and
+      the first synthetic keystroke races its Shift.
+    - **Still open:** a hosted or joined session (needs a second instance).
+      The injected `am2hook.dll` build fails at HEAD (misc.h's AM2_Comm in a C
+      TU, and dllmain.c including C++ widget.h); pre-existing, unrelated, not
+      yet fixed.
+- **Fixable per function now:** true source-shape diffs -- signed vs unsigned
+  loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
+  operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was
+  the first closed; KeyNameIndexOf closed operand-order+signedness together.
+- **The shared-return-tail class** (XorChecksum, MeetsAllThree,
+  RespawnKindAllowed): where the original branches every early-out to ONE
+  epilogue, a reconstruction that returns inline per check gets its own `ret`
+  each time and diverges. Structuring the checks as a single `&&`
+  short-circuit that returns the one value, else the shared other value
+  (`if (a && b && c) return X; return Y;`), or `acc=0; if(n>0){do..}; return
+  acc` for a guarded loop, reproduces the `jXX <shared tail>` chain.
+- **Signed divide-by-power-of-two** (ScaleBy32Blocks): `(v+(v<0?31:0))>>5`
+  written as `v / 32` emits MSVC6's `cdq;and;add;sar` idiom, which is what the
+  original was; the explicit branch form compiled to a conditional.
+- **The AM2_CLASS_DTOR dtor cluster** (+18): the dialog Destruct/Delete pairs
+  were free `__attribute__((thiscall))` functions (compiled __cdecl, extra
+  `mov ecx,[esp+4]`); modelled as AM2_Widget methods like the other 147, they
+  match. See the thiscall-class note above.
+- **The switch-shape class** (KindInSetA/B, ObjCodeUnmapped, MapCode18To28):
+  where the original was a `switch` MSVC6 compiled to an index-byte-table plus a
+  jump table (`mov cl,[idx+tbl]; jmp [ecx*4+jmptbl]`), a reconstruction written
+  as an array lookup (`return tbl[i]`) or an if-else chain compiles to a
+  byte-*value* table or a compare chain and every byte diverges. Written as the
+  `switch` it was, it byte-matches. Two sub-rules learned: (1) arms must branch
+  to a *shared* return tail (`break` to one `return`), not return inline;
+  (2) a switch returning distinct constants with a default needs the
+  `result`-variable form (`int r = 0; switch{ case: r = N; } return r`) to
+  reproduce the original's early default-value preset (`xor eax,eax`) and the
+  register allocation that flows from it -- return-per-arm gets the jump table
+  but the wrong registers.
+- **True leaf+pure accounting:** a raw "no call in the compared bytes" scan
+  over-counts diffs, because it compares *truncated* bytes -- 5-15-byte
+  thiscall forwarders for constructors/dtors, and the ~24-byte switch dispatch
+  *headers* of functions whose full 250-600-byte bodies call engine code. After
+  excluding those (full-function size from `docs/functions.tsv`, and any body
+  with a `call` or a jump-table dispatch), the genuinely fully-compared,
+  call-free, jump-table-free leaf diffs are **26** (down from 39). FOUR that
+  *looked* like register allocation or instruction selection were actually
+  source shape and were closed by reshaping -- do not call a leaf diff
+  irreducible before trying these:
+  - SwapColourBytes: the original builds the result byte-by-byte in a stack
+    buffer, not shift/mask.
+  - FindPlayerById: a pointer-bound walk compared SIGNED against the end
+    address, not an index counter (which carried an extra register).
+  - CommMean32: declaring the accumulator before the pointer schedules its
+    `xor eax,eax` early, so the argument loads straight into the pointer
+    register -- **statement order steers register allocation**, so a prologue-
+    order diff is NOT the irreducible wall.
+  - BitmapBitSet: `(uint8_t)` on a shift amount (`7-(x%8)`, always 0..14) makes
+    MSVC compute it 8-bit (`mov cl,7; sub cl,al`) as the original did, not
+    32-bit -- an "instruction-selection" diff that WAS steerable.
+  Each remaining diff was then *attempted* with multiple transformations, not
+  just characterised. The 26 that resisted split into genuinely-irreducible
+  kinds: **pervasive arg-vs-global
+  register swaps** (PointRuleDefault/Vehicle/Boat -- the argument and a global
+  land in swapped registers throughout; declaration reorder does not flip it),
+  a **peephole choice** (AllocUid `lea ecx,[eax+1]` vs `mov eax,ecx;inc ecx` --
+  every temp form folds back), **binary-search loop-peel + cascading registers**
+  (SpriteSlotOf/FindRecordList/SpriteDirIndex -- the `while` form kills the peel
+  but the register/load-motion residual remains), leaf-not-*pure* writers
+  (InitRemap trio, InitStartupColours, AirInit*, RowAnimFinished's coupled
+  shared-tail+register), and one instruction-selection case
+  (AirInitLeg2Divisor `fidiv` vs `fild`+`fdiv` -- a single FPU-op choice; the
+  loop and everything else match).
+- **Holdouts within leaf+pure:** MSVC6's jump-table *density* heuristic
+  (TypesCompatible: a `case` whose body equals `default` is merged away before
+  the table decision, dropping below threshold, so no table -- not
+  reproducible), and multi-arm arithmetic where each arm's register
+  allocation/scheduling differs (UnitKindMatches, SoldierKindForWeapon, the
+  other "1-byte" switch headers -- the diff is only the `ja` default
+  displacement, driven by cumulative arm size). SetFacing08/14 are a shared
+  helper the original inlined twice, so they need forced inlining (a
+  readability trade) rather than a shape fix.
+
+A flag sweep confirmed /O2 (blend) is the original's setting. Calling-convention
+attributes are honoured (`__attribute__((stdcall))` -> `__stdcall`); free-
+function `thiscall` can't be spelled in VC6, so the win32 member layer (widget
+&c.) compiles but won't match. **~1580 of 1642 functions now compile** -- the
+win32 layer was unblocked by growing the shim (ole32!CLSIDFromString for the
+C++ frontend's COM probe, a DWORD_PTR typedef, a static_assert strip, a forward
+LPDIRECTPLAYLOBBY3A for VC98's DX6.0 headers) and by writing AM2_SHAKE_FALLOFF
+as a literal (MSVC6's /O2 folder rejects `1.0/512.0` in a ternary). Only
+dplay.cpp is left (needs Lobby3 methods VC98 lacks).
+
+## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
+
+The migration first redirected each `ADDR_X` to a C symbol the linker scattered
+into `.rodata` at an address corresponding to nothing in the image -- which left
+a stale blob byte at the real VA (breaking stored pointers), and made the region
+unverifiable. Fixed for the NATIVE (ELF) build: each pure-data global is now
+PLACED at its original VA. `-fdata-sections` gives every global its own input
+section; `tools/placement.py` carves the carried blob around the migrated
+symbols and emits `build/standalone/place.ld`, a fragment that lays the surviving
+blob chunks and the placed symbols' input sections end to end under one writable
+`.origdat` at 0x0046F000 with `SUBALIGN(1)` (so the location counter flows to
+each VA), `INSERT AFTER .bss`. The `standalone.h` redirects stay -- once a symbol
+is at its VA, `&am2_x` equals the numeric `ADDR_X`, so they agree, and a
+mis-placement makes the byte-diff fail.
+
+**127 symbols placed at their exact VAs** -- 117 pure-data plus **all 10
+pointer/fn-ptr tables** (2026-09-14): `weapon_handlers`, `option_table`,
+`state_actions`, `font_descs`, `sprite_set_dirs`, `pointer_modes`, and the four
+`char*` name arrays. A further batch of small named const tables was transcribed
+into the pure-data set: `hud_squad_slot_xy`, `spiral_step`, `map_field_descs`,
+`palette_cycle_seq`/`_interval`, and the two DirectInput device GUIDs
+(`guid_sys_mouse`/`_keyboard`); `AI_MOVE_STATE`/`_ALT` needed nothing -- they
+already alias into placed `weapon_pose_frames[53]`/`[56]`. A placed fn-ptr table holds OUR reconstructed-function addresses at the
+canonical VA, so anything reaching it by address gets our table, not the stale
+image copy (whose function pointers are dead in the native build). Their bytes
+differ from the image by design, so `tools/checkplacement.py` byte-diffs the
+region EXCEPT the pointer-table ranges (checkimagedata dereference-verifies
+their values) and confirms each pointer table's symbol sits at its VA; the
+pure-data region stays byte-identical to the image (34.9% of meaningful bytes,
+byte-checked). Confirmed live: `state_actions` is RunFrame's per-frame
+state-dispatch table, and the native build runs dispatching through it.
+
+**UPDATE (2026-09-15): 140 symbols placed, 38.1% of meaningful bytes.** A run of
+name/keyword tables joined the placed set: the nine remaining COM GUIDs
+(IID/CLSID/APP/NULL), `am2_wave_names` (56 wave filenames), `am2_key_names` (the
+95-row controls-dialog key-name table), `am2_cheat_words` (41 cheat phrases),
+and `am2_def_keywords` (the 100-row .aai vocabulary, every handler a
+reconstructed line parser). Two pipeline improvements landed with them: the
+dead-string sweep now excludes migrated pointer-table ranges from its pointer
+scan, so a string only a migrated name table reached goes dead and is dropped
+too (184 -> 484 strings, 6,232 bytes zeroed); and find_definition's "mixed"
+tokenizer splits only top-level commas, so a label with a comma ("NUM ,") no
+longer mis-sizes a table. The clean named const/name tables are now essentially
+exhausted -- what remains in the blob is CRT data (src/platform/crt's remit),
+runtime-written state (needs the graph/relocate approach in SCOPE, runtime-
+verified), unnamed pointer bands, and the pointer-graph core.
+
+`build_menu_rects` is no longer its own symbol: `ADDR_BUILD_MENU_RECTS`
+(0x004762C0, a stride-0x38 rect table) shares its FIRST rect `{6,190,43,27}` with
+`pointer_modes[6]`'s unused tail ints -- the linker packed it there -- so it is
+reached numerically, into the placed `pointer_modes` (rect 0) and the blob
+(rect 1+); this also fixed a latent OOB read (the old 12-byte symbol was short of
+the 16-byte rect). `hud_cmd_spec` (0x004761A8, the sprite view of the same
+physical records, runtime-written by HudCmdConstruct) stays numeric/blob and
+reads records 1-6 from the placed `pointer_modes` storage -- consistent because
+it is one physical table. The SA/mingw build keeps the `--section-start` blob
+path (PE linker scripts differ); native was the stated priority.
+
+**UPDATE (2026-09-16): 223 symbols placed, 64.9% of meaningful bytes.** Later
+batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
+runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
+pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
+migrated NON-const because `TakeSoldierName` marks one taken at runtime -- the
+parser now accepts a non-const table and byte-checks its initial value). Then a
+run of `src/platform/crt` const tables the reconstructed CRT reads via
+`AM2_IMAGE`: the day-of-year tables `_lpdays`/`_days`, the OS-error->errno map
+`errtable` (+`_END`), the multibyte-codepage init tables
+`mbctype_range_flags`/`mbcp_table` (932/936/949/950/1361), the two `__ld12cvt`
+`CVTINFO` parameter blocks, the runtime-error message table `rterr_table`
+(18 `{int, char*}` pairs, migrated mixed -- which also freed its ~600 bytes of
+`R60xx` message strings), and the two 352-byte base-ten scaling tables
+`pow10_table`/`pow10_neg_table` (80-bit long-double groups, transcribed as the
+`uint8_t` blobs the byte-addressed reader wants), plus the `HUGE_VAL` (+inf)
+constant. A last handful of small game tables joined: the trooper heading-sweep
+deltas `step_facing_sweep`, the nine airstrike slot records `slot_recs`, and the
+one-entry `unit_name_sarge` char* slot (which freed its "Sarge" blob string).
+Finally the CRT `_pctype` classification table (257 words at 0x0048CCA0):
+transcribed under a new `ADDR_CRT_CTYPE_TABLE` base macro, with the existing
+`_pctype` blob pointer slot left pointing one entry into the placed copy.
+
+Phase 2 (SCOPE) began: the first **runtime-written .data-init state** moved to
+non-const placed C -- the CRT time-zone/DST cluster (`_timezone`/`_daylight`/
+`_dstbias` and the two DST cache triples). `find_definition` learned to accept a
+non-const scalar. GOTCHA: an all-zero non-const scalar (`_dstbias`=0-style)
+lands in `.bss`, not `.data`, so it falls out of the placement flow and shifts
+every symbol after it -- group a contiguous cluster into one array holding a
+non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
+macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
+bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
+sweep to **960 dead ranges, 49,144 bytes zeroed**.
+
+**UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
+Auditing the surviving strings showed the remainder is table-structured, not
+loose: most are the targets of char* tables the reconstruction already carries
+in C, and a handful are tables the reconstruction never reads at all (no ADDR_
+macro, no bare hex in src) -- the original's input/animation/menu code walked
+them, and that code is 0xCC `.origgap` in the native build. Added those to
+`deadstrings.py`'s `_DEAD_TABLE_DECL` (which already held SCRIPT_TOKENS): the
+255-slot scancode display-name table (0x00485510, nulls for undefined codes,
+its own string pool at 0x0048590C -- ESC/F1/PAD 7/...), the animation POSE
+names (0x0048A5B4 -- Null/Stand/Run/.../Last), and the small BOOL, flag-team and
+lowercase-colour name tables. Declaring the pointer array dead carves it, so the
+private strings it alone pointed at fall out too, while shared targets (the
+ON/OFF words, the code-referenced colour names) are kept by the per-string
+pointed/coded gate. checkdeadstrings re-derives and confirms all 1,461 zeroed
+ranges are unreachable; the unplaced non-zero blob fell ~11.5K -> ~10.4K.
+
+**UPDATE (2026-09-16): 69 live menu-bitmap/status strings folded to C literals.**
+The remaining live blob strings are read by ADDRESS, not through a table -- the
+menu code loads each button bitmap by literal address (AM2_BMP_* macros) and a
+few HUD/status strings likewise. foldstrings.py grew a second list, FOLD_MACROS,
+of FULL macro names of any prefix (resolved from orig.h, widget.h and
+widget.cpp), and folds each to `((uintptr_t)(const char *)"literal")` -- the same
+redirect the ADDR_STR_ list uses. Safe because AM2_BMP_* pass to MakeButton /
+ButtonConstruct, which take a uint32 and AM2_IMAGE it to const char* (on i386 the
+folded 32-bit pointer flows through unchanged); vetted string-only, so a macro
+used as an address (a loop bound like ADDR_OPTION_TABLE_END) is left out. Their
+blob copies then go dead: deadstrings 1,461 -> 1,523 strings, 34,167 -> 35,377
+bytes. Native boots and the bootcamp side-by-side is IDENTICAL through frame 627
+(its briefing dialogs build the folded OK/Cancel buttons). What still survives is
+~40 bitmaps read by BARE HEX with no macro (a follow-up: give each a macro, then
+fold) and the ~207 dead-in-native binary fragments (GUID Data4 tails, record
+name fields) that are not strings.
+
+**UPDATE (2026-09-16, cont.): the 33 bare-hex menu-bitmap reads folded too.**
+The title and options menus hold their button bitmaps in reconstructed C tables
+(`kTitleButtons[]`, `kOptionsButtons[]` in `widget.cpp`) whose `bmp[3]` cells
+were bare image addresses read as `(const char *)AM2_IMAGE(b->bmp[i])` -- shared
+with the hybrid, where `AM2_IMAGE` maps the cell as an image address, so a bare
+literal there would break the oracle. Each got an `AM2_BMP_NN_NNN_NN` macro
+(`#ifndef`-guarded so `foldstr.h` wins in the standalone build, the hex applies
+in the hybrid) and joined `FOLD_MACROS`: foldstrings folds 114 -> 147 strings,
+the dead-string sweep 1,523 -> **1,556 strings, 35,377 -> 36,097 bytes**. Native
+boots and the title-screen side-by-side (click-509) is IDENTICAL through frame
+435.
+
+**UPDATE (2026-09-16, cont.): the last by-address game strings folded -- 112
+total.** A full sweep of what still survives non-zero in the swept blob found the
+remaining live strings fall in four buckets: (a) six more bare-hex reads -- the
+three confirm-dialog captions and their panel bitmaps (`ConfirmDialogBuild` in
+`widget.cpp`: quit / replay / delete-player); (b) the four MP team-colour names
+(`kColourName[]` in `script.cpp`, read `(const char *)AM2_IMAGE(kColourName[army])`);
+(c) char*-**table**-pointed names -- the object-type display names ("Rifleman"..
+"Mine") and lowercase script keywords ("rifleman".."mine"), kept alive by carried
+pointer tables, not by-address reads; (d) structural strings that are not game
+text -- the 171 PE import names (DLL + function, an IAT concern), ~25 "DEST" GUID
+Data4 fragments, and the CRT date strings ("SunMon..", "JanFeb.."). Buckets (a)
+and (b) were the last by-address reads, so they got macros and joined
+`FOLD_MACROS` (69 + 33 + 10 = **112 strings folded**); foldstrings 147 -> 157,
+the sweep 1,556 -> **1,565 strings, 36,309 bytes** (nine, not ten: "tan" was
+already dead, so its fold is a latent fix -- the tan team had been reading a
+zeroed name). One trap avoided: 0x486BC4 "Heavy MG Pillbox" is
+`ADDR_OPTION_TABLE_END`, a loop bound whose value is that string's address, not a
+string read -- left alone. What remains live is now only buckets (c) and (d): no
+reconstructed function reads a game string from the blob by address any more; the
+object/keyword char* tables (a table-fold) and the IAT/CRT/GUID structural bytes
+(separate work) are what is left.
+
+**UPDATE (2026-09-16, cont.): the PE import machinery dropped -- the biggest
+single lever.** After the fold, a per-chunk sweep put the still-live blob at
+~8.4K non-zero bytes across 58 chunks, 67% of it in one region: the PE import
+section (the `IMAGE_IMPORT_DESCRIPTOR` array at 0x004716C8, every DLL's
+import-lookup thunks, and the hint/name + DLL-name string pool through
+0x00472658 -- 3,984 bytes). The native build is an ELF: nothing maps a PE image
+at 0x400000 and no loader walks these tables (imports resolve through
+`src/platform`; `mkglobals` binds them from the real image, not the blob), and a
+scan confirmed 0 references anywhere in the region. So it is declared dead in
+`deadstrings.py`'s `_DEAD_TABLE_DECL` -- as a DATA range, not a pointer table: its
+own descriptor/thunk dwords point at the names inside it, which is why the string
+sweep could not see the names dead (a name is referenced only at the hint word two
+bytes before it). checkdeadstrings re-derives it and its step-3 (no surviving
+dword points into a zeroed range) holds because the region joins the carved set.
+The guarded metric became 1,566 ranges / 40,293 bytes (1,565 strings + the one
+import region); the still-live blob fell to ~4.5K non-zero bytes -- the CRT
+date/FP constants (live, read by the reconstructed CRT), the COM/DirectX GUID
+data, and the object/keyword record tables. (The IAT itself is NOT among these:
+its 720-byte storage at 0x0046F000 was already migrated to the placed C array
+`am2_iat` in `src/standalone/runtime.cpp` -- filled at startup by the native
+import resolver, its image bytes byte-checked -- so it is placed, not carried.)
+
+**UPDATE (2026-09-16, cont.): the dead DirectX interface data dropped too.** The
+remaining .rdata (0x0046F000..0x004716C8, all read-only) splits into live data the
+port reads -- the four DirectX GUIDs device.cpp/audio.cpp pass (placed symbols),
+the CRT constants at 0x0046FECC (live) -- and DEAD DirectInput/DirectDraw/
+DirectSound data the port never dereferences: the DIOBJECTDATAFORMAT axis/button
+GUIDs and DI property/format blocks, reached only through the c_dfDIMouse /
+c_dfDIKeyboard rgodf arrays (which live in .text -- 0xCC .origgap in native -- and
+feed SetDataFormat, whose platform stub only null-checks the format). Seven .rdata
+gaps between the placed live GUIDs (0x0046F300..0x0046F8A8, 1,180 bytes) are
+declared dead in `_DEAD_TABLE_DECL` (0 src refs, 0 blob dwords point in, checked).
+The metric went to 1,573 ranges / 41,597 bytes; the still-live .rdata was then the
+CRT constants (0x0046FECC..0x004716C8) plus the record/EH blocks inside it.
+
+**UPDATE (2026-09-16, cont.): the C++ exception-handling tables dropped -- the
+last big .rdata region.** The bulk of what looked like "CRT constants" at
+0x004702B8..0x004716C8 (1,975 non-zero bytes) is the MSVC C++ EH data: 93
+`__ehfuncinfo` tables, each starting with the VC6 EH magic 0x19930520, plus their
+unwind/tryblock/handler sub-maps -- one per function the original compiled with
+try/catch. They point at handler code in .text (0xCC `.origgap` in native) and at
+each other. The native build compiles `-fno-exceptions -fno-rtti` and links no
+MSVC EH runtime, so nothing walks them (0 src refs, 0 external blob dwords point
+in -- checked). Declared dead in `_DEAD_TABLE_DECL` as `CXX_EH_FUNCINFO`. The
+metric went to 1,574 ranges / 46,733 bytes. The remaining live .rdata is now only
+the ~315-byte head at 0x0046FECC -- the printf classifier table, the "(null)"
+string, the folded runtime-error/user32 message strings, and a few
+still-referenced R60xx error strings. The still-live blob was then ~1.9K non-zero
+bytes across 51 chunks: that CRT head plus the writable .data record tables
+(object-type/keyword names, MP message strings held by dispatch tables), the
+per-structure graph/relocate remainder.
+
+**UPDATE (2026-09-17): folds and dead-drops exhausted; remainder is
+per-structure placement.** A live-chunk sweep of the swept blob confirmed 0
+foldable strings remain (the one candidate, `ADDR_STR_AVI_DIR`, is read
+`*(const char *const *)` -- a pointer-table deref already served by placed
+`am2_dir_names`, not a string). What is left is genuine live data reached by
+address or by a carried pointer, each needing its own placed symbol. First of
+these: the edit widget's accepted-character-set string (0x00485360, 70 bytes,
+" a-z A-Z 0-9 !'&+-_") -- dereferenced through the raw pointer `am2_edit_charset_ptr`
+= 0x00485360 -- transcribed as the placed `am2_edit_charset` in `widget.cpp` (276
+symbols placed now). Then the biggest remaining chunk turned out to be DEAD, not
+data to place: 0x00489E18..0x0048AE80 (4,200 bytes, 633 non-zero) is the
+multiplayer network debug/log format strings ("TrooperPickupItem %x",
+"UpdateTrooperAction: ask...", etc.) plus a small dead offset table, sitting
+between the placed `am2_step_facing_sweep` (ends 0x00489E18) and `am2_key_defaults`
+(0x0048AE80). The MP send/recv code that logged them is unreconstructed (0xCC
+`.origgap`); the ONLY reconstructed macro in the whole span is
+`ADDR_STEP_FACING_SWEEP` (that placed symbol, outside the range). Declared dead as
+`MP_NET_DEBUG_STRINGS` (0 src refs, 0 blob dwords point in -- checked; many begin
+with a tab, which the string sweep skips, so they had survived). This coalesced
+~164 already-individually-zeroed strings inside the span into one range, so the
+count falls while bytes rise: to 1,410 ranges / 47,896 bytes. Still-live blob
+~1.3K non-zero.
+
+**UPDATE (2026-09-17, cont.): the confirmed-dead debug strings dropped.** Two
+chunks are debug/error/log format strings from subsystems unreconstructed in
+native (0xCC `.origgap`, nothing in the ELF reads them -- 0 src refs, 0 blob dwords
+point in): the bitmap loader's errors ("ERROR: invalid file size in %s.",
+"ERROR: %s not in 1-bit mode") at 0x00478950..0x00478CDC, and the
+region-activation debug line plus the `%s.atl`/`%s.amm` file-name format strings
+(the original loader used them, the reconstruction does not) at 0x00486220..0x00486444.
+Declared dead as `BITMAP_LOADER_DEBUG` and `REGION_DEBUG_AND_FMT`: 1,369 ranges /
+48,094 bytes.
+
+**UPDATE (2026-09-17, cont.): the scancode display-name string pool dropped.**
+`SCANCODE_NAMES` had covered only the 255-slot pointer table (0x00485510..0x0048590C);
+the string pool it alone points at survived (ESC, F1..F15, DEL, TAB, the
+letter/digit/punctuation key names, through 0x00485B28). Since the pointer table was
+already dead (boot-verified) and the pool is reached only through it, extend the
+range to 0x00485510..0x00485B28 (0 external blob dwords point in -- checked). This
+coalesces the pool's individual strings into the one range: **1,331 dead ranges,
+48,402 bytes zeroed**.
+
+**UPDATE (2026-09-17, cont.): the script.cpp string pool dropped.** The
+0x0048825C..0x00489554 region (between the dead SCRIPT_TOKENS table and the placed
+`am2_sprite_set_dirs`) is the script module's string constants: the variable names
+("all", "me", "difficulty", "systemspeed", "numgreen", ...), short keyword
+fragments ("hit"/"and"/"npc"/"pad" -- which the sweep's MIN_LEN=4 had skipped), the
+startup/mission-save filename formats, and the "script.cpp" module name. The
+reconstructed `script.cpp` registers every variable with its OWN C literal
+(`AddNameTableName("all", ...)` etc.) and reads the integer VALUE slots through
+separate `ADDR_SVAR_*` addresses -- none of the `ADDR_STR_*` string macros here
+appear in reconstructed src, and no blob dword points in (both checked). Declared
+dead as `SCRIPT_STRING_POOL`; the region's ~205 individually-zeroed strings coalesce
+into the one range (1,331 -> 1,126 ranges / 48,837 bytes). Verified with a
+mission-loading side-by-side (which exercises the script name-table init), not just
+the title screen.
+
+**UPDATE (2026-09-17, cont.): the HUD/gameplay display strings dropped.** The
+0x004767A8..0x00476FB0 gap (between the placed `am2_cheat_words` at 0x00476704 and
+`am2_fog_of_war` at 0x00476FB0) holds the squad-info stat labels ("HP:"/"MV:"/"WT:"/
+"HT:"), the weapon abbreviations ("BAZ"/"MAG"/"M80"/...), and a scatter of
+format/misc strings ("%d", stratmap/portal names). The reconstructed HUD writes
+every one with its OWN C literal (`widget.cpp` `SQD_TEXT("HP:")`, the
+"GREN"/"FLAM"/"BAZ" weapon-abbrev array, `item.cpp`'s item names) and reads none of
+the `ADDR_STR_*` macros here; no placed symbol lies inside the gap and no blob dword
+points in (all checked; the cheat-word char* table `am2_cheat_words` is placed, so
+its blob pointers are carved). Many are three chars, which the sweep's MIN_LEN=4 had
+skipped. Declared dead as `HUD_LABELS_AND_ABBREVS`: **993 dead ranges, 49,139 bytes
+zeroed**; verified with mission-loading side-by-sides that show the HUD.
+
+**UPDATE (2026-09-17, cont.): two more C++ EH record blocks in the CRT head.**
+The same `{-1, handler, handler, 0}` EH shape as `CXX_EH_FUNCINFO`, but sitting in
+the CRT-string head rather than the big 0x004702B8 block: one record at 0x0046FDA8
+(for the FDIV self-test function) and a run at 0x0046FDF8..0x0046FE70 (for the CRT
+string/printf functions), their handlers all in 0xCC `.origgap` .text. The build is
+`-fno-exceptions`, so nothing walks them (0 src refs, 0 placed symbols inside, 0
+blob dwords point in). The live neighbours are left intact and lie outside: the
+placed FDIV constants (`am2_crt_fdiv`, 0x0046FDB8), the folded
+"IsProcessorFeaturePresent"/"KERNEL32"/"e+000" strings the CRT startup reads
+(startup.cpp:891/895), and the placed printf table (0x0046FE70). Declared dead as
+`CRT_EH_RECORD_FDIV` / `CRT_EH_RECORDS_STDIO`: **995 dead ranges, 49,275 bytes
+zeroed**. Native still boots (the key check for CRT-head changes).
+
+**UPDATE (2026-09-17, cont.): the dregs, done right -- fold the reads, then drop
+the pools.** A first attempt DECLARED the remaining 22 gaps dead in one batch;
+`make check` passed but click-509 trapped at frame 271 (2065-px title box). Cause:
+one gap swallowed 0x004852B4 "%s" (ADDR_STR_FMT_S), which the title reads through
+the macro to build a filename -- so zeroing the blob copy broke it. Reverted. The
+right method, matching how independence actually works: the remaining live strings
+are nearly all < 4 chars (the string sweep's MIN_LEN=4 skips them) and are either
+read via an ADDR macro or pointed by a placed char* table. (a) FOLD the macro reads
+so the port carries its own literal -- 13 more (STR_FMT_S "%s", STR_NEWLINE,
+STR_DOT, the movie/dir/mode fragments, ...); foldstrings 157 -> 170. (b) Then a
+short-string POOL whose table is placed-with-literals can be declared dead
+surgically: the CONTROLS dialog key names (del/ins/f1..f15/letters/tab,
+0x0048B220..0x0048B3D8) -- the {scancode,char*} table that names them is the placed
+`am2_key_names`, so the dialog reads literals and nothing reads the blob pool. This
+needed a `dead_tables()` fix: a macro REDIRECTED in standalone.h (like the loop
+bound ADDR_KEY_NAME_TABLE_END = `am2_key_names + 95`) resolves to a placed symbol,
+not the blob VA, so its use in src must not veto the pool. The metric went to 967
+ranges / 49,529 bytes. LESSON: never batch-declare wide gaps dead; fold the reads
+first, carve exact pools, and a green `make check` is not the gate -- boot + title
++ mission side-by-sides are.
+
+**UPDATE (2026-09-17, cont.): the scattered placed-table strings dropped.** Same
+method applied to the individual dead strings whose naming char* tables are already
+placed with literals: "FOO" (am2_write_dot_record), "map"/"m80"/"#"
+(am2_def_keywords), "mag" (am2_movie_names), "avi" (am2_dir_names), and "Heavy MG
+Pillbox" (am2_option_table's loop-bound target). Each survived only as <4 chars or
+via a redirected bound; none is read through an unfolded macro (checked). **960
+dead ranges, 49,144 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
+now: strings pointed by BLOB char* tables not yet migrated (the ON/OFF bool words,
+team-colour names, a scancode F/T/0 table), and CRT runtime state (the _tzname
+PST/PDT buffers, ctype/pctype, wnullstring). Reaching literally zero needs those
+tables transcribed to placed C and the CRT buffers placed as writable symbols --
+per-structure work, but the method (fold reads, then place/drop) is settled.
+
+**UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
+live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
+(0x00487BA8) is the base of the eight-dword ROACH_* block that `DefGameParse`
+fills from `game.aai`; indices 1..7 were already the placed `am2_roach_*`
+symbols, but index 0 (`ROACH_HEIGHT`, ships 32) was still blob. Placed it as
+`am2_roach_height` (item.cpp) at its VA so the block base and `kGameConst[i]`
+now flow across the contiguous placed set. An audit of every `ADDR_*` macro
+resolving into `.origdat` (0x46F000-0x48E000) that is LIVE in reconstructed code
+(comments stripped) leaves **7 macros**, of which 3 resolve into *placed*
+storage (`BUILD_MENU_RECTS`/`HUD_CMD_SPRITES_END` into `am2_pointer_modes`,
+`SPRITE_GROUPS_C_END` a bound into `am2_sprite_grid_rows`) and are not blob
+reads. The genuine remaining blob reads were the **RANK** cluster and **`MOVIE_VTABLE`**.
+The other ~319 `ADDR_STR_*`/`FMT_*`/`MSG_*` macros in the range are read ONLY by
+unreconstructed original functions, which the native build maps to `0xCC`
+`.origgap` traps and never executes -- so they are carried, not depended on.
+
+**UPDATE (2026-09-16, cont.): the RANK cluster placed; only MOVIE_VTABLE now
+reads the blob from live code.** RANK_RECORDS (0x00473DC0) is eight 28-byte
+runtime-written records; RANK_EXP_TABLE is the +0x18 XP-field view of the same
+records (stride 28), and am2_pillbox_trooper_health (0x00473E44) turned out to
+be record 4's max-health field -- the image aliases the pillbox trooper's health
+onto it. So it is ONE 224-byte non-const array, placed at its VA, with both
+macros (and the ex-pillbox symbol, now removed as a standalone) aliasing into
+it. Placed as a `uint8[]` byte array -- the records hold only small ints and
+floats, no pointers, so checkseams passes. 223 symbols placed, pure-data region
+byte-identical, 65.1% of meaningful bytes; boot clean; make check green
+(roachcheck/roachbitecheck included). **MOVIE_VTABLE** is now migrated: ADDR_MOVIE_VTABLE (0x0046FAB4) is the movie
+widget's 6-slot vtable, transcribed as the fn-ptr table `am2_movie_vtable`
+(movie.cpp) -- `{MoviePoll, DlgSelectMapDelete, WidgetPaintFwd2,
+WidgetUpdateCancel, WidgetTakeFocus, WidgetRepaint}`, each referencing the
+reconstructed C function directly (so checkseams passes) and dereference-verified
+by checkimagedata against the image's original addresses. (My earlier reading
+that these were "not reconstructed" was wrong -- I checked sites.h, but the
+reconstruction record is the `patch_replace` list, and all six are patched.)
+224 symbols placed, 27 pointer tables, 65.1%; checks green; boots clean.
+
+**THE REAL REMAINING origdata DEPENDENCY IS THE FIXUP TABLE.** `mkglobals.py`
+generates `build/standalone/fixups.cpp`, which at startup rewrites every
+blob-stored function pointer -- "the 33 menu vtables among them" -- to the
+reconstructed C functions, because the original .text is not in the binary.
+Those blob-stored pointers ARE an origdata dependency: the vtables live in the
+carried `.origdat` and are patched in place at load. Migrating one out (giving
+it a named C fn-ptr table and adding its address range to the `MIGRATED` list in
+mkglobals.py, so the blob copy goes unused) is exactly what was done for
+`am2_state_actions`, `am2_pointer_modes`, `am2_weapon_handlers`, and now
+`am2_movie_vtable`. **~389 fixup entries remain** (the menu-widget vtables and
+the CRT static-init thunks); each is migratable by the same pattern, and when
+the last one goes the blob's function-pointer dependency is gone. This -- not
+the ADDR_ macro scan -- is the accurate measure of what "no longer depends on
+origdata" still requires. The scalar/string/const/struct DATA is complete; the
+vtable fixups are the remaining, well-defined, piecewise work.
+
+**UPDATE (2026-09-16, cont.): the widget vtable region is transcribed -- fixups
+389 -> 139.** All 50 menu/HUD widget-class vtables (0x0046F8B8..0x0046FD48) are
+now named fn-ptr tables `am2_vtable_*` (widget.cpp), 5 slots each {dtor, paint,
+update, focus, repaint}, every slot referencing the reconstructed C function
+directly. Each `VTABLE_*` macro (66 names, 15 aliased) redirects to its table in
+standalone.h, and the 50 ranges are in mkglobals.py's MIGRATED list so their blob
+fixups are dropped; VTABLE_SELECT_MAP aliases into am2_movie_vtable. The tooling
+learned three things to make this verifiable: `orig_addresses()` now also parses
+`VTABLE_*` (from orig.h and widget.h), checkimagedata's REDIRECT regex accepts
+`VTABLE_*`, and verify_mixed falls back to the `AM2_SA` seam map so the one stub
+slot (VTABLE_MP_SPIN's ADDR_LOG -> am2_sa_log) verifies. Result: **274 symbols
+placed, 77 pointer tables dereference-verified, byte-identical, 65.1%**;
+checkimagedata 291 globals match / 0 failures; checkseams clean; native boots and
+its title-screen widgets drive without fault. **139 fixups remain** -- the
+init-order tables (AirInit*/CommGlobalInit/CRT static-init at 0x473004+, ~29) and
+~110 scattered single function pointers; the vtable region, the biggest and most
+regular chunk, is done.
+
+**UPDATE (2026-09-16, cont.): the init-order tables are transcribed -- fixups
+139 -> 110, and the CRT init walk is now honest.** `am2_crt_inittab` (0x00473000,
+the .CRT XC/XI/XP/XT tables) was already placed but held the image's raw slot
+values and got rewritten at startup like a vtable; it is now a table of the
+reconstructions themselves -- the 21 C++ static initializers (AirInit*×11,
+CommGlobalInit, InitViewColourCopy/InitRemapIdentity/InitDefaultPalette/
+InitRemapBright/InitOverlayPalette, SelListInit, InitStartupColours/B,
+InitItemHeaderSize) and the 6 CRT init/term routines (crt_onexitinit,
+crt_initstdio, crt_initmbctable, crt_seh_set, crt_endstdio, crt_seh_restore),
+with the 0 sentinels in place, typed am2_init_fn (orig.h). The old comment on
+that table said crt_cinit's walk was "dead in native"; it was live all along --
+am2_apply_fixups patched the slots before crt_startup, which is what let
+InitRemapIdentity fill g_remapIdent. Two tooling pieces: verify_mixed now follows
+the XC entries' `jmp` thunks to their targets (the image stores thunks, not the
+initializers), and mkglobals' by-position static-init rewrite skips a MIGRATED
+range like the blob scan does. Two of the 21 (SelListInit, InitItemHeaderSize)
+are declared outside their headers' extern "C" blocks and so carry C++ linkage
+-- the forward declarations in startup.cpp had to match, which the link caught.
+Verified: checkseams clean; native boots through the live init walk and drives
+its title widgets without fault. **110 fixups remained -- all scattered single
+function pointers embedded in data structs** (102 singletons + 4 pairs), the
+long tail: each is migrated by placing the struct that holds it.
+
+**UPDATE (2026-09-16, cont.): the fixup table is EMPTY -- fixups 110 -> 0, and
+`am2_apply_fixups()` now has no body.** The "long tail" turned out to be four
+buckets, three of them already placed C that only lacked a MIGRATED range:
+ - **99 in `am2_def_keywords`** (0x00476FE0, 101 x 12): the .aai vocabulary's
+   handler field already named the reconstructed line-parsers (DefTrooperLine,
+   DefWeaponLine, ...); the fixups were rewriting a correct C table with the
+   same values. MIGRATED range only.
+ - **8 in `am2_aim_displace_map` -- a real bug, now fixed.** The map is 112x112
+   int16 {sx,sy} cells (0x00478CDC, 0xC400 bytes). Eight of them -- {32,66} and
+   {64,66}, in consecutive pairs -- pack to exactly ADDR_EVT_SET_BYTE40
+   (0x00420020) and ADDR_EVT_SET_BYTE530 (0x00420040), so mkglobals' blob scan
+   took them for function pointers and am2_apply_fixups overwrote eight
+   displacement cells with EvtSetByte40/EvtSetByte530's addresses at every
+   native startup. The placed .inc holds the byte-verified real cells; the
+   range is MIGRATED so the scan skips it.
+ - **2 CRT slots** (`am2_crt_fpinit_ptr` 0x0048CC28, `am2_crt_exit_fn_ptr`
+   0x0048CC50): were byte-exact image addresses rewritten to crt_fpmath /
+   crt_exit_quick at startup, under a note calling their calls "dead in
+   native" -- they ran through the fixed-up slots. Now one-element tables of
+   the reconstructions (am2_init_fn / a new am2_exit_fn), verified through the
+   AM2_SA seam map.
+ - **1 lone record** at 0x0047588C: {WriteDotString, -> "FOO"}, eight bytes up
+   to ADDR_GAME_VERSION, referenced by nothing. Transcribed as
+   `am2_write_dot_record` (misc.cpp, new ADDR_WRITE_DOT_RECORD) so its handler
+   slot needs no fixup.
+Verified so far: checkseams clean; native boots with the empty fixup table
+(crt_cinit reaches fpinit through its slot) and drives its title widgets.
+**With this, no function pointer in the carried blob is rewritten at
+startup: every one the native build reads is a placed, named C table of the
+reconstructions themselves.**
+
+## MIGRATION (2026-09-11): global structures transcribed out of the blob
+
+The native/standalone builds carry the original's `.rdata`/`.data` as one blob
+placed at its own VAs (tools/mkglobals.py), and read every global out of it.
+The stated destination is to carve each table out of that blob into typed,
+named, HAND-WRITTEN C -- not generator output -- so eventually the placement
+constraint goes. **122 read-only globals** now come from C
+(`tools/checkimagedata.py` reports the count -- 5 were removed when found to be
+runtime-written state rather than read-only const; see the segfault note below),
+across several batches: the
+pose/AI-move family, the air-strike tables AND its ~20 gauge/flight-path
+scalars, the roach creature params, the object hit-boxes and row-specs
+(explosion/missile/trooper/vehicle/kind7), the float/double math constants,
+the gameplay scalar tunables (gravity, view speed, difficulty, path-search
+count, seq timings; tick-interval and path-node-budget were reverted as runtime
+state), the small pointer-free lookup tables (spiral/kind-frames/
+vehicle-height/trooper-class/drop-ring/mp-row-coords/bit-masks), and the HUD
+layout tables + sprite-grid/sequence counts, the shake-preset table, and the
+char* NAME arrays (item-type / unit-class / vehicle / movie / sprite-set-dir).
+The NAME arrays are the first POINTER-containing tables: their pointer values
+legitimately differ from the image's (our literals vs blob strings), so
+`checkimagedata` verifies them by DEREFERENCE -- each C literal must equal the
+string the image pointer points at -- rather than by byte packing.
+
+**FUNCTION-POINTER TABLES ARE NOW OFF THE GENERATOR.** `am2_state_actions`
+(movie.cpp, the game-state AM2_StateAction[5] dispatch) and `am2_weapon_handlers`
+(widget.cpp, the AM2_WeaponHandler[44] the HUD/input install) were the last
+things `mkglobals.py`'s `fixups.cpp` rewrote in the blob; they are hand-written
+C now, and mkglobals' MIGRATED list skips their ranges (fixups 440 -> 409).
+`checkimagedata` gained a general MIXED verifier for these: each dword is either
+an int (byte-compared) or a function pointer, and a pointer is checked against
+the reconstruction the patch list says replaces the image's ORIGINAL address --
+so a wrong function name or a wrong int is caught (mutation-tested both).
+
+**THE STRUCT-WITH-POINTER TABLES ARE DONE TOO.** `am2_option_table` (widget.cpp,
+the 43-record OPTIONS dialog), `am2_font_descs` (font.cpp), `am2_keyrow_positions`
+(int16 pairs), and `am2_pointer_modes` (widget.cpp, 7 cursor-mode records) --
+records mixing string-pointer, function-pointer and int fields. The MIXED
+verifier gained a third case: a field whose C token is a "string" is checked by
+DEREFERENCE. Two overlaps surfaced and are handled byte-faithfully: OPTION_TABLE
+needed ADDR_OPTION_TABLE_END redirected to one-past the C array (the reader
+loops on it), and POINTER_MODES' mode-6 tail OVERLAPS am2_build_menu_rects in
+the image (the linker packed it there). pointer_modes/option/font-fixups also
+came off the generator (fixups 440 -> 395).
+
+**THE AIM DISPLACE LUT IS OUT TOO.** `am2_aim_displace_map` -- 0x00478CDC, the
+112x112 int16 {sx,sy} displacement block DrawAimOverlay samples (25088 values,
+~50 KB, the single largest thing in the blob) -- is a committed
+`src/game/win32/aimdisplace.inc` (generated ONCE from the image and owned, like
+`glyphs.inc`; the build does NOT regenerate it). checkimagedata reads `.inc`
+now and byte-verifies it.
+
+**THE REMAINING MIGRATABLE CONSTS ARE DONE.** Ten string constants that weren't
+`ADDR_STR_`-prefixed (`MODE_RB/WB/W`, `CD_LABEL`, `DEF_SEPARATORS`,
+`REGISTRY_KEY`, `VOS_DIR`, `MP_DATA_PROBE`, `DATA_MISSING_TEXT/CAPTION`) were
+folded inline (33 sites) the same way the STR_ ones were, and four more const
+tables transcribed: `am2_pad_bit_table` (int32[66] bit masks, pad.cpp),
+`am2_respawn_kind_mask` (uint32[44], maprow.cpp), `am2_key_defaults` (uint8[24]
+default scancodes, gameproc.cpp), `am2_game_version` (commmsg.cpp).
+checkimagedata's int packing now masks-and-emits-unsigned (so a `(int32_t)0x80000000`
+cast is byte-correct) and its number scan skips digits embedded in identifiers.
+Left as macros: SLOT_RECS (its pointers reference BSS runtime globals, not const
+data), and the runtime-state globals (mouse/cursor/palette-cycle/comm/rand/
+name-tables/sprite-arrays), whose relocation is a separate exercise from
+transcribing const structures. The first batch, as an illustration of the shape:
+
+| C symbol(s)                       | was        | shape        | home |
+|---|---|---|---|
+| `am2_weapon_pose_frames`          | 0x00474FE0 | int32[104]   | item.cpp (pose -> anim frame) |
+| `am2_pose_by_class`               | 0x00475180 | int32[3]     | item.cpp |
+| `am2_death_anim_by_code`          | 0x0047518C | int32[3]     | item.cpp |
+| `am2_hit_pose_by_class`           | 0x00475198 | int32[6]     | region.cpp |
+| `ADDR_AI_MOVE_STATE`/`_ALT`       | 0x004750B4 | alias        | OVERLAP `weapon_pose_frames[53]`/`[56]` |
+| `am2_formation_slots`             | 0x00473EA0 | uint8[72]    | air.cpp (12 x 6-byte {facing,,dist}) |
+| `am2_air_drop_offsets`            | 0x00473F74 | int16[6]     | air.cpp |
+| `am2_air_drop_facings`            | 0x00473F80 | uint8[3]     | air.cpp |
+| `am2_air_frame_hotspots`          | 0x00473FB0 | int16[22]    | air.cpp |
+| `am2_air_strike_kinds`            | 0x00473FDC | int32[6]     | air.cpp |
+| `am2_army_pal_base`               | 0x00474174 | uint8[4]     | palette.cpp |
+| 19 float/double scalar constants  | .rdata     | float/double | misc.cpp (WEAPON_RANGE, SIGHT, DBL_*, F_*, HUD_SLIDE, ROACH_REACH, MS_TO_SEC, ENEMY_HEALTH_SHARE) |
+
+Each definition is guarded by `#ifdef AM2_STANDALONE`; `src/inject/standalone.h`
+declares it and redirects the `ADDR_*` macro to the C symbol (the call sites'
+`AM2_IMAGE()` wrapper is a no-op, `am2_image_slide==0` in every placed build).
+The AI-move pair is recorded as an ALIAS, not a copy: 0x004750B4 is
+`weapon_pose_frames`'s index 53 and holds the `{2,8,9,3,8,9}` orig.h documents
+for the two int32[3] tables.
+
+**`tools/checkimagedata.py` is the ratchet** (in `make check`), and it hand-keeps
+NO list: it reads the macro->symbol pairing from standalone.h's redirects, the
+address from orig.h, the values+type from the C definition, packs, and compares
+to `am2.Image().read(addr)` exactly. Adding a transcription extends its coverage
+automatically. Mutation-checked both ways (a scalar and an array). Also verified
+at the ELF level: every compiled float/double constant is byte-identical to the
+image.
+
+Method for the next tables: `refs_to(addr)` must be code-only (no data-blob
+pointer into the table -- true of every read-only const here); read the ELEMENT
+TYPE and index BOUND from the reader, not the byte spacing (WEAPON_RANGE is
+double at 8-byte spacing, not float; FORMATION_SLOTS stride is 6, not 2). WHAT
+IS DELIBERATELY LEFT: globals the game WRITES at runtime are state, not
+structures -- `ADDR_RANK_RECORDS` (definfo writes fire-scale), `ADDR_KEY_BINDINGS`
+(the controls dialog rebinds), `ADDR_ARMY_TABLE` (a pointer). And
+`ADDR_FRAME_HEADING_BIAS`, whose length is ambiguous (trailing zeros then a
+string), is deferred until a reader bounds it.
+
+**THE MIGRATION INTRODUCED THREE NATIVE-BUILD SEGFAULTS, and the read-only
+`.rodata` the migration creates is the oracle that finds them (2026-09-11).**
+`checkimagedata` verifies a migrated const's VALUE but says nothing about
+whether the game WRITES it or depends on its ADDRESS -- and a migrated const
+lands in read-only `.rodata`, where the injected/hybrid build's writable
+`.origdat` placement hid every such fault. Three classes, all found by RUNNING
+the native build (a write to `.rodata` faults with the exact address):
+
+1. **Runtime-written globals migrated as const.** `AirInitTurnYIn/Out` (a
+   C++ static initializer -- crashed at cinit, the reported bug), `ResetLevelState`
+   and `RegionBudget` write `AIR_PATH_TURN_Y_IN`/`_OUT`, `TICK_INTERVAL_MS`,
+   `PATH_MAX_NODES`. All four were `extern "C" const` -> un-migrated (removed the
+   C symbol + standalone.h redirect, so they resolve to their writable `.origdat`
+   placement holding the true image value, exactly as the hybrid does).
+2. **A global whose ADDRESS is a layout boundary.** `ADDR_SPRITE_GROUPS_C_END`
+   was `#define`d as `ADDR_SPRITE_GRID_ROWS`; migrating that symbol relocated its
+   address into `.rodata`, so `LoadSpriteGroupsC`'s `r < C_END` loop ran off the
+   table end, read a garbage count, and `am2_malloc(garbage)` returned NULL ->
+   `memset(NULL)`. Pinned the boundary to the literal `0x0048CA38u`.
+3. **A written table migrated const AND mis-sized.** `am2_hud_cmd_spec` was
+   `const uint8_t[12]` for a 7x0x28=280-byte table (overlapping POINTER_MODES)
+   that `HudCmdConstruct` writes per-record. Un-migrated.
+
+A dataflow-aware static scan (locals derived from a migrated ADDR_ that are then
+written) flagged 5, but 4 were false positives -- the derived local was
+`const`-qualified, so the compiler already forbade the write; only `hud_cmd_spec`
+(a non-const `rec`) was real. **The runtime caught what the static scans could
+not**: class 2 is invisible to a write scan entirely, and the write in class 3
+is through a record pointer. Rule for future migrations: a global is a migratable
+const only if it is (a) never written on any reached path AND (b) never used for
+its address (as a table boundary or alias). Reads under a `const` local are safe;
+runtime-written or address-boundary globals stay at their blob placement.
+
+**A SEPARATE, PRE-EXISTING CRASH is exposed once the above are fixed.** Driving
+a CAMPAIGN save (`map1_mission1`) into the native build via `enterlevel`/`loadgame`
+now reaches the render path and hits SIGFPE in `DrawSelection` (mapdraw.cpp:2136,
+`hp * wide / max`): the loaded leader has `health != 0` but `OBJ_OFF_MAX_HEALTH == 0`,
+an integer divide-by-zero. NOT a migration bug -- `max` is an object field,
+`ADDR_RANK_RECORDS` is unmigrated, and `samission.sh` shows Boot Camp's live
+DrawSelection works. It is a save-load object-init issue (loaded units, cf.
+docs/saveload.md), open and unfixed.
+
+**STRINGS FOLDED INLINE (2026-09-11).** The `ADDR_STR_`/`ADDR_FMT_`/`ADDR_MSG_`/
+`ADDR_NAME_` string indirection was a reversing-time crutch (CLAUDE.md's
+house-style note, now amended); with reversing done, **462 sites across
+src/game were folded to inline literals** -- `(const char *)AM2_IMAGE(ADDR_STR_X)`
+and `(const char *)(uintptr_t)ADDR_STR_X` became the `"literal"`. So the
+native/standalone builds no longer read those strings from the carried blob.
+Byte-safe by construction: each literal was produced from `am2.Image().read`
+and asserted to unescape back to the exact image bytes; `make check` green;
+native builds clean. 319 string macros folded; 0 real strings remain. NOT
+folded (not strings): the `ADDR_MSG_*` window-message codes, `MSG_LIST_*`/
+`NAME_TABLE_*` pool/state pointers, and `ADDR_STR_AVI_DIR` (pointer-to-pointer).
+
+**DEAD-STRING SWEEP (2026-09-14).** Folding the 462 sites orphaned the blob's
+own copies of those strings: nothing in the native/SA build reaches them (there
+is no original `.text` in either build, so a blob string is live only if a
+reconstructed function reads it by address or a carried char* dword points at
+it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
+`build/standalone/origdata.bin` during `standalone-generate`, between
+`mkglobals.py` and `placement.py`. **960 dead ranges, 49,144 bytes zeroed** -- log,
+error, cheat, and `printf`-format strings that the original pushed as code
+immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
+`"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
+the strings that only a MIGRATED pointer table reached (e.g. the wave-effect
+filenames once `am2_wave_names` became C literals): placement carves those
+tables out and replaces their pointers with C `.rodata`, so the sweep excludes
+the carved ranges from its pointer scan and the orphaned strings drop too.
+
+The safety rule is what makes this non-trivial: a naive "printable
+NUL-terminated run" sweep also matches coincidental ASCII *inside* binary
+structs -- the DirectInput device GUIDs carry `Data4 = BF C7 44 45 53 54 00 00`,
+so `"DEST"` looks like a string at every GUID's +6, and the same shape appears
+in any record array of fixed name fields read by `base + i*stride` (only
+record[0]'s field is pointed at). So a run counts as a genuine string only if
+its **exact start VA is referenced in the original image** (a code immediate or
+a data dword); a mid-GUID fragment or a record[1..N] field is never referenced
+at its start and is left untouched. A genuine string is then zeroed only when no
+dword in the current blob points into it and neither its `ADDR_` macro nor its
+hex address appears in `src/`. `tools/checkdeadstrings.py` (in `make check`)
+recomputes the set from a pristine blob and re-proves every zeroed range
+unreachable. Native still boots to window + audio init with no fault. This does
+not shrink the carried blob (the zeros sit mid-`.origdat`), but it makes the
+"still-opaque bytes" figure count only data that is genuinely still load-bearing.
+The remaining printable runs are kept: they are still pointed at (name tables
+not yet transcribed) or still read by address. Each further name-table migration
+drops its strings the same way.
+
+**UPDATE (2026-09-17): full semantic re-transcribe begins -- the CRT
+runtime-error pool.** Directive change: rather than declaring a residual region
+dead (which zeroes the blob copy but names nothing), re-transcribe each residual
+region as meaningful named C AT its VA and REPOINT the existing table at that
+placed VA. First region: the CRT runtime-error message pool. The 18
+`am2_crt_rterr_table` records (startup.cpp) held hand-written string LITERALS, so
+the image's own 649-byte pool at 0x0046FF00..0x00470189 (the R60xx/DOMAIN/SING/
+TLOSS/`abnormal program termination` texts, packed in reverse) was orphaned --
+neither placed nor coded, so it sat as unplaced non-zero blob. Now
+`am2_crt_rterr_pool[649]` is a byte-exact `extern "C" const uint8_t` array placed
+at 0x0046FF00 (ADDR_CRT_RTERR_POOL, redirected in standalone.h), and
+`am2_crt_rterr_table` is repointed into it (`am2_crt_rterr_pool + 0xNNN` per
+record) instead of carrying its own literals. So there is ONE copy of each
+string, at its original VA, semantically named -- and `deadstrings`'
+`in_placed()` now excludes 0x46FF00..0x470189, dropping those runs from the sweep
+(**974 -> 962 dead ranges**, the pool's bytes moving from swept-zero to
+placed-and-byte-verified). `checkimagedata` byte-verifies the 649-byte pool
+against the image; title and mission side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-17, cont.): the residual short strings placed at their VAs
+(new `src/standalone/origtail.cpp`).** Continuing the re-transcribe pass, the 22
+leftover short `.rdata` strings the folds/dead-sweep could not reach (they read
+via a folded literal now, or are under the 4-char sweep floor) are placed
+byte-identical at their VAs in a dedicated `origtail.cpp`: the CRT asctime
+weekday/month name tables, the wide `L"(null)"`, the `IsProcessorFeaturePresent`
+import name, the rterr `"\n\n"`/`"..."` punctuation, `fopen` mode and printf
+format strings, the `-nm`/`-sm`/`-bm`/`-df` command-line flags, the `ON`/`OFF`
+boolean words, and the `its`/`3do`/`sml` movie type strings. Each ADDR_ macro is
+redirected to its placed pool (which sits at the same VA, so every reader --
+folded literal or numeric `AM2_IMAGE` -- resolves to the same bytes); a folded
+macro among them is re-redirected by foldstr.h to its literal, harmless because
+the pool is still placed and byte-verified. Placement 277 -> 299 symbols;
+`checkimagedata` 294 -> 316 match; the carried blob's non-zero UNPLACED bytes
+fell **535 -> 381** (271 -> 237 runs). Deferred (need care, not in this batch):
+the writable tzname PST/PDT buffers (`__tzset` overwrites them, so non-const +
+full buffer size), the three `AM2_STR_`-prefixed slot/suffix labels
+(checkimagedata only scans `ADDR_`/`VTABLE_` redirects), and the ~346 bytes of
+binary FP/EH/pointer fragments. make check green; title + mission side-by-sides
+IDENTICAL.
+
+**UPDATE (2026-09-18): the CRT-head binary fragments placed (9 more pools in
+`origtail.cpp`).** The genuinely-carried non-zero binary bytes in the CRT/widget
+`.rdata` head are placed byte-identical: six floating-point constant slots
+(`230.0f`; `0.7`; the `-2.0`/`2.0`/`1/512` double triple; `32.0`; `100.0f`/
+`80.0f`; `-10.0f`/`0.5f`/`2.75f`) and three dead C++ EH catch-handler tables
+(`0x46FEE8`, `0x470238`, `0x4702A0` -- `0xffffffff` + `.text`-pointer triples,
+unreachable under `-fno-exceptions`). Placed as `uint8_t` byte pools so the value
+interpretation carries no risk; checkimagedata byte-verifies each. IMPORTANT
+safety note confirmed: the EH pads hold `.text` pointers, but `build/standalone/
+fixups.cpp`'s `am2_apply_fixups()` is empty and stays empty -- mkglobals' fixup
+scan runs on the (unchanged) origdata.bin, so a placed byte pool creates no
+load-time write into `const .rodata`. Note the region just past the rterr pool is
+dead-*swept* MSVC banner/import strings ("Microsoft Visual C++ Runtime
+Library...", "GetActiveWindow", "user32.dll"), already zeroed in the blob -- NOT
+placed. Placement 299 -> 308; checkimagedata 316 -> 325 match; blob non-zero
+UNPLACED **381 -> 304** (237 -> 215 runs). Skipped: `0x46FA98` (`double 1.5`,
+already has an `AM2_CONST_1_5` macro -- same prefix issue as the `AM2_STR_`
+labels). make check green; title + mission side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-18, cont.): the CRT exception-action tables placed
+(`am2_crt_xcpt_tables`).** The 136-byte block at `0x0048D2B0` (just before
+`am2_crt_rterr_table`) is the CRT's `_XcptActTab` -- the NTSTATUS->signal map
+(`0xC0000005` access-violation, `0xC000001D` illegal-instruction, `0xC0000096`
+privileged-instruction, `0xC000008D..93` the eight float exceptions), each with
+its signal -- followed by the four-entry FPE subcode table `{3,7,10,0x8C}`.
+Read-only CRT const (nothing in `src/` writes `0x48D2xx`), placed as a `uint8_t`
+byte pool. Placement 308 -> 309; checkimagedata 325 -> 326 match; blob non-zero
+UNPLACED **304 -> 270** (215 -> 209 runs). make check green; title + mission
+side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-18, cont.): four read-only game const tables placed.** Moving
+from the dead CRT `.rdata` into the game's own read-only lookup data (each sits
+between already-migrated const symbols, and the mission side-by-side exercises
+its code path -- the write-safety gate): `am2_air_bit_masks` (0x473F88, the
+air-path bit/shift masks `{32,16,8,4,2}`,`{-2,-4,-8,-16,-32}`, between the placed
+air-path scalars and `am2_air_frame_hotspots`); `am2_mp_pause_bits` (0x48C7A8,
+reusing `ADDR_MP_PAUSE_BITS_A`, the MP pause bit-mask A/B/C sets);
+`am2_map_field_tables` (0x485FFC, the map field descriptor count/index tables,
+between `am2_map_field_descs` and `am2_palette_cycle_seq`); `am2_spiral_path_const`
+(0x48784C, between `am2_spiral_dy` and `am2_path_max_nodes`). All placed as
+`uint8_t` byte pools; the mission side-by-side (map load + pathfinding + MP)
+running IDENTICAL confirms none is runtime-written. Placement 309 -> 313;
+checkimagedata 326 -> 330 match; blob non-zero UNPLACED **270 -> 174** (209 ->
+~150 runs). make check green; title + mission side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-18, cont.): rank thresholds + the WRITABLE tzname buffers.**
+`am2_rank_thresholds` (0x473DA0, ascending int thresholds {96,240,380,480,1000,
+3000} before `am2_rank_records`) placed const. The tzname STD/DST buffers
+(0x48D40C/0x48D44C) are the first RUNTIME-WRITTEN target: `__tzset` (time.cpp)
+overwrites them through `am2_crt_tzname`, so they are placed NON-const
+(`am2_tzname_std`/`am2_tzname_dst`), sized to the full 64-byte original buffers,
+with their "PST"/"PDT" init keeping them in `.data` (defined inside an
+`extern "C" {}` block so the initialized definition needs no `extern` storage
+class -- avoids the -Wextra warning). `am2_crt_tzname` still holds 0x48D40C/
+0x48D44C, so it points at the placed buffers and `__tzset`'s writes land in
+writable `.data`. The side-by-sides run `__tzset` at CRT startup, so their
+IDENTICAL result is the write-safety proof. Placement 313 -> 316; checkimagedata
+330 -> 333 match; blob non-zero UNPLACED **174 -> 157**. make check green; title +
+mission side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-18, cont.): the sprite metadata tables placed.** The sprite
+region turned out to be READ-ONLY source data, not the load-filled pointer graph
+that was feared -- the load-filled DESTINATION (`am2_sprite_groups`) is already
+placed, and what remained is the const dimension/index data the sprite/grid
+LOADERS read: `am2_sprite_group_b` (0x48CA08, the group-B dimension/count records
+read via `[esi+0x48CA08]`, reusing `ADDR_SPRITE_GROUPS_B_END`) and
+`am2_sprite_grid_data` (0x48CA44, 324B of grid dimension/index metadata between
+`am2_sprite_grid` and `am2_seq_grid_rows`). Placed const; the mission side-by-side
+(Boot Camp sprite load + render) running IDENTICAL is the proof they are
+read-only. Placement 316 -> 318; checkimagedata 333 -> 335 match; blob non-zero
+UNPLACED **157 -> 123**. make check green; title + mission side-by-sides
+IDENTICAL. Remaining ~123 B: `KEY_BINDINGS`, the CRT linked-list sentinel, the
+`AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_` prefix labels, and small scattered clusters.
+
+**UPDATE (2026-09-18, cont.): five small read-only const clusters placed.** Each
+sits between placed const symbols: `am2_roach_score_ints` (0x487C00),
+`am2_item_type_offsets` (0x48C470, {-10,-10,10,10}), `am2_difficulty_consts`
+(0x489874, 2.0/1.5), `am2_screen_consts` (0x4852E4, {750,100}, after
+`am2_view_speed`), `am2_crt_osver_pair` (0x48CC20, {0x9875,0x9873}). Placed const;
+mission side-by-side IDENTICAL. Placement 318 -> 323; checkimagedata 335 -> 340
+match; blob non-zero UNPLACED **123 -> 98**. make check green.
+
+**UPDATE (2026-09-18, cont.): the AM2_STR_/AM2_CONST_ prefix labels placed.**
+checkimagedata's `orig_addresses()` and `REDIRECT` scan now also recognise the
+older `AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_` macro names (regex `_MACRO_PREFIX`), so
+the residual bytes behind those labels can be redirected to placed
+origtail.cpp pools like any `ADDR_` macro. Placed (reusing each label's macro):
+`am2_str_computer_slot` (0x4873DC "-- Computer --"), `am2_str_open_slot`
+(0x4871A0 "-- Open --"), `am2_str_unique_suffix` (0x485D90 "%s_%d"), and
+`am2_dbl_1_5` (0x46FA98, the double 1.5). Placement 323 -> 327; checkimagedata
+340 -> 344 match; blob non-zero UNPLACED **98 -> 67**. make check green; title +
+mission side-by-sides IDENTICAL. Remaining ~67 B: dead CRT `.text`-handler
+tables at 0x48CC58/0x48CC78 (read-only), the folded BOOL display strings, the
+KEY_BINDINGS region, and small scattered singles.
+
+**UPDATE (2026-09-18, cont.): the dead CRT signal-handler tables + folded
+single-char strings placed.** `am2_crt_sig_handlers_a/b` (0x48CC58/0x48CC78, the
+CRT signal/exception default-handler pointer tables whose `.text` targets are
+0xCC `.origgap` in native, so unreached and unwritten), `am2_crt_pctype_alias`
+(0x48CC9C, a second pointer into the placed ctype table), and the three folded
+single-char strings `am2_str_newline`/`am2_str_glob_all`/`am2_str_line_break`.
+Placement 327 -> 333; checkimagedata 344 -> 350 match; blob non-zero UNPLACED
+**67 -> 33**. make check green; side-by-sides IDENTICAL. NOTE (per Boran): the
+CRT-owned pools now scattered through `origtail.cpp` are to be relocated into
+`src/platform/crt/` in a follow-up so the CRT is an extractable, reusable module
+(code + data) and `origtail.cpp` keeps only game data.
+
+**UPDATE (2026-09-18, cont.): down to 3 non-zero UNPLACED bytes.** Ten more
+small const clusters placed: the key-binding default action ids (0x4854E6, the
+const table right after the writable bindings end), the orphaned WriteDot
+flag/data, the bool display strings (0x47795C -- one pool restoring the
+dead-swept "False"/"false", so the dead sweep drops 962->960 / 49,156->49,144
+bytes), the HUD build-menu end data, the dead MSVC EH magic `0x19930520`, a
+palette-cycle value, a debug-blast value, the sequence variant stride, and a CRT
+const 1. Placement 333 -> 343; checkimagedata 350 -> 360 match; blob non-zero
+UNPLACED **33 -> 3**. The only bytes left are the LOGPALETTE header at 0x477E68
+(`palVersion=0x300, palNumEntries=1`) -- deferred as possibly GDI-written. make
+check green; title + mission side-by-sides IDENTICAL.
+
+**MILESTONE (2026-09-18): the carried blob is ZERO -- 0 non-zero UNPLACED
+bytes.** Two fixes finished it: `am2_write_dot_data` was split (its "FOO" is
+dead-swept in the blob, so a pure-data pool cannot span it -- checkplacement
+compares placed pure-data against `origdata.bin`, not the pristine image; now
+only the float `am2_write_dot_float` and the "." `am2_str_dot` are placed, the
+swept "FOO" stays a zero chunk), the bool pool was extended to 40 bytes to
+include "True"'s "T", and the small LOGPALETTE header at 0x477E68 (distinct from
+the 1028-byte `am2_logpalette` at 0x477A60; only the 4-byte header fits before
+`am2_gdi_palette`) was placed read-only. Every non-zero byte of
+`build/standalone/origdata.bin` is now a placed, named C symbol (345 in range);
+`checkimagedata` 362 match / 0 FAIL, `checkplacement` clean, title (click-509)
+and mission (grenade-live-16065) side-by-sides IDENTICAL. Guarded dead-string
+count now **960 dead ranges / 49,144 bytes** (the bool pool moved "False"/"false"
+from swept-zero to placed). The port no longer carries any un-named non-zero
+`.rdata`/`.data` byte -- the "drop origdata" goal is functionally met.
+FOLLOW-UP (per Boran): relocate the CRT-owned pools out of `origtail.cpp` into
+`src/platform/crt/` so the CRT is an extractable, reusable module, leaving
+`origtail.cpp` game-only.
+
+**UPDATE (2026-09-18): CRT / game data separated.** The residual `.rdata`/`.data`
+pools are now split by owner: the 23 CRT-owned symbols (date/asctime name tables,
+wide `"(null)"`, fopen mode strings, codepage names, the exception-action and
+signal-default-handler tables, the dead C++ EH records, `IsProcessorFeaturePresent`,
+and the writable tzname buffers) moved to a new `src/platform/crt/crtdata.cpp`
+(auto-globbed into `SA_SRC` alongside the CRT code), while `src/standalone/
+origtail.cpp` keeps only the 45 game-owned pools (command-line flags, boolean/
+movie display strings, widget FP constants, the air/MP/map/sprite/rank/roach
+tables, MP slot labels). Pure relocation of definitions between files -- macros,
+externs and standalone.h redirects are unchanged, and `find_definition` locates a
+symbol wherever it lives -- so it is byte-identical: blob still 0, checkimagedata
+362 match, both side-by-sides IDENTICAL, make check green. The CRT reconstruction
+(`src/platform/crt/`) is now code + data together, extractable for reuse.
+
+**MILESTONE (2026-09-18): the native port BUILDS WITHOUT `ArmyMen2.exe`.** With
+the blob at zero, the image is no longer needed to build -- only to regenerate
+and to run `make check`'s byte-verification. Two changes:
+- `tools/placement.py` emits the region's gaps as **zero-fill** (`.space`)
+  instead of `.incbin` of the dumped blob, so the native build carries no
+  `origdata.bin`. It still verifies (when the blob IS present) that every gap is
+  all-zero -- a non-zero gap errors, which keeps the zero-fill honest as new data
+  appears. The VA placement pins are unchanged (kept for the side-by-side).
+- The EXE-derived generated SOURCE is now COMMITTED under `src/`, like
+  `origstate.cpp`: `src/standalone/imports.cpp` (the import table),
+  `src/standalone/tables.cpp` (data the original kept in .text),
+  `src/standalone/fixups.cpp` (now a trivial empty hook -- every fixup is a
+  placed table), `src/standalone/origgap.S` (the 0xCC `.text` fill), and
+  `src/inject/foldstr.h` (the folded string literals). `mkglobals`/`foldstrings`
+  write these paths; `am2.exe_present()` makes those tools and `deadstrings` skip
+  regeneration when the image is absent (leaving the committed files), and
+  `origbss.addr` is hardcoded `0x0048E000` in the Makefile.
+
+VERIFIED: with `ArmyMen2.exe` moved aside, `make clean && make native-dev` builds
+`build/armymen2-dev` (rc 0); restoring the image, that same binary's title
+(click-509) and mission (grenade-live-16065) side-by-sides are IDENTICAL. The
+image is still needed for the injected/Wine (`sa`/hybrid) builds and for
+`make check`. Still open (the other half of independence): the reconstruction is
+piecewise, so `.origgap` (0xCC) remains where functions are unreconstructed -- a
+reachable one traps; closing those is the ongoing reconstruction.
+
+**FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
+`LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
+single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
+image palette5.bmp..palette0.bmp sit sixteen bytes apart with palette0 highest.
+The string-fold rewrote the base to a `.rodata` literal, `"palette0.bmp" -
+i*16`, which is pointer arithmetic off the front of one C literal: i=0 gave
+palette0.bmp, i=1..5 read whatever the linker placed before it (garbage), so
+five of the six palette files never loaded. Invisible on Boot Camp (the whole
+function is gated on ADDR_TILESET_RESERVE, zero there); on a cycling map
+(campaign.txt's `cycling? = true` -- homeland/level 2, tankstore, mania, ...)
+CyclePalette steps `which = 0,1,2,3,4,5,4,3,2,1` through the six slots, so the
+water/fire shimmer was correct on step 0 and wrong on the other five -- the
+"palette shifts for water" divergence. Fixed by spelling the six names as an
+array in load order (correct AND blob-free). Found via sidebyside: both games
+loaded `sarge/map2_mission1` byte-identically through the load; the mechanism
+was confirmed by compiling both expressions (i=1..5 broken vs. the array). NB
+the live water frame still can't be watched through loadgame -- the separate,
+open DrawSelection SIGFPE on campaign-save render (below) exits the port on
+mission entry. This was the ONLY literal-arithmetic fold bug; a src sweep for
+`"literal" +/- ` and `"literal"[` found no others in game code.
+
+## DONE (2026-09-11): the .bss working memory is a named C struct
+
+The whole 1,887 KB .bss zero region (0x0048E000..0x00666000) is now
+`src/game/origstate.cpp`'s `am2_origstate` -- one C struct, 677 members named
+from orig.h (each `uint8_t[...]` sized to the next symbol, so every member
+lands at its EXACT original VA), placed in `.origbss` at 0x0048E000. It
+REPLACES the anonymous `.space` mkglobals used to emit (mkglobals no longer
+emits it; origstate.cpp is committed, generated once). Because members are at
+matching VAs, the reconstruction's `ADDR_` macros still resolve and stored
+.data pointers into .bss stay valid -- so no macro redirects, zero
+address-mismatch risk. The struct is zero at load, byte-identical to the
+original's .bss. Cost: the section is PROGBITS now (nobits is C-impossible at a
+fixed section -- measured), so the native binary grows ~1.9 MB (accepted).
+`tools/checkimagedata.py` verifies every member's struct offset equals its VA
+and the struct spans the whole range (mutation-tested: a wrong size drifts a
+later member and fails). uint8_t members are 1-aligned, so no compiler padding
+shifts the layout. flat-module count 34 -> 35.
+
+WHAT THIS DOES NOT DO: drop the placement. `.origbss` (now the struct) and
+`.origdat` are still linked at their VAs. Dropping placement additionally needs
+the .data-init state relocated -- its initial VALUES plus the ~1,443 .data->.data
+and .data->.bss stored pointers (the graph), which is the harder remaining
+piece. Typed per-member structs (player/timer/packet records, etc.) can now
+replace the `uint8_t[]` members incrementally, since the layout is pinned.
+
+TYPING HAS A COMPILE-TIME SAFETY NET, and it is started. origstate.cpp now
+carries a `static_assert(offsetof(AM2_OrigState, member) == VA - base)` for
+every one of the 676 members plus the total `sizeof`, so replacing a
+`uint8_t[N]` with a real `struct[cnt]` that is not EXACTLY N bytes drifts the
+next offset and fails the build (mutation-tested: a spurious field in AM2_Timer
+fails on `event_table`/`timer_table_id_end`). checkimagedata verifies the
+asserts are honest (one per .bss VA, right total). ~41 members typed so far: the record structs `depth_nodes` (AM2_DepthNode[500]),
+`timer_table` (AM2_Timer[1000]), `pad_numbers` (AM2_PadNumber[256]), `pads`
+(AM2_Pad[512]), `player_records` (AM2_PlayerRecord[6], stride 0x7E0 with the two
+int32[120] rings at 0x420/0x600 and the own/want/made-at/is-host fields named),
+`packet_records` (AM2_PacketRecord[400], stride 0x28, real 0x400-buffer pointer
+at +0x20), `rowpool_b_entries` (AM2_RowPoolEntry[100], stride 12), `sound_slots`
+(AM2_SoundSlot[56], stride 0x10, DirectSound-buffer pointer as void*),
+`sight_block_by_dir` (AM2_SightDir[64], stride 16, low/mid/high + two stamps) --
+defined locally in origstate.cpp so the flat file stays free of game-header
+dependencies -- plus ten POINTER arrays now real pointers rather than byte
+blobs: `menu_sprites` (void*[190]), the aim/air/mp-panel sprite arrays
+(void*[6/9/20/11/5/13]), and the uint8_t* tables `remap_shades`[4],
+`variation_table`[64], `tile_reveal_grids`[4] (sprite arrays are void* because
+the flat file names no COM type)
+-- plus the array members orig.h already types and whose span is EXACTLY the
+array (auto-typed where count*elemsize == span, so no trailing unnamed bytes are
+absorbed): the aim buffers, key_repeat_at/key_pressed[256], system_palette/
+tileset_palettes (PALETTEENTRY as uint32), tile_line_buf[50000], army_points,
+game_over_saved/source, variation_blocks[64][256], path_nodes[65536][16], and
+more. The other ~625 members stay uint8_t[] (correct, just opaque) until their
+layout is worth reading; each can be typed the same way, the offsetof asserts
+refusing any wrong size. NOT every record has a clean stride: `vehicle_mask`
+(191.97 records of 0xA4 -- a 192nd would overrun `vehicle_anims`) and the A row
+pool (split across the mis-named `spawn_kind_table_end` neighbour) are left
+opaque rather than forced into a wrong record count.
+
+## SCOPE (2026-09-11): what relocating the runtime STATE would take
+
+The const-structure migration is done; dropping the blob's placement now needs
+the STATE relocated, and that is a DIFFERENT, larger, graph-shaped problem.
+Measured:
+
+- **.bss working memory: 1,887 KB, 676 named globals (603 the reconstruction
+  reads).** Path nodes alone are 1 MB; region/tile buffers, pad/timer/player/
+  packet tables, dirty/depth lists make up the rest. Zero-initialised, so no
+  stored pointers live in it.
+- **.data-init state**: ~133 referenced non-migrated globals (scalars/tables
+  with initial VALUES, some holding pointers).
+- **3,582 stored data pointers in the carried .rdata/.data** (410 -> .text
+  reconstructed = fixups; 1,568 -> CRT/.text; 1,443 -> .data; 2,139 -> .bss).
+  Per mkglobals, a pointer cannot be told from a non-pointer by value
+  (0x00606060 is the ASCII "```"), so these overcount -- any dword in .bss's
+  1.9 MB value-range looks like a .bss pointer.
+
+WHY IT IS NOT INCREMENTAL LIKE THE CONSTS. A stored .data pointer into a .bss
+buffer only resolves because .bss is placed at the same VA; move the buffer to
+C and the (un-relocatable) .data pointer still holds the old address. So a
+connected component must move together, targets before the pointers that name
+them. The good news: of the 603 referenced .bss globals, **586 are LEAF** (no
+stored pointer targets them) and only **17 are graph-locked** -- most working
+memory can move individually.
+
+TWO MORE FACTS THAT SHAPE IT:
+- **Only native/standalone can drop the placement.** The hybrid runs the
+  original .text, which addresses this state at its fixed VAs, so the blob
+  stays placed there regardless.
+- **State cannot be byte-verified the way consts were.** checkimagedata checks
+  a fixed value; a mutable global has none. Verification is RUNTIME -- the
+  native-with-state-in-C against the hybrid must stay frame-exact
+  (tools/lockstep.sh, samission.sh). So each batch costs an A/B, not a static
+  check.
+
+PHASES, IF PURSUED:
+  1. 586 leaf .bss globals -> C zero-storage (redirect the macro; watch for
+     cross-global indexing -- CLAUDE.md's overlap scars live here). Runtime
+     A/B per batch.
+  2. .data-init state-with-initial-values -> C with initializers.
+  3. The graph core: 17 graph-locked .bss globals + the .data pointer tables,
+     migrated leaf-first so each pointer becomes a C `&symbol`; the false-
+     positive pointers must be read individually (the ambiguity mkglobals
+     documents).
+  4. CRT data (1,568 .text pointers + CRT tables) -- src/platform/crt's remit,
+     not the game layer.
+  5. Only when a whole component is C does it leave the blob; the file drops
+     for native when nothing native reads is left there.
+
+RECOMMENDATION: the placement is harmless and the reconstruction is already
+C-based for all const data, so this is optional cleanup with real risk and
+runtime-only verification. If pursued, Phase 1 is the tractable, valuable part;
+the graph core (Phase 3) is where it gets expensive and may not be worth it.
+
+## TOOLING (2026-09-08): frame-exact Lua injection
+
+`tools/sidebyside.py` gained an **inject file** (`<out>/inject`): a line
+written to it is sent to BOTH lockstepped games as an action for the SAME pump.
+A `lua <code>` line runs through the new `am2_host_lua` hook in
+`am2_replay_apply` -- on the game thread, at the pump boundary, before that
+pump's frame is produced -- so a give/poke lands identically on both and they
+stay frame-exact, replacing the earlier "skip the next N frames" hack (the skip
+file remains for other transients). The dev runtimes install the hook after
+`control_start()` (native `runtime.cpp`, hybrid `loader.cpp`); the retail build
+links sdl.cpp but not the console, so the hook is null and the verb just logs.
+The same chunk resolves `CheatLine` in either build: `sym("CheatLine")` native,
+raw `0x00417B80` hybrid (`sym` returns 0 there; 0 is truthy in Lua, so test
+`==0`). Injected lines are recorded to the run's `input.txt`, so replays
+reproduce the give. See docs/lua.md.
+
+## OPEN DIVERGENCES, newest first
+
+- **CONFIRMED FIXED (2026-09-20): the in-game PAUSE menu (DlgGameMenu) showed
+  the focus highlight on the wrong item -- LOAD GAME instead of RETURN TO GAME --
+  when the menu opened with the cursor over an item. ROOT: DlgGameMenuConstruct
+  (widget.cpp:5386, orig 0x00452AA0) had an EXTRA `w->focusedChild = btn;`
+  before the default-focus call that the original does not have.** The original
+  does `WidgetAddChild(dialog, btn)` (0x00452b63) then calls the button's focus
+  slot `WidgetTakeFocus(btn, 0)` (0x00452b6e) with focusedChild still unset, so
+  WidgetTakeFocus takes its `!had` arm -- which sets focusedChild to firstChild
+  (== btn) AND runs its `PollInput()`/`LatchKeyState()`. That re-poll drains the
+  frame's mouse motion and clears g_mouseMoved to 0, so the SAME-frame
+  ButtonUpdate does NOT re-focus the hovered button and the default sticks.
+  Pre-assigning focusedChild = btn made WidgetTakeFocus early-return on `had == w`
+  and SKIP that PollInput, leaving g_mouseMoved set -- so ButtonUpdate re-focused
+  whatever item the cursor was over as the menu opened. Fix: delete the extra
+  line, leaving only the focus-slot call as in the original.
+  HOW FOUND: proved it was a real deterministic bug (not a live-`--video`
+  artifact) by replaying the recorded session in NON-video lockstep -- traps at
+  pump 8269, box 267,138-376,228. Read the two held games via lua (g_paintObject
+  0x0065A058 -> +0x34 focusedChild): byte-identical heap and cursor, only
+  focusedChild differed. Instrumented ButtonUpdate/DlgGameMenuConstruct on the
+  port (AM2_MENULOG) -> saw CONSTRUCT then a same-frame FOCUS(LOAD GAME) with
+  moved=1; the disasm of DlgGameMenuConstruct showed the original never writes
+  focusedChild before the focus call. Repro: sessions/menu-diff-session-input.txt.
+  VERIFIED: `tools/sidebyside.py --replay sessions/menu-diff-session-input.txt`
+  now runs with ZERO traps (both present 112,318 identical frames; old trap was
+  pump 8269).
+
+- **NOTE (2026-09-19): the "small pixel divergences" seen during live
+  `--video` play (17-px swapped-pair sprite edges, ~1000-px animating-sprite
+  blobs) are LIVE-MODE ARTIFACTS, not port bugs.** In `--video` the leader takes
+  real SDL input and presents in real time while the follower runs one pump
+  behind on lockstep replay, so any animating sprite differs by one frame and the
+  object state is byte-identical (verified: 761 objects, all fields match). Proof:
+  replaying the exact recorded session in NON-video mode (both games on the same
+  replay path) traps ONLY on the menu bug above -- none of the small diffs
+  reproduce. So exact side-by-side is for deterministic replays; live `--video`
+  is inherently noisy on animating content and is not a divergence source.
+
+- **CONFIRMED FIXED (2026-09-19): the tankstore bridge divergence -- the enemy
+  destroyed the train bridge (mission failure) on the hybrid but NOT the port.
+  ROOT: `RunScriptAction` (event.cpp, ADDR_RUN_SCRIPT_ACTION 0x00420410) case
+  0x36 (fireweapon) had DROPPED the point-target branch.** Both `FIREWEAPON` and
+  `UNITFIRE` parse to code 0x36/0x37 (script.cpp:2439) and the point-vs-object
+  choice is made at RUNTIME: the original's 0x36 arm branches on
+  `xvar>0 || relative!=0 || (word)pos.x!=0` -- a POINT calls FireWeaponAtPoint
+  (0x004200F0, original point arm at 0x004211fa), else the fall-through calls
+  FireWeaponAtObject (0x004201A0, at 0x004211b8). The reconstruction kept only
+  the object fall-through and turned the point case into a bare `return`, so a
+  point-target `FIREWEAPON ... (x,y)` NEVER fired on the native port -- the
+  classic dropped-branch pitfall (nothing static caught it: the function still
+  compiled, installed, and passed every fixture, none of which fires a
+  point-weapon). The bridge event `IF PADON Bridge1 AFTER PADOFF Bridge1 TESTVAR
+  BRIDEXPSET = 0 THEN FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` therefore ran
+  its condition identically on both builds but its FIREWEAPON action was a no-op
+  on the port, so the explosive charge (object 200003f3) was never created and
+  the bridge (8000043a/b) kept hp100. Fix: restore the point arm --
+  `FireWeaponAtPoint(ResolveUid(subject,0), ResolveUid(army,owner), n0,
+  ActionPoint(act,owner))` -- transcribed from the disasm (weapon & unit resolve
+  the same as the object arm; only the last arg differs, ActionPoint vs
+  ResolveUid(target,owner)).
+  HOW FOUND (2026-09-19): instrumented the reconstructed `EvtCondition`/AFTER
+  arm and `FireWeaponAtPoint` (env-gated, temporary), ran the port ALONE through
+  the replay with `AM2_LOCKSTEP=1 AM2_REPLAY=...` (self-clocked; the replay is
+  applied only inside the lockstep branch, sdl.cpp:1230) -- every AFTER condition
+  reached AFTER-RUN but FireWeaponAtPoint was called ZERO times, which pointed
+  straight at the dispatcher. Disassembling 0x00420410 showed two fire calls
+  (0x4211eb object, 0x42122a point); the recon had one.
+  VERIFIED: `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt
+  --break 5289,5300,5400` now BREAKs (not TRAPs) at the old trap pump 5289 and
+  runs clean past 5300/5400; a free 600s lockstep run reached ~207k frames with
+  zero TRAP. After the fix the port fires `FireWeaponAtPoint unit=200003ee
+  at=(1017,1065)` (= BRIDSAB1) exactly as the hybrid.
+  This CORRECTS the earlier long trail here (now removed): it was NOT an AI/spawn
+  divergence, NOT a pad-occupancy bug, and NOT the AFTER/TESTVAR condition -- the
+  condition fired identically; only the action's point branch was missing. (The
+  hybrid runs ORIGINAL code at 0x004xxxxx; the native port runs RECONSTRUCTED
+  code, so a dropped reconstruction branch diverges from the hybrid even though
+  the identical source compiles into both the injected build's patches and the
+  port.)
+
+- **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
+  divergence cluster is closed -- re-running the fixtures on a fresh build
+  (native-dev vs hybrid-dev, `tools/sidebyside.py --leader a --replay`) plays
+  each frame-exact far past its old trap pump.** The 09-10 RoachBehaviour
+  nesting + tail fixes and the 09-10 BuildMapObjects-on-load guard resolved all
+  of them; this is the "should be re-run to confirm" the 09-10 entries asked
+  for. Results (317-item campaign map on each real fixture, no `left at pump`):
+  - bazookaroach-8583 -- identical through pump 32922 (old trap 8583).
+  - roachheap-1575 -- identical through pump 44611, 317 items (old trap 1575,
+    both the heap-desync and the sight divergence gone).
+  - roachattack-1391 -- identical through pump 25519, 317 items (old trap
+    1391/1456).
+  So the FIELD_540/FIELD_530 "roach sees a different observer from identical
+  inputs" family (8583, 1575, 1112, 1391) no longer reproduces. The individual
+  09-10 OPEN entries below are kept as the record of how each was cornered.
+
+- **FIXED (2026-09-19, eb14298d): the port drew no infinite-ammo indicator --
+  found live playing a campaign mission side by side.** The far-right HUD strip
+  is the weapon AMMO display; for infinite ammo (n > 99) HudEdgePaint draws
+  AM2_HUD_STR_AMMO_OVER = "**" (two stars, DrawTextVertical), reading it via
+  AM2_IMAGE(AM2_HUD_STR_AMMO_OVER). The port left the slot blank (background
+  colour 24,60,33) -- box 632,423-634,437, first seen at a --video trap frame
+  4445 (the tool mis-flags the symmetric 3x4 glyphs as "swapped horizontal
+  pairs"). ROOT: its sibling AM2_HUD_STR_AMMO_FMT ("%02d") was in foldstrings'
+  FOLD_MACROS but AMMO_OVER was omitted, so it stayed a raw blob read at
+  0x476FA4 -- a zero-filled gap between placed symbols (am2_cheat_words ..
+  am2_fog_of_war) in the native build -> empty string. Proven at the held trap:
+  peekstr(0x476FA4) = "" on the port, "**" on the oracle; poking "**" restored
+  it. Fixed by adding AM2_HUD_STR_AMMO_OVER to FOLD_MACROS; the native binary
+  now carries the "**" literal.
+
+- **REVERTED for now (2026-09-19): the SDL relative-mouse grab (6ef718ce) made
+  native mouse control feel sluggish; restored the prior absolute-mouse behavior
+  (revert c9a9a1bc).** In relative mode the grabbed-path deltas were run through
+  `SDL_ConvertEventToRenderCoordinates`, which scales window-space xrel/yrel by
+  the render scale -- so on a window larger than the 640x480 render (the common
+  live case) the deltas shrink and the pointer crawls. The old path maps the
+  ABSOLUTE host position to logical coords (`am2_mouse_to_logical` ->
+  `am2_mouse_moved`) with a Ctrl+Alt soft-grab toggle, so it tracks the physical
+  pointer 1:1 regardless of window scale. To redo relative mode properly later:
+  feed the RAW device delta (don't scale by render coords), or scale by the
+  inverse of the render scale, so sensitivity is window-size-independent.
+
+- **WHOLE FIXTURE SUITE GREEN (2026-09-19): every recorded reproducible fixture
+  now plays frame-exact with no trap and no divergence.** Beyond the roach
+  cluster and magnifying glass, a sweep of the rest all PASS far past their old
+  trap pumps (native-dev vs hybrid-dev, `--leader a --replay`, no `left at
+  pump`): bazookamissile-1772 (to 10380), jeepfire-2276 (12713), jeepMV-2393
+  (12550), board-3355 (16165), halftrack-3552 (16208), level2pass-4325 (18331,
+  the L1->L2 transition, 317 items), vehmove2-6591 (21910), vehmove-11373
+  (29017), htmine-26439 (42261). So there is currently **no reproducible frame
+  divergence and no reachable `.origgap` trap in any recorded fixture** -- the
+  09-10 OPEN list is fully closed. The only non-passing entry is roachbite-1112,
+  whose FIXTURE is stale (empty "default" mission; needs re-recording, above).
+  The remaining reconstruction frontier is therefore code paths NO current
+  fixture exercises (other campaign levels, MP, cold branches) -- found by extending coverage, not by the existing
+  replays. (The roach has-leader block 0x004086FF..0x004089B6 that was listed
+  here is reconstructed as of 2026-09-30; see below.)
+
+- **CONFIRMED FIXED (2026-09-19): the magnifying-glass 4-px refraction residual
+  (DrawEffectLayer, old trap magnifyingglass-7655) no longer reproduces.**
+  Re-run identical through pump 52474 (317-item map, aim exercised, "Saved 317
+  items"), far past the old frame-8414 trap -- no `left at pump`. Closed
+  alongside the roach cluster on the same fresh build; kept here as the last
+  reproducible OPEN entry from the 09-10 batch, now green.
+  **roachbite-1112 is a SEPARATE, non-reconstruction problem: its fixture is
+  stale.** Replaying it now (both hybrid AND port, so not a port bug) navigates
+  the menus to an empty "default" mission -- `load_default.bmp`, "Failed to open
+  Object.aai", "Loaded 0 items" -- and exits at pump 255 before any roach. The
+  recorded from-menu clicks no longer select campaign level 1 (kitchen) on this
+  checkout; it needs re-recording against the current menu/save state, not a
+  code fix. (The port itself is healthy: tests/replays/bootcamp.txt is identical
+  through frame 627.)
+
+- **FIXED (2026-09-16): the 09-15 pause-cursor fix diverged from the oracle from
+  the briefing transition on -- bootcamp side-by-side trapped at pump 104 -- and
+  the real bug was the PLATFORM's stretch rounding, fixed there for both builds.**
+  Found
+  re-running `tools/sidebyside.py --replay tests/replays/bootcamp.txt` (exact)
+  after the blob transcriptions: frame 91 differs by 40 pixels in the cursor's
+  rect, and the difference GROWS each tick (50 at frame 92, >60 by 95). NOT the
+  transcriptions: the release port built 09-15 19:24, before all of them, traps
+  at the same pump with the same frame hashes. At the trap every piece of state
+  compared on the two live games is identical -- cursor (306,143), animation
+  frame/next-tick, the cursor sprite pointer and its decoded pixels, the save
+  slot rect {0,0,32,32}, g_savedRect {306,143,318,159}. What differs is the
+  SAVE SLOT'S CONTENT: the hybrid's holds a 12->32 up-stretch (the original's
+  save blt at 0x00413172 stretches the cursor rect INTO the whole 32x32 slot,
+  and its restore at 0x004130D4 stretches the whole slot back), the port's holds
+  the 09-15 fix's 1:1 copy. The hybrid's up-stretched row decodes to the true
+  row shifted right by one: its backbuffer already carried the residue of the
+  previous tick's lossy round trip, and on a screen that does not repaint each
+  tick (the briefing; the pause menu) that residue accumulates -- which IS the
+  "smear". am2_stretch's rounding was calibrated against Wine to reproduce
+  exactly that residue (118 pixels of a Boot Camp dialog frame), so the hybrid
+  here is the original's behaviour, and the 09-15 fix removed a genuine quirk of
+  the original from the port -- or so it read. Boran's call: the smear is not
+  the game's, it is OURS, and the fix belongs in the platform, for the hybrid
+  too. Simulating am2_stretch's arithmetic confirmed it: the accumulated,
+  truncated 16.16 step it copied from wined3d makes 12 -> 32 -> 12 land every
+  column past the first ONE PIXEL LEFT ([0,0,1,...,10]) -- exactly the frame's
+  uniform shift -- while sampling pixel centres makes both the 12<->32 and
+  16<->32 round trips the identity. So: am2_stretch now samples centres (the
+  increment starts at half a step), which fixes the round trip for the hybrid
+  and the port alike, and DrawMenuCursor makes the original's whole-slot save
+  (0x00413172) and restore (0x004130D4) calls again -- the 1:1 sub-rect was a
+  game-side workaround for a platform bug. docs/lockstep.md's note that the
+  platform "steps wined3d's truncated increment" is corrected. A stock-under-
+  Wine check on Xvfb was attempted first but was inconclusive (Wine's DirectDraw
+  presents nothing capturable without GL, and the old rounding was Wine's own
+  anyway). Verified: `tools/sidebyside.py --replay tests/replays/bootcamp.txt`,
+  exact, is IDENTICAL through presented frame 627 -- the whole replay, title to
+  mission to both dialogs to the walk -- where it trapped at frame 91 before.
+
+- **FIXED (2026-09-15): the pause-menu cursor smeared the frozen background as
+  it moved -- a garbled trail that only cleared on a full repaint (moving the
+  host pointer out of the window and back set ADDR_OVERLAY_DIRTY via
+  WM_ACTIVATEAPP). DrawMenuCursor's save-under (0x00412FE0) copies the pixels
+  under the cursor into ADDR_MENU_SAVE_SLOT and restores them next tick. The
+  slot is a fixed 32x32 corner of the menu surface, but the menu cursor is
+  12x16, and the reconstruction passed the WHOLE slot rect as the save's
+  destination and the restore's source -- so both blts went through am2_stretch
+  (12x16 <-> 32x32), a lossy nearest-neighbour round trip that scrambled the
+  background every frame. On the title screen the whole frame repaints each tick
+  so it never showed (which is why the 0-pixel title A/B passed); on the pause
+  menu's frozen mission it accumulated. Fixed by sizing the slot sub-rect to the
+  cursor so save and restore are 1:1 copies (surface.cpp). Reproduced and
+  confirmed clean on the live native build (bootcamp -> ESC -> sweep the cursor
+  over the stone wall). make check green.**
+
+- **FIXED (2026-09-15): mouse grab did not hold the pointer like the other
+  src/platform ports. It used SDL_SetWindowMouseGrab -- a soft confine that is
+  unreliable (worst on Wayland) -- as a Ctrl+Alt toggle. Reworked to SDL relative
+  mouse mode, matching ../TIM (reconstruct/sdl.c): grab on the first click in the
+  window (that click is the grab's, not the game's), Ctrl+Alt releases, and while
+  grabbed the device xrel/yrel are fed straight to the DirectInput accumulator
+  (the game already works in deltas). Cursor visibility is left to the game, so
+  relative mode's hide/restore no longer fights the game's own ShowCursor state
+  (fixing a latent double-cursor the old SDL_ShowCursor-on-release could leave). sdl.cpp; builds, boots, make check green.**
+
+- **FIXED (2026-09-11): AiTrooperStep dropped the 0x00404A90 "keep the current
+  route" check before the region hop, so a trooper walking a multi-waypoint A*
+  path re-derived its region link every frame and replanned into a direct move
+  when a line cleared -- shifting an off-screen enemy squad's minimap blips a
+  tile. Restored the check (PointsEqual(ROUTE_GOAL,pt) && MOVE_COUNT>0 &&
+  MOVE_AT<MOVE_COUNT-1 -> after_region). sessions/radartroop-2164 now frame-exact
+  (912 objects), level2pass and roachbite unregressed, make check green. The
+  long investigation below is kept as the record of how it was cornered -- every
+  other suspect (reveal grid, RNG, region graph/cache, cell weights, subpixel,
+  and each callee vs the disasm) was verified identical, which is what isolated
+  the one dropped branch.**
+
+- **[WAS OPEN] an off-screen enemy attack-squad diverges -- a trooper's
+  region-link waypoint is snapped one tile row off, so it takes a direct move
+  where the original still pathfinds.** Shows only on the RADAR: the unit's
+  reveal flag / blip position differs (box ~533,113, "swapped pairs"). Repro
+  sessions/radartroop-2164.txt (trap frame 2458); the same class hits early in
+  any campaign play with enemy troops. Chased in depth:
+  - The trap object is an army-1 aimode-6 trooper (0x3f8/0x3fa/0x404); its
+    position and OBJ_FLAG_REVEALED (0x800) diverge, so its blip lands elsewhere
+    on the port.
+  - First divergence pump 2153 (radartroop). A gdb watchpoint on OBJ_OFF_MOVE_COUNT
+    named the writer: BeginMoveTo (region.cpp:1595) sets MOVE_COUNT=2 (a direct
+    two-waypoint move) via AiTrooperStep <- AiPatrolStep. On the port BeginMoveTo
+    returns 1 (its straight tile-line is clear); on the hybrid it returns 0
+    (a tile is refused, so it keeps its 16-waypoint A* path).
+  - The divergence is the SECOND BeginMoveTo (AiTrooperStep region block,
+    line 3478), whose `to` is the region-link waypoint from line 3459's
+    NearestAllowedTile. That waypoint is (1624,2360) on the port and (1624,2376)
+    on the hybrid -- one tile row (16) off in Y.
+  - EVERYTHING feeding it is byte-identical at pump 2152/2153: pos, dest
+    (FIELD_C0), OBJ_OFF_REGION/PREV_REGION/STUCK_COUNT, and the region-path
+    cache (kRegionCost/kRegionNext row for from=41, stride 211, stamp 1). So
+    MiddleRegionLink -> kLinks[link].into -> NearestAllowedTile should be
+    deterministic, yet the port's pt.y is 16 less.
+  - NEXT: gdb both builds at AiTrooperStep's region block (line 3441-3460) for
+    this trooper at pump 2153 and diff the first differing intermediate -- the
+    link index, kLinks[link].into tile, or NearestAllowedTile's spiral result
+    (region.cpp:837, ADDR_SPIRAL_DX/DY order/leg logic). A trace helper note:
+    am2_host_pump_number() reads 0 inside region.cpp (weak-link quirk), so gate
+    region.cpp traces on object state, not the pump.
+  - Pre-existing and independent of today's three fixes; off-screen-only.
+  - **REFRAMED via gdb on both builds (2026-09-10): this is NOT a pathing bug --
+    it is downstream of the reveal grid / sight system.** The gdb walk: at pump
+    2153 the trooper's BeginMoveTo(dest) returns 1 (line clear -> two-waypoint
+    direct move, MOVE_UNTIL := CLOCK+0x1F4) on the port but 0 (blocked -> keep
+    the A* path) on the hybrid, from byte-identical pos/dest. The two functions
+    the trooper's AiTrooperStep uses -- NearestAllowedTile (region.cpp:837) and
+    MiddleRegionLink (484) -- plus TraceTileLine (map.cpp:619) and BeginMoveTo
+    (1595) were each diffed against the disasm and MATCH; the region graph
+    (kRegionOfCell md5), region cache (kRegionCost/kRegionNext), and cell
+    weights are all byte-identical. What BeginMoveTo's line-clear rule
+    (PointRuleDefault, region.cpp:388) also reads is ADDR_TILE_REVEAL_GRIDS
+    [army][tile] -- the DYNAMIC per-army reveal grid. So the same sight/reveal
+    divergence that flips the blip's OBJ_FLAG_REVEALED also flips one tile of
+    army 1's reveal grid on the trooper's straight line, which flips the
+    line-clear, which triggers the spurious direct move. Root is the sight
+    system (SightScan 0x00403B40 / ConsiderSighting / RevealObj and what writes
+    the reveal grid), i.e. the SAME open sight-family bug the roach residuals
+    below describe -- the trooper pathing and the radar blip are two symptoms of
+    it. NEXT: bisect when army 1's reveal grid first diverges (earlier than
+    2153; not visible in the object table) and read the sight/reveal writer.
+  - **CORRECTION (2026-09-10): the reveal-grid reframe above is WRONG.** A gdb
+    rule-loop walk on both builds showed the hybrid trooper's BeginMoveTo line
+    blocks at tile 35172, but that tile's reveal grid (0) AND cell weight (15)
+    are BYTE-IDENTICAL on both builds -- so PointRuleDefault gives the same
+    answer and the reveal grid is not the cause. A clean single-pump gdb stop at
+    the trooper's BeginMoveTo showed the destination `to` IDENTICAL (06c806c0)
+    but the trooper's POS already different (HYB 1491,2620 vs PRT 1507,2588).
+    So the divergence is UPSTREAM of BeginMoveTo -- the trooper's position/step
+    itself diverges around pump 2153 -- not the line-clear rule and not the
+    reveal grid. Also ruled out at 2153: RNG seed and game clock (identical),
+    region graph/cache, cell weights. ROOT STILL UNIDENTIFIED. The obstacle to a
+    clean isolation is that the two games DESYNC at pump 2153, so gdb
+    breakpoints on later calls land at different pumps; a definitive read needs
+    both games frozen at the SAME pump-2153 step (single hit, no continue) and
+    the trooper's step (AiTrooperStep <- AiPatrolStep <- AiStepDispatch) walked
+    instruction by instruction against the disasm to find the first differing
+    field write. Multiple army-1 troopers (0x3f8, 0x3fa) diverge at 2153 at
+    once, so the cause is a shared per-step global, not per-trooper.
+  - **FULL CAUSAL CHAIN traced by gdb watchpoints (2026-09-11), first
+    divergence pinned to pump 2151 with IDENTICAL trooper position.** Working
+    from the blip inward on trooper 0x3fa: (1) radar blip differs <- world pos
+    differs; (2) pos written by ObjMoveAlongFacing (item.cpp:10830, moves along
+    facing) <- UpdateTrooperAction (region.cpp:8577); (3) facing written at
+    region.cpp:8390 as `facing = w[4]`; (4) w[4] (the AI heading) written at
+    AiTrooperStep region.cpp:3531 `w[4] = AngleBetween(pos, pt)` <- AiPatrolStep
+    (4748) <- AiStepDispatch (6790) <- TrooperAiStep (6953) <- StepType2; (5)
+    pos identical, so the waypoint `pt` diverges; (6) pt = MOVE_FROM[MOVE_AT] --
+    the trooper's PATH, which diverged at pump 2151: the port replanned 0x3fa to
+    a 2-waypoint direct move (mcnt 15->2) while the hybrid kept its 15-waypoint
+    A* path, SAME goal (rgoal=c006c806); (7) that replan is BeginMoveTo(dest)
+    returning clear on the port and blocked on the hybrid at pump 2151, where
+    the trooper's pos, facing, subpixel (0x4c/0x50), region and prev-region are
+    ALL byte-identical. Also verified identical at 2151: RNG seed, game clock,
+    region graph/cache, cell weights; and for 0x3f8's blocking tile the reveal
+    grid + cell weight matched too. So the seed is BeginMoveTo's straight-line
+    clear-check flipping from identical trooper state -- either a nearby object
+    in its BlockWeightRoute chain (item.cpp:2999) that diverged even earlier (a
+    cascade among the squad), or a BlockWeightRoute chain-order/transcription
+    issue. NEXT: freeze both games at pump 2151's 0x3fa BeginMoveTo (single hit,
+    no continue) and diff the rule-loop tile list + each rule result, then the
+    BlockWeightRoute chain contents, to name the one tile/object that flips. The
+    gdb tile-loop reads keep fighting the post-2151 desync; a compiled
+    obj-gated trace in BeginMoveTo (pump gate is useless -- am2_host_pump_number
+    reads 0 in region.cpp) is the more reliable instrument.
+
+The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
+no forgiven pixel class -- and the first differing frame is the issue.
+Newest first: a divergence found while fixing another is fixed before
+returning to it. Each entry names its reproduction; an entry moves to
+FIXED below when that replay runs identical.
+
+- **FIXED (2026-09-10): entering campaign level 2 created a DUPLICATE Sarge --
+  PlaceScenario placed our army from the scenario even when a saved platoon
+  existed.** Found live under tools/sidebyside.py passing from level 1 to level 2
+  (trap frame 4310, ~4600 px; repro sessions/level2pass-4325.txt). The port had
+  907 objects against the hybrid's 905, two sarge=1 troopers against one: a
+  scenario leader at (1702,3500) beside the cof-loaded one left at (3425,1725).
+  The original PlaceScenario (0x0043DE16) skips creating OUR army from the
+  scenario when ADDR_HAVE_DEFAULT_COF is set -- those units come from
+  default.cof (LoadDefaultCof) -- recording only the leader's spawn point into
+  ADDR_LEADER_POS/FACING for the .cof form-up pass; the reconstruction placed
+  every row unconditionally. Invisible until a campaign transition because
+  default.cof does not ship and single levels leave HAVE_DEFAULT_COF at 0.
+  A leader-swap A/B ruled out a shared-save-file harness artifact (the port
+  over-created whether it led or followed); the heap trace named the extra
+  CreateTrooper and the disasm the missing guard. Also corrected the normal
+  path's g_defaultOwner test to compare the army, not the slot (0x0043DF1E).
+  Now frame-exact end to end, object tables byte-identical at 905.
+
+- **FIXED (2026-09-10): the roach turned toward a just-spotted target instead of
+  its route -- RoachBehaviour's far/dest-route arms wrongly called
+  CopyByteIfSet.** Found live (roachattack, trap pump 1443): identical object
+  table, RNG seed and sight context, but the port committed FIELD_540 heading
+  0x1d where the hybrid kept 0x95. The original jmps the far (RANGE>WANT) and
+  dest-route (DEST_DIST>12) arms straight to ConsiderSightingB (0x00408A42) and
+  never calls CopyByteIfSet; the reconstruction routed them through a shared
+  tail that did, so after the found-promote CopyByteIfSet
+  (`if (ctx[OBSERVER]) *out = ctx[BEARING]`) overwrote RoachRouteToward's route
+  heading with the found bearing. Rewrote RoachBehaviour to map all five arms
+  to 0x00408640 exactly and moved the FOLLOW_UID persist (0x00408A3C) to the
+  no-leader arm where the original has it. The live side-by-side now plays all
+  of campaign level 1 frame-exact through every roach interaction. The
+  has-leader block (0x004086FF..0x004089B6), a documented gap here until
+  2026-09-30, is now reconstructed: it is the AI line-of-sight test
+  (AM2_AI_SIGHT_TEST) with the leader as the target, then route-and-promote-
+  found when out of sight, route-and-promote-leader when in sight beyond
+  WANT_RANGE, else the old promote-leader commit. Still cold in every
+  fixture, so it is checked against the disassembly only. The older roach fixtures (bazookaroach-8583,
+  roachbite-1112, roachheap-1575) share this RoachBehaviour root and should be
+  re-run to confirm; the OPEN entries below predate this fix.
+
+- **FIXED (2026-09-10): a bazooka missile's terrain-crossing height clamp was
+  inverted, so it detonated a pixel off.** Found live (trap pump 1772, frame
+  1905, 143 px in box 50,197-65,212 -- the explosion; repro
+  sessions/bazookamissile-1772.txt). The missile (type 5, 0x58f) flew identically
+  to pump 1771; at 1772 the hybrid clamped MISSILE_OFF_HEIGHT (0x42) from 28 to
+  24 as it crossed from open onto blocked terrain, while the port left it 28, so
+  it detonated at x=1428 vs 1427 and spawned a different explosion set. StepType5
+  (item.cpp) clamps the height when crossing tiles: the original adjusts when
+  HEIGHT > want (`cmp; jle` past the block at 0x0043C54A; want = ground +
+  overhead), clamping the flight DOWN; the reconstruction had `if (HEIGHT <
+  want)`, the opposite sense, so it never lowered a too-high missile. Fixed the
+  comparison to `>`. The recording then replays frame-exact past 1772 (55,447+
+  frames, no differing frame). RNG/heap identical, so it was a pure StepType5
+  transcription bug.
+- **PARTLY FIXED (2026-09-10): a FROM-SAVE load desynced the heap by running
+  BuildMapObjects on the load** -- the port's LoadMap (map.cpp) called
+  BuildMapObjects unconditionally, but the original skips it on a load (after
+  BuildRespawnPool at 0x0042D0B2 it tests ADDR_LOAD_PENDING and `jne`s past the
+  build loop to the free-temp tail 0x0042D325), because the objects come from
+  the save (LoadItems). Rebuilding the map's objects on every load was ~1250
+  extra alloc/free ops that shifted every fixed-heap address. Fixed by guarding
+  the call `if (ADDR_LOAD_PENDING == 0)`, matching the camera guard just above
+  it. Verified: sessions/roachheap-1575.txt now has the heap ALIGNED (Sarge and
+  the roach at identical addresses on both builds), and a fresh-start replay
+  (tests/replays/bootcamp.txt) stays frame-exact -- so BuildMapObjects still
+  runs on a fresh start. What REMAINS at that trap is the roach heading
+  divergence itself, now proven INDEPENDENT of the heap (roach 0x400003ea still
+  pos 2452,1174 vs 2451,1169 with the heap aligned): it is the SAME sight-scan
+  bug as the 8583 entry below, so the fixture still traps at 1575 until that is
+  fixed.
+- **OPEN (2026-09-10): a FROM-MENU session desyncs the heap at mission load
+  (~pump 490), and a roaming roach then diverges downstream.** [SUPERSEDED by
+  the PARTLY FIXED entry above -- the heap desync was BuildMapObjects on load;
+  the roach divergence is the 8583 sight bug, independent of the heap.] Found live
+  (fresh `--video`, no replay; trap pump 1575, frame 1703; repro
+  sessions/roachheap-1575.txt). At the trap only roach 0x400003ea (type 8,
+  FULL health -- not hit) differs, pos (2452,1174) vs (2451,1169), and its
+  FIELD_540/facing diverge with RNG IDENTICAL -- the same heading mechanism as
+  the 8583 entry. BUT the cause here is different: EVERY object is at a
+  different heap address between builds (Sarge 0x3e8 at 0c650bdc vs 0c1d45ec),
+  so the heap is globally desynced and the roach's sight-scan iteration/tiebreak
+  order shifts. AM2_TRACE_HEAP diff (both builds, replay of the recording):
+  identical through op 1058, then at PUMP 490 the port makes ~1254 MORE
+  allocations (and ~1242 more frees) than the hybrid -- ~1250 extra alloc/free
+  pairs during the sprite/object load, spread across CreateItem (192B, item.cpp
+  :12249), BuildRowsFromDef (96B, maprow.cpp:1099), MakeRecordList
+  (objtype.cpp:264), LoadMaskPacked (misc.cpp:532), PreloadSprite/
+  SpriteLoadFromDataFile (64B, sprite.cpp) and ObjInitCommon. The named sprite
+  loads MATCH in count (alloc 3517 x1 both), so it is not an extra sprite --
+  it is a per-object/row temporary the reconstruction allocates-and-frees where
+  the original does not, which reorders the allocator's free list and shifts
+  every later address. The 8583 sight divergence did NOT show this because that
+  session began from a replay recorded AFTER the load, already aligned.
+  ROOTED (AM2_TRACE_HEAP op-sequence diff, sites via addr2line): both builds are
+  aligned through op 1058 (`alloc 268`, BuildRespawnPool). Then they FORK on the
+  order of the SPRITE-SET RELOAD versus BuildMapObjects, and this is a from-SAVE
+  load so it is in the save-load chain Boran flagged (docs/saveload.md). The
+  HYBRID, right after BuildRespawnPool, does the reload as a BLOCK -- 16x
+  free(NULL) over the sprite-set array (FreeSpriteSets, winmain.cpp:410) then a
+  batch of GrowSpriteList/LoadSpriteSet -- and THEN creates the map objects. The
+  PORT runs BuildMapObjects FIRST (op 1059+: PreloadSprite, SpriteLoadFromDataFile,
+  CreateItem, ObjInitCommon, BuildRowsFromDef, RowAlloc, per object) and does the
+  same free-16 + LoadSpriteSet reload block ~1600 allocations later (op 2674).
+  So the sprite buffers and the object/row blocks are allocated in OPPOSITE order
+  and every later address shifts. free(NULL) is a no-op and does not shift the
+  heap; the real reorder is the LoadSpriteSet batch vs the CreateItem/RowAlloc
+  run. Fix: reorder the port's save-load sequence so the sprite-set reload runs
+  before BuildMapObjects, matching the original -- but it sits beside the
+  deliberate LoadItems/ItemsReset deviation and the original's latent cell-grid
+  use-after-free, so place it by reading State2Enter's load chain against the
+  disasm rather than by moving a call blindly. Repro sessions/roachheap-1575.txt.
+- **OPEN (2026-09-10): a hit roach's heading diverges -- the port's roach
+  SightScan finds an observer the hybrid's does not, so it turns toward it.**
+  Found live under tools/sidebyside.py after firing a bazooka at a roach (trap
+  pump 8583, frame 8414; repro sessions/bazookaroach-8583.txt, replayed with
+  --tolerance 12 to pass the magnifying-glass 4-px residual first). At the trap
+  only roach 0x400003ec (type 8, army 2) differs: OBJ_OFF_FACING 23 vs 41,
+  OBJ_OFF_AI_POSE (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
+  all downstream of FIELD_540. RNG seed (0x2f0c6a4a), game clock and
+  ADDR_SIGHT_GENERATION (0x0e6c) are IDENTICAL, so it is deterministic, not an
+  RNG desync. NARROWED (gdb watchpoint on FIELD_540): RoachBehaviour
+  (region.cpp:9061) routes the roach to heading 237 on both, then its tail
+  `CopyByteIfSet(obj, &FIELD_540, ctx)` (region.cpp:9116, misc.cpp:61) overrides
+  it with `ctx[SIGHT_OFF_BEARING=0x18]` IFF `ctx[SIGHT_OFF_OBSERVER=0x10] != 0`.
+  On the port ctx.observer is set (roach sees a threat -> F540<-68); on the
+  hybrid it is 0 (sees nothing -> keeps 237). So the port's per-frame roach
+  SightScan (RoachBuildContext -> 0x00403B40) finds an observer the hybrid does
+  not. Same subsystem as the pump-2464 sight bug, a different instance and the
+  opposite direction (there the port UNDER-saw; here it OVER-sees). Next: catch
+  the roach's SightScan on both -- which object it accepts as the observer, and
+  why AiCanSee / the directional cache answers differently for the roach's
+  bearing -- the method that fixed 2464.
+- **OPEN (2026-09-10): the magnifying glass's aim marker has a 4-px 2x2
+  refraction residual (box 476,32-477,33) after the aim-cursor fix below.**
+  With UNIT_OFF_FIRE_X now identical, `DrawEffectLayer` (0x004123D0,
+  mapdraw.cpp:2421) draws the marker in the right place, but its 112x112
+  refraction block -- which reads displaced offscreen pixels through
+  `g_framebuffer[sy*g_pitch + sx]` (ADDR_AIM_DISPLACE_MAP at 0x00478CDC, in
+  .data and carried) and writes them back -- differs at one 2x2 cell: hybrid
+  (66,69,66) vs port (123,121,123). It is the ONLY differing block in the
+  frame. DrawEffectLayer is cold (no drive reached a pointer-mode aim weapon
+  before this), so its refraction has never been A/B'd; the 4 px are a
+  distinct issue from the .text-gap read fixed below, only now reachable.
+  Repro sessions/magnifyingglass-7655.txt (traps at pump 7655, now 4 px).
+  Next: catch the refraction mid-draw (g_pitch and the source sx,sy are 0
+  post-frame, set only under Lock) -- break in DrawEffectLayer's read loop on
+  both builds and compare the offscreen source pixel and g_pitch for the 2x2
+  cell.
+- **OPEN (2026-09-10): a roach's BITE-state transition diverges -- hybrid bites
+  Sarge, port still approaches.** Live repro sessions/roachbite-1112.txt (trap
+  pump 1112, frame 1238, 1274 px box 218,193-312,268). Object tables, RNG and
+  all positions identical; roach 0x400003ef's OBJ_OFF_TROOP_STATE is 4 (biting) on
+  the hybrid and 2 (approaching) on the port, with OBJ_OFF_DEADLINE_58 and the
+  bite fields (0x54c-0x55d, 0xc4) set only on the hybrid -- so the sprite is the
+  bite animation vs the walk. FOURTH manifestation of one recurring roach bug,
+  all in RoachBehaviour/RoachStepTailA and all deterministic from identical
+  state: 8583 and 1575 diverge on FIELD_540 (heading / which observer it faces),
+  1391 on FIELD_44 (speed 0, move refused), 1112 on FIELD_530 (arrived->bite vs
+  approach). Common root is the roach's sight/distance decision in RoachBehaviour
+  answering differently from byte-identical inputs -- so the fix is one dig into
+  RoachBuildContext->SightScan (0x00403B40) / the AiCanSee cache the roach reads,
+  not four separate ones. Recommend chasing it as a dedicated RoachBehaviour
+  investigation rather than per-manifestation.
+- **PARTLY FIXED (2026-09-10): RoachBehaviour flattened a nested branch, so a
+  roach with 0 < RANGE <= WANT wrongly ran the "arrived" path.** The input ctx
+  was byte-identical yet FIELD_540 diverged (63 vs 95) -- a transcription error
+  in the branch structure, not SightScan. The original nests it: `if (RANGE>0)
+  { if (RANGE>WANT) far; goto tail; } else { if (DEST_DIST>12) route; else
+  arrived; }` (0x00408654 tests RANGE>0 first and jumps the whole DEST/arrived
+  arm to 0x0040868D; 0x00408658 tests far inside it). The reconstruction had it
+  flat -- `if (RANGE>0 && RANGE>WANT) far; if (DEST_DIST>REACHED) route; else
+  arrived` -- so a positive range within WANT fell through to arrived and
+  overwrote BEARING with the leader's. Restored the nesting. roachbite-1112 now
+  runs frame-exact 1116 -> 24150 (a fresh, unrelated trap there). STILL OPEN:
+  other roaches in the same recordings diverge later -- roachattack-1391 now
+  traps at 1456 on a DIFFERENT roach (0x3ea, roaming, pos off by 2,-26),
+  roachheap-1575 still at 1575 -- likely more of the same roach subsystem or
+  the pump-2464 directional-cache class; chase them next. With the tail
+  restored the roach now bites on both builds, and roachbite-1112 advances to a
+  trap at 1116. NARROWED: the roach is byte-identical through pump 1114
+  (position, subpixel, facing, FIELD_540, state 4, deadline) and at 1115 its
+  FIELD_540 diverges 63(hyb)/95(prt) -- CopyByteIfSet writes FIELD_540 =
+  ctx[SIGHT_OFF_BEARING], and that bearing is 100 vs 95 despite identical roach
+  and Sarge positions. So the roach's SightScan (RoachBuildContext ->
+  0x00403B40) answers a different bearing/observer from identical inputs -- the
+  same directional-sight subsystem as the pump-2464 bug (AddSightBlocker /
+  ADDR_SIGHT_BLOCK_BY_DIR / AiCanSee), a residual instance the target-acquisition
+  fix now exposes. Repro sessions/roachbite-1112.txt (traps 1116). Next: catch
+  the roach's SightScan on both at 1115, compare what it finds and the
+  directional cache it reads for the bearing. This SUPERSEDES the earlier
+  "move-refusal" framing: the move refusal (speed 0) was downstream of this
+  heading divergence, not a separate RoachMaskWeight bug.
+- **SUPERSEDED (see above): a roach attacking Sarge diverges by 1 px -- the port
+  REFUSES a move step the original takes.** Live repro sessions/roachattack-1391.txt
+  (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
+  identical; only roach 0x400003ef differs, pos (2108,762) vs (2109,761), and
+  its OBJ_OFF_SPEED (speed) is 130 on the hybrid but 0 on the port -- same
+  facing (63), same OBJ_OFF_AI_POSE (63), same subpixel and pos through pump
+  1390. So this is NOT the heading/CopyByteIfSet path of the 8583 entry; it is
+  the SPEED path. RoachStepTailA (0x0043D750, item.cpp) refuses the step when
+  `RoachMaskWeight(obj, next, landing, 1) >= RoachMaskWeight(obj, cur, pos, 0)`
+  (the landing is no better than here) -> speed 0. The port refuses at 1391, the
+  hybrid does not. Since pos/facing/subpixel match going in, the divergence is
+  in RoachMaskWeight (cell weights / footprint mask) or in the ctrl record
+  RoachBehaviour hands RoachStepTailA (ROACHSTEP_OFF_STATE/FACING/FLAG18). Next:
+  catch RoachStepTailA on both at 1391 and compare `here`, `next`, `at` and the
+  two RoachMaskWeight results -- if those inputs match, the weight table
+  diverged; if not, it is the RoachBehaviour ctrl (same subsystem as 8583).
+  MAY share a root with the 8583/1575 roach entries.
+- **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
+  on a button -- one-pump hover-focus lag, ~1336 px over the button column
+  (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
+  (trap pump 11034, frame 10850; repro `sessions/pausefocus-11034.txt`
+  = the run's recorded input.txt). At the trap: same dialog (308328080), same firstChild
+  (308327952), same cursor (289,265, inside the ABORT rect 245,250,397,275) --
+  the ONLY difference is `focusedChild` (dialog +0x34): the hybrid keeps it on
+  the construct default (RETURN, the first child) while the port has moved it to
+  the hovered button (ABORT). The highlight sprite follows `focusedChild`
+  (ButtonPaint), so ABORT lights on the port and RETURN on the hybrid.
+
+  Mechanism: `ButtonUpdate` (device.cpp path) takes hover-focus with
+  `if (orig_mouse_moved) FOCUS(w,1)` when the cursor is in its rect -- faithful.
+  So the port's `orig_mouse_moved` (ADDR_MOUSE_MOVED 0x00485494) was 1 at the
+  open pump where the hybrid's was 0: the cursor was STATIONARY over ABORT on
+  the 2nd open, so the original leaves focus at the default, but the port stole
+  it. NOT persistent -- resuming and letting the cursor move (317,255) took BOTH
+  to focusedChild=308334384 (ABORT), so the frames re-converge; it is a
+  one-pump LEAD of the port's mouse-moved flag at the pause-menu open. The two
+  run DIFFERENT `PollMouse` (port = our device.cpp reconstruction with the
+  `input_take_events`/`input_pump` path; hybrid = the original), both reading
+  the platform DI buffer, so the suspect is a one-pump timing difference in when
+  `g_mouseMoved` is set/cleared relative to the dialog-open pump (ESC-release
+  edge) between the two.
+
+  To root-cause (needs a headless replay, so do it when no live run is up, to
+  avoid rebuilding under one): replay sessions/pausefocus-11034.txt under
+  `tools/lockstep.sh` with a per-pump trace of `g_mouseMoved`, the dialog
+  pointer at 0x0065A058 and its +0x34, and the ESC key edge, on both builds;
+  find the first pump where the port sets mouseMoved and the hybrid does not.
+
+- **OPEN (2026-09-08): the flamethrower's flame trail renders one animation
+  frame off while firing, ~80 px, box near the plume.** Found hand-playing the
+  flamethrower under `tools/sidebyside.py`; trapped twice (pumps 3587, 3014).
+  Only ONE object differs -- the newest def-3 flame-trail segment -- and only
+  its VZ: port -64.0, hybrid 0.0, which makes the port's segment FALL (height
+  28->27), shifting its sprite rect a pixel. Every end-of-pump field on Sarge,
+  his SIGHTCOUT, and the object tables are byte-identical.
+
+  ROOT-CAUSED (2026-09-08) to a SUB-PUMP ORDERING of a height-settling value,
+  via `sessions/flamevz-32208.txt` replayed step-locked under sidebyside (the
+  headless file-replay under lockstep.sh does NOT reproduce it -- see the note
+  below). `CreateMissile`'s a6 = `spot.ground` (item.cpp:13156) and it computes
+  `VZ = (spot.ground - height) << 1` with height=28. TrooperFire's no-target
+  arm (the flamethrower's) sets `spot.ground = *(int16 *)(SIGHTCOUT + 0x18)` =
+  `obj + 0x594`. That one address is BOTH `SIGHTCOUT_OFF_YADJ`
+  (SIGHT_OUT_T2 0x57C + 0x18) and `UNIT_OFF_FIRE_Z` -- the sight-resolve
+  (`ConsiderSightingC`, which writes the OBSERVED object's `OBJ_OFF_ROW0_Y_ADJUST`
+  there) and the fire share it. Traced with a FLAMEZ line (region.cpp
+  TrooperFire + a hybrid TrooperFire trampoline, both now reverted): on the
+  PORT every fire read `ground=28` EXCEPT the last (the trap pump), which read
+  `-4`; `ground == sightYadj` on the port on every fire, so it is always the
+  no-target arm. At the trap BOTH read `-4` (targetUid=0, hit=0, fireZ=-4,
+  fireX=3670 -- byte-identical), so obj+0x594 transitions 28 -> -4 DURING pump
+  32208 and the port's TrooperFire reads it AFTER the write while the hybrid
+  reads it BEFORE: port a6=-4 (VZ=-64), hybrid a6=28 (VZ=0). So it is not a
+  read-site or branch bug -- it is the observed object's row0y settling by one
+  pump, the same CLASS as the flame /200 and item-height divergences, feeding
+  the aim-ground read.
+
+  On aligning traces: `ADDR_GAME_CLOCK_MS` IS identical on both builds when
+  they are genuinely in sync -- step-locked under sidebyside it read 44032 at
+  pump 3000 and 159982 at pump 10000 on BOTH. (An earlier note here claimed it
+  diverged even step-locked; that was a mis-sample -- the FLAMEZ clocks that
+  looked different, 157k vs 176k, were fire events from LATE in the run, after
+  the pause-focus divergence at 11034 had been skipped past, so the two builds
+  had been allowed to drift. Not same-pump readings.) The clock resets to 0 at
+  level load and only accumulates during gameplay frames, so clk/pump < the
+  16.67 ms pump step is expected. Still align traces by PUMP, since clk resets
+  and, once any divergence is tolerated, drifts.
+
+  NEXT: find which object's `OBJ_OFF_ROW0_Y_ADJUST` transitions 28 -> -4 at
+  pump 32208 (the observer the sight cone picks up) and why the two builds
+  settle it a pump apart -- then the fix is the same shape as the other
+  height-settling fixes. Repro: replay `sessions/flamevz-32208.txt` step-locked
+  under `tools/sidebyside.py --replay` (skip past the pause-focus trap at 11034
+  with `echo 150 > <out>/skip`); it traps at the flame at pump 32208. Give the
+  flamethrower live with `"village people"` (case 12, keeps the rifle) or
+  `phoenix!` (case 9, swaps it out but is equipped and fires at once).
+
+FIXED by this rule so far, each with the replay that reproduces it:
+- **FIXED (2026-09-10): RoachBehaviour dropped two statements of its shared
+  tail, so a roach never kept a target -- the root behind all four roach
+  divergences (8583/1575 heading, 1391 speed, 1112 bite).** The original tail
+  (0x00408A27..0x00408A45) runs three things on every path; only the first was
+  reconstructed. Added the other two: (2) `if (ctx.OBSERVER) OBJ_OFF_FOLLOW_UID
+  = OBSERVER->uid` -- persist the sighted target so it re-acquires next frame
+  (0x00408A3C); (3) `ConsiderSightingB(obj, out, ctx)` -- commit the sighting,
+  which is what writes the BITE state FIELD_530=4 (0x00408A45). Without them the
+  port's roach always had SIGHT_OFF_LEADER 0 in its ctx (took RoachBehaviour's
+  no-leader branch) and never bit. Verified: the port now acquires FOLLOW_UID
+  0x3e8 at pump 1000 like the hybrid; make check green; tests/replays/bootcamp
+  frame-exact (no regression to fresh starts). Fixtures sessions/roachbite-1112,
+  roachattack-1391, roachheap-1575, roachbite-... reproduce the family. A
+  SEPARATE residual remains (see the roach move-refusal OPEN below): with the
+  target now kept, roachbite advances 1112->1116 where the roach's move step
+  still diverges by ~2 px -- the RoachStepTailA / RoachMaskWeight speed path of
+  the 1391 entry, next to chase.
+THE SQUAD PANEL'S NAME GUARD WAS INVERTED, so a green trooper carrying a custom
+scripted name (e.g. "wildblood") showed a RANDOM soldier-table name in the HUD
+SQUAD detail instead of the scripted one -- the original drew "Wildblood", the
+port "D. DuBois" (found live under tools/sidebyside.py, trap pump 4479 / frame
+4397, 161 green pixels in the HUD box 556,275-603,282; repro
+scratchpad/live-4479.txt). HudSquadDetail (0x00416340) tries the scripted name
+from ADDR_SCRIPT_NAMES first: at 0x004166FE it does `strncmp(name,"green",5)`
+and `je` to the SoldierNameOf path -- so it uses the scripted name when it does
+NOT begin "green" (a "green..." id is internal and is skipped for a personal
+name). The reconstruction (widget.cpp HudSquadDetail) had the sense inverted
+(`== 0`), so it used the scripted name ONLY when it began "green" and hid every
+custom name behind a random one from ADDR_SOLDIER_NAMES. Everything readable was
+identical -- selection (unit 0x3ea on both), cursor, hover, view origin, RNG
+seed, the soldier-name "taken" table (empty on both), and the scripted-name
+index itself (obj+0x0C = 26 -> "wildblood" on both) -- which is what pointed at
+the DISPLAY guard rather than any state: same inputs, different rendered name.
+Fixed by inverting the guard to `!= 0`. The recording then replays frame-exact
+past 4479 (50,980+ frames, no differing frame). Invisible to every A/B: the
+squad detail is only drawn when a unit is selected in a live mission, which no
+scripted drive does, and the object tables it dumps do not include the rendered
+name.
+ADDSIGHTBLOCKER DROPPED THE ONE-TILE DISTANCE PAD IN THE BAND WRITE, so every
+directional sight-cache band the port wrote was 16 units (one tile) short, and a
+green trooper's `AiCanSee` therefore read out-of-sight where the original read
+in-sight -- the pump-2464 green-trooper divergence (repro the combat run's
+recorded input.txt, `/tmp/sbs/input.txt`; trap was frame 2158 on 0x3ee, a type-2
+army-0 aimode-1 trooper whose AiGuardStep set OBJ_OFF_BY_TYPE_C0 on the port and 0
+on the original). The original `AddSightBlocker` (0x004036F0) computes the
+silhouette distance `dist = max(ApproxDistXY(near), ApproxDistXY(far))` and then
+does `add esi,0x10` ONCE (at 0x004038AD), so both the sight-range check AND the
+LOW/MID/HIGH band stores read `dist + 16` (AM2_SIGHT_DIST_PAD). The
+reconstruction (air.cpp) added the pad only in the range check and wrote the
+UNPADDED `dist` into the bands, leaving every band exactly one tile short. NAMED
+BY A GDB CAPTURE ON THE ALIGNED HEAP: at gen 565 both builds' viewer roach
+(0x400003ec) and blocker (0x800004fb) were byte-identical (box, pos, facing 70,
+heights 32/32) yet the port wrote 167 to record 23's HIGH where the hybrid wrote
+183 -- exactly 16 apart at every diverging record and pump (167/183, 148/164,
+208/224), which a geometry difference could not produce but a missing constant
+does. The hybrid's AddSightBlocker frame at the record-23 store showed
+`esi=0xb7=183` right after `add esi,0x10`. Fixed by folding the pad into `dist`
+once, so the range check and the bands both read the padded value, matching the
+single `add esi,0x10`. The combat replay then runs frame-exact from 2464 to the
+END of the recording (94,139 frames, no differing frame; sight cache
+byte-identical at gen 565 after the fix). Invisible to every A/B and every prior
+replay -- no drive reached a sighting through a moving blocker in combat, which
+only became reachable once the AI-dispatch fix below carried the replay past
+1460.
+A TROOPER'S AIMODE-6 DISPATCH RAN SARGE'S ARM, so an enemy soldier that should
+attack (kneel and fire) never dropped into the firing pose -- the "missing
+missile" (trap pump 1304 on 0x3ef, then 1460 on 0x3ed once the heap was aligned;
+repro the combat run's recorded input.txt). The original has TWO AI dispatchers,
+SargeAiStep (0x00407020) and TrooperAiStep (0x004062B0), each with its own
+AI_MODE jump table (0x0040716C and 0x0040643C). Diffed byte for byte the two
+tables agree on every arm but AI_MODE 6: Sarge's calls AiEngageStep (0x00406B30),
+a trooper's goes through the thunk 0x00405D10 to AiPatrolStep (0x004057D0). The
+reconstruction had merged both into one AiStepDispatch that always took
+AiEngageStep. AiPatrolStep copies OBJ_OFF_SCRIPT_STATE (0xb4) into
+OBJ_OFF_SCRIPT_ID (0xb0) -- the AI saved-point -- at its head and carries its own
+engage path; AiEngageStep never touches 0xb0. So an aimode-6 enemy trooper lost
+that save at spawn and then made a different pose/facing decision. NAMED BY A GDB
+WATCHPOINT, which the aligned heap made possible: the object's address is now
+stable, so `watch *(unsigned int*)<obj+0xb0>` in the hybrid stopped on the write
+at 0x004057F1, inside AiPatrolStep, reached from TrooperAiStep's AI_MODE-6 arm --
+which the reconstruction was not calling. Fixed by giving AiStepDispatch a `sarge`
+flag: case 6 is AiEngageStep for Sarge and AiPatrolStep for a trooper, matching
+the two original tables. The combat replay then runs frame-exact from 1460 to a
+new trap at 2464 (a separate green-trooper divergence, now OPEN above). The whole
+chase is the deterministic-paradox pattern taken to its end: identical object
+tables, identical heap (after the teardown fixes), identical RNG and clock, and
+the single differing byte (0xb0) named its writer once a watchpoint could reach
+it. Invisible to every A/B and to the earlier replays -- no drive reaches an
+aimode-6 enemy trooper.
+THE MISSION-SECTION TEARDOWN LEFT THE FIXED HEAP MISALIGNED, because three
+reconstructed teardown functions dropped frees, so every allocation after the
+teardown landed at a shifted address. Found hand-playing Boot Camp's combat
+section under `tools/sidebyside.py` and diffing `AM2_TRACE_HEAP` logs: the two
+games' heaps were byte-identical up to the section change (pump 398/580 in the
+recordings), then the port ran fewer/reordered frees. Three drops, each a
+disassembly-confirmed omission: `SeqCtxFree` (0x00460E30) freed each record's
+row but not the records ARRAY itself, and skipped the five header clears and
+the per-record NEXT/PREV = -1 resets; `FreeMapLayers` (0x0042D3D0) dropped the
+`TILE_REVEAL_GRIDS[4]` free loop between TILE_FLAGS and TILE_COVER; and the same
+function dropped its whole TAIL (0x0042D550..0x0042D571) -- `ItemsReset`, both
+`MapDescFree`s, `FreeAaiTables`, `FreeSpriteRegistry` -- which deferred those
+frees to the next load and so ran them in a different ORDER, the point the trace
+showed the port in FreeAnimTable where the original was still inside ItemsReset.
+All five tail functions are idempotent (each guards its pointer and clears it),
+so running them at teardown as well as at load is safe. With the three fixed the
+heap is byte-identical across the builds through the whole combat sequence
+(every object at pump 1459 sits at the SAME address, where before the delta was
+~0x1470), and `make check` plus five committed replays (board, halftrack,
+jeepfire, mineplace, rallyfollow) run frame-exact. NOTE: this did NOT clear the
+combat trap it was found chasing -- see the OPEN combat entry; with the heap
+aligned that divergence is isolated to a trooper's OBJ_OFF_SCRIPT_ID (0xb0)
+dropped at spawn, which is a separate AI bug rather than a pointer tie-break.
+A FOLLOWER VEHICLE'S FACING DRIFTED because Step3ChooseFacing never reset its
+AI facing-search counter on the give-up exits (trap pump 6591, frame 5934;
+repro `sessions/vehmove2-6591.txt`; hand-played ordering multiple vehicles to
+move, exposed only once the formation fix above let a follower actually reach
+its slot and cluster). Every comparable input was byte-identical -- the full
+object (0x00..0x600), its row structure, the RNG seed, the view/cursor globals,
+the frame delta -- yet OBJ_OFF_FACE_TO (`o+0x574`, a PERSISTENT search
+counter) read 3 on the port and 0 on the original, which fed Step3NextCandidate
+a different facing and cascaded to a 4,495-pixel divergence. A hybrid
+trampoline over VehicleBlockWeight showed the block weights and the CALL COUNT
+identical on both -- same search work -- so the port was not searching more, it
+was failing to RESET. Step3ChooseFacing (0x0045C8D0) has one reset block at
+0x0045CA85 (`mov [esi+0x570],ebx; mov [esi+0x574],ebx` with ebx==0) that FOUR
+exits jump to: the three early returns (MP, player-driven, record-satisfied)
+and the past-the-interval arm's "current heading is clear" exit (0x0045CA05).
+The reconstruction had written all four as a plain `return`, so 0x574
+accumulated across frames on the port where the original zeroed it. Fixed by
+resetting 0x570 and 0x574 to 0 on those four exits; the short-interval arm's
+clear exit and the search-loop exits return WITHOUT the reset, as the image
+has them. Replay then runs identical (no trap past frame 5934). Invisible to
+every A/B: both drivable missions start with a squad of one, so nothing places
+a follower to cluster. (Found the hard way with rebuild+trampoline traces; a
+gdb watchpoint on 0x574 in the hybrid would have named 0x0045CA85 in one step.)
+A FOLLOWER VEHICLE ORDERED INTO A GROUP MOVE STOOD ON ITS LEADER instead of in
+its formation slot (trap pump 11373, frame 11243; repro
+`sessions/vehmove-11373.txt`; hand-played selecting two vehicles and ordering
+them to a point). Everything was byte-identical through pump 11350; on the
+order pump the follower 0x3f4 was attached to leader 0x3f6 (FOLLOW_UID and
+aimode 3 set correctly on both), but the original wrote its destination
+OBJ_OFF_BY_TYPE_C0 to a FORMATION point (1227,2707), 128 west of the leader,
+while the port left C0 at the leader's raw position -- so the port read as
+arrived (out state 1) where the original kept routing to the slot (out state
+4). AiBuildContext (0x00407D70), the vehicle AI context builder, had been
+reconstructed to copy the leader's raw position into SIGHT_OFF_DEST
+UNCONDITIONALLY, on a note that only its twin TrooperBuildContext resolves a
+formation point. The disassembly at 0x00407DE6 shows otherwise: it resolves a
+formation point too -- `ResolveFormationPoint(obj, leader, &DEST)` when the
+leader is an allied type 2/3/8, the raw position only otherwise -- and the one
+real difference from the twin is ObjsAreAllied's third argument, 0 here against
+the twin's 1. The follower's mode-3 step AiStepFollow copies SIGHT_OFF_DEST
+into C0, so the dropped branch put the slot at the leader's feet. Fixed by
+giving AiBuildContext the same conditional the twin has. Found by a live
+side-by-side trace of the original's ResolveFormationPoint: on the order pump
+it fired once -- foll=0x3f4 lead=0x3f6 out=1227,2707 -- from caller 0x407e11 =
+AiBuildContext+0xA1, a call the port did not make. Replay then runs identical
+(no trap past 11243). Invisible to every A/B: both drivable missions start with
+a squad of ONE, so no scripted drive ever places a follower (tools/blindspots
+and formationcheck already say the whole follow layer is cold here).
+A NON-SARGE UNIT ORDERED ONTO A VEHICLE BOARDED ONE PUMP LATE on the port (trap
+pump 3355, frame 3197; repro `sessions/board-3355.txt`; hand-played sending a
+second soldier to a jeep the first had already entered). Every measurable input
+was byte-identical the pump before the board -- the soldier's 1536-byte record,
+its row structure, the RNG seed, the game clock and the frame delta all agreed
+on both sides at pump 3354 -- yet the original boarded at pump 3355 and the port
+did not until 3356. That ruled out drifting state and pointed at a missing code
+path. A live side-by-side trace of the ORIGINAL's `EnterVehicle` caller (a
+trampoline detour in the hybrid, logging `__builtin_return_address(0)`) settled
+it: the first soldier boarded from `UpdateTrooperAction` (0x44b36f) on BOTH
+builds, but the second boarded from **`TrooperAiStep`+0x77 (0x406327)** in the
+original -- a call the port did not have. `TrooperAiStep` (0x004062B0) has a
+BOARD arm between the hit-react (`AiHitReact`) and the AI-mode dispatch: if the
+sight context's claimed vehicle (`SIGHTC_OFF_VEHICLE`, 0x2C) is within
+`AM2_BOARD_NEAR` (0x40 = 64) at `SIGHTC_OFF_VEHICLE_DIST` (0x30), it calls
+`EnterVehicle(obj, veh)` and RETURNS, skipping the dispatch and the 0x540 tail.
+`SargeAiStep` (0x00407020) has no such arm -- its react is followed straight by
+the dispatch. The reconstruction had factored react+dispatch into one shared
+helper (`AiStepReactAndDispatch`) on the belief the middle was identical "to the
+instruction"; it is not, and the fold dropped the trooper's board -- so a
+non-Sarge unit boarded only later, through `UpdateTrooperAction`'s tighter
+blocked-by-rect path (stepPoint must enter the vehicle's hit rect), one pump
+behind the original's distance-64 board. Fixed by splitting the helper into
+`AiStepReact` (returns whether the kind-7 shortcut skips the dispatch) and
+`AiStepDispatch`; `SargeAiStep` keeps the react-then-dispatch wrapper,
+`TrooperAiStep` inserts the board between them. Replay then runs identical (no
+trap past 3197, 104k+ frames). Invisible to every A/B: no scripted drive boards
+a vehicle, and after boarding the rider is off-map, so the one divergent frame
+self-heals on screen.
+A HALF-TRACK KILLED IN A MINEFIELD WAS NEVER MARKED DESTROYED on the port (trap
+pump 26439, frame 26162; repro `sessions/htmine-26439.txt`; hand-played driving
+a half-track into mines). Tables identical but for the vehicle's flags -- port
+0x820, hybrid 0x824, bit 0x4 = OBJ_FLAG_DESTROYED. Pinned it: at pump 26435
+both read 0x820 with the half-track already dead (health 0), so the hybrid SETS
+0x4 during the death sequence and the port never does. OBJ_FLAG_DESTROYED is
+set in exactly ONE place in the image -- `DestroyObjCommon` (0x00429399,
+`or ebx,4`) -- reached through DestroyByType. StepType3's dead-vehicle path
+dispatches on the vehicle kind through a jump table (0x0045D74C -> 0x0045D954)
+and EVERY arm ends in DestroyByType: kinds 0-3 and the default share a
+LeaveRemainsRow + DestroyByType tail (0x0045D777), kind 5 destroys with no
+remains (0x0045D7AE). The reconstruction had played the kind's death sound and
+`break`-ed, calling DestroyByType only in the default arm -- so a dead vehicle
+of kind 0/1/2/3/5 was never destroyed. This one CASCADES rather than staying
+cosmetic: DamageObject early-returns on `flags & DESTROYED`, so without it the
+port keeps re-damaging the dead wreck as more mines go off. Fixed by giving
+every arm the destroy tail. The replay then runs identical (no trap past 26162,
+27k+ frames). Invisible to every A/B: no scripted drive kills a vehicle, so the
+whole dead-vehicle dispatch is cold -- found by tracing the single DESTROYED
+setter back through its callers once the flag was the only thing left differing.
+A HALF-TRACK UNDER A MOVE ORDER SWUNG ITS AIMED GUN BACK TO THE HULL on the
+port where the hybrid kept it pointed (trap pump 3552, frame 3319; 153 px, box
+218,222-233,255 -- the mounted gun's barrel angle; repro
+`sessions/halftrack-3552.txt`; hand-played driving a half-track). Object tables
+identical; the divergence was the turret facing (o+0x530: port 0xf9, hybrid
+0x08) and behind it the turret target r[1] (o+0x579: port 0xb1 == the hull
+target r[0], hybrid 0x08 independent). `Step3RouteAndBoard` (0x0045D4B0)
+branches on o+0x10C into two mutually-exclusive paths: with a route in progress
+(o+0x10C != 0) it runs AiRouteToward and ONLY an arrival check, jumping to the
+tail if not arrived (0x45d4d9); the heading/turret block -- `*r=a; r+8=4;
+if (o+0x548==0) r[1]=r[0]` and the tolerance ladder -- runs ONLY when
+o+0x10C == 0 (0x45d51a). The reconstruction had folded them into one
+`if arrived / else`, so the `r[1]=r[0]` (turret tracks hull) ran DURING a route
+too, dragging the manually-aimed gun back onto the hull. Split the branch to
+match; the replay then runs identical (no trap past 3319, 20k+ frames). Only a
+multi-part vehicle (a turret) under a move order shows it, and the turret
+facing is not in any object dump -- found by reading o+0x530/r[1] over the
+sockets after the tables came back clean.
+BOARDING A JEEP AUTO-FIRED ITS MOUNTED GUN on the port where the hybrid never
+fired (trap pump 2276, frame 2100; 1 px at first, then a stream of missiles;
+repro `sessions/jeepfire-2276.txt`; hand-played boarding a jeep with the fire
+button held). The only object difference was an extra type-5 (missile) on the
+port -- 0x3f7, then 0x3f8..0x3fc as it kept firing. Traced by tracing object
+registration (AddToItemList) to its type, then FireWeapon: the port's
+Step3Drive fired the jeep's weapon (r+4 == 1) every cooldown while the hybrid's
+did not. Every readable input matched -- weapon uid, WEAPON_FN_SLOT3, cooldown,
+mouse button/changed, menu row 3, MOUSE_GRAB -1, boarding state -- so the
+divergence was the ONE unreadable local, `steered`. Step3Input's mouse-fire
+gate is `if (row != 1 && steered != 1) return`, and `steered` is set by the
+four steering KEYS only (0x0045C1B8/C227/C257/C285); the mouse block does not
+touch it (the sole `[esp+0x18]` reference in the block is the read at
+0x0045C581). The reconstruction had a spurious `steered = 1` at the end of the
+mouse block, so with the fire button held the mouse-fire path fired at HUD row
+3 with no steering key down. Removed it; the replay then runs identical (no
+trap past 2100, 20k+ frames). Invisible to every A/B: no scripted drive boards
+a weaponised vehicle and holds fire, and `steered` is a stack local no dump can
+show -- it was found only by eliminating every global the gate reads.
+THE SQUAD PANEL'S "MV" READ 4 FOR THE JEEP where the hybrid read 5 (trap pump
+2393, frame 2333; ~23 px, box 576,311-580,318; repro `sessions/jeepMV-2393.txt`;
+hand-played boarding a jeep). This corrects the per-kind speed-table fix below
+(the truck MV): that fix read the table's base as esp+0x58 == the init level's
++0x28, and the jeep (VEHICLE_OFF_KIND 0) exposed that the base is actually
++0x2c. Both offsets give the convoy truck (kind 3) the value 4 -- +0x34 holds
+a real 4, +0x38 an uninitialised slot that is a stable 4 in play -- so the
+truck stayed frame-exact and hid the off-by-one. With base +0x2c the table
+reads +0x2c,+0x30,+0x34,+0x38,+0x3c = {5,3,4,4,2}, so kind 0 (jeep) -> 5 and
+kind 3 (truck) -> 4. `kVehicleSpeed` is now `{5,3,4,4,2,4}`; the jeep replay
+runs identical (21,572 frames) and the truck replay stays identical. The
+lesson: a table index verified on ONE input pins the base only up to slots
+that happen to share a value -- board a second kind before trusting the base.
+EXITING A VEHICLE DIVERGED TWO WAYS AT ONCE, both on the same frame (trap
+pump 4557, frame 4514; repro `sessions/vehexit-4557.txt`; hand-played getting
+Sarge out of the convoy truck). The object table showed only the truck's pos
+off by 1, but the render differed by ~9k px: the SQUAD panel was empty on the
+port where the hybrid showed Sarge, and the truck's health bar was missing.
+Two independent bugs:
+
+  1. THE VEHICLE DID NOT STOP FOR THE UNIT LEAVING IT. Same signature as the
+     tree: port `FIELD_44`(speed)=0x1c/`0xD8`(blocked)=0, hybrid 0/1. But this
+     time `VehicleBlockWeight` returned 15 on the hybrid and 0 on the port for
+     BYTE-IDENTICAL inputs (facing=9, at=2071..; traced via item.cpp + a hybrid
+     trampoline over 0x0045BC70, reverted). The block came from Sarge, freshly
+     exited, sampled at a mask point -- a type-2 trooper. `BlockWeightTroops`'
+     trooper arm was INVERTED: the original blocks an ALLIED trooper and passes
+     an enemy (0x0045B877 `test eax; je w=0; else mov eax,0xF` -- a vehicle
+     stops for its own side and runs an enemy over), and the reconstruction had
+     `ObjsAreAllied(f,o,0) ? 0 : AM2_BLOCK_FULL`, backwards. Fixed by swapping
+     the ternary. The header comment was confidently wrong too and is fixed.
+
+  2. THE SELECTION LIST LOST THE OCCUPANT. On exit the original re-selects the
+     unit (`SelectUnit(occupant); DeselectUnit(vehicle)` in ExitOneFromVehicle,
+     which both games reach identically), leaving the squad panel showing
+     Sarge. The port left the selection EMPTY. Traced (item.cpp/objtable.cpp
+     SEL/DESEL traces + hybrid trampolines over SelectUnit/DeselectUnit,
+     reverted) to `OnSelectionChanged`'s "leader becomes element zero" SWAP,
+     which the original does as `edx=uids[0]; ecx=uids[leaderIdx];
+     uids[leaderIdx]=edx; uids[0]=ecx` (0x00427B1B). The reconstruction read
+     only uids[0] and wrote it to BOTH slots, never reading the leader -- so
+     whenever the leader was not already at index 0 (the occupant is appended,
+     then promoted), it DUPLICATED element zero and dropped the leader. The
+     matching DeselectUnit removes every copy, emptying the list. Fixed by
+     reading both ends before writing either.
+
+The replay then runs identical (9,269 frames, no trap). Both are invisible to
+every A/B: no scripted drive boards a vehicle, so the trooper-block arm and the
+non-first-leader swap are never exercised. Bug 2 is the sharper lesson -- a
+swap that reads one end twice is a duplicate, and it only bites when the two
+ends differ, which single-selection never does.
+THE CONVOY TRUCK DROVE THROUGH A TREE on the port where the hybrid stopped
+(whole play area diverged, ~158k px, box 0,21-479,479; trap pump 34847, frame
+34786; repro `sessions/truckTree-34847.txt`; hand-played hitting a tree with
+the truck). Only one object differed -- the truck (uid 3f6), pos y 2670 (port)
+vs 2672 (hybrid), a 2-unit MoveStepPoint step -- and the camera follows it, so
+the whole screen moved. The port's Step3Drive block check read
+`FIELD_44`(speed)=0xa0/`0xD8`(blocked)=0 where the hybrid read 0/1: the port
+did NOT detect the tree. A VBW trace (item.cpp + a hybrid trampoline over
+0x0045BC70, both reverted) showed VehicleBlockWeight itself was correct --
+both returned 15 (blocked) for `facing=1f` -- but the port's Step3Drive block
+check passed `gunFacing=0` where the original passed 0x1f, so it sampled the
+wrong mask direction and missed the tree. An S3D entry trace
+(0x0045CB30 trampoline) traced that to `out[0]` (the record's wanted facing):
+port 0x1b vs hybrid 0xfa, with the candidate counter `+0x574` advanced to 2 on
+the port and 0 on the hybrid. So the port ran the AI CANDIDATE SEARCH on the
+PLAYER's vehicle. Root cause: `Step3ChooseFacing` (0x0045C8D0) has THREE early
+returns and only the third was reconstructed. The missing second --
+`if (ListFirstField548(obj) && obj[OBJ_OFF_WALK_ORDER]==0) return` -- is what
+skips the search for a player-driven vehicle; without it the search fought the
+player's input and, at the tree, chose a facing that was not blocked, turning
+the hull aside (gunFacing 0x1f -> 0). Fixed by adding the two missing guards
+(the MP-ownership guard too, for faithfulness); the replay then runs identical
+(51,608 frames, no trap). Invisible to every A/B: no scripted drive boards a
+vehicle and drives it into an obstacle, and ADDR_MP_SESSION is 0 here so the
+first guard is inert regardless.
+THE SQUAD PANEL'S "MV" STAT read 3 cm/s on the port where the hybrid read
+4, after Sarge boards a vehicle (~23 px in the HUD; trap pump 46446, frame
+45681; repro `sessions/vehicle-46446.txt`; digit at ~576,309, the Convoy
+Truck readout). VEHICLE_OFF_KIND (0x52C) was byte-identical (3) on both, so
+this was NOT a raw-field divergence -- the original does not print the kind.
+`HudSquadDetail` (0x00416340) builds a per-kind SPEED TABLE on its stack at
+the top of the function (0x0041634c..0x00416502: eax=4 written to slots 0,1,3,
+then 1<-5, 2<-3, 5<-2) and prints `table[kind]` (0x00416bc7: `mov edx,
+[esi+0x52c]; mov eax,[esp+edx*4+0x58]`). Fixed by indexing a `kVehicleSpeed[6]`
+table in the vehicle arm; the replay then runs identical (103,614 frames, no
+trap -- the full recording). Invisible to every A/B: no scripted drive boards a
+vehicle and opens the squad panel, and the KIND field the code reads is
+identical -- only the table LOOKUP the original interposes differs. (The base
+offset was read as S+0x28 here, giving `{4,5,3,4,uninit,2}` -- corrected to
+S+0x2c below once a jeep was boarded, since both offsets happen to give the
+truck 4.)
+RALLIED FOLLOWERS FIRED AT NOTHING -- a following trooper targeted and shot a
+dropped weapon on the ground when no enemy was in sight, on the PORT only
+(~514 px, box 204,198-238,242; trap pump 11074, repro
+`sessions/rallyfollow-11074.txt`). At pump 11073 the WHOLE object table was
+byte-identical (1616=1616); at 11074 follower 3fb (aimode 3) acquired target
+0x800009b7 (a type-4 weapon) and fired missile 3fd, while the hybrid found
+nothing. `SightScan` (0x00403B40, ours) returned the weapon as its `alt`
+pickup fallback; the original returned NULL. The cause: `TrooperBuildContext`
+(0x00404730) passed SightScan's sixth arg -- the SARGE flag -- as
+`(int32_t)anchor` (a packed point, always non-zero) instead of ARG3 `sarge`.
+espmap: the original reads `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the
+anchor it had stored at [esp+0x18]. That flag gates SightScan's weapon arm and
+its hittable-vs-live predicate, so with it always set every follower scanned
+for weapons and engaged them; only Sarge should. Fixed by passing `sarge`; the
+other four SightScan callers already pass 0 correctly. Replay then runs clean
+past 11074 (53k+ frames, no trap). The wrong-argument class again -- a
+plausible nearby value (anchor) for a function argument -- invisible to every
+A/B and to `checkoffsetuse`. (Distinct from the rally CRASH below, which was a
+NULL guard; this is why the crash had to be fixed first to even reach it.)
+RALLY WITH TROOPS NEARBY crashed the PORT (not the hybrid) -- a NULL dereference,
+SIGSEGV at eip 0x00741BFB addr 0x4, hand-playing under `tools/sidebyside.py`
+(pump 34013; repro `sessions/rallycrash-34013.txt`). nm put the fault in
+`AiApproachLeader` (0x00405DB0), which rally runs on nearby troops. The
+`AM2_SIGHTC_PROMOTE_FOUND` macro copied `found->OWNER` (found = ctx +
+SIGHTC_OFF_FOUND) with NO null check, and rallying with nothing in a unit's
+sight reaches the promote tail with FOUND null -> `*(NULL+4)`. The original
+GUARDS it: `mov eax,[esi+0x20]; test eax,eax; je` skips the whole promote block
+at 0x0040605A and 0x0040609E (both macro sites). Fixed by wrapping the macro
+body in `if (found_)`; the sibling `AM2_ROACH_PROMOTE_FOUND` was already guarded
+externally at all three of its sites, so it needed nothing. Replay then runs
+clean past 34013 (61k+ frames, no fault, no trap). A NULL-guard the port dropped
+-- invisible to every A/B, since no scripted drive rallies with an empty sight.
+PLACING A MINE put it a few pixels off on the port (~91 px, box 254,231-273,246)
+-- reached hand-playing under `tools/sidebyside.py` (trap pump 6735, frame 6412;
+repro `sessions/mineplace-6735.txt`). The mine (uid 461, type-1 item) was planted
+at a point differing by (9,8): port Sarge+(19,-16), hybrid Sarge+(28,-8), same
+Sarge pos/pose/facing/RNG. A WATCHLAY trace (item.cpp CreateWatchedItem + a
+hybrid CreateWatchedItem trampoline, both reverted) showed the muzzle `at`, the
+sprite and its attach IDENTICAL on both -- the ONLY difference was the fourth
+argument to `CreateWatchedItem`: hybrid 191 (Sarge's OBJ_OFF_FACING 0xbf), port 0
+(his OBJ_OFF_ARMY). `FireWeapon` case 11 (kind 11, lay charge) and case 12
+passed `OBJ_OFF_ARMY` (0x10) where the original pushes `[esi+0x40]`
+OBJ_OFF_FACING at 0x0045FB4E/0x0045FB84; `CreateWatchedItem` uses it only to drop
+the charge Cos8/Sin8 behind the muzzle, so the wrong field planted every mine due
+east instead of behind the firer. Fixed by passing OBJ_OFF_FACING in both arms;
+the replay then runs identical (51k+ frames, no trap). The `ADDR_ENTER_VEHICLE`
+class -- a wrong-field argument -- invisible to every A/B (no drive lays a mine)
+and to `checkoffsetuse` (the offset is present, just the wrong field).
+DROPPING A HELD WEAPON left it on the map at the wrong place on the port
+(~559 px, box 220,234-260,269) -- reached hand-playing under
+`tools/sidebyside.py` (trap pump 15230, frame 15190; repro
+`sessions/weapondrop-15230.txt`). `PlaceObj` (0x00429220) had its early-return
+condition INVERTED: the original returns when the object is already at `where`
+and NOT destroyed (already placed, nothing to do -- `test [esi+8],al`, al=4=
+DESTROYED, `je RETURN` on the clear bit) and PROCEEDS when destroyed, which is
+the re-place/revive case. A dropped weapon is destroyed and its pos is dragged
+to the trooper every step, so pos==`where`; the reconstruction returned on the
+SET bit, skipping the re-registration, so tile/hit-rect/cells stayed stale from
+where the weapon last sat while the original re-placed it and cleared DESTROYED.
+Confirmed by the object diff: same uid 80000618 type-4, same ammo (0x3a) and pos
+(2972,3364) on both, differing only in flags (port 5 with 0x4 set vs hybrid 1),
+tile and hit rect. Fixed by inverting the test in `item.cpp` `PlaceObj`; the
+replay then runs identical (23,526 frames each, no trap). Invisible to every
+A/B and to the offset checks -- a destroyed object re-placed at its own position
+is only reached by a hand drop, and no scripted drive drops a weapon.
+the IN-MISSION GAME MENU showed SAVE and LOAD where the original hides them --
+reached by pausing in Boot Camp under `tools/sidebyside.py` (~10k px over the
+button column, port 6 buttons vs hybrid 4). `DlgGameMenuConstruct`
+(0x00452AA0) skips the SAVE (i=1) and LOAD (i=2) rows when either
+ADDR_MP_SESSION or ADDR_WIN_ENABLED is set -- the original does
+`cmp [0x00511DA0],0; jne` then `cmp [0x00512304],0; jne 0x00452C82` right after
+RETURN, jumping clean past both `new`s -- and both are set in Boot Camp, so its
+menu is RETURN/CONTROLS/AUDIO/ABORT. The rows below a skipped pair move up (the
+top is a running counter), so the reconstruction's plain six-row loop drew all
+six at the wrong offsets. Now gated with a running `row`; identified by `ctl
+widgets` diffing the two dialogs (same object, 6 vs 4 children). Invisible to
+every A/B because the game menu needs ADDR_GAME_STATE 2, unreachable from the
+title.
+the TITLE MENU built a different button set -- reached at once under
+`tools/sidebyside.py` (~pump 684, ~10k px over the button column). The port
+built the MULTI-PLAYER button on a coin toss because
+`src/standalone/runtime.cpp`'s `restore_multiplayer` was defined `void` while
+`src/inject/restore.h` declares it `int` and `OpenTitleScreen` calls
+`!restore_multiplayer()` -- so it returned whatever was in eax. Both games now
+build the same six buttons with identical sprite ids. Nondeterministic, which
+is why the title matched some runs and not others; `ctl widgets` diffs it
+exactly. Fixed by giving the standalone stub the injected side's body (off
+unless AM2_MULTIPLAYER=1).
+a click-to-move on the player faced the RAW click, not the snapped move goal
+(`sessions/aim-3261.txt`, trap pump 3261, 764 px, box 217,218-274,261):
+found hand-playing under `tools/sidebyside.py`, reproduces headless under
+lockstep with the first differing frame exactly 3261. Only Sarge (uid 0x3e8)
+differed and only in his aim/route sub-state -- FACING 218(port) vs
+212(hybrid). Pump 3260 byte-identical, so it is born in pump 3261 (the
+button-up pump). Two false trails ruled out by measurement: the mouse button
+release is pushed AND taken at pump 3261 on both (`AM2_TRACE_DI`), so not an
+input-timing seam; and every decision global (cursor 354,179; viewRect
+3234,2466; button; pressMs) is byte-identical, so not the input. `AM2_TRACE_ANGLE`
+pinned it to the second AngleBetween (the move step reading FIELD_C0): hybrid
+to=(3592,2664)->212, port to=(3587,2646)->218. The TAP arm of `Type2PlayerInput`
+(0x0044A420) sets the move goal: `FIELD_C0 = at; NearestAllowedTile(o,
+TileOfPoint(at), &FIELD_C0)` -- the original (0x0044AC0A) hands the snap its
+OWN &FIELD_C0, so the goal becomes the nearest allowed TILE CENTRE. The
+reconstruction passed `&at`, the local, so FIELD_C0 kept the raw click and the
+move step faced the un-snapped point. One-argument fix; verified identical over
+the recording plus 96k idle pumps, `make check` and all seven lockstep replays
+still IDENTICAL. Invisible to every scripted replay -- no drive click-releases
+over the map. Independent of the flame fix (8d04c7e).
+a FLAMETHROWER's flame ran one animation frame AHEAD
+(`sessions/flame-5197.txt`, trap pump 5197, 80 px, box 187,196-203,214):
+the flame is a def-3 trail missile whose sprite comes from `TimedDirFrame`
+(0x00461F90), `col = (clock - STAMP_54) / N` indexing the direction grid.
+Object tables were byte-identical (1605 each) and only the row's
+ROW_OFF_SPRITE differed -- port GRID[9], hybrid GRID[8], one column apart.
+The original's reciprocal is `mov eax,0x51EB851F; mul ecx; shr edx,6`: the
+`mul` puts the high dword in edx (a >>32) and `shr 6` takes it to >>38, and
+0x51EB851F/2^38 is exactly 1/200 -- so the divisor is 200, not 100. The
+reconstruction had `/100u` (the same constant's /100 form is `shr 5`), so
+at elapsed 100 the port advanced the column where the original waits for
+200. Under lockstep the whole recording plus 100k idle pumps now run
+byte-identical; `make check` and all seven self-terminating lockstep
+replays stay IDENTICAL.
+a thrown grenade LAUNCHED ~20px too low (`sessions/grenade-live-16065.txt`,
+pump 16053): FireWeapon's lobbed arm (item.cpp case 2/5) passed the
+arc-measuring point `a` as CreateMissile's launch point, but `a` exists
+only to measure the range for the speed-scale (via ApproxDist) -- the
+missile LEAVES from the muzzle `from`. The original loads `at` from frame
+slot +0x18 (`from`) at 0x0045F9C2, not the +0x10 that holds `a`. Passing
+`a` dropped the grenade's start below the muzzle (an arc from the waist,
+not over the head); `CreateMissile(..., from, ...)` fixes it. Verified: at
+the throw both missiles launch at (2945,1637), object tables identical.
+a map WEAPON created with the wrong ammo, then consumed and REMOVED
+(`sessions/weapon-6117.txt`, missing weapon uid 80000615 at trap pump
+6117): `BuildMapObjects` (map.cpp) passed `quantity=0` to CreateWeapon, so
+a crate specifying NUMB=30 got the default 3 rounds, was used up and freed,
+and the port was short a whole object thousands of pumps later. The
+quantity is the record's NUMB field: the original reads frame slot +0x2c
+(the raw `[esp+0x30]` at 0x0042D2D1 is one slot off because
+SettlePointInRegion's push is still down -- espmap confirms +0x2c), which
+0x0042CBF1 sets from `movsx byte [numb]`. A prior reconstruction called
+that slot "a zero local" -- the SAME espmap-shift class as the grenade
+bug. `CreateWeapon(..., (int8_t)r[MAPREC_OFF_NUMB], ...)` fixes it.
+Verified: port weapon now quantity=30/ammo=30, object tables identical at
+pump 6116, the weapon present in both.
+the grenade/teardown HEAP CORRUPTION (`sessions/grenade-1845.txt`,
+`sessions/missile-11062.txt`, replay headless under `AM2_HEAP_CHECK=1`):
+at level teardown the small-block heap released a 1 MB reservation with
+`VirtualFree(MEM_RELEASE)`, and `am2_fixed_release` (fixedheap.cpp) freed
+EVERY consecutive used slot up to the next gap -- so releasing the
+reservation at `0x12100000` also madvise-ZEROED the live reservation at
+`0x12200000` beside it. A later `free` of a block in that zeroed region
+read `sizeFront=0` and walked a null free-list link, faulting in
+`crt_sbh_free_block`/`resize_block` (port) and the original's
+`__sbh_free_block` (hybrid) -- both, because both call the one shared
+platform release. `slot_run[]` now records each reservation's slot-count
+the grenade/teardown HEAP CORRUPTION (`sessions/grenade-1845.txt`,
+`sessions/missile-11062.txt`, replay headless under `AM2_HEAP_CHECK=1`):
+at level teardown the small-block heap released a 1 MB reservation with
+`VirtualFree(MEM_RELEASE)`, and `am2_fixed_release` (fixedheap.cpp) freed
+EVERY consecutive used slot up to the next gap -- so releasing the
+reservation at `0x12100000` also madvise-ZEROED the live reservation at
+`0x12200000` beside it. A later `free` of a block in that zeroed region
+read `sizeFront=0` and walked a null free-list link, faulting in
+`crt_sbh_free_block`/`resize_block` (port) and the original's
+`__sbh_free_block` (hybrid) -- both, because both call the one shared
+platform release. `slot_run[]` now records each reservation's slot-count
+and release frees exactly that many. Found by adding a gated small-block
+validator (`AM2_HEAP_CHECK`, heap.cpp) that walks every committed page
+before each free/alloc and names the first corrupted entry, then logging
+`VirtualAlloc`/`VirtualFree` ranges to see the release at `0x12100000`
+swallow `0x12200000`. Both recordings now run clean to 320 s with the
+validator on, and the six standard lockstep replays stay IDENTICAL.
+the HUD ammo count drawn one pixel left (`sessions/hudcount-2823.txt`):
+the HUD ammo count drawn one pixel left (`sessions/hudcount-2823.txt`):
+the original centers the count at `mid + 1` (HUD_EDGE_PAINT+0x5B1,
+`lea eax,[eax+ecx+1]`) where the strip's labels use the plain `mid`, so
+the count could not share EdgeText; ours did and lost the +1. Found with
+AM2_TRACE_BLIT (glyphs at 630 vs 629) and a DrawTextVertical trampoline
+(center 633 vs 632).
+the bottom-edge terrain and the depth-120685 item order, ONE ROOT: our
+`BuildMapObjects` (map.cpp) called `ApplyHeightItem` only in the weapon
+arm, while the original's item arm FALLS INTO the same shared tail
+(0x0042D1C3 jmps to the `ApplyHeightItem` at 0x0042D30B the weapon arm
+reaches by falling through). Our item arm did `continue`, so every map
+item kept height 0 instead of the terrain's, which halved its depth layer
+(`ScaleBy32Blocks(0)`=1000 vs 2000) and sorted overlapping ground sprites
+the wrong way. Found with `AM2_TRACE_BLIT` (identical blit params, opposite
+ORDER) then `AM2_TRACE_HEIGHT` (the hybrid calls `ApplyHeightItem hin=50`
+at pump 193 for the items, the port never does). Fixed by making both arms
+share the height tail; `sessions/botrow-965.txt` and
+`sessions/depth-120685.txt` are the repros, identical since.
+
+one pixel of a corner where two sandbags overlap
+(`sessions/corner-1276.txt`, pump 1276, pixel 479,479): the original's
+depth comparator breaks an exact tie by comparing the two objects'
+POINTERS, so which segment is drawn last is decided by where the heap put
+them -- and the hybrid's HeapAlloc went to glibc while the port's went to
+the dev arena. Not a transcription defect: the comparator was right on
+both sides and the heaps were not the same heap. The platform owns a
+deterministic heap now (`src/platform/fixedheap.cpp`, below) and both
+games allocate identically;
+the 26 pixels from frame 80 of every comparison since the first lockstep
+-- the ORIGINAL's overlay blitter stores a two-pixel run at an address of
+1 mod 4 with its mapped bytes exchanged (0x0041C5A6), and ours mapped in
+place; reproduced, `bootcamp.txt` identical through all 628 frames;
+a radar click scaled its y from the widget's own offset rather than its
+rectangle's top, so the view jumped 650 pixels too far
+(`sessions/click-509.txt`, exact once the terrain unit is fixed);
+weapon range in the wrong slot (`sessions/shot.txt`), held click aimed at
+the raw point (`sessions/shot.txt`), depth slope parsed as an integer
+(`sessions/signpost.txt`), picked-up weapon left on the map
+(`sessions/pickup.txt`), and the step socket's 64-note cap (a tool defect,
+`sessions/pickup.txt` after a long trap).
+
+## THE CRT IS BEING RECONSTRUCTED, under src/platform/crt
+
+The image carries MSVC 6's C runtime: **231 functions from `0x00464416`,
+42,860 bytes, 44 of them called by the game** (the rest are their
+internals and the startup). The native build ran the game over glibc
+behind those names, and the two are not the same runtime where it shows:
+`qsort` orders ties differently, the heap hands out different addresses,
+`printf` formats floats by other rules. Each is a frame the lockstep
+comparison above can see. `src/platform/crt/` is that runtime function by
+function, from the disassembly, under `crt_` names (the host's libc has
+the real ones), reached through the `ADDR_CRT_*` seams `standalone.h`
+already re-points, so the reconstruction's sources do not change.
+
+Done (2026-09-06), each replayed in `tests/selftest.cpp` against what the
+original answered under Unicorn:
+
+- `sort.cpp`: `qsort` with its `shortsort` and `swap`, `bsearch`.
+  `tools/qsortcheck.py`, 195 arrays built for ties, 1,401 rows; three of
+  four mutations fail and the fourth is a theorem.
+- `rand.cpp`: `rand`, `srand` over the image's seed.
+- `string.cpp`: `strtok`, `strchr`, `strstr`, `strncpy`, `strncmp`,
+  `_stricmp`, `_strlwr`, `strlen`, `strcpy`, `memmove`. `conv.cpp`: `atoi`,
+  `atol`, `strtol`. Nine of these are in `tests/vectors.h`: 7,487 vectors.
+- `printf.cpp`: `_output`, the whole state machine, with `sprintf` and
+  `vsprintf` over it. `fltcvt.cpp`: `_cfltcvt` down to `$I10_OUTPUT` -- the
+  twelve-byte long double, its multiply, the powers-of-ten tables read
+  from the image, `_fptostr` and the three layouts. `tools/printfcheck.py`
+  runs the original's `sprintf` over 1,793 formats and values -- every
+  conversion and flag, and for the float ones the halves, the nines that
+  carry, denormals, the extremes, an infinity and a NaN -- and all 1,793
+  replay exactly. Four of six mutations fail it -- the digit rounding, the
+  decimal-exponent estimate, `%p`'s precision, the "0x" a zero does not
+  get. Of the two that do not, the powers-of-ten guard threshold is a
+  theorem (no entry in either table sits on 0x8000), and the multiply's
+  exact-half tie is a GAP: no value in the corpus lands on it.
+
+- `stdio.cpp` and `lowio.cpp` (2026-09-06): `fopen` through `_openfile`,
+  `_getstream` and `_sopen`; `fclose`, `fread`, `fwrite`, `fgets`, `fseek`,
+  `ftell`, `fflush` with `_flush` and `_flushall`, `_flsbuf`, `_filbuf`,
+  `_getbuf`, `_freebuf`; and beneath them the `__pioinfo` handle table --
+  `_alloc_osfhnd` and its three siblings, `_read` with the text-mode CR LF
+  and Ctrl-Z rules, `_write` with LF expansion, `_lseek`, `_close`,
+  `_commit`, `_chsize`, `_setmode`, `_isatty`, `_dosmaperr` over the
+  image's own table, `_ioinit` and `__initstdio`. The FILEs are the
+  image's `_iob`, the tables are the image's, and the two initialisers run
+  lazily on the first open since nothing here runs the original's
+  startup. **The oracle is the hybrid, with no Wine and no emulator**:
+  `build/armymen2-hybrid-dev` runs the original CRT over `src/platform`,
+  and `AM2_CRTCHECK=<dir>` (`tools/crtcheck.sh`, `tools/crtcheck.py` in
+  `make check`) links the reconstruction beside it and runs
+  `src/hybrid/crtcheck.cpp` instead of the game: 521 scripted sequences of
+  stdio calls over 19 generated files, through both stacks on separate
+  copies, 40,211 calls compared on return value, errno, the FILE's fields
+  and a hash of the bytes, and every file compared afterwards. 0 differ.
+  Eight of nine mutations fail it and the ninth is unreachable through the
+  FILE layer; the letters S, R, T and D stay verified by reading.
+
+- `dir.cpp`, `time.cpp`, `env.cpp` and `mbcs.cpp` (2026-09-06): the
+  find family, `_chdir`, `_getcwd` with `_getdcwd` and `_validdrive`,
+  `_mkdir`, `_rmdir`, `remove`, `_chmod`; `time` with `__loctotime_t`,
+  `__tzset` (the TZ parser and the `GetTimeZoneInformation` arm),
+  `_isindst`, its `cvtdate` and the FILETIME conversion `_findfirst`
+  uses; `getenv` over `_environ`, `_mbsnbicoll` and `_mbctoupper`. The
+  same hybrid check covers them, run under three TZ settings, 308 values
+  each: eleven of fourteen mutations fail and the three that pass are
+  theorems on this platform, listed in `tools/crtcheck.py`. Two things
+  the native build cannot have without the original's startup: an
+  environment table, so `getenv` answers NULL there and `__tzset` always
+  takes the API arm; and the `_mbctype` tables, so `_mbctoupper` answers
+  its argument. Both are stated in the modules.
+
+The game's startup, heap, stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
+`rand`, `atoi`, `strtol` and the string functions above now run on the
+CRT in both the standalone and the native build; the lockstep comparison
+is unchanged by all of it, as it should be. `standin.cpp` holds what the
+modules need and nothing has read yet -- `malloc`, `calloc`, `free`,
+`_amsg_exit`, `__crtCompareStringA` and `__wtomb_environ` over the host --
+and says so in its name.
+
+- `strtod.cpp` (2026-09-06): `strtod` through `_fltin2`, the twelve-state
+  parser `__strgtold12`, `__mtold12`, `__ld12tod` and `__ld12cvt` with its
+  seven mantissa helpers; `_isctype` beside them in `conv.cpp`. The hybrid
+  check's third section compares it on 1,616 strings by the double's bits,
+  the end offset and errno, in all three TZ runs: seven of nine mutations
+  fail, one is a theorem (a denormal is never observable, strtod answers
+  zero for it) and one a gap (the 25th digit's rounding of the 24th, a part
+  in 10^24). `memcpy` joined `tests/vectors.h` with 75 vectors, and the
+  check's fourth section overlaps it 8,424 ways, which vectors cannot:
+  the original copies from the end when the destination lies inside the
+  source, so it is memmove under the other name. Adding it found a hole
+  in the vector harness rather than in the CRT: Unicorn keeps EFLAGS
+  between runs, a faulted try left the direction flag set, and 117
+  vectors of two functions were recorded wrong; CLAUDE.md has it.
+
+- `heap.cpp` and `exit.cpp` (2026-09-06): `malloc`, `operator new`,
+  `free`, `operator delete`, `realloc`, `calloc` and `_msize` over MSVC 6's
+  small-block heap -- `__sbh_alloc_block`, `__sbh_free_block`,
+  `__sbh_resize_block`, the region and group allocators, `__sbh_find_block`,
+  `_heap_init` -- with `HeapAlloc` above the 1016-byte threshold; and
+  `atexit` with `_onexit`, `exit`, `_exit`, `doexit`, `_initterm`,
+  `_endstdio` and `_fcloseall`. The whole native build runs on it now,
+  the game's blocks and the CRT's own, and the lockstep A/B is unchanged.
+  The oracle is exact where the FILE tables' was not: the check snapshots
+  the entire small-block heap, runs one operation through each stack from
+  the same state, and compares the two states' digests -- 24,279
+  operations including a burst that fills three regions and empties them
+  again, 0 differ, three region releases skipped because an unmapped
+  region cannot be put back. Exit: handlers registered through both stacks land
+  in one table, both `doexit`s run them in the same reverse order, and
+  the table grows past its 32 entries. `mkglobals` rewrites the image's
+  two terminator-table entries to `crt_endstdio` and `crt_seh_restore`,
+  so the native exit path walks the same tables the original does.
+  Thirteen mutations, all failing.
+
+Every seam in `standalone.h` now names a reconstruction except the three
+`standin.cpp` holds -- `_amsg_exit`, `__crtCompareStringA`,
+`__wtomb_environ` -- and the DirectX creators, which are the platform's.
+The development binary keeps its fixed-address arena for the game's blocks
+(savestates need it); the CRT's own allocations there are on the
+small-block heap, and the one block that could cross, `getcwd(NULL)`'s,
+the game never asks for.
+
+- `startup.cpp` (2026-09-06): `WinMainCRTStartup` up to its call of
+  `WinMain` -- the version words, `_heap_init`, `_ioinit`, the command
+  line and `__crtGetEnvironmentStringsA`, `_setargv` with its two-pass
+  `parse_cmdline`, `_setenvp`, `__wincmdln`, `_cinit` walking the image's
+  own initializer tables -- with `_setmbcp` and the multibyte tables,
+  `_fpmath` with `_control87` and the FDIV test, and `_amsg_exit` with
+  `_NMSG_WRITE` and the message box. The standalone and native builds call
+  it from their startup object, so the tables every other module read
+  lazily are the original's now, built in the original's order, and the
+  x87 runs at the 53-bit precision the original set. `mkglobals` rewrites
+  the initializer table's slots to the reconstructions as well as the
+  terminator tables', which is how `_cinit` finds them. The check's
+  seventh section compares the parser on 22 command lines both passes,
+  `__wincmdln`, `_setmbcp` for nine code pages table for table, and
+  `_control87` both ways round; the lockstep A/B is unchanged.
+
+Not reproduced, and stated in the module: the entry point's SEH frame and
+`_XcptFilter`, which map a machine exception to a C signal handler the
+game never installs. `standin.cpp` holds the three locale wrappers and the
+wide-environment conversion, each forwarding to the one kernel32 call its
+original makes.
+
+**The CRT is complete for what the game reaches, measured two ways.**
+Every one of the 63 seams in `standalone.h` resolves to a reconstruction
+-- the one outside the CRT set is the DirectInput import thunk, the
+platform's -- and the native build plays Boot Camp under lockstep on all
+of it. What the reconstruction's own source still takes from the host is
+the pure string and memory functions the original mostly inlined --
+`strcpy` 119 call sites, `memset` 98, `memcpy` 59, `strlen` 44, `strcmp`
+26, `strstr` 18, `strcat` 17 -- whose answers cannot differ, and the
+probes and dump code (`getenv`, `fopen`, `sprintf` in anim dumps and the
+script sweep), which are the harness's; every `rand()` in `src/game` is
+in a comment, the calls go through `am2_rand`. What remains of the
+image's runtime is the C++ exception dispatcher and the locale wrappers,
+which nothing reaches.
+
+## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
+
+`AM2_LOCKSTEP=1` makes the platform deterministic: the clock is a count of
+pumps (16.67 ms each, `AM2_LOCKSTEP_MS` overrides), `Sleep` on the game
+thread moves it, multimedia timers fire from the pump when it passes them,
+the sound is mixed on the game thread one step per pump, input comes only
+from an `AM2_REPLAY` script keyed by pump number, and every frame presented
+is hashed into `AM2_FRAMELOG`. Both the hybrid and the native build run it
+headless under SDL's dummy drivers, so a comparison needs no display and
+takes half a minute:
+
+    tools/lockstep.sh tests/replays/bootcamp.txt
+    tools/sidebyside.py --replay tests/replays/bootcamp.txt --tolerate-swaps
+
+The second is the same comparison with both games STEP-LOCKED over a
+socket and stopped, alive, on the first frame that differs, so the state
+behind a difference can be read out of both at once; `--video` makes it
+playable by hand, the leader's window driving both.
+
+**Measured** (2026-09-06, `tests/replays/bootcamp.txt`: title, BOOT CAMP,
+RETURN, both dialogs, then W, S and D held for 100 pumps each):
+
+| what | result |
+|---|---|
+| native run against native run | identical, 628 presented frames |
+| hybrid (original) against native (reconstruction) | **IDENTICAL through all 628 frames** (2026-09-07). Until then frame 80 on differed by 26 pixels, every one a swapped pair, which was the original's overlay blitter exchanging a two-pixel run at an address of 1 mod 4 -- now reproduced |
+| the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A; more pairs come into view as the map scrolls |
+| hand play, recorded and replayed (`tools/sidebyside.py --video`) | four defects in the first hour. `TrooperPickupItem`'s swap arm destroyed the held weapon where the original destroys the picked-up item, so a weapon picked up stayed on the map, drawn over Sarge. The object line's ninth field is a FLOAT (`DefObjLine`), the depth slope, parsed as an integer so a sign post drew over Sarge's rifle. And two argument slots: every weapon's range was its following field (`DefWeaponLine`, fields 4 and 5 swapped by the original), so the first shot detonated on Sarge; and a held click took its bearing to the raw point where the original uses the overlay-adjusted one (`Type2PlayerInput`). Fixed; the recorded session replays with nothing beyond the swapped pairs |
+| what "the same 26 pixels" had hidden | the port never showed Boot Camp's INSTRUCTION SIGN and kept running through the fifty pumps the original spent paused on it: `ScriptNameUid` indexed the name table with the call that reallocates it, and `showsign`, a forward reference on a growth boundary, got uid 0. Fixed; found by the side-by-side, not by the tables, which agree because nothing moves in a sign |
+| the object tables | identical at the mission start and after the walk, all 1,610 lines, Sarge at `1743,976` on both |
+| the game's memory at Boot Camp | carried span 2,012 KB (74 KB of it initialised), game heap 14,037 KB, resident total 30.9 MB and FLAT over 56,000 frames |
+
+**The lockstep sound was a leak, in both builds equally.** `am2_audio_step`
+mixed one pump of sound on the game thread and QUEUED it into the SDL
+stream, and a device drains a stream in real time while the pump outruns
+real time whenever it is not sleeping -- so on the dummy device nothing
+drained it at all: 5.6 KB a pump, 70 MB every 12,400 frames, 528 MB resident
+after ninety thousand. The first reading of the game's memory was that
+number and not the game's. A stack trace on the megabyte `mmap`s named it
+(`strace -k`), and the CRT's small-block heap held one region throughout.
+The mix is what a comparison wants, so it is mixed and dropped; the device
+is opened so the game believes it has one.
+
+So the simulation is in lockstep with the original over this drive, and the
+whole visible difference is one rare two-pixel case in something that
+encodes or paints terrain -- a 16-bit unit written with its bytes reversed
+where the two pixels differ, invisible wherever they are equal. Not yet
+located; the way to locate it is a hybrid that installs reconstructions
+one at a time, which is the next tool.
+
+**How the native build had stopped running, and why nothing said so.** The
+platform's headers are included through `-isystem`, and `-MMD` omits system
+headers from the dependency files, so reordering the `IDirectDraw` vtable
+rebuilt `ddraw.o` and not `device.o`: the reconstruction went on calling
+slot 22 for `SetDisplayMode` and landed on `WaitForVerticalBlank`. The
+build is `-MD` now and the dependency files name the platform headers. A
+header change that rebuilds one side of an interface and not the other is
+a crash that reads like a code defect; the bisection that found it reverted
+the header and got a clean run from objects that had never been rebuilt.
+
+## THE ORIGINAL EXE RUNS OVER THE PLATFORM LAYER, WITHOUT WINE
+
+`make hybrid` builds `build/armymen2-hybrid` and `build/armymen2-hybrid-dev`:
+a PE loader of our own (`src/hybrid/loader.cpp`) that maps the retail
+`ArmyMen2.exe` at `0x00400000` inside an i386 ELF whose own text sits at
+`0x00700000`, binds every one of its 171 imports to `src/platform`'s
+implementation by module and name, gives each thread a TEB for the SEH chain
+at `fs:[0]`, and calls the MSVC CRT's entry point. No reconstruction is
+linked in: it is the ORIGINAL code over OUR platform, which is the other
+half of what the native build checks.
+
+    make hybrid
+    AM2_GAMEDIR=".wine/drive_c/GOG Games/Army Men II" build/armymen2-hybrid -nointro
+
+`AM2_LOG=<file>` captures the game's log (the retail logger stub is
+detoured, as the harness detours it); `AM2_EXE` names another image. The
+dev binary carries the harness's control socket on port 31337, so
+`tools/objdump.py --port 31337 --table` and `tools/am2ctl.py` work on it.
+
+**Measured on Xvfb `:99`, against the original under Wine driven the same
+way** (2026-09-06):
+
+| step | evidence |
+|---|---|
+| imports | `imports: 171 bound, 0 missing` |
+| title screen | **208 of 307,200** pixels differ from the Wine title frame, all inside the pointer's box |
+| BOOT CAMP briefing, HQ dialog | `lines: 101  tokens: 372  names: 43  compounds: 16`; the HQ dialog frame differs from a Wine frame of the same drive by **118..172 pixels, all inside the pointer's 21x22 box** -- see below for what those are |
+| the instruction sign | **0 of 307,200** pixels differ from the Wine frame, seven captures in a row, both pointers parked at (600,400) |
+| live mission, object state | `tools/objdump.py --table` on both: **1,610 lines, no difference**; the live frame differs by 80 pixels in the minimap and the pointer, which animate |
+| live mission, movement | two seconds of S moves Sarge from `pos=1674,910` to `pos=1704,972`, and only Sarge's two rows change in the table |
+| the game's log | the same lines as the Wine log, harness lines aside, bar `Missing cpuinf32.dll` for Wine's `system speed: 1` -- the platform has no cpuinf32.dll to load, as the native build has not |
+
+Two things it found on its first run, both in the platform layer and both
+invisible to the native build:
+
+- **The platform's `IDirectDraw` vtables were not in the SDK's slot order.**
+  `ddraw.h` put `SetDisplayMode` last so one macro could declare the prefix
+  the two interfaces share, on the reasoning that the reconstruction reaches
+  every method by name. The original indexes by NUMBER: `InitDirectDraw`
+  called slot 21 of `IDirectDraw2` with six dwords, got
+  `WaitForVerticalBlank` taking three, and returned twelve bytes off into
+  its own HWND argument. `tools/checkvtables.py` compares all thirteen
+  platform vtables with mingw's SDK headers slot by slot and is in `make
+  check`.
+- **stb_truetype is not Wine's FreeType.** Every non-pointer pixel that
+  differed in the HQ dialog -- about 1,400 -- was GDI text: the game builds
+  its three fonts by drawing each character with `TextOutA` and encoding the
+  result. `tools/glyphdump.py` reads those built fonts out of the original
+  under Wine (all three: ArialNarrow 12 and 14, ArialBlack 18, 672 glyphs)
+  into `tests/glyphs-reference.txt`, and `src/platform/glyphs.inc` is
+  generated from it; `gdi32.cpp` replays the recorded bitmaps for those
+  faces and heights. With that the text is byte for byte the original's, in
+  the native build as well.
+
+**The pointer's box is history, not rendering.** `DrawMenuCursor` saves and
+restores only the 12x16 arrow through a 32x32 slot (AM2_BLT_TRACE=1 shows
+the two stretching blits); the bubble and the bar beside it are software
+sprites that nothing restores, so what lingers at a spot the pointer has
+left is whatever was drawn there last, and the two drives were not
+frame-synchronised. Measured rather than assumed: moving both cursors away
+leaves residue on BOTH sides, the same residue the box differed by, and a
+screen that repaints over the spot (the sign) is exact. The stretch itself
+now uses wined3d's truncated 16.16 stepping rather than exact division,
+which differs on the restore's vertical axis.
+
+What is NOT verified here: audio (the dummy driver), the movie (Smacker is
+stubbed), and every screen the drive above does not reach.
+
+## THE GAME RUNS AS A LINUX EXECUTABLE
+
+`make native` builds `build/armymen2` and `build/armymen2-dev`: the same
+reconstruction as the
+standalone, linked as an i386 ELF against `src/platform/` -- the Win32 and
+DirectX surface `src/game/win32/` calls, implemented over SDL3 -- instead of
+against Wine. One executable, no runner. SDL is the outermost layer; every
+Win32, GDI, DirectDraw, DirectInput, kernel and CRT call the game makes is
+emulated to it below the window.
+
+    make native
+    AM2_GAMEDIR=".wine/drive_c/GOG Games/Army Men II" build/armymen2 -nointro
+
+Needs `glibc-devel.i686`, `libstdc++-devel.i686` and `SDL3-devel.i686`. It is
+32-bit and cannot be otherwise: the carried `.data` holds 32-bit pointers and
+every record offset assumes a 4-byte pointer. The section placement is the
+standalone's -- `.origdat` at the original's VAs, our code at `0x00700000` --
+and the same generated files serve both builds; only the assembler section
+flags differ by object format, and `mkglobals.py` emits both.
+
+**What it reaches, measured on Xvfb `:99` with real X input (`xdotool`):**
+
+| step | evidence |
+|---|---|
+| title screen | **54 of 307,200** pixels differ from the injected build's title frame (`build/shots/99/title.png`), all inside the cursor's 10x13 box |
+| BOOT CAMP, briefing, both dialogs | `lines: 101  tokens: 372  names: 43  compounds: 16` -- the four totals CLAUDE.md records for Boot Camp |
+| live mission | `tools/objdump.py --table` reads **1,609** objects over the control socket; holding W moves Sarge (`pos=1979,1028` after 2.5 s from the start) |
+| QUIT through the menu | `Releasing Comm Connection`, `Unreleased memory (0) blocks`, `Packet Thread Exited with return code 259`, `Receive thread got event 0`, exit 0 -- the same lines as the Wine log, 259 included |
+| the game's own log | 14 messages on a Boot Camp run, the count the Wine A/B table gives, with no line the original does not write |
+
+The layout of `src/platform/` is in its `platform.h`. Four things decided there
+that are worth knowing before touching it:
+
+- **DirectDraw surfaces are plain 8-bit buffers.** The primary's pixels go
+  through its attached palette (or the last realised GDI palette) into one
+  streaming SDL texture on Flip, on any Blt into the primary, on Unlock or
+  ReleaseDC of it, and on a SetEntries of its palette -- that last one is
+  what makes the game's palette fades show without a flip.
+- **Exclusive modes are accepted and not enforced.** `SetCooperativeLevel`,
+  `SetDisplayMode` and DirectInput's exclusive mouse all answer success and do
+  nothing; the game gets a window whose logical size is the mode it asked
+  for, and the desktop keeps its pointer.
+- **GDI text is stb_truetype** (`src/platform/stb/`, vendored, public
+  domain), drawn onto the surface a DC names and thresholded to one palette
+  index, which is what the game's `EncodeGlyph` reads back. ArialNarrow is
+  Liberation Sans at 82% width; ArialBlack is Liberation Sans Bold.
+  `AM2_FONT_NARROW`, `AM2_FONT_BLACK`, `AM2_FONT_DEFAULT` override.
+- **The game's cursor is kept under the host pointer by measuring each delta
+  from where the game's cursor actually is**, not from the last pointer
+  position; `runtime.cpp` installs the query. And each axis is followed by a
+  zero on the same axis, because `PollMouse` re-adds its sticky per-poll delta
+  after EVERY event -- which is the "acceleration" this file's Wine notes
+  measured, explained.
+
+**A sixth, found by walking:** `ScrollView` blits the offscreen surface
+onto itself, and a copy that walks rows top-down reads rows it has just
+overwritten whenever the destination lies below the source. With a
+one-pixel scroll every row becomes a copy of the first, which showed as
+vertical stripes over the whole map the moment Sarge moved or the pointer
+scrolled the view. The copy goes bottom-up in that case now; verified by
+walking in all four directions and edge-scrolling across the map.
+
+**A seventh, reported as broken collisions:** a DirectDraw Flip blocks
+until the vertical blank, and the game's pace is its frame rate -- how far
+a trooper steps and how far he turns are per frame. My Flip returned at
+once, so on Xvfb's software GL the game ran at whatever rate a present
+cost, the steps grew, and Sarge walked straight through sandbags and the
+hut. `am2_host_wait_vblank` paces Flip at 60 Hz now (`AM2_FPS` overrides,
+0 disables), and the same drive on both builds -- turn 1.2 s, walk 8 s --
+ends at (1246,1227) here against (1247,1205) under Wine, stopped by the
+hut in both. Measured, since the object tables at mission start were
+already identical apart from Sarge's own row.
+
+**An eighth, and this one is in the RECONSTRUCTION, found by the native
+build's first run on a real desktop:** `Type2PlayerStep` seeded the AI
+context's class at +4, and the original seeds +0 -- the store is
+`mov [esp+0x14], eax` at 0x0044AD51 while the `push edi` of the call before
+it is still on the stack, so it is [esp+0x10], the context's first field,
+once `add esp, 4` has run. `AiTrooperStep` indexes its move-state table
+with +0, which the wrong reconstruction left uninitialised: small enough to
+pass under Wine for months, a libc pointer on the desktop, a fault. Settled
+by measurement, not reading: the original run with only `AiTrooperStep`
+replaced by a logger writes 0, the class, at ctx[0] on every call from that
+site, and garbage at ctx[1]. No A/B could have seen it -- both sides of an
+injected comparison run the reconstruction -- and it is the same cdecl
+cleans-later trap CLAUDE.md records for `CreateVehicle`.
+
+**And the collision report was FOUR defects in the reconstruction, none
+of them visible under Wine.** "Sarge walks through things" was chased by
+dumping the two collision planes -- `ADDR_CELL_WEIGHTS` and
+`ADDR_TILE_COVER`, 256x256 bytes each -- out of a live Boot Camp mission and
+diffing them against the ORIGINAL's under `AM2_NOPATCH=1`. The injected
+build is not the oracle there: both sides of an ordinary A/B run the
+reconstruction, which is why all four had survived every configuration in
+the suite. `AM2_NOPATCH_NAMES=a,b` (a comma list of reconstructions left
+original) bisected them one at a time:
+
+- `LoadMask` had the `-df` polarity inverted, so the packed masks were
+  loaded only under the switch and no drive here ever loaded a footprint
+  mask at all. CLAUDE.md already records that switch's name says the
+  opposite of what it does; this was the same trap one function over.
+- `ObjAfterMove` and `ItemTeardown` took the cell index from the wrong
+  slot -- `[esp+N]` read before a push rather than after it, the eighth
+  defect's shape again -- so a walking object's own weight was moved to a
+  cell chosen by a rectangle coordinate.
+- `ObjAfterMove`'s remove arm takes TWO off the centre cover cell
+  (`add dl, 0xFE` at 0x0043922D) where the add arm and both of
+  `ItemTeardown`'s take one; the shared helper had smoothed the asymmetry
+  away, and `ShiftTileCover` carries the centre's delta separately now.
+- `ObjFootprint` and the roach pair indexed `ADDR_CELL_WEIGHTS` as the
+  plane, where it is a POINTER to the plane (`mov edx, [0x514EC0]` at
+  0x0045A70B). Every vehicle footprint -- laid and lifted each frame by
+  `Step3Drive` -- went into the globals after 0x00514EC0, so no vehicle
+  ever blocked anything.
+- Not a defect but a cause of two false ones: the native build's random
+  seed was a private global, so anything randomised diverged from the
+  original run to run; it reads `ADDR_RAND_SEED` now.
+
+**NO VEHICLE WAS EVER STEPPED BY THE PLAYER OR THE AI, and the fixed
+point found it in an afternoon.** Reported as "movement is completely
+broken inside a vehicle, and the sound is wrong until Esc opens the menu",
+with two F5 saves, one before boarding and one after. Loading the
+before-save in the native build and in the original (`tools/enterlevel.sh`),
+clicking the truck and holding D: the original's truck turns on boarding
+and again under D, ours never changes facing. Same controlled-object
+context on both, same guards clear, so the vehicle input handler was
+not being reached -- and `grep` found no call to `Step3Input` anywhere,
+only its definition, while its own header names one caller. `StepType3`'s
+alive path was misread in four places against 0x0045D660:
+
+- it tested the record's first word, the heading byte, where the original
+  tests `OBJ_OFF_CTL_GATE`, so every live vehicle skipped the whole block;
+- a vehicle with occupants went nowhere: the original sends the player's
+  vehicle (first occupant owned by the player) to `Step3Input` and
+  `Step3RouteAndBoard` and everyone else's to `AiStep`, then all of them
+  to `Step3ChooseFacing`; ours had the attach arm only, for empty vehicles;
+- a dead kind-0 vehicle went to the attach arm instead of being destroyed;
+- the per-frame copy of the aim point into the vehicle's fire point, gated
+  on the record's second word, was missing.
+
+Measured after the fix on one save, D for two seconds then W for four: the
+native truck turns 33 to 177 to 65 and drives from (1242,2659) to (632,2710)
+with the record in the driving state 4, and stops on release. No A/B could
+have seen it: `bootcamp`'s dump is taken at the briefing before any vehicle
+steps, `mission` compares logs, and Boot Camp's truck sits in the motor pool
+either way. The vehicle sound is the same fix's business -- the engine's
+two sound tables key on the record state that was stuck at 1 -- and wants
+retesting on the desktop.
+
+**AND THE PLANES WERE NOT THE DEFECT THE REPORT WAS ABOUT.** With both
+identical, Sarge still walked through Boot Camp's hut, and so did the
+INJECTED build under Wine -- the same drive on the original stops him at
+(1653,1145). Bisecting `AM2_NOPATCH_NAMES` with "does the hut stop him" as
+the oracle needed the whole by-name chain left original, WinMain down to
+`UpdateTrooperAction`, because a reconstruction reached by NAME cannot be
+put back one function at a time; greedy removal then left exactly that
+chain, so the defect was in that function's own body. Three, all in
+`UpdateTrooperAction` and none an offset:
+
+- The move was handed `OBJ_OFF_SPEED` itself where the original hands
+  the SPEED slot whenever that field is set, and the trooper's own signed
+  height only when it differs from the tile's. The field reads 88 on a
+  walking Sarge, `ObjMoveAlongFacing` made that his height, and
+  `BlockWeightRoute` discounts anything more than 16 units off the walker's
+  height -- so every hut and sandbag weighed nothing.
+- The no-route chain fell through to the settle with `turned` clear when
+  none of its four stop conditions held; the original's failed multiplayer
+  tests all jump back to the heading sweep.
+- The sweep tried one heading too many (its count starts at 1), passed the
+  state where the original passes the saved pose, and picked the player's
+  shorter limit by comparing Field548's VALUE against the default owner
+  instead of the object's army byte -- the idiom CLAUDE.md records.
+
+Verified by probing the callees the original reaches by address: with the
+original `UpdateTrooperAction` in place and ours, the per-frame sequence at
+the hut is the same -- three-heading sweeps every frame, all blocked,
+`PickFireMode` each time, the same facing distribution over 4,900 frames.
+No configuration in the suite can see this class: both sides are driven
+with the same input and nothing compares a position in play.
+
+Both planes are BYTE-IDENTICAL to the original's with the HQ dialog up.
+Dumped in live play they differ by a handful of cells, which is the socket
+thread reading between a vehicle's clear and its re-stamp; take that dump
+under a dialog, where no frame composes.
+
+**Five defects the first native run found, each a Windows behaviour the
+reconstruction relied on without saying so:**
+
+- `_strlwr` writes only the characters it changes (MSVC's does); `map.cpp`
+  lowercases the literal `"camera"`, which lives in `.rodata` here.
+- Text-mode `fopen` strips CR before LF; `mpmaps.txt` read raw yields a
+  `"\r"` token on every blank line and the level list does not parse.
+- `crt.cpp`'s host `chdir` default does not understand a backslash; every
+  `SetGameDir` before `am2_crt_use_game` failed silently and the `.aai`
+  files opened from the wrong directory.
+- The packet thread is cdecl behind a stdcall cast (dplay.cpp records the
+  original's mismatch), so the thread trampoline restores `esp` itself.
+- `IID_IDirectPlay4A` and `IID_IDirectPlayLobby3A` were compared against the
+  wrong GUIDs, the lobby was never created, and `CommLobbyStart` calls a
+  method on the NULL that follows -- the original's test there "can only
+  ever pass", so it has no path for that.
+
+**TWO NATIVE BINARIES: THE PLAYER'S AND THE DEVELOPER'S, and `make native`
+builds both.** It builds `build/armymen2` with no control socket, no injected input and no
+savestates, and `build/armymen2-dev`, the same sources
+with `AM2_DEVTOOLS`, plus the harness's control.c and input.c and
+`src/standalone/devtools.cpp`. The socket is on by default there (port
+31337, `AM2_CONTROL=0` turns it off), and everything a drive or a dump
+needs lives in that binary only.
+
+**SAVESTATES, in the dev binary.** Every game allocation there comes from a
+96 MB arena at a fixed address (0x0C000000 now; see the next section) with a deterministic first-fit
+allocator whose bookkeeping lives inside the region, so a savestate is the
+carried globals (2 MB, 0x0046F000..0x00666000) plus the arena's used part,
+16 MB in a Boot Camp mission, written and restored as bytes.
+`snap save FILE` and `snap load FILE` on the socket (FILE absolute -- the
+game chdirs). They run on the game thread at the top of the host's frame
+pump, never mid-frame. **F5 and F9 are the GAME's save and load, not the
+raw state**: F5 calls `SaveGame` with the first free `f5-N.sav` under the
+folder the game-proc block names and prints the path, F9 makes the LOAD
+button's writes for the latest one -- because a game save is the file
+`tools/enterlevel.sh` brings back in any build and any run, which is what
+a fixture has to be. Measured: save
+at (1981,1026), walk to (2249,998), load, read (1981,1026), walk again and
+the game carries on. What a state does NOT hold is anything the platform
+owns -- surfaces, sound buffers, open files -- so it is valid within the
+session and mission it was taken in; the game's own SAVE GAME is the
+portable one.
+
+**THE ARENA IS THE PLATFORM'S NOW (2026-09-07), AND EVERY BINARY HAS
+IT.** `src/platform/fixedheap.cpp` is the heap under the CRT's `HeapAlloc`
+and the reservations under its `VirtualAlloc`: a first-fit heap over 96 MB
+at 0x0C000000 and 1 MB slots over 64 MB at 0x12000000, both at fixed
+addresses, both mapped `MAP_NORESERVE`. The dev binary's own arena and
+its `AM2_DEV_NOARENA` switch are gone with it; the game's allocations go
+through `crt_malloc` in both native binaries, and the hybrid -- running
+the ORIGINAL CRT over the same `HeapAlloc` -- lands every object at the
+same address the port does. That is what the corner divergence above
+needed: the depth comparator's pointer tie-break. `AM2_FIXED_HEAP=0` is
+the bisecting switch (glibc and `mmap(NULL)` again). The savestate
+snapshots both regions, so a `snap` carries the small-block heap too.
+
+**THE ARENA'S ADDRESS IS NOT A FREE CHOICE.** The game overloads fields
+with a uid or a pointer and tells them apart by value; uids carry their
+kind in the high nibble (`200003E8`, `800003E9`), so the arena has to sit
+where the MSVC heap and glibc's brk heap both do, below 0x10000000. The
+other switches stay in:
+`AM2_DEV_NOREUSE=1` (freed blocks never handed out again),
+`AM2_DEV_POISON=1` and `AM2_DEV_CANARY=1` (freed blocks filled with 0xDD
+and checked every frame, naming a block written after its free by size and
+allocating call site). They exist because a campaign start came up as a
+black screen in three arena runs in a row and in none of four non-reuse
+runs; the canary found no write into freed memory, and the next four runs
+under every mode came up fine. That start is intermittent and unrelated to
+the allocator -- the mission is sometimes seen in play at sub-state 0x21
+with nothing drawn and the briefing never shown, and a SPACE brings it up.
+Not understood, and said so.
+
+**A LEVEL CAN BE ENTERED AT WILL, FROZEN, ON ANY BUILD, IN FIFTEEN SECONDS
+AND WITHOUT A MENU, and that is the verification point the port needed.**
+The game's own save is the snapshot that crosses runs and builds, and a load
+of it is how a level is entered. Two harness pieces make that a fixed point:
+
+- **`loadgame FOLDER FILE` on the control socket** makes the LOAD button's
+  four writes (`OnLoadGameLoad`, 0x00452060): the folder name into the
+  game-proc block, the file name into its second string, the load-pending
+  flag, a request for state 2. No menu, no coordinates, and it takes
+  `AM2_NOPATCH=1` unchanged because all four are the game's globals.
+- **`AM2_PAUSE_ON_ENTER=1`** raises the -dbg pause reason the moment the
+  game state becomes 2, which the game does on a fresh start and not after
+  a load (its pause is gated on no load pending). The hook is in
+  `input_pump`, on the game thread in every build. The mission arrives
+  frozen before its first frame.
+
+`tools/enterlevel.sh [-b dev|orig|recon] [-f FOLDER] SAVE` copies the save
+into `save/FOLDER`, starts the build, issues the load and prints the object
+count and the table's md5, leaving the game paused on its port. Measured:
+
+| save | build | objects | table md5 |
+|---|---|---|---|
+| campaign, MAP 01 | dev, twice; original, twice; injected | 327 | b1ced1edb769 |
+| Boot Camp | dev, original, injected | 1,612 | a9ee8b48d784 |
+
+**BOOT CAMP CAN BE SAVED ONCE IT HAS A FOLDER, which the menu never
+gives it.** `SaveGame`'s guard is the game-proc block's first string, the
+player's name, which is also the folder the save goes under; the level's
+name (`bootcamp`, `kitchen`) sits 0x20 further into the block. In Boot
+Camp the first string is EMPTY -- there is no player -- so the original
+cannot save there and the menu never offers it. Write a folder name into
+that string and the save dialog saves Boot Camp's briefing: 1,609 items,
+347 KB, under `save\<that name>`. The dev binary's F5 does exactly that,
+using the level's name when the folder is empty, and `loadgame bootcamp
+FILE` at the title screen brings the file back identically in all three
+builds. (An earlier version of this paragraph said the block already held
+`bootcamp`; it was the LEVEL string, at +0x20, being read.)
+The raw savestates do not cross runs: a
+state saved in one run and loaded in a fresh run at the same point of the
+same mission dies in `RestoreLostSurfaces` on the first frame, address
+randomisation off or on, because the platform's surfaces are at new
+addresses. They stay the quick tool within a session.
+
+**`tools/savecheck.sh` IS THE SERIALISATION A/B, and it passes.** The
+game's save file is the one snapshot that crosses builds: objects go out
+by uid. The script drives the dev binary and the ORIGINAL under Wine to the
+same campaign briefing, held under `-dbg`, has each save through the game's
+own dialog (opened by writing the two globals the SAVE button writes, the
+name typed after clearing the pre-filled one), then loads each file in each
+build and freezes the loaded game with the game menu. Measured:
+
+| comparison | result |
+|---|---|
+| the two saves' object tables, 325 objects | static fields identical; two walking troopers 1 px apart |
+| native's file loaded by the original and by native | identical in every field, frozen on entry |
+| the original's file loaded by both | identical in every field, frozen on entry |
+| each build's load against its own save | static fields identical, with the four counter-uid'd type-6 records renumbered by both |
+| the two files, 180,618 bytes | 2,943 bytes differ, all of them accounted for |
+
+The file bytes cannot match and the tool says why per section: the
+object-script, condition and item sections write records whole, pointers
+included -- native's sit in the arena and Wine's in its heap -- the
+game-proc block carries the clock and a frame counter, the event block
+three counters two frames apart, and one word of the script section is
+padding the arena zero-fills. `SaveObjScriptSection`'s
+own comment had already said the item section cannot be compared byte for
+byte across builds. The one-pixel offset is the native port's first frame,
+not the reconstruction: the injected build under Wine gives a briefing
+table identical to the original's, and a second native run gives one
+identical to the first.
+
+**DIRECTSOUND IS IMPLEMENTED, and checked without ears.** A secondary
+buffer keeps its bytes; one mixer, pulled by the host device from its own
+thread, walks every playing buffer's cursor at the buffer's rate,
+resampling 8/16-bit mono/stereo to float stereo with the volume and pan
+applied, so Lock/Unlock write into the very memory the mixer reads,
+GetCurrentPosition advances in real time and a non-looping buffer stops at
+its end with the cursor back at 0 -- the semantics the stream refill and
+the effect restarts were written against. The 3D listener is accepted and
+ignored: the game does its own distance attenuation. winmm's mmio is the
+buffered RIFF reader the wave loader consumes directly through
+GetInfo/Advance/SetInfo, and the multimedia timer is the host's.
+
+`AM2_AUDIO_DUMP=<file>` writes everything the mixer hands the device as raw
+stereo float, and that is the check: a Boot Camp drive under
+`SDL_AUDIO_DRIVER=dummy` dumped 41 s, and seconds 2..6 of it cross-correlate
+with `title.wav` resampled the mixer's way at **1.0000, zero error**, at a
+gain of 0.355 -- the game's own music volume -- and at a lag of exactly
+2.000 s, so the stream's refill kept time to the sample over the run. The
+mission's effects show as bursts in the RMS trace. `AM2_NOSOUND=1` answers
+DSERR_NODRIVER, the silent path the original takes with no device.
+
+**DEFERRED, deliberately:** DirectPlay (objects that decline everything, no
+transport) and Smacker movies (`SmackOpen` answers NULL). Present does
+not wait for the display's vertical blank by default (`AM2_VSYNC=1` turns it
+on): the clock already paces Flip, and a compositor throttling an unfocused
+window to a frame a second reads to the game as enormous time steps.
+Windowed mode
+(`-w`) renders the same title frame -- 208 pixels differ from the reference
+in both modes, all of them the cursor, drawn at its start position here and
+where the A/B's drive left it there -- and it needed one more Windows fact:
+a windowed primary shows through the system palette GDI realised, not
+through the DirectDraw palette attached to it, which the game builds from a
+snapshot that is still zero at that point. The A/B suite does not know this
+build exists yet.
+
+## `AM2_GAMEDIR` points the port at the original game's directory
+
+The original has no way to be told where the game lives: `CheckBasePath` reads
+the working directory into `ADDR_GAME_DIR` and every `SetGameDir` concatenates
+onto that, so the install directory is simply wherever the process started.
+Fine for a shortcut in the game folder, useless for running the port from a
+build tree or aiming it at a second install.
+
+    AM2_GAMEDIR='C:\GOG Games\Army Men II' wine .../am2port.exe -nointro
+
+Set it and the process chdirs there before the read, so everything downstream
+sees that directory. **Unset it and nothing changes** -- with the variable
+absent `CheckBasePath` is the original's function instruction for instruction,
+which is what keeps the A/Bs honest, since both halves are driven with the
+same environment.
+
+Verified in both directions from a scratch working directory:
+
+| | log | screen |
+|---|---|---|
+| with the variable | the normal four startup lines | 234 distinct colours -- the title art |
+| without it | `Unable to load wave file click.wav` | 2 colours -- blank |
+
+A chdir that FAILS is logged, naming the directory and the Win32 error, and is
+not fatal. `FatalError`'s only string is about a path being too long, which
+would be a lie; a game that cannot find its data then says so in its own words
+with our line above it.
+
+**WHAT IT BUYS: the port runs from the BUILD TREE, never copied anywhere.**
+
+    AM2_GAMEDIR='C:\GOG Games\Army Men II' \
+      wine explorer /desktop=NAME,1024x768 \
+      'Z:\home\boran\git\ArmyMen2\build\ArmyMen2.exe' -nointro
+
+Verified: the title art renders (234 distinct colours) and the log is the same
+four startup lines. It lands beside the EXE, so `build/am2port.log` rather than
+the game folder's -- which is the diagnostic that memory note asks to keep, and
+it follows the binary rather than the data.
+
+That removes the install step from the edit-run loop entirely. The game folder
+keeps the ORIGINAL `ArmyMen2.exe` untouched, which every A/B needs, and
+`am2port.exe` beside it stays useful for testing what a player would actually
+have.
+
+## OPEN: the trooper "jerksteps" while turning -- a REPRO, and what it rules out
+
+Reported from play: in Boot Camp hold W to move forward and then hold A (or S)
+-- Sarge should run in circles without stutters, and does not. That is a
+deterministic repro and far better than anything the suite can drive; it also
+needs no mouse, so the input is exactly two held scancodes.
+
+**Drive it with `ctl key 0x11 down` and `ctl key 0x1E down`** -- the command
+takes a NAME or an `0x`-prefixed scancode, and a bare `11` silently resolves to
+nothing, which reads as the game ignoring input. `ctl keys` confirms what the
+GAME sees: `down: 11 1e pressed: 11 1e`.
+
+**Walking straight is NOT broken**, measured on both sides under the same
+drive with a matched `Options.cfg`. Both cycle the same animation chain --
+frames 0x2E, 0x04, 0x2F, 0x05 through `ROW_OFF_ANIM_NEXT_ID` -- and both
+advance position steadily, about 0x23 a sample.
+
+**What the turn quantisation is NOT:** our `(facing +/- 0x10) & 0xF0` looked
+like a prime suspect -- 16 directions, a whole notch a step -- and the original
+does exactly the same, `sub al,0x10; and al,0xf0` at 0x0044A566 and
+`add al,0x10; and al,0xf0` at 0x0044A5BC. Stepped facing is the game's own.
+
+**IT IS OURS, AND HERE IS THE MEASUREMENT.** Forty samples a side, same
+drive, same matched `Options.cfg`, the same injected `key 0x11 down`:
+
+| | animation cell | animation frame |
+|---|---|---|
+| original | 00 x19, 01 x15, 02 x6 -- it ADVANCES | 04, 05, 2e, 2f -- the whole walk cycle |
+| ours | **00 x40 -- never advances** | **01 x26 (STAND), 05 x14 (walk)** |
+
+The original never shows frame 1 while walking. Ours flips between stand and
+walk, and every flip calls `SetAnimFrame` with a different frame, which resets
+`ROW_OFF_CELL` to 0 -- so the legs restart perpetually. That is exactly the
+reported symptom, and the cell never advancing is a CONSEQUENCE of the frame
+changing, not a second bug.
+
+So `ActionKeyDown(0)` reads FALSE on frames where the key is held. The harness
+is not the cause: both sides get the same injection through the same hook, and
+only the reconstruction flickers.
+
+**Excluded by reading the original beside ours:** `ActionKeyDown` itself (the
+original loads the buffer pointer once and tests both bindings; ours does the
+same), the key bindings (byte-identical), `PollKeyboard`'s buffer SWAP (same
+three moves, same order, GetDeviceState into the new current), and its
+`DI_OK`-is-zero retry.
+
+**AND THE INPUT IS NOT THE CAUSE EITHER.** An 11-arm probe over every write to
+the action inside `Type2PlayerInput`, plus both writes inside
+`Type2PlayerStep`, run on a verified-live drive with W held:
+
+    7741  arm=1    1 -> 2      the ActionKeyDown(0) walk arm, EVERY frame
+     155  arm=102  1 -> 2
+       1  arm=101  2 -> 1
+
+So `ActionKeyDown(0)` answers TRUE every frame -- the key state is fine, and
+the flicker is not a missed keypress. What the counts say instead is that the
+field reads **1 at the START of nearly every frame**: the walk arm would fire
+once and stay if nothing reset it, and instead it fires 7,741 times.
+
+Neither instrumented arm puts a 1 there -- arm=101 is the only 2 -> 1 and it
+fired ONCE. So the per-frame reset happens OUTSIDE both functions, in
+something else holding the same record: it is `o + OBJ_OFF_SIGHT_OUT_T2`, and
+`AiTrooperStep` and `TrooperFire` are both handed it.
+
+**Excluded, each by reading the original beside ours or by measurement:**
+`ActionKeyDown`, the key bindings, `PollKeyboard`'s swap and its DI_OK retry,
+`KEY_STATES` being 256 so the harness overlay applies, the wheel delta being
+cleared each poll, and the turn quantisation.
+
+**FOUND: `UpdateTrooperAction`'s `no_route` ARM, firing every frame.**
+Instrumenting all TWENTY-FOUR writers of that field in region.cpp and running
+the repro on a clock-verified live drive:
+
+    7838  arm=14  1 -> 2   Type2PlayerInput's ActionKeyDown(0) walk arm
+    6197  arm=12  2 -> 1   UpdateTrooperAction, the `no_route` block
+     156  arm=8   1 -> 2   Type2PlayerStep
+       1  arm=7   2 -> 1
+
+So the two fight every frame. The input says walk, `UpdateTrooperAction`
+decides there is nothing walkable ahead and stops the trooper, and the next
+frame the input says walk again. Each flip calls `SetAnimFrame` with a
+different frame, which resets `ROW_OFF_CELL` to 0 -- the legs restart, and the
+movement hitches. That is the whole symptom.
+
+**So the defect is in the walkability test**, in the code above `no_route:`
+that decides whether the tile ahead can be entered -- not in the input, not in
+the animation, and not in the key state. `arm=12` also writes 1 over garbage
+values (`28 -> 1`, `7796576 -> 1`), so it runs for other objects too and the
+test is shared.
+
+**FIXED, AND THE BRANCH SENSE WAS SETTLED BY CONTROL FLOW RATHER THAN BY THE
+LOCAL.** `< 15` is CLEAR. Three things say so together and none of them needs
+to know what any stack slot holds:
+
+- The sweep loop at `0x0044B283` is `jge 0x44b208`, which loops BACK. A sweep
+  continues while blocked, so `>= 15` is blocked and `< 15` ends it.
+- `0x0044B14B`'s `jl` target, `0x0044B382`, writes the facing back and falls
+  into the settle-and-step at `0x0044B41C`. It runs no stop arm at all.
+- The `>= 15` fall-through at `0x0044B151` reads the claimed vehicle uid and,
+  when there is none, `0x0044B159` jumps to `0x0044B299` -- which IS this
+  function's stop block, calling `ObjKind538In10To17` and writing `w[8] = 1`.
+
+So the original reaches the stop arms only when the step is BLOCKED and no
+vehicle is claimed. Ours reached them when the step was CLEAR.
+
+The one piece of evidence that had held the fix up -- `mov [esp+0x1c], 0` on
+the `jl` path -- turned out to discriminate nothing: the give-up arm at
+`0x0044B3A7` and all four stop arms zero the same slot. A local that is zeroed
+on both sides of a branch cannot say which side is which, and treating it as
+though it could is what made this look unreadable for two sessions.
+
+**The function's own comment already knew.** The header says of the sweep
+"under AM2_STEP_ROUTE_OK is walkable and ends it" -- correct, and the exact
+opposite of what the first gate twelve lines below it did with the same
+comparison. The sweep's copy of the test was right all along; only the first
+one was pointed at the wrong label.
+
+Measured on a live Boot Camp mission, holding W, sampling the leader's
+`OBJ_OFF_POS` once a second:
+
+    ours      x += 86, 91, 92, 91, 92     y -= 9, 10, 9, 10, 9
+    original  x += 92, 91, 91, 65, 91     y -= 9, 10, 10, 18, 10
+
+and holding W and A together, which is the repro Boran gave -- Sarge should run
+in circles -- both sides trace a circle of the same size, 20 units across in x
+and 18 in y, over the same twelve samples. Before the fix he restarted his walk
+every frame.
+
+**`combat`'s frame gate fails and it is NOT this change.** 16505/44385 and
+16592/43432 on two runs of the fix; the PARENT commit, same configuration, same
+machine, reads 16591/50865 -- worse. So the gate was already failing and the
+fix NARROWS it, from 306% to 261%, which is what our side doing the same work
+the original's does should look like. The control was run because this file
+says a single clean control does not establish a regression; here it
+established the opposite, which is the same tool used the other way round.
+
+Everything else is clean: `bootcamp` state identical at 1,610 objects,
+`campaign` at 2 pixels and 35 widget nodes, `mission` with state, widgets and
+log identical and the original as the runaway in its usual direction.
+
+**A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
+ONE contiguous hex string, not space-separated bytes. Splitting it into tokens
+and indexing gives an empty result, which reads exactly like a dead socket --
+and the socket was answering `pong` throughout.
+
+**Do not read an earlier "cell stuck at 0" observation as evidence** -- it came
+from a run with stale instances alive, the condition CLAUDE.md warns produces
+convincing false results, and it did not reproduce once the environment was
+clean.
+
+## In flight
+
+Nothing uncommitted. **1,644 patches plus 6 REGISTERED**, **71** analysis
+tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
+the recipe).
+
+## THE STANDALONE PORT REACHES THE MAIN MENU
+
+`make standalone` builds `build/ArmyMen2.exe`, which replaces ArmyMen2.exe in
+the game folder and needs the original at BUILD time only. It renders the
+title art, the six menu buttons, the cursor and the copyright text, and its
+log is identical to the injected build's, line for line.
+
+    make standalone      # -> build/ArmyMen2.exe, copy into the game folder
+
+How it is put together, and why: the image's relocations are stripped, so the
+3,582 pointers inside its own data cannot be told from the bytes around them
+and cannot be moved. `.origdat` is OUR section, placed at the addresses those
+pointers were written for, with our code linked above at 0x00700000. What is
+rewritten at startup is what IS unambiguous -- 411 function pointers, the
+whole import table (171 across 10 DLLs), and the 21 C++ static initializers
+the MSVC CRT used to run.
+
+**Every table migrated out of that blob into typed C data is one less thing
+holding the layout in place**, and the first is already gone: `c_dfDIMouse`
+now comes from the DirectInput SDK rather than the image.
+
+**The blob is smaller than it looks, which reframes that campaign.** Of its
+1.96 MB only **73,772 bytes are non-zero**, the last at 0x0048D8D3 -- MSVC
+folds `.bss` into `.data`, so 94% was never in the original's file either. It
+is split at 0x0048E000 now, with an ALLOC-only `.origbss` for the tail, and
+`build/ArmyMen2.exe` is 4,169,345 bytes rather than 6,102,591. What actually
+holds the layout in place is 124 KB, not 2 MB.
+
+**Two tools check the port rather than leaving it to a screenshot.**
+`tools/samission.sh` is the stronger: it drives both builds into the same
+live Boot Camp mission and diffs the whole object table with no budget --
+1,610 lines, identical -- which is the artifact ab.sh already treats as its
+sharpest. `tools/samenu.sh` is the cheap one and covers startup:: it runs both builds through the same startup and compares the
+game's own log (identical, five messages) and the title screen (0 of 307,200
+pixels on a run where the cursor lands in the same place, 45 when it does
+not). Tested in the failing direction with a negative budget.
+
+Past the menu the port loads and plays a Boot Camp mission, and its LIVE
+OBJECT STATE is identical to the injected build's -- all 1,610 lines of
+`tools/objdump.py --table`, diffed with no budget, taken in ordinary play at
+sub-state 0x21. That is the same artifact `ab.sh bootcamp` treats as its
+sharpest, and it is a much stronger statement than the title screen.
+
+A report that Sarge cannot be moved did not reproduce: with the cursor placed
+absolutely through the socket, the same click moves him in NEITHER build, so
+the click is not a move order and the port is not diverging.
+
+## NOTHING LEFT TO TRANSPOSE
+
+`tools/remaining.py` reads **0 game functions and 0 C++ static initializers**
+over every byte from `0x00401000` to the real CRT frontier at `0x00464420`,
+and reports that the entries tile `.text` with no gaps.
+
+**The standalone build is a stronger completeness oracle**, and it found
+three things nothing else could see -- `0x0040A6A0`, `0x004185C0` and
+`0x00451990`, called by address and still the original's code, all INTERIOR
+addresses of merged entries whose entry is patched, so every count read them
+as done. All three are closed now: the first is a linker thunk to
+FreeArmyObjLists, and the other two are reconstructed as `OnEnterNameOk`
+(RECRUIT's ENTER NAME dialog) and `HudChatChar` (the HUD chat WM_CHAR
+handler). It also found `0x00433770`, which is not a function at all but a
+byte table MSVC placed in .text, now extracted into generated C.
+
+Nothing in the standalone build is stubbed any more except the
+AM2_PROBE_NOACTION seam, which exists to call the ORIGINAL action parser and
+so cannot mean anything in a build that carries none of it.
+
+## THE PLAYER CAN MOVE AGAIN
+
+`StepType2`'s player-input gate was transcribed as a test for null where the
+original does `cmp [0x5122c8], esi; jne` -- is the FOLLOWED OBJECT THIS ONE.
+The camera follows Sarge all mission, so the original took that arm every
+frame and we took it never: no key and no click moved anything, in either
+build. Reported from play, invisible to the whole suite.
+
+Nothing here could see it, and each artifact has its own reason. The A/B
+drives both sides with the same input, so they agree about ignoring it;
+`bootcamp`'s object dump is taken at the briefing before anything moves;
+`mission`'s pixel check is off by construction; and every counter on that
+path is blind, its callers being ours.
+
+**`tools/movecheck.sh` is the check that was missing** -- the only one in the
+project that drives a REAL DEVICE, sending X events through `xdotool` so they
+reach the game as a player's keyboard does. It asserts DISPLACEMENT rather
+than equality, since two unsynchronised runs walk for different lengths of
+time. Mutation-checked by putting the bug back: 0 units against the
+original's 237, and 241 against 237 with the fix.
+
+    tools/movecheck.sh
+    tools/saquit.sh        # the standalone's teardown, which nothing covered
+    tools/loadcheck.sh     # loading a save; FAILS today on the known defect
+
+Generalising the defect into a static check was tried and abandoned with
+measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
+compare, so all 15 candidates it finds are correct.
+
+## THIS SESSION'S CHANGES ARE VERIFIED ACROSS SIXTEEN CONFIGURATIONS
+
+Sixteen `ab.sh` configurations were run over the four `src/` changes this
+session landed. Fifteen are clean:
+
+    bootcamp campaign combat mission quit controls windowed menuscreens
+    intro audio df multi difficulty audiovol movies state3
+
+`mpoptions` fails -- and it was ALREADY failing before this session, with the
+same signature to the pixel: commit 2f55eb3 of 2026-09-03 records it logging
+"Couldn't open bitmap file!" twice on the reconstruction side and reporting
+**221,423** differing pixels, which is exactly what it reports today, twice
+over. So it is a standing defect on the multiplayer options screen and not a
+regression from anything here.
+
+## THIS SESSION'S CHANGES ARE VERIFIED ACROSS EIGHT CONFIGURATIONS
+
+Four `src/` changes landed -- the player-input gate, `LoadGameProcSection`'s
+two missing stores, `State2Enter`'s missing no-argument log call, and the one
+deliberate deviation in `LoadItems`. They are checked by:
+
+    bootcamp  campaign  combat  mission  quit  controls  windowed  menuscreens
+
+all clean, plus `loadcheck` (now passing on both builds), `movecheck`,
+`samenu`, `samission` and `saquit`. `mission`'s frame gate fails as it has on
+every run for reasons recorded in CLAUDE.md -- ours at 635, inside the
+documented band -- while its state, widgets and log are identical.
+
+## LOADING A SAVED GAME WORKS
+
+`tools/loadcheck.sh` passes: our build and the original both come back alive
+at sub-state 0x18 with 325 objects and the save file untouched. The STANDALONE
+does the same, measured separately: alive, sub-state 0x18, 325 objects, md5
+unchanged, `Loaded 317 items` in its log. Two fixes and
+one deliberate deviation got there; see CLAUDE.md for all three.
+
+The deviation is the only one in the tree: `LoadItems` unlinks objects from
+the cell grid before `ItemsReset` frees them, because the original leaves 305
+dangling entries and survives only because its allocations happen to reoccupy
+them. It is confined to the load path so no other configuration is touched.
+
+## FIXED: LoadGameProcSection dropped the two stores that make a load happen
+
+The original ends that function's success path with `HAVE_DEFAULT_COF = 0`
+and `LOAD_PENDING = 1` (0x0042698B). We had neither. They exist because the
+function's own fread overwrites LOAD_PENDING -- it lies 0x370 into the
+0x438-byte block being read -- so without them every load silently became a
+fresh start, and the retry stamp in MissionStartup then saved over the file
+the player asked to load.
+
+After the fix our build logs `Loaded 317 items` for the first time and the
+save's md5 is unchanged; `ab.sh bootcamp campaign` is clean.
+
+**It exposes the next defect**: the load path had never executed here, and now
+that it does, our build exits just after `calculating region data...` where
+the original loads and lives. That is the next thing to chase.
+
+## SUPERSEDED: our autosave fires where the original's does not
+
+**Retracted first**: an earlier entry here said the standalone loses saved
+games. It does not. `drive.sh` defaults to `-nointro -dbg` and my standalone
+launches passed `-nointro` alone, and the pause that decides the whole
+behaviour is gated on that switch. With the arguments matched the standalone
+loads a save exactly as the injected build does -- sub-state 0x21, the save's
+316 objects, md5 unchanged.
+
+What survives is real and is not standalone-specific. Without `-dbg`, OUR
+reconstruction rewrites the save through `MissionStartup`'s retry stamp and
+the ORIGINAL does not, in both builds. Starting the mission fresh without
+`-dbg` is the game's own behaviour; the extra save is ours.
+
+The three guards are transcribed correctly against the disassembly, so the
+divergence is whether the call is reached -- `TakeMenuRequest`, entered from
+`State2Frame` on arm 11 only when `GetPauseFlags()` is zero.
+
+No configuration in the suite can see this: they all run with `-dbg`. It is
+the player running the port normally who is affected.
+
+## Where the work is now: VERIFICATION, not transposition
+
+Everything is transposed; not everything is checked. The sharpest statement
+of the gap is CLAUDE.md's list of functions no drive in this environment
+reaches, which `tools/checkclaims.py` splits by measurement rather than by
+assertion. **That list is now 31 of 32**, and the one remaining is excluded
+deliberately rather than outstanding: `ItemSetBox`, whose arithmetic is
+`RowAlloc`'s and runs 2,512 times a mission, so it has live coverage and only
+this transcription of it does not.
+
+Each of the thirty-one is an enumerating oracle of the `tools/shakecheck.py`
+shape, because no configuration here reaches any of them and none can be
+added -- Boot Camp's enemies never engage, and MAP 01 turns hostile the
+moment its dialog clears, which is the one screen whose log, pixels and
+object table are all unavailable at once.
+
+Three lessons from closing the last of them are worth carrying to the next
+oracle, all recorded in CLAUDE.md:
+
+- **A stub has an ABI.** `tools/vehexitcheck.py` reported 71 of 85 cases
+  differing with the ARM SEQUENCE CORRECT on every one and only the arguments
+  wrong, which is the signature of a stack off by a push -- two of its ten
+  callees are thiscall.
+- **A corpus derived from the model cannot fail against it**, in a new place:
+  `tools/tilesetcheck.py`'s model looped over the case's chunk list where the
+  original loops on `offset < formSize`, so removing a payload from the
+  accumulation passed all 84 cases.
+- **Diff before leaning on a sibling for coverage**, not only before merging.
+  `LoadAtlFile` runs on every map load and reads the same file format as
+  `RestoreTileSet`, but at similarity 0.245 with no shared run of six it
+  covers the FORMAT and none of the instructions.
+
+## Where the boundary is
+
+The sub-CRT set is **closed at 1,239 of 1,239**, and so is everything above
+the nominal `CRT_START`: `tools/crt.py` measures **148 game functions** below
+the real frontier -- 112 of them above the nominal line, code every count in
+this project silently dropped until that tool existed -- and reports
+**0 unlabelled**. The Win32/DirectX boundary is separately closed at 0 COM
+sites and 2 unreachable `MessageBoxA` sites (`docs/boundary.md`).
+
+The line itself is measured rather than assumed: game code runs to
+`0x00462600` and the CRT proper starts at `0x00464420`, with a six-entry
+thunk table parked between them.
+
+## Families closed earlier in this run
+
+**The vehicle step, five of five.** `Step3TurnBlocked`, `Step3ChooseFacing`,
+`Step3TurnState`, `Step3RouteAndBoard`, `Step3Drive` (0x0045CB30, 769
+instructions) and `Step3Input` (0x0045C050) -- input, turn planning, routing,
+boarding and the drive itself. **Every one is COLD**: no configuration here
+puts a player in a vehicle, so the transcription checks are the verification
+and the A/B only says nothing else broke.
+
+**The vehicle delta protocol, both ends.** `VehicleUpdateAppend` (0x0045DAA0)
+and `VehicleUpdateApply` (0x0045DF10), plus the batch walk `RecvVehicle1B`
+that drives the second, and `RecvVehicle1E` and `RecvVehicle24` beside them.
+Needs a live DirectPlay session, so also verified by reading.
+
+## What the checks caught today, which reading did not
+
+Worth keeping as evidence about where the defects actually are:
+
+- **`AppendTroopState` counted the old length twice.** Found by reading the
+  vehicle sibling, not by any test -- its only caller needs DirectPlay, so it
+  has never executed here.
+- **Two globals were named from a caller's interpretation.** `ADDR_DRAG_ACTIVE`
+  and `ADDR_CLICK_ENABLED` are mouse button 1's state and edge; our own
+  `PollMouse` already spelled them as `g_mouseButton[n]`, so the tree
+  contradicted itself and nothing could see it.
+- **`checkseams` fired in three consecutive commits**, each time on a seam
+  that became a lie the moment an address became ours.
+- **`checkoffsets` refused a duplicate string define**; the compiler refused a
+  duplicate `VehicleMsgRecv` I wrote without grepping the address first.
+
+## OPEN: are the row-pool evictors reachable at all?
+
+`RowPoolARelease`/`BRelease` and `RowPoolAEvict`/`BEvict` are installed and
+**unverified**, because each has exactly one caller and the chain is
+
+    alloc -> (only if count > capacity) -> evict -> release
+
+with capacity 450 for pool A and 90 for pool B. If no drive fills a pool,
+those four are verified by reading alone and every clean `bootcamp` is silent
+about them.
+
+A `peek` probe was written to settle it and **it failed, honestly**: all six
+samples read 0 for both pool counts -- and 0 for `ADDR_GAME_CLOCK_MS` beside
+them, with `ComposeFrame=0` at the end. The clock ticks during play, so the
+zeroes are a drive that never reached the mission, not pools that stayed
+empty. Second hand-rolled drive to fail that way today; `ab.sh`'s mission
+sequence is elaborate for reasons and reinventing it in ten lines of `sh` does
+not work.
+
+The liveness reading is the only thing that made the run interpretable. Take
+one whenever the conclusion is a claim about zeroes.
+
+## Above the line: the sprite family, complete at eighteen
+
+`0x00462A60..0x00463383` -- two dispatchers over eight subsystems, each with a
+lazy loader and a releaser, both dispatchers called from `ADDR_STATE2_ENTER`.
+All sixteen leaves run on a single Boot Camp drive, and `bootcamp` and
+`campaign` are clean with them in.
+
+**It was eight variations on one idea, which is the shape that invites
+generating six of them from the first two.** What stopped that, each a one
+command check that caught something which would have compiled:
+
+- **pairwise diffs, not against one baseline.** A single-baseline pass called
+  pairs 4 and 7 distinct; they are 1.000 identical. A baseline finds twins OF
+  the baseline and hides twins among the rest.
+- **`[esi-4]` per body, presence AND absence.** Four base conventions across
+  the pairs -- and pair 3's loader points at its record base, so carrying pair
+  1's correction over would have put that table four bytes early. The first
+  instance in this project of applying a base fix where none was needed.
+- **a no-writer scan**, which turned an apparent defect back into a constant:
+  a global with no writer is a constant, where a FIELD with no writer is dead
+  code.
+- **reading each `je` target.** One bit between `jl` and `jle` separates a
+  correct free from one that leaks eight of thirteen.
+
+Three defect-shaped behaviours are reproduced rather than fixed: the decal
+loader's `hotY` taken from the width, that eight-of-thirteen leak, and four
+different NULL conventions across the frees.
+
+## Next: the vehicle step, and its entry is already done
+
+`ADDR_STEP_TYPE3` is reconstructed -- found after reading 240 instructions of
+it, because I grepped four sibling addresses for patches and not that one. The
+outstanding work is its five callees, ~4,880 bytes, all reached from our own
+code so their counters will be blind.
+
+The leaf is `0x0045C6E0`, vehicle steering, fully read and scoped in the
+scratchpad: three arguments (the `add esp, 0x18` says six and is cleaning a
+neighbour's), an acceleration limiter whose two arms are a floor and a
+ceiling, and an `esi` that stops being the object and becomes a ROW partway
+through.
+
+## Above the line: the two 12-byte row pools
+
+Four functions in, 1,436 patches. `RowPoolAInit`/`BInit` (`0x00460800`,
+`0x00460AC0`) and `RowPoolAFree`/`BFree` (`0x00460860`, `0x00460B30`).
+
+**Verified for the inits, NOT for the teardowns**, and the difference is worth
+keeping straight:
+
+- The first version omitted `RowAlloc` and `ab.sh bootcamp` returned **293,671
+  pixels** with an identical log. With the call in it is **22**, the usual
+  baseline, and the 1,610-line object-state dump is identical. So the inits
+  are compared against the original on a live map load.
+- `ab.sh quit` passed **on the broken build too**, because it leaves through
+  the TITLE screen and never enters state 2 -- so the pools are never
+  initialised and `ADDR_FREE_SEQ_CONTEXTS`, which is the LEVEL teardown, never
+  runs. Both teardowns are therefore unverified, and that clean pass is worse
+  than no result because it looks like one.
+
+Reaching them needs a drive that leaves a live mission: poke
+`ADDR_MENU_REQUEST` during play, which is how `StopAllSounds` was first
+executed. No configuration does it yet.
+
+## THE SUB-CRT BOUNDARY IS CLOSED
+
+**Every game function below `0x0045C000` is reconstructed: 1,239 of 1,239.**
+Measured, not asserted -- `docs/functions.tsv` lists 1,239 entries below the
+line, 1,238 have at least one `patch_replace` inside them, and the one that
+does not is `0x0040A6A0`, which is `WndProc` and is REGISTERED into the
+`WNDCLASS` rather than detoured. That is the shape `CLAUDE.md` warns about
+under "not every reconstruction is a patch", and a count that only looked at
+patches would have reported 1,238 and left someone hunting a function that
+was finished long ago.
+
+The last one in was `FlowRecvMessage` (`0x004014C0`, 3,040 B), the
+flow-control receive path: three protocol messages -- data, nack and pulse
+ack -- eight exits, and a cumulative-ack retirement loop written out twice.
+
+**It is the weakest-verified function in the tree and that should be said
+plainly.** No DirectPlay session opens on this machine, so every counter in
+it reads 0 on every drive; `tools/vectors.py` cannot take it, because it
+reads globals and calls into the image; and `AM2_SELFCHECK=1` cannot, because
+the comm object is NULL before `install()`. It is verified by reading, and by
+the checks that caught four transcription errors on the way in.
+
+## OPEN: the reconstruction side of `mission` is ~12x slower than recorded
+
+Measured today over three runs: our side composes **533, 652 and 625** frames
+where `CLAUDE.md` records a band of 6,291-8,300. The original's side reads
+25,563 / 26,305 / 26,433 against its recorded 25,932 / 25,917 / 25,738 -- so
+**the original is unchanged and ours is what moved.** Two of the three runs
+predate this session entirely.
+
+It is not a correctness problem on the evidence available: the game log is
+identical at 13 messages, the object state dump is identical, and the widget
+tree is identical at 16 nodes, on every one of those runs.
+
+**Two more samples after FireWeapon landed: 471 and 546, against the
+original's 7,443 and 7,343.** Same band as the 533/652/625 above, and the
+same three artifacts identical both times. Worth recording because
+FireWeapon is the largest function in the tree and lands in the middle of
+the weapon path, so it was the obvious suspect the moment the gate failed --
+and it is not the cause. The band was already this low on commits that
+predate it.
+
+Note the ORIGINAL side also reads ~7,400 here rather than the ~26,000 above,
+so both halves moved with the machine between those sessions. Read the
+RATIO's direction, not either number alone: what stayed constant across all
+five runs is that ours is the short side, which is itself the reverse of
+what CLAUDE.md documents for this configuration.
+
+**THE TRACE TABLE IS NOT THE CAUSE. TESTED AND DISPROVED.**
+
+| | original | reconstruction |
+|---|---:|---:|
+| `TRACE=0` | 25,548 | **604** |
+| `TRACE=1` | 25,563 / 26,305 / 26,433 | 533 / 652 / 625 |
+
+604 sits inside the spread of the three traced runs, so turning tracing off
+changes nothing measurable. The prediction was written down before the run --
+"if both come back ~500-700, tracing is NOT the cause and the hypothesis is
+wrong and should be deleted, not amended" -- and this is that outcome, so it
+is deleted rather than qualified.
+
+The original's side is an unplanned control and a good one: `AM2_NOPATCH`
+installs no stubs whatever `TRACE` says, so its 25,548 against 25,563 is the
+instrument reporting no change where none is possible. Four samples over
+twelve hours, all 25,500-26,500.
+
+**So the reconstruction composes about 600 frames where the original composes
+about 25,500, and WHY IS NOT KNOWN.** What has been ruled out is the trace
+stubs. What has not been examined at all: the detour jump at every one of
+1,432 patched entries, GCC against MSVC 6 on this code, and whether some
+single hot reconstruction is disproportionately slow. The last of those is
+the one a profile would find in minutes and nobody has taken one.
+
+`AM2_AB_TRACE` exists now for anyone repeating this. Note that with `TRACE=0`
+there are no counters at all, since the counters ARE the stubs.
+
+**FOUR MORE SAMPLES, AND TWELVE COMMITS RULED OUT.** 582, 619, 573 and 589,
+taken while chasing what looked like a regression from a seam closure. They
+sit inside the 533-652 spread above, so nothing has moved. What they add is
+the ATTRIBUTION: 573 is the parent commit with the change stashed, and 589 is
+`291581c`, which predates this session entirely -- so none of the twelve
+commits made since is the cause, and neither is the change that was under
+suspicion when the gate first failed.
+
+Both halves ran the same `am2hook.dll` on every one of those, which the hash
+guard in `ab.sh` reports rather than leaving to trust; and `uptime` was 3.8,
+well below the 18-21 that makes any A/B figure meaningless.
+
+**Read this section, not `CLAUDE.md`, for the band.** CLAUDE.md still says our
+side sits at 6,291-8,300 and calls a departure from it the cheapest possible
+check -- which was true when written and is now an order of magnitude wrong.
+A commit message in this session asserted the opposite, that STATUS.md was the
+stale one; it was not, and the correction is recorded here because getting the
+direction backwards is exactly how a stale number survives being noticed.
+
+## `tools/ab.sh all` -- 17 configurations, one failure and it is the known one
+
+Run end to end after this session's work. Every configuration's real evidence
+is identical: logs match on all seventeen, every widget tree matches
+(`mpoptions` 131 nodes, `campaign` 35, `controls` 26, `mission` 16,
+`audiovol` 14, `movies` 9, `multi` 9, `menuscreens` 8, `difficulty` 7), and
+`bootcamp`'s 1,610-line object dump and `mpoptions`' five exact state dumps
+both match byte for byte. Nine configurations report ZERO differing pixels.
+
+The one failure is `mission`'s frame gate at **26157/640**, and CLAUDE.md
+already says what it is: our side's band went stale at roughly 600 against the
+original's 26,000, so that gate fails on every run and "the failure is not
+evidence of anything". `mission`'s own evidence -- state, 16 widget nodes, 13
+log messages -- is identical.
+
+Read `intro`, `mission` and `combat` pixel figures as meaningless by
+construction; their logs are the evidence and all three match.
+
+## CLOSED: `ab.sh mpoptions` is A/B clean -- widgets, state and log all identical
+
+**Our build EXITS when the multiplayer options screen is requested.** It is
+not a drawing difference and never was: 221,423 pixels is one side showing a
+panel and the other showing whatever was on screen when the process died. The
+drive's own symptom said so all along -- "could not settle the team button
+(got )" is an empty widget dump, which is what a dead game returns.
+
+Driven identically by the same pokes, under `AM2_WINE_OUT` with `WINEDBG=+seh`:
+
+| | original | ours |
+|---|---|---|
+| alive after the request | yes | **no** |
+| `ADDR_NAME_TABLE_COUNT` | 6 | 6 |
+| `ADDR_LEVEL_TABLE_COUNT` | 10 | 10 |
+| handshake checksums logged | six | none |
+
+Both tables parse correctly -- 6 `RULES` and 10 `MAP` lines, exactly what
+`mpmaps.txt` declares.
+
+**The fault is `MpPanelUpdate` +0xa2**, `mov 0x58(%eax),%eax` with
+`eax = rows[i]`, resolved with two anchors from that run's own patch lines.
+`MP_PANEL_OFF_ARMY_ROWS` (+0x258) is READ every frame and written NOWHERE --
+one use in the whole tree, and no `0x258` literal reaches the panel either.
+The original does the identical pair of dereferences, so the update is not
+what is wrong: **`MpPanelConstruct` never builds the four army-points rows.**
+
+Not fixed in the diagnosing commit on purpose. The original fills that array
+through a walking pointer rather than a `+0x258` literal, so the block has to
+be read out of the constructor; writing it from the shape of the update would
+be inventing a layout.
+
+Two false trails died by measurement and are recorded so they are not re-run:
+the `Lobby start` / `Releasing Comm Connection` pair before the death is
+ORDINARY STARTUP and the original logs both, and the map-list block added to
+`MpPanelConstruct` is cleared -- disabling it behind a switch leaves the exit
+exactly where it was.
+
+Still true and still worth acting on: this is the only configuration that
+reaches the multiplayer widget tree, so every comm reconstruction verified "by
+reading" has had no drive behind it for as long as this has been broken.
+
+## What is next, as a number rather than a direction
+## `ab.sh mission`'s `frames` figure is a MARKER COUNT, not a frame rate
+
+A `mission` run of HudSquadUpdate failed the frame gate at 7452/379 -- the
+original's side running away, as it always is, and ours below the gate's
+floor of 500. All three exact oracles passed on the same run: state
+identical, widget tree identical at 16 nodes, log identical at 13 messages.
+
+What settled it was a probe rather than a re-run. On a live Boot Camp
+mission our build composes **1,196 frames a second** under a load average of
+8, and HudSquadUpdate runs 9,688 times against HudSquadPaint's 9,688 -- one
+update per paint, exactly. So the reconstruction is neither slow nor broken.
+
+The `frames` number counts the per-frame `-dbg` markers stripped from the
+LOG, so it measures how much of the run was spent in live play, not how fast
+the game went. Under load the drive spends longer getting through the two
+dialogs and the marker count collapses while the frame rate does not. The
+widget tree matching at 16 nodes is the proof our side did reach live play:
+that artifact is taken after both dialogs are cleared.
+
+Read this one as a drive-timing gauge. Its evidence is the log, the widgets
+and the state, exactly as its own comment says the pixels are meaningless.
+
+**BUT THE TWO MEASUREMENTS DO NOT RECONCILE, and that is worth stating rather
+than leaving as a shrug.** The markers really are one per composed frame, and
+both sides emit them across their whole log -- ours from raw line 56 of 653,
+the original's from 484 of 26,170 -- so this is not our side reaching play
+late. It is the original composing 26,170 frames where ours composes 653 in
+the same wall-clock drive.
+
+That cannot be squared with the 1,196 frames a second measured above. At that
+rate a drive with any live play at all would show tens of thousands. Either
+the marker is not emitted once per ComposeFrame on our side, or the 1,196
+figure does not describe this configuration. **Both are measurements and one
+of them is wrong**, which is a sharper open question than "the band went
+stale".
+
+What is NOT in doubt: it predates this session -- CLAUDE.md records 533, 652
+and 625 across runs two of which are older than the work that first noticed it
+-- and it is not a defect the other artifacts can see, since `mission`'s
+state, its 16-node widget tree and its 13 log messages are identical every
+time.
+
+**THAT ANSWER WAS WRONG AND THE NEXT PROBE KILLED IT.** It read the recon
+log's last line -- `calculating region data...` -- as the mission still
+loading. Timed on both sides, RETURN to that message takes **2 s on the
+original and 1 s on ours**, so the load is not slow and is not where either
+side sits. A log that ENDS at a line means only that nothing was logged after
+it; with the per-frame markers being the only thing that follows, it means no
+frames were composed, which is a different claim and not the one made.
+
+Both sides also finish showing the MAP -- their finishing screenshots carry
+195 and 193 distinct colours with the same greens and browns -- so both reach
+live play. The dialogs are cleared on both.
+
+Driven by hand with the SAME clicks but more slack -- 46 s before BOOT CAMP
+instead of `ab.sh`'s 20, then its own 25 and 30 -- our side reaches live play
+and emits **33,494** markers in twenty seconds, comfortably past the
+original's whole-run 25,797. So the build is not slow at composing; it is
+slow at LOADING, and `ab.sh mission`'s fixed 30-second wait is enough for the
+original and not for us.
+
+That also disposes of the reconciliation puzzle above: the 1,196 frames a
+second and the 608 markers were never measuring the same thing, because the
+608 contains no live play at all.
+
+**`ComposeFrame`'s counter is BLIND and cannot be used here**, which cost a
+probe: it reads 0 in live play while the log takes 33,494 markers, because
+its caller is reconstructed and reaches it directly. Count the markers.
+
+**ANSWERED: THE MARKERS STOP WHILE THE GAME KEEPS DRAWING.** Our side does
+not compose fewer frames; it stops EMITTING the per-frame `-dbg` marker and
+goes on rendering. Measured in one drive:
+
+- after both dialogs, 7,891 markers
+- after six horizontal mouse-moves and 4 s, 8,638 -- already slowing
+- after six VERTICAL mouse-moves and 6 s, 8,638 -- **delta zero**
+- ten seconds idle, then scrolling back: still 8,638, so it never resumes
+
+The game is fine at that point. The control socket answers `pong`, the pause
+mask reads 0, `ctl pointer` is normal -- and scrolling again moves **202,859
+pixels**, which is a frame composed and presented after the markers stopped.
+So the `frames` figure stops being a frame count on our side partway through
+this drive, and the gate compares two different things.
+
+Ruled out along the way, each by a run rather than an argument: the initial
+wait (28,386 against 28,249 at 20 s and 46 s), the PAUSE (both sides read
+mask 0 -- now captured in the state artifact of every `mission` run), and
+TRACE (26,333 against 633 with `AM2_AB_TRACE=0`, unchanged).
+
+What is left is WHY the marker emission stops after a vertical scroll, in OUR
+code since the original's does not stop. Worth having found: it is the same
+log the A/B compares.
+
+**THE LOG'S SHAPE IS IDENTICAL ON BOTH SIDES, which narrows it further.** Each
+run is 13 header lines ending at `calculating region data...` and then nothing
+but markers to the end -- 633 of them on ours, 26,333 on the original's. So
+markers begin when the mission does, on both, and only the count differs.
+
+**And the launch is not the difference.** `ab.sh` passes `extra=""` for this
+configuration, so its command line is exactly the hand replication's.
+
+**Run ORDER is not it either**, tested by hand: the original driven first
+gives 20,212 markers and the reconstruction driven straight after it gives
+**8,421** -- not the 633 the suite reports. So inheriting the previous side's
+`Options.cfg` and running second do not reproduce it.
+
+What that run DID confirm is the scroll: with the mouse-moves included our
+side falls from ~28,000 to 8,421, which is the marker stop measured
+independently.
+
+So a hand replication of everything the suite does still lands an order of
+magnitude above the suite itself, and the residue is unexplained. **This is
+where the investigation stops being worth its cost**: five candidates have
+been excluded by runs, the shortfall is in a LOG COUNT and not in the game,
+and every other artifact this configuration produces is identical. Anyone
+picking it up should start by instrumenting `ab.sh` itself -- printing the
+marker count at each step of its own drive -- rather than replicating it a
+sixth time by hand.
+
+Worth stating plainly: this is not a defect in the game. Every other artifact
+this configuration produces -- the state, the 16-node widget tree, the 13 log
+messages -- is identical, the frame is demonstrably being composed, and the
+gate is the only thing that disagrees.
+
+Three explanations were offered and retracted before this one -- a stale band,
+a still-loading map, and two irreconcilable measurements -- and each rested on
+ONE artifact read in isolation. What settled it was changing one thing at a
+time and a screenshot diff that asked whether the frame had moved.
+
+## Driving to a live mission by hand needs ab.sh's WAITS
+
+Three probe attempts read `HudSquadUpdate=0` and looked like dead code. The
+drive was simply too impatient: `ab.sh` waits **25 seconds** after clicking
+BOOT CAMP at (306,143) and **30 more** after `key RETURN tap`, and sends the
+key by NAME rather than as scancode 28. With six-second waits the game sits
+on the briefing with the load bar full and composes nothing.
+
+`ComposeFrame` is the wrong liveness counter to check that with -- it is
+BLIND, its caller being reconstructed, so it reads 0 in a healthy mission
+and looks like confirmation that nothing is running. `HudSquadPaint` is an
+honest one on this screen. CLAUDE.md already says to read a liveness counter
+beside the one you care about; it does not help if the liveness counter is
+itself blind, so check blindspots.py for the one you pick.
+
+## COMPLETE, with the three blind spots each ruled out by measurement
+
+tools/remaining.py reads **0 game functions and 0 C++ static initializers**
+over every byte from 0x00401000 to the real CRT frontier at 0x00464420.
+
+The number is only worth as much as the method, and the method was wrong
+twice before it was right.  All three ways it could have been wrong are now
+either fixed or ruled out:
+
+| blind spot | how it was found | state |
+|---|---|---|
+| range: merged entries not split above the nominal CRT_START | six functions hidden, found by splitting the band by hand | fixed -- remaining.py splits the whole range |
+| range: the jump-table and thunk classifiers testing against the nominal line | a 45-entry table counted as a 180-byte function | fixed -- both test against CRT_REAL |
+| gaps: a function living where no entry covers | ruled out -- the entries tile .text from 0x00401000 to 0x00464420 with ZERO gap bytes | checked on every run |
+
+The tiling check is the one that can be ruled out rather than fixed, and it
+is the trig tables' rule applied to the function list: if a layout does not
+tile, one of the bases is wrong.  remaining.py prints it every run, so the
+claim stays verified rather than remembered.
+
+## The fourth blind spot: "CRT by position" is an inference, and it holds
+
+tools/crt.py labels 58 functions CRT from their own bodies and **171 more by
+sitting above the evidenced frontier**.  That second group is an inference,
+and if any of them were game code it would be untransposed work the counts
+cannot see -- they stop at 0x00464420.
+
+Two probes, and the sharper one is the second:
+
+- Referencing game-range data does NOT distinguish them.  97 of the 230
+  entries above the frontier touch 0x004F0000..0x00670000, because the CRT is
+  statically linked and its own statics live in the same .data.  A test that
+  cannot separate the two answers nothing.
+- CALLING game code does.  Exactly TWO entries above the frontier call
+  anything below 0x00462600, and both are explained: 0x004664C0 calls
+  ADDR_WIN_MAIN, which is the CRT startup doing its job, and 0x0046D8D0 is an
+  MSVC SEH unwind funclet -- `mov ecx,[ebp-0x50]; jmp WidgetDestruct`, sitting
+  just past int3 padding -- which is compiler-generated and which this port
+  does not reproduce by standing decision.
+
+So nothing above the frontier is game code wearing a CRT label.  Worth
+recording that the first probe was useless rather than only the second: a
+test with no discriminating power reads exactly like a passing one.
+
+## What is left, and why none of it is work
+
+The section below claimed 0 game functions.  That was an artifact of HOW the
+range was widened, not a fact about the work: `merges.real_functions()` stops
+splitting merged entries at the NOMINAL CRT_START, so every entry in the band
+above it was credited whole the moment one function inside it was
+reconstructed.  Six functions were hidden that way.
+
+This is the merged-entry error this file already documents twice -- once when
+the naive count read 0, and once when matching on exact start hid WndProc --
+recurring a third time, in the band that had just been added.  Widening a
+range without widening the SPLITTING that goes with it produces a number that
+gets better-looking as it gets more wrong.
+
+tools/remaining.py splits the whole range now.  Read its output; the table
+below is kept only for the description of what is not work.
+
+## The three groups that are not work
+
+Measured 2026-09-03. `tools/remaining.py` reads **0 game functions and 0 C++
+static initializers**, over the full range to the REAL CRT frontier
+(0x00464420, per tools/crt.py) rather than the nominal CRT_START -- which is
+26 KB low and would have hidden 112 game functions.
+
+What is still the image's, and why none of it is work:
+
+| | entries | bytes | why |
+|---|---:|---:|---|
+| linker thunks | 18 | 288 | one `jmp` each into the real body; an incremental-linking artifact the original source never had |
+| jump tables | 4 | 188 | data in `.text`, not code |
+| harness / IAT | 4 | 4,246 | ADDR_LOG, which src/inject/gamelog.c owns, and the three `jmp [IAT]` import thunks |
+
+The last group is the one worth being explicit about, because reconstructing
+any of it is a DEFECT rather than progress. Replacing ADDR_LOG with an empty
+function once silenced the game's log and blinded half of tools/ab.sh --
+CLAUDE.md records the five configurations spent that way. And DirectInput
+MUST go through its thunk, or our own import would resolve past
+dinput_hook.c's patch, which tools/checkhooks.py exists to catch.
+
+remaining.py classifies all three groups rather than counting them, and
+prints "nothing left to transpose" when the two real counts reach zero.
+
+## STALE: 82 functions, and 36 of them are one class
+
+Measured 2026-09-03 at 1,580 patches, by the method below (split merged
+entries through tools/merges.py, then containment WITHIN a real function):
+
+**82 functions, 4,636 bytes** -- which reconciles exactly with the 84 /
+4,732 measured earlier in the session: the difference is 2 functions and
+96 bytes, the two 48-byte pad handlers transcribed since. Same method,
+same answer, which is the first time two of these counts have agreed.
+
+The decomposition is new and it matters more than the total:
+
+| | functions | bytes |
+|---|---:|---:|
+| C++ static initializers | 36 | 896 |
+| real game functions | 46 | 3,740 |
+
+The 36 are the null-terminated function-pointer array at **0x00473004**
+-- MSVC's `.CRT$XC` table, run by `_initterm` -- together with the 16-byte
+incremental-linking thunks that jmp into them. They compute globals from
+a .data geometry block: 0x00427640 is `[0x51307c] = 0x68`, the record size
+that 0x004227DB then uses as a rep movsd count.
+
+**They are reachable, which was not obvious and was nearly assumed away.**
+Static initializers run from the CRT before WinMain, so the instinct is
+that a patch on one can never fire. It does: tools/launcher.c creates the
+process CREATE_SUSPENDED, calls LoadLibraryA remotely -- which runs
+DllMain, which is where install() lives -- and only THEN ResumeThread. So
+every patch is in place before the EXE entry point, hence before
+_initterm. A patched initializer is called by the CRT and its counter
+moves like anything else.
+
+Two ways to get this wrong, both avoided by measuring rather than reading:
+
+- A naive split reports **83 / 6,892** because it matches on exact start
+  and so misses that ADDR_WND_PROC is 0x0040A6B0 filed under an entry
+  beginning 0x0040A6A0 -- 2,256 bytes of reconstructed code counted as
+  outstanding. Containment within the real function fixes it. This is the
+  merged-entry error one step along, and it bit again while writing this.
+- Roughly half the 16-byte "functions" in any raw list are pure `jmp`
+  thunks with twelve nops after them. Nothing to transcribe. refs_to
+  answers [] for all of them, which proves nothing -- it cannot see a
+  call rel32, as CLAUDE.md says.
+
+## STALE: it is 112 functions, not 31 -- and not 0
+
+The "31 remain" table below is stale twice over. Most of its entries have
+since been transcribed, and the method that produced it was wrong in a way
+that gets MORE wrong as the work finishes.
+
+Counting docs/functions.tsv entries below CRT_START and dropping any entry
+that contains a patched address now answers **0 functions, 0 bytes** -- which
+is the merged-entry false positive CLAUDE.md already documents for
+coverage.py, arriving here by a different route. An entry that is several
+functions is credited whole the moment ANY of them is patched, so the count
+collapses to zero exactly when the last straggler in each merged entry is
+still outstanding.
+
+There is a concrete counterexample and it was found by accident, reading
+SoldierNameOf's callers: 0x004158D0 is a thiscall HUD painter that nothing
+has reconstructed, and it sits inside HudSquadDestruct's merged 2,800-byte
+entry at 0x00415850. The naive count calls it done. It is also, at 2,568
+bytes, the LARGEST thing left.
+
+Splitting every merged entry through tools/merges.py first -- which is what
+CLAUDE.md says to do before ranking anything -- gives the real figure:
+
+**112 functions, 15,796 bytes.**
+
+| bytes | address | name |
+|---:|---|---|
+| 2568 | 0x004158D0 | -- |
+| 1200 | 0x00455340 | -- |
+| 1184 | 0x00431E10 | ADDR_CHECK_MAP_RULES |
+| 976 | 0x00421E80 | ADDR_EVT_CONDITION |
+| 640 | 0x004171C0 | -- |
+| 624 | 0x00411C20 | ADDR_COMM_FRAME_PRE_A |
+| 544 | 0x00457E50 | -- |
+| 512 | 0x00431A30 | -- |
+| 464 | 0x0044CDA0 | -- |
+
+and a long tail of DirectPlay callbacks, save-list handlers and menu widget
+methods from 336 bytes down. Note how much of the tail is comm: those are
+verifiable by reading only, on a machine that opens no session.
+
+Do not hand-keep this table either -- recompute it. The one-line version is
+merges.real_functions() to split, merges.reconstructed() to subtract.
+
+## STALE: the earlier "31 remain" table, kept for the record
+
+Reported for several turns, and it does not survive being measured. Taking
+docs/functions.tsv below CRT_START, subtracting every patch_replace target
+and the two REGISTERED reconstructions that are not patches, leaves **31
+functions, 26,896 bytes**:
+
+| bytes | address | name |
+|---:|---|---|
+| 3328 | 0x00416340 | ADDR_HUD_SQUAD_DETAIL |
+| 2064 | 0x00414F20 | ADDR_SELECT_WEAPON |
+| 1952 | 0x00418480 | ADDR_HUD_CHAT_SEND |
+| 1472 | 0x0044D110 | -- |
+| 1456 | 0x00453280 | ADDR_SAVE_LIST_CTOR |
+| 1296 | 0x00431E10 | ADDR_CHECK_MAP_RULES |
+| 1200 | 0x0042BEA0 | ADDR_LOAD_ATL_FILE |
+| 1168 | 0x00425300 | ADDR_STATE2_ENTER |
+
+plus 23 more from 1,024 bytes down to 192. Most of the tail is the menu
+widget layer -- constructors and destructors for the save list, the game
+menu, the overwrite and message dialogs, the multiplayer spinner, the three
+HUD panels.
+
+**Where the wrong number came from.** `docs/boundary.md` reports the
+Win32/DirectX boundary, and that IS essentially finished -- 0 COM sites and
+2 unreachable MessageBoxA sites outstanding. "The boundary is done" is true
+and answers a narrower question than "every game function is
+reconstructed". The two got conflated, and the second was then reported as
+measured when nothing had measured it.
+
+CLAUDE.md already warns about exactly this in another form: read the figures
+from the generated doc rather than from prose, and know which question the
+doc answers. The boundary doc's own header says "Only game code is counted"
+and means only game code that touches the boundary.
+
+**A patch count cannot detect this either.** 1,516 patches is more than the
+1,239 entries below the line, because merged entries take several patches --
+so the total going up says nothing about coverage of the function list.
+
+Three of the four addresses above the line that look unpatched are NOT
+functions and should never be counted: 0x0045CAA0 is the retail-stubbed
+logger (a bare `c3`, patched by src/inject/gamelog.c, and reconstructing it
+as an empty update once silenced the game log), and 0x00463390, 0x00463396
+and 0x00464410 are one-instruction `jmp [IAT]` import thunks, one of which
+must stay a thunk for dinput_hook.c's IAT patch to be reached.
+
+## The standalone is drivable now, and it was accepting input into a hole
+
+`make run PORT=1` launches the standalone and it REACHES THE MAIN MENU and
+plays: title screen with every button painted, BOOT CAMP through to a live
+mission with Sarge on the map, the HUD, the radar and the squad panel, and the
+game clock ticking. The previous session recorded `PORT=1` as not working, on a
+run that showed `control: disabled` and `DDERROR 80004001` in `InitDirectDraw`.
+Nothing in the code was wrong: that is what the standalone does when it is
+launched without a Wine desktop, which is already written down as the way to
+run it. A launch error, read as a defect.
+
+**What WAS wrong is that none of the injected input reached it.** The standalone
+links `src/inject/input.c` and `src/inject/control.c`, so every `key`, `type`
+and `mouse` command was accepted and acknowledged -- and dropped. Two things
+were missing and each is invisible on its own:
+
+- **Nothing called `input_init()`.** `dllmain.c` and `dinput_hook.c` call it and
+  neither is in the standalone link.
+- **Nothing applied the overlays.** In the injected build `dinput_hook.c` wraps
+  the device's own `GetDeviceState` and `GetDeviceData` by patching the game's
+  IAT. The standalone has no IAT to patch and no original device to wrap -- our
+  `PollKeyboard` and `PollMouse` ARE the poller -- so the two overlays are
+  applied there instead, at the points that hook applies them:
+  `input_overlay_keyboard` onto the state just read and before `MirrorModifier`,
+  so an injected shift mirrors the way a real one does; and `input_take_events`
+  in `PollMouse`'s drain loop when the device has nothing left, so injected
+  events come after real ones rather than masking them. `input_pump` runs once
+  per poll, not once per event -- inside the loop it would retire a tap before
+  the game had seen its press.
+
+**The symptom read exactly like a dead port.** The menu painted, the cursor
+moved when written (`cursor` writes globals, which needs no device at all), and
+BOOT CAMP even sat highlighted -- so the screen said the widget layer was
+alive. Only `ctl keys` distinguished it: nothing down while a key was held.
+That is the command's whole purpose, and this file already says why -- `state`
+is what the harness is injecting and `keys` is what the game sees, and a
+channel broken in between shows up in one and not the other. First time the
+distinction has been load-bearing.
+
+`counts` says `(no counters: this build has no patch stubs)` here, correctly:
+the counters ARE the patch stubs and the standalone has no patches. Do not read
+that as a broken socket.
+
+Measured after the fix, on a live Boot Camp mission, against the injected build
+and the original doing the same drive:
+
+    W held, x per second   standalone 85, 91, 92, 91
+                           injected   86, 91, 92, 91, 92
+                           original   92, 91, 91, 65, 91
+
+    W and A held           standalone circle 20 wide, 17 tall
+                           injected   circle 20 wide, 18 tall
+                           original   circle 20 wide, 18 tall
+
+so the standalone plays, and today's route-gate fix is in it.
+
+## The whole suite after both of today's changes
+
+`tools/ab.sh all`, 17 configurations, one run, after the route-gate fix and the
+standalone input wiring:
+
+| | evidence |
+|---|---|
+| bootcamp | state identical (1,610 objects), log identical, 22 pixels |
+| windowed | log identical, 0 pixels |
+| intro | log identical (its pixels are two unsynchronised playbacks) |
+| audio | log identical, 22 pixels |
+| mission | state, widgets and log identical; frame gate FAILS |
+| combat | log identical; frame gate FAILS |
+| campaign | widgets identical (35), log identical, 2 pixels |
+| controls | widgets identical (26), log identical, 0 pixels |
+| difficulty | widgets identical (7), log identical, 0 pixels |
+| audiovol | widgets identical (14), log identical, 45 pixels |
+| menuscreens | widgets identical (8), log identical, 0 pixels |
+| movies | widgets identical (9), log identical, 0 pixels |
+| multi | widgets identical (9), log identical, 0 pixels |
+| mpoptions | state identical (5), widgets identical (131), log identical (35), 151 pixels |
+| df | log identical (24), 0 pixels |
+| state3 | state identical, log identical, 0 pixels |
+| quit | log identical, 0 pixels |
+
+So every artifact this suite compares is identical everywhere, and the only two
+failures are the two frame gates -- `mission`'s, which this file already
+documents as failing for reasons nobody has established, and `combat`'s, which
+the previous commit measured as PRE-EXISTING and NARROWED by the movement fix.
+
+**`combat`'s gate points the OTHER WAY from `mission`'s, on the same machine
+and the same build, and that is not yet explained.** `mission` reads
+26,369/8,461 -- the ORIGINAL running away, which this file calls structural and
+attributes to the `AM2_NOPATCH` half having no trace stubs in front of it.
+`combat` reads 16,505/44,385 and 16,592/43,432 on two runs, with OURS the
+runaway. One build cannot be both slower and faster than the original for the
+reason the trace stubs give, so at least one of those two configurations is
+failing for a different reason than the file states.
+
+Recorded rather than guessed at. What would settle it is what the `frames`
+number actually counts -- the `-dbg` per-frame markers, which is not the same
+question as how many frames were composed -- and nothing has checked that the
+two sides emit one marker per frame in the same places.
+
+
+## CLOSED: the Lock/Unlock bracket, and the queue that kept being wrong about it
+
+A goal of its own, separate from the Win32/DirectX boundary: find the game's
+software RASTERISERS by which functions call `LockSurface`/`UnlockSurface`.
+
+- **The Lock/Unlock bracket batch is a different goal from the boundary, and
+  its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
+  `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
+  all. Measured: **29 functions** call the bracket and **29** are reconstructed
+  — the bracket is COMPLETE, closed by HudSquadDetail, and the rasteriser
+  goal this item tracks is finished
+  — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
+  the last of which the old list predates, and the menu-widget painters that
+  have landed since.
+
+The queue for it was hand-kept beside a ratchet, and that is the part worth
+keeping now the goal is closed -- it was wrong in both directions, repeatedly,
+and each time the correction was a paragraph rather than a fix:
+
+  **That shortlist listed functions that were already done**, which is what a
+  hand-kept queue beside a ratchet always comes to: it named `0x0041CC40`,
+  which is `DrawHLine` and had been reconstructed for some time, and
+  `0x0041C7F0`, which is `DrawBlip3` and went in the same day this sentence
+  was corrected. A count that only goes up cannot tell you a candidate has
+  been taken; only re-reading the list against the patch list can.
+
+  **And it did it again one entry later**, listing `0x0041C8A0`, `0x0041CA50`
+  and `0x004149B0` as outstanding when all three -- `DrawBlipPulse`,
+  `DrawBlipSquare` and `RadarBlipColour` -- had landed with the radar. The
+  radar's five primitives are now all ours. So is `DrawSelection`
+  (`0x00462120`, 688 B), the leader's caret and the selected units' health
+  bars, which is the first of the batch that ordinary play actually reaches.
+
+  Rather than keep writing the queue down, generate it -- the same argument
+  that put the count in `tools/checkclaims.py`.
+
+  **THE QUEUE IS EMPTY AND THE HAND-KEPT VERSION WAS WRONG IN BOTH
+  DIRECTIONS.** It said "**four** functions and none of them small" and then
+  listed TWO, `0x00462600` and `0x00416340` -- a count and a table that had
+  stopped agreeing with each other, in a paragraph whose whole argument is
+  that queues should be generated rather than written down. Both are
+  reconstructed now, checkclaims reads (29, 29) for the bracket, and
+  tools/remaining.py reads 0 game functions.
+
+  So this entry is closed, and the way it failed is the argument for the
+  advice above it: the list drifted from its own count before it drifted from
+- **The Win32/DirectX boundary is DONE, and the reasoning is
+  `docs/boundary-notes.md`.** Every Win32 call site in the image that can
+
+The rule that came out of it is in CLAUDE.md and is the reason this section is
+here rather than there: **generate the queue, do not write it down.** A count
+that only goes up cannot tell you a candidate has been taken, and a list beside
+a count drifts from the count before either drifts from the code.
+
+
+## OPEN: what no drive here reaches, and what windowed mode looks like today
+
+Moved out of CLAUDE.md, which is a policy file and had been carrying these as
+though they were rules. They are state: each is true of this machine and this
+suite today, and each would be closed by a drive nobody has written.
+
+- Windowed mode runs and is worth using as a second configuration — the window
+  is created, sized and positioned correctly (client area 640x480 at (4,30))
+  and `CalibratePalette` fires. **It no longer stays black**: this entry used
+  to say Wine hands back no lockable primary and the client area never draws,
+  and that is not what happens here now — the area paints, mostly white, with
+  a blinking 10×10 element in it. White rather than the title art is still not
+  right, so fullscreen remains the configuration to verify against; what
+  changed is that "it is black" can no longer be quoted as the reason a
+  windowed comparison is trivially exact.
+- Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
+  in the original — it publishes an uninitialised descriptor after a successful
+  Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.
+- **NO CONFIGURATION IN THE SUITE REACHES COMBAT, and that is one measurement
+  rather than a dozen separate mysteries.** On a Boot Camp mission driven past
+  both dialogs, with `ObjIsItem` climbing past 84,000 and the frame ticking,
+  `ShotStrike`, `ApplyShotDamage`, `DamageObject`, `CreateMissile`,
+  `FireWeaponAtPoint` and `FireWeaponAtObject` ALL read 0 -- and none of those
+  counters is blind. Sarge stands there; nothing fires and nothing is hit.
+  Pressing SPACE, both CTRLs, ALT and RETURN changes none of them.
+
+  So every function whose only route is "something took damage" is cold for
+  ONE reason, and the entries below that used to explain themselves
+  individually -- `RemoveFromItemList`, `FreeItem`, `ShooterReact`,
+  `ApplyObjFrame`'s DamageItem route -- are the same fact said four times.
+  Getting any of them exercised needs a drive that makes a unit shoot, which
+  this project does not have and which would be worth more than several more
+  reconstructions: it would unlock the whole combat-consequence layer at once.
+
+- **`RemoveFromItemList` is unexercised for a now-known reason.** Its gated
+  caller is `FreeItem` (`0x004285F0`), which dispatches on the item kind and is
+  the only route that unlinks. Neither runs on a campaign drive: 325 items are
+  added during load and none is destroyed in the ~25 s observed, because
+  nothing in that window shoots anything. Reaching either needs a mission
+  driven long enough for something to die, which is a drive this project does
+  not yet have -- not a missing code path.
+- `CheckSaveTag` executes; it is reached by the save-file header read at
+  `0x00425950` on any campaign start with a save present. The entry below
+  predates that and is left for the others.
+
+The durable half of all this is in `docs/combat.md` -- that no configuration
+reaches combat is one measurement rather than a dozen mysteries -- and in
+`docs/oracles.md`, which lists what checks those functions instead.
+
+  - **CONTINUED (2026-09-11): narrowed to AiTrooperStep's region-hop, still not
+    the instruction.** At pump 2151, 0x3fa: the port takes the region hop and
+    replans to a direct move; the hybrid takes the region-hop SKIP (line 3435:
+    `(ROUTE_GOAL==pt && PREV_REGION==fromRegion) || toRegion==fromRegion`) and
+    keeps its A* route. Yet fromRegion(41), PREV_REGION(42), toRegion, pos,
+    dest, and the FULL region graph are byte-identical: kRegionOfCell md5,
+    kRegionNext[41], region 41's 61 link records (to/from/into), kRegionCost,
+    cell weights, and the reveal grid at every candidate tile all match, and
+    MiddleRegionLink/NearestAllowedTile/TraceTileLine/BeginMoveTo/PointRuleDefault
+    all match the disasm. So the skip condition evaluates differently from
+    identical inputs -- impossible for correct deterministic code. The one thing
+    NOT yet diffed instruction-by-instruction is AiTrooperStep's OWN region
+    block (region.cpp:3420-3488, orig 0x004049C0's region section: how it
+    derives fromRegion/toRegion, the skip test, and pt) -- the prime remaining
+    suspect for a transcription bug, since its callees are all verified. NEXT:
+    diff that block against 0x004049C0 line by line.
+
+
+## OPEN ITEMS AND FINDINGS (moved from CLAUDE.md, 2026-09-14)
+
+## Open items
+
+- **The Lock/Unlock bracket goal is CLOSED** -- 29 functions call the bracket
+  and 29 are ours. See STATUS.md for where it stands and for the queue that
+  kept being wrong about it. Two things from it are durable and stay here:
+
+  Do not hand-edit that pair. `tools/checkclaims.py` recomputes it, and it is
+  the reason this sentence is right: the count moved from 10 to 11 the moment
+  `TyperPaint` was written, and the check failed the build rather than letting
+  the prose go quietly stale — which is the whole argument for the tool.
+
+  Do not hand-edit that pair. `tools/checkclaims.py` recomputes it, and it is
+  the reason this sentence is right: the count moved from 10 to 11 the moment
+  `TyperPaint` was written, and the check failed the build rather than letting
+  the prose go quietly stale — which is the whole argument for the tool.
+
+  `0x00454F00` came off the shortlist as `LabelDraw`, and it opened a subsystem
+  rather than closing a rasteriser: it is vtable slot 1 of a menu widget class,
+  one of **thirty-three five-slot vtables** laid out consecutively from
+  `0x0046FAB8` to `0x0046FD38`, each referenced by exactly one constructor and
+  one destructor. So the menus are a class tree with five virtuals apiece, the
+  edit box (`0x00454C10`, whose focus method installs `g_charHandler`) is the
+  class one entry earlier, and `src/game/win32/widget.cpp` is where the rest of
+  it goes. A vtable array is worth walking the moment one of its slots is
+  reconstructed — it says how big the subsystem is before any of it is read.
+
+  **The five slots are 0 destructor, 1 paint, 2 update, 3 focus, 4 repaint**,
+  and naming them needed the whole array rather than any one vtable: slot 3 is
+  the same function in 30 of the 33 and slot 4 in 29, so those are the base's
+  and everything else is an override.
+
+  **Slot 2 went in as "click" and that was wrong**, from a glance at
+  `0x00454BD0` that saw a function pointer being called and stopped there. Its
+  callees settle it: the three queries around the call are `IsKeyDown`,
+  `KeyChanged` and a consume, the scancode is 1 — ESCAPE — and
+  `!down && changed` is the key being RELEASED, the same idiom as the
+  in-mission ESCAPE handler. It is the per-frame update, `0x00454BD0` is the
+  override that gives a dialog its cancel key first, and the base at
+  `0x00453E80` places the widget and recurses into its children — which is why
+  `WidgetScreenRect` runs a million and a half times. **Name a virtual from
+  its callees, not from the shape of its body.**
+
+  **Drive the input and see where the game ends up.** The menu layer turned
+  out to be checkable far more sharply than by comparing frames.
+  `WidgetUpdate` is a dialog's whole keyboard interface — UP and DOWN and TAB
+  move focus, SPACE and RETURN repaint the focused child and then fire its
+  handler on RELEASE — and four of its five branches were confirmed in one run
+  by pressing the keys: DOWN walks the OPTIONS highlight AUDIO → CONTROLS →
+  DIFFICULTY, TAB does the same to the pixel, SPACE opens CONTROLS, RETURN
+  opens SELECT DIFFICULTY. ESCAPE closes a dialog through `WidgetUpdateCancel`
+  the same way.
+
+  This beats the A/B on its own ground for anything that causes a state
+  transition. It needs no second run and no budget, and it discriminates a
+  wrong scancode constant — which an A/B never can, because both sides are
+  driven with the same key and would agree about ignoring it.
+
+**`drive.sh ctl widgets` dumps the widget tree, and it is an EXACT oracle
+where the pixels are a blunt one.** The menu layer's defects are too small for
+a whole-frame comparison — measured, not guessed: a wrong toggle sprite is 212
+pixels, a WM_CHAR handler that is never installed is 72, an unrepainted list
+row is 0, and two flags the base constructor writes are 0. Every budget that
+survives a blinking caret is above all of those.
+
+The state those defects live in is in the tree. `widgets` walks it from
+`0x0065A058` — where the dialog opener at `0x00451210` stores whatever dialog
+is up — and prints each node's rectangle, vtable, sprite, focused child and
+flags, with pointers renumbered in first-seen order the way `tools/actdiff.py`
+renumbers them. The CONTROLS dialog is 25 nodes and they come back **byte for
+byte identical** from the original and from the reconstruction, so `ab.sh`
+compares them with `diff` and no budget at all. Setting the base constructor's
+`0x0050` to 0 — invisible to all three pixel frames — changes all 25 lines.
+
+**A first-seen index cannot see a SUBSTITUTION.** Pointers are renumbered so
+the dump survives the heap moving, which is the same trick `tools/actdiff.py`
+uses — and it made the oracle blind in exactly the way it was built to fix.
+Forcing `TogglePaint` to the wrong sprite left the tree identical, because the
+substituted sprite is first-seen at the same position and takes the same index:
+`spr=10` on both sides, 212 pixels apart on screen. The sprite's own `id` is
+printed beside the index now, and reads 1576448 against 1576449. **Renumbering
+buys reproducibility and blindness in the same stroke — carry one real datum
+beside every renumbered pointer.**
+
+**Two ways a debug dump can take the game down, both hit here.** Reading the
+sprite id without a range check faulted; and the pointer was read in the
+declaration's initialiser, which runs BEFORE the `if (!w)` guard below it, so
+every null child faulted. Both closed the control socket mid-reply, which fails
+the run the dump was meant to explain. A diagnostic that can crash is worse
+than no diagnostic.
+
+**Field `0x0040` is deliberately NOT in the dump.** It is the one the
+constructor never writes, because `ButtonUpdate` computes it before anything
+reads it, so for every widget whose update has not run it holds whatever the
+allocator left: it came back as 25, 1 and 27,346,604 on runs that were
+otherwise identical. Two runs compared by hand happened to agree, which is how
+it got into the first version. **An uninitialised field cannot be part of an
+exact oracle**, however meaningful it is when it is set.
+
+    **`tools/ab.sh controls` is the menu A/B.** That dialog is
+  78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
+  VEHICLE" — and the dialog itself comes out **0 of 786,432**. Its budget is
+  200, for the cursor and nothing else; see below.
+  Two clicks from the title screen, no typing and no mission:
+  the cheapest gameplay-free configuration in the suite, and the only one that
+  compares the menu widget layer at all, since `bootcamp` and `campaign` merely
+  pass through the menus and the game composes no frames while a dialog is up.
+
+  **Three runs agreeing is not determinism, and this budget was 0 for exactly
+  as long as it took a fourth run to disagree.** Driving it by hand first gave
+  54 pixels in a 10x13 box at the cursor. That looked like an artefact of two
+  clicks landing at different moments, and three `ab.sh` runs at 0 seemed to
+  confirm it — so the budget was tightened to 0 with a comment saying it had
+  been measured rather than reasoned. It had been measured; three times is
+  simply not enough for something that happens about one run in five. The
+  fifth run came out at 45, in the same 10x13 box.
+
+  So the pointer is not reproducible frame for frame even when both sides are
+  driven identically, and 200 covers the box. **When a figure is going to
+  become a budget, ask how rare a disagreement would have to be to hide from
+  the sample you took** — three clean runs cannot distinguish "never" from
+  "one in five" with any confidence at all.
+
+  What survives is the useful half: the DIALOG is exact, and the difference
+  when there is one is entirely the cursor. That is worth knowing, because it
+  means a handful of pixels here is never a caption.
+
+  It fails when it should: clearing the label background with the ink colour
+  rather than the paper colour puts it 17,110 pixels over.
+
+  **It takes TWO shots, and any configuration may.** `ab.sh` compares every
+  frame a run leaves behind, not only the last one — `controls` grabs the
+  OPTIONS menu between its two clicks, and the comparer checks both against
+  the same budget. That was added because a menu is mostly transients and a
+  settled final frame cannot show one.
+
+  **It did not do what it was added for, and that is worth knowing.** Three
+  mutations that are genuinely wrong code passed the single-frame version —
+  `WidgetTakeFocus` focusing the obvious widget instead of the parent's first
+  child, `WidgetRepaint` never deferring to an ancestor, and both flags
+  `WidgetConstruct` writes as 1 — and all three still pass with the second
+  frame in. So the sample was not too late; that state simply does not reach
+  the screen on either of these two. The second frame is still worth having,
+  because it is discriminating on its own (93,347 pixels for a
+  `WidgetScreenRect` error, independently of the final frame's 305,939), and
+  it covers a screen nothing else did. **Mutation-check an extension of a test
+  before crediting it with anything** — extending a test is not the same as
+  extending its reach.
+
+  The sizes quoted for the next candidates were off as well (`0x00413610` is
+  128 B, not 256; `0x00433350` is `0x00433360` at 288 B), which is what
+  `tools/merges.py` was written to fix.
+
+  Worth being clear about what this item is: the bracket finds the game's
+  software RASTERISERS, which are a rewrite goal of their own. It is not the
+  Win32/DirectX boundary and finishing it is not required for that boundary to
+  be complete — every lock in the image already goes through our `LockSurface`.
+  The line trio is done -- `DrawVLine` (`0x0041CBA0`), `DrawHLine`
+  (`0x0041CC40`) and the `DrawRect` (`0x0041CDC0`) that calls both, all in
+  `win32/mapdraw.cpp`. Worth knowing before taking the next one: both line
+  drawers Lock and never Unlock, so the pairing is the caller's, and several of
+  the 29 will be half-brackets like that. `DrawViewRect` (`0x00413610`) is the
+  matching half for all three -- it Locks once, draws the whole outline, and
+  Unlocks once -- so **the pairing is per FEATURE, not per function**, and a
+  count of "functions calling the bracket" will keep finding halves. Worth knowing too that none of the
+  three executes on any drive this project has -- being a rasteriser does not
+  make a function reachable.
+  **Generate the queue, do not write it down.** That shortlist was wrong in
+  both directions more than once -- naming functions that were already
+  reconstructed, and giving a count that disagreed with its own table, in a
+  paragraph whose whole argument was that queues should be generated. A count
+  that only goes up cannot tell you a candidate has been taken; only re-reading
+  the list against the patch list can, and nobody does that. The history is in
+  STATUS.md.
+
+  Worth being clear about what this goal was: the bracket finds the game's
+  software RASTERISERS, which is a rewrite goal of its own. It is not the
+  Win32/DirectX boundary, and the pairing is per FEATURE rather than per
+  function -- both line drawers Lock and never Unlock, so a count of "functions
+  calling the bracket" keeps finding halves.
+  actually execute is inside reconstructed code or incidental, and all 207
+  confirmed COM dispatch sites below the CRT are ours. **Read the figures from
+  `docs/boundary.md`, never from prose here** -- quoting a generated number in
+  prose is how three separate figures in this file went stale, and one of them
+  was in this very bullet.
+
+  Four things from it that change how you WORK rather than what you know:
+
+  - **A vtable call is only COM if `this` is PUSHED.** An i386 MSVC C++ virtual
+    is thiscall and keeps `this` in `ecx`; both compile to the same
+    `mov vt,[obj]` / `call [vt+N]`. Whichever appears CLOSEST to the call wins.
+    145 of 353 in-game sites are C++ rather than COM, and a survey matching on
+    shape alone reports the engine's own destructor chains as DirectX.
+  - **Creating or destroying an OS object is boundary work; operating on a
+    handle you were given is not.** That line has to be the same for kernel
+    objects as for COM or the word stops meaning anything.
+  - **Pick the next target by boundary density, not by import count** -- but the
+    denominator is wrong for one entry in eight, because `functions.tsv` runs
+    neighbours together where it cannot see a boundary. Run `tools/merges.py`
+    before ranking anything.
+  - **A tool that recommends targets has to know what is already DONE**, and
+    three separate ways of not knowing bit within an hour: it ranked out of a
+    description of the ORIGINAL image, it let unclassified sites through as if
+    unknown meant COM, and not every reconstruction is a `patch_replace`.
+
+  **A function declined on density can still arrive because the layer around it
+  did**, which is what happened to all three of the last declines. A density
+  ranking does not decide what gets reconstructed, only what gets reconstructed
+  FIRST.
+- **`tools/samission.sh` IS THE SAME COMPARISON IN PLAY**, and it is the
+strongest check the port has. It drives both builds to the same point of the
+same Boot Camp mission -- past the briefing and the instruction sign, into
+sub-state 0x21 -- and diffs the whole object table with NO budget: 1,609
+objects, each with type, flags, army, position, tile, both rectangles,
+health, cell count, AI mode and pose. It reads IDENTICAL at 1,610 lines.
+
+Two things make it work where four rounds of hand-driving did not. The cursor
+is placed through the CONTROL SOCKET, which writes the game's own three
+globals, so both builds take identical coordinates -- a relative move lands
+somewhere else, because Wine's acceleration is non-linear. And the button is
+still xdotool's on both sides, because the standalone has no DirectInput hook
+and the socket's `mouse` is inert there; using the same real button keeps the
+two drives the same.
+
+**MUTATION-CHECKED, AND THE MUTATION HAS TO BE STANDALONE-ONLY.** Both halves
+build from one tree, so an ordinary edit changes them together and the diff
+stays empty -- the corpus-derived-from-the-model trap in a new shape. Guarded
+with `#ifdef AM2_STANDALONE`, adding 1 to SetMaxHealth's argument fails the
+run and names the objects and the field: health 60 against 62, 138 against
+140. Restored, it reads identical again.
+
+It also refuses to pass on nothing: a dump under 100 lines is a VOID that
+names ArmyMenMutex, because two empty tables diff as identical and that is
+how three wrong conclusions were reached in one session.
+
+**THE PORT'S LIVE OBJECT STATE IS IDENTICAL TO THE ORIGINAL'S, all 1,610
+lines of it**, and that is what the control socket was added to find out.
+Driven to the same point of the same Boot Camp mission -- past both dialogs,
+sub-state 0x21, the clock running -- `tools/objdump.py --table` gives the two
+builds the same 1,609 objects with the same type, flags, army, position,
+tile, both rectangles, health, cell count, AI mode and pose. Not a budget, not
+a pixel count: a diff with no slack that comes back empty.
+
+That is a far stronger statement than `tools/samenu.sh`'s title screen,
+because it is taken in PLAY rather than at a static menu, and it is the
+artifact `ab.sh bootcamp` already treats as its sharpest -- the one that has
+caught a wrong field five times where the pixels and the log agreed.
+
+**AND IT SETTLES A BUG REPORT THAT FOUR ROUNDS OF PROBING COULD NOT.** The
+port was reported unable to move Sarge. With the cursor placed ABSOLUTELY
+through the socket rather than by relative motion -- which Wine's
+acceleration makes land somewhere else, and which is why every earlier
+attempt was inconclusive -- a click at the same point moves Sarge in NEITHER
+build: `pos=1743,1052` before and after, on both. So the click is not a move
+order, the port is not diverging, and the thing to fix is the drive rather
+than the reconstruction.
+
+The general shape is one this file already states and I still had to learn
+again here: **a bug report about the port needs the ORIGINAL measured the
+same way, first, with an artifact that cannot pass on nothing.** Two of the
+comparisons on the way to this one came back "equal" because both sides were
+EMPTY -- an objdump against the wrong port, and an A/B whose drive never
+reached the mission.
+
+**AN A/B CAN PASS ON AN EMPTY STATE DUMP, and it did.** `tools/ab.sh`
+compares the object table only `if [ -s ... ]` on both sides, so a run where
+the drive never reached the mission produced two EMPTY dumps, skipped the
+comparison silently, and reported **A/B clean** on a four-line log and 0
+differing pixels. The cause was three leftover standalone processes holding
+`ArmyMenMutex` -- `tools/samenu.sh` was killing the `wine explorer` wrapper
+by pid and not the game beneath it -- so both halves exited early and
+compared nothing.
+
+This is the sibling of the missing-file case this file already records, where
+"two missing files diff as identical". Empty ones do too, and the `-s` guard
+that fixed the first hides the second. The configurations that INTEND a dump
+now leave a marker beside it, and an empty dump with a marker is a VOID that
+fails the run and names the likely cause. Tested both ways: with a decoy
+holding the mutex it fails and says so, and without one it reads the usual
+1,610 lines, 13 messages and 22 pixels.
+
+The reading to take is the one this file keeps arriving at from new
+directions: **a clean verdict on a configuration whose evidence is missing is
+worse than no run**, and the artifact counts are what tell the two apart.
+
+**`tools/samenu.sh` IS THE STANDALONE BUILD'S A/B, and it is the only place
+the port's headline claim is checked rather than looked at.** It runs the
+injected build and the standalone through the same startup, then compares the
+two things that CAN be compared: the game's own log lines, which come out
+identical at five messages, and the title screen, which is static on both
+sides. Measured: **0 of 307,200 pixels** on a run where the cursor happens to
+land in the same place, 45 when it does not.
+
+It is deliberately not a configuration of `tools/ab.sh`. That compares one
+binary with and without our patches; this compares two DIFFERENT executables,
+and wiring it in would have meant teaching every stage about a second one.
+
+Tested in the failing direction, which took three tries and each failure was
+the SCRIPT rather than the port:
+
+- `set -e` aborts on a failing last command in an `&&` list, so a `kill` of a
+  process that had already exited took the script down -- after it had
+  printed that it PASSED, leaving a passing run reporting failure.
+- doing that kill BEFORE the comparison ended the script silently, which read
+  exactly like the budget check failing.
+- `set -e` also aborts on a failing command substitution, so `SA_PID=$(cat
+  ...)` on a pid file that had not been written yet exited before anything
+  was compared.
+
+A budget of 0 is NOT a failing-direction test here, because the cursor lands
+in the same place often enough that a clean run really does read 0; `-1` is,
+and that is what proves the check can fail.
+
+**A PROBE INSIDE THE FRAME LOOP IS MEASURING THE COMPILER UNLESS IT IS
+`volatile`, AND I MADE THIS MISTAKE TWICE IN ONE SESSION BEFORE CHECKING.**
+Chasing a report that the standalone port would not move Sarge, a probe in
+WinMain's `for (;;)` read `ADDR_GAME_CLOCK_MS` and reported it frozen at 100
+forever -- which reads as the whole answer, since nothing that depends on
+elapsed time can run. A second probe read `ADDR_MENU_MODE` and reported the
+sub-state stuck at 24, an in-mission dialog arm rather than play. Both were
+plain `*(uint32_t *)(uintptr_t)ADDR_X` reads; neither address is written by
+anything the compiler can see from that loop, so GCC hoisted the load out and
+re-reported one stale value. With `volatile` the clock climbs normally and
+the sub-state reaches 33.
+
+The tell was available and ignored: `FrameClockStep`'s own probe showed the
+clock at 19,462 ms in the same run the loop probe called it 100. Two
+measurements of one global disagreeing means one of the measurements is
+wrong, and the one to suspect is the one in the hot loop.
+
+**AND THE CONTROL SETTLED IT WHERE FOUR PROBES DID NOT.** Running the SAME
+drive and the SAME measurements against the injected build gave submode 33
+against 33, pause 0 against 0, a clock advancing on both, 104 pixels against
+117 for a held arrow key, and 248 against 0 for a click-to-move. Holding a
+key does not scroll in the ORIGINAL under this environment either. So there
+was no divergence to find, and every hour after the first probe was spent
+looking for one. This file already says to give the control as many samples
+as the thing it is controlling for; the corollary is that a bug report about
+a port needs the ORIGINAL measured the same way FIRST, before anything is
+instrumented.
+
+**A PROBE THAT REDEFINES THE FUNCTION'S NAME ALSO REDEFINES ITS PATCH.** The
+trick that works for a blind counter -- `#define Fn ((FnType)(uintptr_t)ADDR_FN)`
+so the caller goes through the detour -- rewrites the `patch_replace(ADDR_FN,
+(const void *)Fn, ...)` line too, so the address is patched to jump to itself.
+The counter then reads whatever the corrupted stub leaves in the slot: 752
+million, then two billion ten seconds later, which is not a call count of
+anything. Reverted, and the reading stands on the disassembly instead.
+
+The version that worked on `ApplyObjFrame` put the macro in the CALLER'S file,
+where there is no `patch_replace` to catch. **Put the probe macro where the
+call is, never where the install is** -- and treat an implausible counter as a
+broken probe before treating it as a result.
+
+**AN ARGUMENT ORDER IN `orig.h` IS A GUESS UNTIL SOMETHING READS THE
+PROLOGUE, and one of them propagated into a reconstruction and stayed wrong.**
+`ADDR_ENTER_VEHICLE` carried `/* void(vehicle, unit) */`; the unit is first.
+The reconstruction was written from that comment and then written CONSISTENTLY
+with it, so the seat check ran on the unit and the boarding uid went into the
+vehicle -- every field access on the other object, with nothing inside the
+function looking wrong and nothing for the compiler to say.
+
+Two instructions settle it and neither is subtle: `mov edi, [esp+0xC]` before
+the second push is the SECOND argument and carries VEHICLE_OFF_SEATS,
+VEHICLE_OFF_PTR_LIST and the army the broadcast is gated on; `mov esi,
+[esp+0xC]` one push later is the FIRST and carries OBJ_OFF_RIDING,
+OBJ_OFF_SARGE and the DestroyByType at the end.
+
+It was found by reading a CALLER for something else entirely, and confirmed by
+a second caller that reads OBJ_OFF_SOLDIER_KIND off the argument it passes
+first. **When a prototype in `orig.h` names two arguments of similar type, it
+is a guess unless its comment says which instruction fixed it** -- and a
+reconstruction that inherits the guess cannot detect it from the inside.
+`checkoffsetuse` cannot see it either: the offsets are all still there, just
+on the wrong pointer. The sibling `BoardVehicle` was checked the same way and
+is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
+
+**Name a function from its body, not from one call site.** Two instances now,
+  and the second was still sitting in `orig.h` months after the first was
+  written up. `0x0042C0E0` went in as `ADDR_ON_MAP_RESTORED` because
+  `RestoreLostSurfaces` tail-calls it; its own error strings say
+  `RestoreTileSet`, and it reloads the tileset from a `.atl` file. Renamed.
+  `0x0041AD30` went
+  in as `AttachPalette` because that is what it looked like where
+  `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
+  the wrong name survived a commit. Reading the callee costs a minute;
+  a wrong name in `orig.h` propagates into every module that picks it up.
+- **94% OF THE CARRIED BLOB IS ZERO-FILL, and emitting it cost 1.84 MB of the
+binary.** The standalone places the original's `.rdata` and `.data` at the
+addresses their own pointers were written for, spanning 0x0046F000..0x00666000
+-- 1.96 MB. Measured: only 73,772 bytes of it are non-zero and the last one is
+at 0x0048D8D3, because MSVC folds `.bss` into `.data` and the original's file
+never contained those bytes either.
+
+So the span is split at the next page, 0x0048E000: `.origdat` keeps the
+initialised head and an ALLOC-only `.origbss` covers the rest, which the
+loader zeroes. `build/ArmyMen2.exe` went from 6,102,591 bytes to 4,169,345,
+and the split address is written by `mkglobals.py` into a file the link line
+reads, so the section start and the split cannot disagree.
+
+**`.origgap` is NOT eligible and the contrast is the point.** Its content must
+be 0xCC, because zeros there decode as `add [eax], al` and SLIDE -- a call to
+a missing seam then faults at an address unrelated to the call, which is how a
+missing `free` reported itself at a value appearing nowhere in the binary. A
+region of zeros and a region that is uninitialised are the same thing only
+when nothing executes it.
+
+The evidence it is behaviour-free is `samission.sh`: the object tables live
+ABOVE the split, at 0x0065xxxx, and 1,610 objects come back identical -- so
+the region is demonstrably both writable and zeroed. The pixels and the log
+could not have shown that; only the artifact that reads those addresses does.
+
+**`tools/checkgap.py` guards the standalone's own version of that failure.**
+The standalone does not carry the original's `.text`; that range is int3, so
+a reference into it is not a link error and not a crash at the call site --
+it is whatever the filler means. `c_dfDIMouse` is how this was found: the
+DIDATAFORMAT struct is in `.rdata` and IS carried, its `rgodf` array is at
+`0x004643A0` and is NOT, and the game reported "DDERROR 80070057:
+SetDataFormat (mouse)" -- a plausible DirectInput failure with nothing in it
+about a missing byte range. A missing `free` seam did worse and faulted at an
+address that appears nowhere in the binary.
+
+So: any `ADDR_` macro `src/game` DEREFERENCES whose address is in the gap
+must be redefined under `AM2_STANDALONE`. It is **37 of 37** today, all of
+them the statically linked MSVC CRT plus the stubbed logger -- which is
+exactly the set the port points at the real C library. Tested by removing one
+definition, which names it and its use site.
+
+It skips `patch_replace` targets, since installing a patch in the standalone
+is a no-op and the address is never reached; and it resolves macros rather
+than dataflow, so a seam reached through a variable is invisible, the same
+blind spot `checkseams.py` records.
+
+**And it disproved a hypothesis cheaply, which is most of what it is for.**
+Movement not working in the standalone looked like a missing input seam --
+the mouse data format had already been exactly that. One run said 37 of 37
+were covered, so it is not a gap read, and no time was spent reading the
+input path again.
+
+**`tools/checkhooks.py` guards the one failure that no A/B can see.** It
+  reads the IAT slot `src/inject/dinput_hook.c` patches, resolves which symbol
+  that is from the game's own import directory, and fails if `am2hook.dll`
+  imports it. Tested by pointing the hook at `PostMessageA`, which the harness
+  does import: it reports the clash and exits 1.
+
+  Worth having because the failure mode is invisible. Both sides of an A/B
+  would be equally undriven, so the logs and the pixels would agree perfectly
+  while every scripted click went nowhere.
+
+- **A reconstruction can break the harness rather than the game.**
+  `src/inject/dinput_hook.c` works by patching the game's IAT slot for
+  `DirectInputCreateA`. A reconstructed `InitInput` that imported the symbol
+  into `am2hook.dll` would resolve through *our* IAT, walk straight past the
+  hook and silently disable all injected input — the game would still run and
+  look perfectly healthy. `src/game/win32/device.cpp` calls the game's own import
+  thunks (`0x00463396`, `0x00464410`) instead, which read the patched slot at
+  call time. Check for a harness hook before reconstructing anything that calls
+  an import.
+- **Not every reconstruction has to be a patch, and there are two now.**
+  `AudioTimerProc` (`0x0040D020`) is the second: `StartAudioStream` hands it to
+  `timeSetEvent`, that call is the address's only reference in the image, and
+  the call is ours — so a detour would install a jump nothing reaches. Both are
+  listed in `tools/coverage.py`'s `REGISTERED`, which `tools/merges.py` imports
+  rather than copying, because two lists of "what is done" is how they come to
+  disagree. The cost is that neither gets a trace counter, since the counters
+  *are* the patch stubs; verify those with a temporary probe.
+
+  `WndProc` is registered, not
+  detoured: the only reference to `0x0040A6B0` in the whole image is the
+  `WNDCLASS` field in `InitApplication`, and that is ours now. Look for this
+  shape before detouring anything reached through a function pointer — a
+  callback, a vtable, a dispatch table. It buys back the thing detouring costs,
+  which is the ability to defer.
+
+  That deferral has now been taken back: the six messages `WndProc` used to
+  forward to the original are reconstructed, so nothing in `winproc.cpp` calls
+  `0x0040A6B0` any more.
+
+  **AND SWEEP BOTH ENDS, because a sweep from one misses what the other has.**
+  The six names below came from the RECEIVER's switch and are complete for
+  what `WndProc` handles -- which is exactly why `0x0468` was not among them.
+  `CommSystemMessage` posts it after a player joins, it is the only site in
+  the image that does, and nothing handles it at all: `DefWindowProc` eats it.
+  A message with a sender and no receiver is invisible to a sweep of either
+  end alone.
+
+  **Name a window message from what POSTS it.** Decoding forward from each
+  `push <msg>` to the `PostMessageA` that follows gives every sender, and it
+  also removes two candidates that a bare constant scan reports: `InitInput`'s
+  `push 0x500` is DirectInput's *version number* on its way to `0x00464410`,
+  and six `push 0x464` sites are arguments to a CRT call. The senders are
+  `PacketThreadProc` for `0x0464` and `0x046B`; `0x00410090`
+  ("DestroyPlayer Id=%x"), `0x00411C20` ("TIMING OUT PLAYER") and `CommSend`
+  for `0x046C`; `0x00410090` again for `0x046D`; the ready/end-setup handshake
+  for `0x046E`; and `AudioTimerProc` for `0x0500`.
+
+  That last one settles something the old names hid: **`0x0500` is not comm
+  traffic at all.** It shared a case label with the other five only because
+  `WndProc` forwarded them together. The constants are now
+  `AM2_WM_PACKETS_READY`, `AM2_WM_NO_BUFFERS`, `AM2_WM_PLAYER_GONE`,
+  `AM2_WM_HOST_CHANGED`, `AM2_WM_SETUP_DONE` and `AM2_WM_STREAM_DONE`.
+
+  **Only `0x0500` can be exercised here**, and `AudioTimerProc` posting it means
+  it runs in every session: `StopAudioStream` still reads 2 through a Boot Camp
+  briefing, which with the forward gone can only have come through our handler.
+  The other five need a live DirectPlay session with a second player, so they
+  are verified by reading — weaker than the rest of the tree, and worth saying
+  plainly.
+
+  `g_charHandler` is NOT the same kind of thing. It is a slot, not a function:
+  the menu's text fields write their own consumer into `0x005125B8` and
+  `WndProc` just calls whatever is there. Porting "it" meant porting the
+  text-field system, and this entry said so as a reason to leave it alone.
+
+  **The text-field system is ours now**, so the argument expired rather than
+  being overturned: the edit box, its focus method and `EditCharHandler`
+  (`0x0044D520`) are all reconstructed, and `EditTakeFocus` installs the
+  handler by NAME. The slot still holds whatever the field put there — what
+  changed is who wrote it. `0x00417790` and `0x00418480` are the two
+  still-original fields that are not the menu's.
+- **`-w` is windowed mode**, global `0x00507344`, and it gates far more than it
+  looks: the window border and repositioning, the palettized primary in
+  `InitDirectDraw`, and `CalibratePalette`. Anything that reads 0 under the
+  default fullscreen run may simply be behind it. The other switches are in
+  `orig.h`; three are developer names, and `-rob` is the flag that was already
+  known as `ADDR_DEBUG_ITEMLIST`.
+- **What no drive reaches, and what windowed mode looks like today, is in
+  STATUS.md.** Both are state rather than policy: windowed mode paints now
+  where it used to stay black, so "it is black" can no longer be quoted as the
+  reason a windowed comparison is trivially exact; both DirectDraw `Restore`
+  paths are still untested, and `LockSurface`'s is a real defect in the
+  ORIGINAL kept as-is deliberately; and no configuration reaches combat, which
+  `docs/combat.md` covers.
+- **What no drive reaches, and what checks it anyway, is `docs/oracles.md`.**
+  Thirty-one of the thirty-two unexercised functions are checked by ENUMERATING
+  ORACLES -- tools that build a corpus, run the original under Unicorn, and
+  compare -- because no configuration here provokes a fight, opens a DirectPlay
+  session or reaches an in-mission dialog. `tools/checkclaims.py` recomputes
+  that split from the tools, so it cannot go stale.
+
+  Four rules from it that apply to any new oracle:
+
+  - **A counter of 0 usually means nothing.** `tools/blindspots.py` says which
+    counters CAN move: of 1,640 traced functions, 54 mean what they say, 1,346
+    are blind because every caller is ours, and 240 are reached by address. Ask
+    it before reading a zero as evidence, and note it gets worse as the
+    reconstruction gets better.
+  - **A corpus derived from the model under test cannot fail against it.** Four
+    instances now. The tell is that the CASE COUNT moves under a mutation
+    rather than the verdict -- a mutation that shrinks the corpus reads exactly
+    like one that was absorbed.
+  - **Ask what a function's output actually IS before comparing anything.**
+    Several of these answer the same value on every path and do their work by
+    WRITING a field, so an oracle comparing `eax` would pass with the body
+    deleted. Seed the slot with a sentinel, so "wrote nothing" is
+    distinguishable from "wrote zero".
+  - **Say which of a tool's gaps are gaps and which are THEOREMS.** Three
+    mutations here provably cannot be caught by any corpus -- a continuous
+    piecewise ramp, a 16-bit tile index, an always-zero table bit -- and that
+    is a different statement from "not covered".
+- **Audio can be exercised without a sound device, and must be.** There is no
+  PipeWire or PulseAudio session here, so DirectSound will not start and every
+  audio function returns at its first line. That left the largest block of
+  reconstruction in the tree verified by reading alone — and the build, the
+  fingerprints and the A/B on all three configurations all pass whether that
+  code is right or wrong.
+
+  ALSA's `null` plugin is built into libasound and needs no server at all:
+
+  ```
+  export ALSA_CONFIG_PATH=$PWD/tools/alsa/asoundrc AM2_DUMP_SOUND=1
+  AM2_DISPLAY=:99 tools/drive.sh start 25 "ARGS=-nointro -dbg"
+  tools/checkwaves.py
+  ```
+
+  DirectSound then starts, all 56 waves load, and `checkwaves.py` confirms the
+  bytes handed to each buffer are byte-for-byte the `.WAV`'s `data` chunk —
+  which exercises `WaveOpenFile`, `WaveReadFile`, `LoadWaveSound` and
+  everything under them.
+
+  That config is deliberately self-contained rather than including
+  `/usr/share/alsa/alsa.conf`: that file pre-loads `alsa.conf.d`, where
+  `99-pipewire-default` re-points `default` at PipeWire through a hook that
+  runs after anything a later override says. The only symptom is "Host is
+  down".
+
+  It earned its keep immediately: `LoadWaveSound` was leaving the
+  `DSBUFFERDESC` with no format and no length, so every `CreateSoundBuffer` in
+  the game failed. The reader writes both fields straight into that structure,
+  which is why the original only assigns `dwSize` and `dwFlags` by hand.
+
+  A mission, not just the title screen, is what exercises the rest. Clicking
+  BOOT CAMP and then pressing `RETURN` at the briefing gives, over one run:
+
+  | function | calls |
+  |---|---:|
+  | `WaveReadFile` | 498 |
+  | `Update3DAudioVolumes` | 121 |
+  | `PlaySoundAt` | 35 |
+  | `WaveOpenFile`, `StartAudioStream`, `SetStreamVolume`, `RefillAudioBuffer` | 2 each |
+  | `InitDirectSound`, `InitWaveSounds`, `FillSoundBuffer` | 1 each |
+
+  `tools/ab.sh audio` drives that same sequence, so all of it is compared
+  against the original and not merely run.
+
+  `FreeDynamicSounds`, `FreeSound` (56 calls) and `ReleaseSoundBuffers` came
+  off this list once `tools/ab.sh quit` existed.
+
+  **`WaveCloseReadFile` was never cold — it was the count-of-0 blind spot.**
+  `StopAudioStream` is ours and calls it directly, so the counter cannot move.
+  A probe shows it running once with a real `HMMIO`. It should not have been on
+  this list at all, and the lesson is the one already written above: resolve a
+  zero with a probe rather than adding it to a list of things to try harder at.
+
+  `StopNamedSound` and `StopAllSounds` are genuinely unexecuted, and the
+  mechanism is now mapped rather than guessed at. `RunFrame` dispatches on the
+  state at `ADDR_GAME_STATE` through a table; state 2's handler jumps to the
+  level teardown **only when `ADDR_STATE_PENDING` is set**, and that flag is
+  raised by `ADDR_REQUEST_STATE` and lowered by `ADDR_COMMIT_STATE`.
+
+  So the teardown runs when a state change is requested while the game is
+  *already* in state 2 — on LEAVING a level. Entering Boot Camp is a transition
+  into the state and does not trigger it, which is why driving the whole
+  title → briefing → mission path leaves both counters at 0; measured, not
+  assumed. Quitting from the title screen cannot reach it either.
+
+  The state machine is confirmed rather than inferred: a probe in
+  `PollKeyboard`, which runs every frame, shows `0` at startup, `1` on the
+  menu and `2` in a Boot Camp mission.
+
+  **`ADDR_LEVEL_TEARDOWN` named the wrong function**, which is why the mechanism
+  read as murkier than it is. `0x004260C0` is the state-2 handler — RunFrame's
+  jump table at `0x0040B050` dispatches to it every frame of a mission — and it
+  tail-jumps to the real teardown at `0x004256F0` when the pending flag is set.
+  That one calls `StopAllSounds`. The names are now `ADDR_STATE2_FRAME` and
+  `ADDR_LEVEL_TEARDOWN` respectively. Third instance of naming a function from
+  a call site rather than its body; the giveaway was already in the file, where
+  a comment called it "the state-2 handler at `ADDR_LEVEL_TEARDOWN`".
+
+  The in-game trigger is a **menu request**. `0x00425EE0` consumes the
+  `ADDR_MENU_REQUEST` / `ADDR_MENU_REQUEST_SET` pair — the same two globals
+  `StartSelectedGame` and `HostBattle` write — and raises the state-pending
+  flag. So the chain is: menu request while in state 2 → pending flag → the
+  state-2 handler jumps to the teardown → `StopAllSounds`.
+
+  **`StopAllSounds` has now been executed, and the chain above is confirmed by
+  running it rather than by reading.** A temporary `poke` command in the control
+  socket set `ADDR_MENU_REQUEST`/`ADDR_MENU_REQUEST_SET` during a live Boot Camp
+  mission — exactly what the ESCAPE handler writes — and the counter went 0 to
+  1, `FreeMapSurfaces` with it, while the game returned cleanly to the title
+  with `StartAudioStream("title.wav")` and `CommDropDirectPlay` in the log. So
+  the whole path holds: menu request raised while in state 2 →
+  `ADDR_TAKE_MENU_REQUEST` consumes it → `ADDR_STATE_PENDING` →
+  `ADDR_STATE2_FRAME` tail-jumps to `ADDR_LEVEL_TEARDOWN` → `StopAllSounds`.
+
+  Poking `ADDR_STATE_PENDING` directly also works and is the cruder version of
+  the same thing; prefer the menu-request form, since that is the route the
+  game itself takes and it exercises `TakeMenuRequest` too.
+
+  Two readings from the same session, both measured. The in-mission sub-state
+  `ADDR_MENU_MODE` reads **33** throughout Boot Camp play, which is
+  why the ESCAPE arm — number 34 — never runs. And `ADDR_STATE_WANTED` really
+  does sit at -1 while nothing is pending, as `orig.h` claims.
+
+  **`StopNamedSound` is still unexecuted, and the reason is now the LEVEL
+  RECORD rather than a mystery.** Its only call site is `0x00424DC3`, guarded
+  by the name buffer at `0x00511D58` being non-empty -- and that buffer is
+  filled by `SelectLevel` (`0x0043ED50`) from the chosen level's record, field
+  +0x288. Boot Camp's record leaves it empty, so nothing is ever named to be
+  stopped. A level that names one would reach the call. That buffer stays
+  all-zero for an entire Boot Camp mission — polled repeatedly — so nothing is ever named to be stopped.
+  Forcing a name into it does not help either: the counter stays at 0 through
+  90,000 further frames, so the code path holding that call is not reached in
+  this mission at all. Note `tools/merges.py` does NOT split the entry at
+  `0x00424CA0`, which really is several functions — the call sits past a `ret`
+  at `0x00424CD3` — so attributing that site by entry gives the wrong caller.
+  A reminder that the split list is a lower bound, exactly as its docstring
+  says.
+
+- **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
+  Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
+  branch, and that function's single caller at `0x0042EE78` passes a literal
+  `0`. So the branch is dead and so is everything behind it — including the
+  `InitializeConnection` in the same branch. The transport is actually brought
+  up by `CommInitializeConnection` from `StartSelectedGame`.
+
+  Worth checking for before spending time trying to exercise something: a
+  function can be reachable, called from live code, and still never run because
+  the argument that gates it is a constant at the one call site.
+- **The script family confirms the count-of-0 blind spot rather than
+  contradicting it.** A Boot Camp run reads `ScriptNextToken` 101 and
+  `ScriptResetTokens` 1, while `ScriptLookupToken`, `ScriptAddToken`,
+  `ScriptGrowTokens`, `ScriptParseNumber`, `IsBlank` and `IsScriptDelim` all
+  read 0 -- our `NextToken` calls them directly and never crosses a patched
+  entry. The same run gives `FirstItem` 363 and `NextItem` 584,067, and
+  363 x 1,609 is 584,067 exactly, so the registry invariant holds with the
+  tokeniser in place. `tools/ab.sh mission` is clean on the same build.
+- **The statement layer is complete**: `ReadScript` and all five handlers are
+  reconstructed. It dispatches on exactly six ids, the same set
+  `ScriptIsStatementStart` answers yes for -- `preloadsprite` (25), `pad` (26),
+  `if` (44), `variable` (133), and `object` (139) and `objclass` (140) sharing
+  `GenerateObjScriptFromTokens`, which is a real source name recovered from
+  that function's own error string.
+
+  **NOTHING BELOW A STATEMENT IS STILL ORIGINAL, and this paragraph said
+  otherwise for a long time.** It listed the event parser (`0x0043FF90`), the
+  event-list parser (`0x00440600`), the testvar value parser (`0x00443010`),
+  the 8,608-byte action parser (`0x00440D70`) and ScriptRunLine
+  (`0x00444C40`) as reached by address. All five are reconstructed --
+  checked against the patch list, not assumed from the total -- and the
+  parenthetical "now reconstructed" against just one of them is the tell: a
+  list corrected in place, one entry at a time, until only the sentence
+  around it was wrong.
+
+  **The handler A/B has better evidence than a log match.** `ReadScript` prints
+  four totals that count exactly what the handlers produce -- Boot Camp
+  `lines: 101  tokens: 372  names: 43  compounds: 16` and campaign
+  `lines: 1225  tokens: 2895  names: 316  compounds: 91`. `names` counts what
+  `variable`, `pad` and `object` declared; `compounds` counts the `if`
+  statements that parsed. Four independent numbers agreeing on both sides is
+  worth more than "the log is identical".
+- **The object types are `docs/objects.md`** -- seven of the eight identified,
+  none of them guessed. Two rules from settling them:
+
+  **Reach for `LoadTypeN` when a type is unidentified.** The per-type savegame
+  loader is where a type's constants all appear at once -- the box, the row
+  spec, the anim table and the def record -- which is how the missile and the
+  roach were settled.
+
+  **A shared teardown arm names nothing.** Four types share one `FreeItem` arm
+  and three of the four were identified from elsewhere, which is the same rule
+  as "a `free` is the weakest possible toucher", one level up.
+
+  Worth noting HOW type 2 stayed open: nothing was missing. `DestroyTrooper`
+  had been named from its own log string and `FreeItem`'s switch had been
+  reconstructed with all its arms, and this list went on saying unidentified
+  because nobody put the switch beside the question. **Before recording
+  something as unknown, grep the tree for what already answers it.**

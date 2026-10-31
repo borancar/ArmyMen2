@@ -36,7 +36,7 @@ GAMEDIR    = $(PREFIX)/drive_c/GOG Games/Army Men II
 GAMEEXE   := C:\\GOG Games\\Army Men II\\ArmyMen2.exe
 # PORT=1's two paths. The install is named for AM2_GAMEDIR rather than chdir'd
 # into, and the exe is reached through Z: so no copy into the game folder is
-# needed -- see STATUS.md.
+# needed -- see docs/status-history.md (`AM2_GAMEDIR`).
 GAMEDIRWIN := C:\\GOG Games\\Army Men II
 PORTEXEWIN := Z:$(subst /,\\,$(CURDIR))\\build\\ArmyMen2.exe
 LAUNCHEXE := C:\\GOG Games\\Army Men II\\launcher.exe
@@ -123,6 +123,11 @@ HOOK_DEP := $(HOOK_OBJ:.o=.d)
 LAUNCH_SRC := src/inject/launcher.c
 
 .PHONY: all clean run run-stock install-hook
+
+# A bare `make` builds the native Linux port (`native`, further down) -- the
+# product. `all` is the injected harness (am2hook.dll + launcher.exe) that
+# `make run` launches into the original EXE under Wine.
+.DEFAULT_GOAL := native
 
 all: $(BUILD)/am2hook.dll $(BUILD)/launcher.exe
 

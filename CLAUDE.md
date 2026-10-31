@@ -223,7 +223,9 @@ which is why the list is empirical rather than aspirational.
    compile. `g++ ... -c -o /tmp/x.o src/game/foo.cpp` outside the build tree
    answers in a second without disturbing a running suite.
 
-1. **`make`.** The compiler finds name collisions -- three in one session, twice
+1. **`make` and `make all`.** A bare `make` is the native port (the default
+   target); `make all` is the injected harness, the only build that compiles
+   `src/inject`'s C (`selfcheck.c` among it) -- read both. The compiler finds name collisions -- three in one session, twice
    because the obvious name for a table was already on a different table -- and
    linkage mismatches, which go BOTH ways: `mapdraw.h` closes its `extern "C"`
    at line 129 and declares `ShakeAt` at 158, so a stub for it must NOT be

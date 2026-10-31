@@ -7,7 +7,7 @@ and agree about ignoring it.
 The first was `StepType2`'s player arm, gated on `cmp [0x5122c8], esi; jne` at
 0x0044B9B0 -- is the FOLLOWED OBJECT THIS ONE -- transcribed as a test for null.
 The second was `UpdateTrooperAction`'s route test, which sent a CLEAR step to
-the stop arms; see `STATUS.md` for that one, which is the jerkstep Boran
+the stop arms; see `docs/status-history.md` for that one, which is the jerkstep Boran
 reported.
 
 `tools/movecheck.sh` is the configuration that catches this class, and it is the

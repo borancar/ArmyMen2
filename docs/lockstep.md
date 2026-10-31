@@ -300,4 +300,4 @@ real reconstruction divergence, not a pointer tie-break: one item's
 `OBJ_OFF_HEIGHT_SET` reads 50 against 0, which halves its depth layer.
 The heap trace's whole value is that it takes the heap OFF the table of
 suspects -- when it comes back clean, the difference is above it, and the
-depth trace (`AM2_TRACE_DEPTH`) reads the field out. Open in STATUS.md.
+depth trace (`AM2_TRACE_DEPTH`) reads the field out. Recorded in docs/status-history.md.
