@@ -1,0 +1,11 @@
+libsmacker 1.2.0, vendored unmodified.
+
+  upstream  https://github.com/greg-kennedy/libsmacker
+  commit    76094fb9c8e98bd5fac982c504e8d9aeff3ece01 (master, 2026-02-22)
+  site      https://libsmacker.sourceforge.net
+  license   LGPL 2.1 or later (COPYING)
+
+Only the library is kept: smacker.c, smacker.h, smk_malloc.h, plus README and
+COPYING. The sample drivers, build files and project files are left out. It is
+linked into the native port alone (src/platform/smackw32.cpp); the hybrid keeps
+smackw32's inert stubs.

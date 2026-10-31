@@ -122,14 +122,16 @@ BOOL WINAPI QueryPerformanceFrequency(LARGE_INTEGER *out)
 
 /* The original's IAT is carried in .origdat and bound at startup by the
  * generated am2_bind_imports, which asks for each entry by module and name.
- * Five sites in src/game then call through those slots -- GetTickCount
- * from the AI and comm timers, IntersectRect from the row layer, and the
- * Smacker entry points from movie.cpp -- so the answers have to be real
- * functions with the right convention.
+ * Sites in src/game then call through those slots -- GetTickCount from the
+ * AI and comm timers, IntersectRect from the row layer -- so the answers have
+ * to be real functions with the right convention.
  *
  * A name in a module we emulate that is not in the table gets a trap that
  * says which name it was, once, and answers 0. Most of the kernel32 list is
- * the MSVC CRT's own imports, which nothing in this tree calls. */
+ * the MSVC CRT's own imports, which nothing in this tree calls. smackw32 is
+ * all traps: the native port's movie.cpp calls its own smackw32 (src/game/
+ * win32/smackw32.cpp, over libsmacker) by name, and the hybrid's original
+ * code gets 0 from SmackOpen and so skips every film, as it always has here. */
 
 static const char *am2_missing_names[64];
 static int32_t     am2_missing_count;
@@ -227,15 +229,6 @@ static const AM2_Export am2_exports[] = {
     X("WINMM.dll", mmioGetInfo), X("WINMM.dll", mmioClose), X("WINMM.dll", mmioSetInfo),
     X("WINMM.dll", mmioSeek), X("WINMM.dll", mmioOpenA), X("WINMM.dll", mmioAscend),
     X("ole32.dll", CoInitialize), X("ole32.dll", CoCreateInstance),
-    { "smackw32.dll", "_SmackOpen@12", (const void *)&SmackOpen },
-    { "smackw32.dll", "_SmackClose@4", (const void *)&SmackClose },
-    { "smackw32.dll", "_SmackDoFrame@4", (const void *)&SmackDoFrame },
-    { "smackw32.dll", "_SmackNextFrame@4", (const void *)&SmackNextFrame },
-    { "smackw32.dll", "_SmackWait@4", (const void *)&SmackWait },
-    { "smackw32.dll", "_SmackSoundUseDirectSound@4", (const void *)&SmackSoundUseDirectSound },
-    { "smackw32.dll", "_SmackDDSurfaceType@4", (const void *)&SmackDDSurfaceType },
-    { "smackw32.dll", "_SmackToBuffer@28", (const void *)&SmackToBuffer },
-    { "smackw32.dll", "_SmackVolumePan@16", (const void *)&SmackVolumePan },
 };
 #undef X
 

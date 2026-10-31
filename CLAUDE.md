@@ -103,7 +103,7 @@ split the same way rather than along a line of our choosing, with
 `scriptint.h` as the private surface between them. Where the original's own
 division is visible, use it.
 
-`src/game/win32/` holds every module that talks to Win32 or DirectX -- **16**
+`src/game/win32/` holds every module that talks to Win32 or DirectX -- **17**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
 API at all, and there are **35**; the split is the answer to "what still talks
 to the outside world" in directory form.

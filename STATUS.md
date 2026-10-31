@@ -30,7 +30,10 @@ Last updated: **2026-10-31**.
   `AM2_GAMEDIR=".wine/drive_c/GOG Games/Army Men II" build/armymen2 -nointro`.
   Needs `glibc-devel.i686`, `libstdc++-devel.i686`, `SDL3-devel.i686`. Builds
   from committed sources alone; the generated inputs are refreshed by
-  `make standalone-generate`, which needs the image.
+  `make standalone-generate`, which needs the image. The films play through
+  libsmacker (`third_party/libsmacker`, LGPL 2.1, pinned upstream commit in its
+  `UPSTREAM`) behind `src/game/win32/smackw32.cpp`, RAD's API adapted to it;
+  only the native build links it.
 - **`make hybrid`**: `build/armymen2-hybrid(-dev)`, the ORIGINAL `ArmyMen2.exe`
   loaded by our own PE loader over the same `src/platform/`, no Wine. It is the
   oracle every comparison here is made against.
@@ -152,6 +155,23 @@ the history. The hybrid replaced it as the reference.
   since. The `vc6-link` comment in the `Makefile` still describes the older
   state, a fault in SetGamePalette.
 - **`make standalone`'s link failure** (above).
+- **Films differ between hybrid and port by design.** The port plays them; the
+  hybrid's `smackw32` imports are the platform's missing-import trap, so its
+  `SmackOpen` answers 0 and the original skips every film. A side-by-side over
+  a film (the intro without `-nointro`, a campaign cutscene) traps there; the
+  recorded sessions do not reach one (bootcamp identical, 2026-10-31).
+- **Films use the Windows static colours for the reserved palette entries.**
+  The adapter's `SmackDDSurfaceType` answers 0, so the game copies film palette
+  entries 10-245 only (`MovieApplyPalette`) and takes the other twenty from its
+  snapshot of GDI's system palette. That palette is now its own in
+  `src/platform/gdi32.cpp`, as on Windows under `SYSPAL_STATIC`: the twenty
+  statics, fixed, with `RealizePalette` filling only 10-245 and the
+  exclusive-mode DirectDraw palette replacing the screen's, not GDI's. Before
+  that the snapshot took the game's RGB 3-3-2 cube and the 3DO logo's greys on
+  entry 7 came out as blue speckles. What the real, packed `smackw32.dll` does
+  is still unread.
+- **Film audio is untested by ear.** It plays through a buffer on the game's
+  DirectSound object; every run here used SDL's dummy audio driver.
 - **Multiplayer is unexercised** on every build: nothing here opens a DirectPlay
   session, so the comm layer is verified by reading and by oracles only.
 - **`make native` warnings, 7 distinct, all understood**: five

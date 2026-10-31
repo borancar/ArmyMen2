@@ -524,11 +524,16 @@ NATIVE_CXX   := g++
 NATIVE_CC    := gcc
 NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp) \
                 src/standalone/noinput.cpp src/standalone/devtools.cpp
+# libsmacker (third_party/libsmacker, LGPL 2.1) decodes the films for the
+# native port's smackw32 (src/game/win32/smackw32.cpp); no other build links it.
+SMACKER_CSRC := third_party/libsmacker/smacker.c
 NATIVE_OBJ   := $(patsubst %.cpp,$(BUILD)/native/%.o,$(NATIVE_SRC)) \
+                $(patsubst %.c,$(BUILD)/native/%.o,$(SMACKER_CSRC)) \
                 $(BUILD)/native/origchunks.o $(BUILD)/native/origgap.o
 DEV_CSRC     := $(SA_CSRC)
 DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(DEV_CSRC)) \
+                $(patsubst %.c,$(BUILD)/native-dev/%.o,$(SMACKER_CSRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(LUA_CSRC)) \
                 $(BUILD)/native-dev/origchunks.o $(BUILD)/native-dev/origgap.o
 NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE \
