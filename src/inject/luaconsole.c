@@ -102,10 +102,11 @@ static int l_call(lua_State *L)
  * dlsym; extern-"C" names (CheatLine, ...) resolve, C++-mangled ones do not. */
 static int l_sym(lua_State *L)
 {
-    const char *name = luaL_checkstring(L, 1);
-    void       *p    = 0;
+    void *p = 0;
 #ifndef _WIN32
-    p = dlsym(RTLD_DEFAULT, name);
+    p = dlsym(RTLD_DEFAULT, luaL_checkstring(L, 1));
+#else
+    luaL_checkstring(L, 1);
 #endif
     lua_pushinteger(L, (lua_Integer)(uint32_t)(uintptr_t)p);
     return 1;

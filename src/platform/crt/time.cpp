@@ -42,13 +42,17 @@ extern "C" const int32_t am2_crt_days[13] = {
  * initial bytes still equal the image and are byte-checked. Grouped as arrays
  * (each holds a non-zero element) so the compiler keeps them in .data -- an
  * all-zero scalar would land in .bss and fall out of the placement flow. */
-extern "C" int32_t am2_crt_tz_state[3] = { 28800, 1, -3600 };  /* timezone, daylight, dstbias */
-extern "C" int32_t am2_crt_dst_start[3] = { -1, 0, 0 };        /* year, yday, ms */
-extern "C" int32_t am2_crt_dst_end[3] = { -1, 0, 0 };
+extern "C" {
+int32_t am2_crt_tz_state[3] = { 28800, 1, -3600 };  /* timezone, daylight, dstbias */
+int32_t am2_crt_dst_start[3] = { -1, 0, 0 };        /* year, yday, ms */
+int32_t am2_crt_dst_end[3] = { -1, 0, 0 };
+}
 /* The _tzname[2] array at 0x0048D48C: two char* into the placed origdat name
  * buffers (init "PST"/"PDT" at 0x0048D40C/0x0048D44C, which __tzset overwrites);
  * the raw pointers resolve because those buffers stay in the blob region. */
-extern "C" uint32_t am2_crt_tzname[2] = { 0x0048D40Cu, 0x0048D44Cu };
+extern "C" {
+uint32_t am2_crt_tzname[2] = { 0x0048D40Cu, 0x0048D44Cu };
+}
 #endif
 
 #define G32(addr)  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(addr)))

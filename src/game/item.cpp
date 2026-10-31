@@ -81,7 +81,8 @@ extern "C" const char *const am2_unit_name_sarge[1] = { "Sarge" };
  * NON-const: TakeSoldierName marks a name taken at runtime; the initial
  * taken is 0 and the names are literals, so the blob name strings drop. */
 /* AM2_SoldierName is in objtable.h. */
-extern "C" AM2_SoldierName am2_soldier_names[62] = {
+extern "C" {
+AM2_SoldierName am2_soldier_names[62] = {
     {"D. DuBois", 0}, {"R. Pavey", 0}, {"D. Lee", 0},
     {"D. Fruin", 0}, {"A. Muolic", 0}, {"J. Wildblood", 0},
     {"J. Bates", 0}, {"M. Bates", 0}, {"S. Ruggels", 0},
@@ -104,6 +105,7 @@ extern "C" AM2_SoldierName am2_soldier_names[62] = {
     {"Monty", 0}, {"D.R. Allgood", 0}, {"R. Gently", 0},
     {"Joe Flash", 0}, {"Razor Limb", 0},
 };
+}
 #endif
 #include "script.h"   /* AM2_Pad */
 #include "map.h"      /* TileOfPoint */
@@ -3074,6 +3076,10 @@ add:
 }
 #pragma GCC diagnostic pop
 
+/* The last tile index; BlockWeightChain's vacuous guard compares a 16-bit
+ * tile against it. Named so GCC does not warn that the guard cannot fire. */
+enum { kLastTile = 0xFFFF };
+
 /* 0x0045B690, two callers, 112 bytes. The sibling of BlockWeightAt above, and
  * the two differences are the whole of it.
  *
@@ -3127,7 +3133,7 @@ int32_t __cdecl BlockWeightChain(AM2_Object *from, AM2_Point at, AM2_Object *cha
 
     /* The original's guard, vacuous on a 16-bit tile; see above. */
     tile = (uint16_t)TileOfPoint(at);
-    if (tile <= (uint16_t)0xFFFF) {
+    if (tile <= kLastTile) {
         if (!(g_tileFlags[tile] & AM2_TILE_OPEN))
             total += AM2_BLOCK_FULL;
         return total;

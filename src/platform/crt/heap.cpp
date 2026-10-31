@@ -33,7 +33,9 @@
 /* The small-block-heap threshold at 0x0048CC74 (1016 = 0x3F8, the largest
  * request the SBH satisfies); runtime-written by the heap init, non-const,
  * initial byte-checked. */
-extern "C" uint32_t am2_crt_sbh_threshold = 1016;
+extern "C" {
+uint32_t am2_crt_sbh_threshold = 1016;
+}
 #endif
 
 #define G32(a)  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(a)))

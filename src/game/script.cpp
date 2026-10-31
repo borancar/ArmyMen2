@@ -2680,7 +2680,6 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                 return 0;
         } else
             act->n0 = -1;
-place:
         return ScriptLocation(ctx, at, act, 0) != 0;
     }
 #undef STEP
@@ -3244,7 +3243,6 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* ---- then ---- */
-then_word:
     if (!IS_WORD(AM2_TOK_THEN)) {
         am2_log("Line [%4d]:  Missing 'then' in if-statement.\n", ctx->tokens[*at].line);
         goto fail;

@@ -36,7 +36,9 @@
  * int32_t and const char* are both 4 bytes, so the int32* stride the reader
  * uses still lands one field per step. */
 /* __app_type at 0x0048CC54 (2 = GUI; __set_app_type writes it at startup). */
-extern "C" int32_t am2_crt_app_type = 2;
+extern "C" {
+int32_t am2_crt_app_type = 2;
+}
 /* The _fpinit and _exit function-pointer slots at 0x0048CC28 / 0x0048CC50, read
  * by crt_cinit and crt_exit_entry. The image holds _fpmath and _exit's own
  * addresses; mkglobals used to rewrite them to crt_fpmath / crt_exit_quick at

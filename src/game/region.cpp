@@ -1209,6 +1209,11 @@ static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
     }
 }
 
+/* AM2_PATH_TILES as an enumerator: FindPath compares the 16-bit toTile
+ * against it, a check that cannot fire, and GCC warns about that only
+ * against a bare literal. */
+enum { kPathTiles = AM2_PATH_TILES };
+
 /* FindPath -- original 0x004395B0, 1,808 bytes, one caller: PlanPathTo, which
  * treats a zero answer as "no route". A* over map tiles, and the survey in
  * orig.h is the thing to read first -- what follows assumes it.
@@ -1290,7 +1295,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     if (from <= 0
         || (fromTile = from & 0xFFFF) >= AM2_PATH_TILES
         || (uint16_t)to <= 0
-        || (toTile = to & 0xFFFF) >= AM2_PATH_TILES)
+        || (toTile = to & 0xFFFF) >= kPathTiles)
         return 0;
 
     startRegion = g_regionOfCell[from & 0xFFFF];
@@ -7399,6 +7404,17 @@ static inline void TrooperFaceTo(AM2_Object *o, const AM2_Point *to)
                                           AM2_FireSpot, void *))           \
                      (void (*)(void))FireWeapon)
 
+/* Facing values no object has: the facing is one byte. TrooperFire and
+ * UpdateTrooperAction test it against two of them at once -- never true --
+ * as number wins (docs/numberwins.md). Named so GCC does not warn that
+ * the byte cannot hold them; VC6 sees the same constants. */
+enum {
+    kNever2000 = 2000, kNever2001 = 2001, kNever4000 = 4000, kNever4001 = 4001,
+    kNever5100 = 5100, kNever5101 = 5101, kNever5102 = 5102, kNever5103 = 5103,
+    kNever5304 = 5304, kNever5305 = 5305, kNever5306 = 5306, kNever5307 = 5307,
+    kNever5308 = 5308, kNever5309 = 5309, kNever5310 = 5310, kNever5311 = 5311,
+};
+
 /* TrooperFire -- original 0x00449FD0, 976 bytes, two callers, both of them
  * StepType2's AI arms. It names itself in its own log line:
  * "FIRE  trooper: %x  weapon: %x  ammo: %d". Given a trooper, the weapon it
@@ -7569,8 +7585,8 @@ void __cdecl TrooperFire(AM2_Object *o, AM2_Object *held, AM2_SightOut *out)
     } else {
         const AM2_FireSpot *at = &out->spot;
 
-        if (at->at.x != 0 && ((ObjCodeUnmapped(w) && !(o->facing == 4000 && o->facing == 4001))
-                              || (o->facing == 2000 && o->facing == 2001))) {
+        if (at->at.x != 0 && ((ObjCodeUnmapped(w) && !(o->facing == kNever4000 && o->facing == kNever4001))
+                              || (o->facing == kNever2000 && o->facing == kNever2001))) {
             /* Turned to face it only when it is somewhere else: a point
              * we are standing on still gets fired at, unturned. The
              * image's PointsDiffer `je` lands on the jitter below, not on
@@ -7840,13 +7856,13 @@ sweep:
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;
-        } else if ((!found && !(o->facing == 5100 && o->facing == 5101)) || (o->facing == 5102 && o->facing == 5103)) {
+        } else if ((!found && !(o->facing == kNever5100 && o->facing == kNever5101)) || (o->facing == kNever5102 && o->facing == kNever5103)) {
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;
         } else if (g_mpSession
-                   && ((!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner) && !(o->facing == 5304 && o->facing == 5305)) || (o->facing == 5306 && o->facing == 5307))
-                   && ((ObjType2Field548(o) && !(o->facing == 5308 && o->facing == 5309)) || (o->facing == 5310 && o->facing == 5311))) {
+                   && ((!AM2_THE_COMM->CommMustBroadcast((int16_t)o->owner) && !(o->facing == kNever5304 && o->facing == kNever5305)) || (o->facing == kNever5306 && o->facing == kNever5307))
+                   && ((ObjType2Field548(o) && !(o->facing == kNever5308 && o->facing == kNever5309)) || (o->facing == kNever5310 && o->facing == kNever5311))) {
             out->state = 1;
             turned = 1;
             (*(AM2_SightOut *volatile *)&out)->bearing = facing;
